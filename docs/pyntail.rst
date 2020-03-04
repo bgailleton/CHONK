@@ -1,0 +1,4 @@
+pyntail
+=========================
+
+.. automodule:: pyntail
