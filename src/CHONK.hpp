@@ -1,6 +1,6 @@
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-#ifndef cppintail_HPP
-#define cppintail_HPP
+#ifndef CHONK_HPP
+#define CHONK_HPP
 
 // STL imports
 #include <iostream>
@@ -27,9 +27,22 @@
 
 class chonk
 {
+  public:
+    chonk() { create(); }
 
+  protected:
+    int current_id;
 
-
+  private:
+    void create();
 };
+
+
+// void compute_receivers_d8(std::vector<int>& receivers, std::vector<float>& dist2receivers, std::vector<float>& elevation, int nx, int ny, float dx, float dy);
+// void compute_donors(std::vector<int>& ndonors, std::vector<int>&  donors, std::vector<int>&  receivers, int nnodes);
+// int _add2stack(int inode, std::vector<int>& ndonors, std::vector<int>& donors, std::vector<int>& stack, int istack);
+// void compute_stack(std::vector<int>& stack, std::vector<int>& ndonors, std::vector<int>& donors, std::vector<int>& receivers, int& nnodes);
+
+
 
 #endif

@@ -46,6 +46,10 @@ PYBIND11_MODULE(pyntail, m)
 
     py::class_<cppintail>(m, "cppintail",py::dynamic_attr())
       .def(py::init<>())
+      .def(py::init([](float tXMIN, float tXMAX, float tYMIN, float tYMAX, float tXRES, float tYRES, int tNROWS, int tNCOLS, float tNODATAVALUE){return std::unique_ptr<cppintail>(new cppintail(tXMIN, tXMAX, tYMIN, tYMAX, tXRES, tYRES, tNROWS, tNCOLS, tNODATAVALUE)); }))
+      .def("compute_neighbors", &cppintail::compute_neighbors)
+      .def("find_nodes_with_no_donors", &cppintail::find_nodes_with_no_donors)
+      .def("get_flowdir", &cppintail::get_flowdir)
       
     ;
 }

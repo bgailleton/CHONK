@@ -29,14 +29,19 @@ class cppintail
   public:
   
     cppintail() { create(); }
+    cppintail(float tXMIN, float tXMAX, float tYMIN, float tYMAX, float tXRES, float tYRES, int tNROWS, int tNCOLS, float tNODATAVALUE) { create(tXMIN, tXMAX, tYMIN, tYMAX, tXRES, tYRES, tNROWS, tNCOLS, tNODATAVALUE); }
 
     void compute_neighbors(xt::pytensor<float,2>& DEM);
-
+    
+    void flowdir_to_receiver_indices(int nodeID, std::vector<int>& receiver_nodes);
     void flowdir_to_receiver_indices(int row, int col, std::vector<int>& receiver_rows, std::vector<int>& receiver_cols);
 
     void Initialise_MF_stacks(xt::pytensor<float,2>& DEM);
 
     void compute_DA_slope_exp( double slexponent, xt::pytensor<float,2>& DEM);
+
+    void find_nodes_with_no_donors( xt::pytensor<float,2>& DEM);
+
 
 
     // This function transform the linearised node indice to row/col
@@ -48,6 +53,11 @@ class cppintail
 
     inline int row_col_to_node(int& row, int& col){return row * NCOLS + col;};
     inline int row_col_to_node(size_t& row, size_t& col){return int(row * NCOLS + col);};
+
+
+    //Getter
+    std::vector<int> get_label_from_nodonode(){return label_from_nodonodes;};
+    xt::pytensor<int,2> get_flowdir(){return FLOWDIR;};
   
 
   protected:
@@ -77,6 +87,10 @@ class cppintail
 
     // Drainage Area
     xt::pytensor<float,2> Drainage_area;
+
+    // Node with no donor
+    std::vector<int> no_donor_nodes, label_from_nodonodes;
+    
 
     // MF stacks: to deal with multiple flow direction
     std::vector<int> MF_stack;

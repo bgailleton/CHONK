@@ -72,8 +72,8 @@ void cppintail::compute_neighbors(xt::pytensor<float,2>& DEM)
 
   // First processing the centre of the DEM
   // Avoiding the edgae to avoid having to test systematically if I am close to the edge
-  for(size_t i = 0; i < NROWS - 1; i++)
-  for(size_t j = 0; j < NCOLS - 1; j++)
+  for(size_t i = 1; i < NROWS - 1; i++)
+  for(size_t j = 1; j < NCOLS - 1; j++)
   {
     if(DEM(i,j) == NODATAVALUE)
       continue;
@@ -96,10 +96,11 @@ void cppintail::compute_neighbors(xt::pytensor<float,2>& DEM)
     if(DEM(i, j-1) < this_elevation)
       FLOWDIR(i,j) += 10000000;
   }
+  std::cout << "DEBUG::done with core flowdir" << std::endl;
 
   // WNow I am looping through the edges, I can add many tests as there are much less nodes
   // 🦆
-  for(size_t i = 0; i < NROWS - 1; i++)
+  for(size_t i = 0; i < NROWS ; i++)
   {
     // FIRST COLUMN
     size_t j = 0;
@@ -154,7 +155,7 @@ void cppintail::compute_neighbors(xt::pytensor<float,2>& DEM)
       FLOWDIR(i,j) += 10000000;
   }
 
-  for(size_t j = 0; j < NROWS - 1; j++)
+  for(size_t j = 1; j < NCOLS - 1; j++)
   {
 
     size_t i = 0;
@@ -162,6 +163,7 @@ void cppintail::compute_neighbors(xt::pytensor<float,2>& DEM)
     
     if(DEM(i,j) == NODATAVALUE)
       continue;
+
     if(j>0)
     {
       if(DEM(i+1, j-1) < this_elevation)
@@ -169,6 +171,7 @@ void cppintail::compute_neighbors(xt::pytensor<float,2>& DEM)
       if(DEM(i, j-1) < this_elevation)
         FLOWDIR(i,j) += 10000000;
     }
+
     if(j < NCOLS - 1)
     {
       if(DEM(i, j+1) < this_elevation)
@@ -203,6 +206,7 @@ void cppintail::compute_neighbors(xt::pytensor<float,2>& DEM)
       FLOWDIR(i,j) += 10;
 
   }
+  std::cout << "DEBUG::done with edge flowdir" << std::endl;
 
 }
 
@@ -210,6 +214,20 @@ void cppintail::compute_neighbors(xt::pytensor<float,2>& DEM)
 // This function converts flow direction to list of row-col of receivers
 // -> DEM: numpy array
 //-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#
+void cppintail::flowdir_to_receiver_indices(int nodeID, std::vector<int>& receiver_nodes)
+{
+  int row,col; this->node_to_row_col(nodeID,row,col);
+  std::vector<int> receiver_rows, receiver_cols;
+  this->flowdir_to_receiver_indices( row,  col,  receiver_rows,  receiver_cols);
+  receiver_nodes = std::vector<int>(receiver_rows.size());
+  for(size_t i =0; i<receiver_rows.size();i++)
+  {
+    int nodeID,row = receiver_rows[i], col = receiver_cols[i];
+    nodeID = this->row_col_to_node(row,col);
+    receiver_nodes[i] = nodeID;
+  }
+
+}
 void cppintail::flowdir_to_receiver_indices(int row, int col, std::vector<int>& receiver_rows, std::vector<int>& receiver_cols)
 {
 
@@ -276,7 +294,77 @@ void cppintail::flowdir_to_receiver_indices(int row, int col, std::vector<int>& 
   receiver_rows.shrink_to_fit();
   receiver_cols.shrink_to_fit();
 
+  std::vector<int> new_vecrow, new_vecol;
+
+  for (size_t i = 0; i < receiver_rows.size(); i++ )
+  {
+    if(receiver_rows[i] < 0 || receiver_cols[i] < 0 || receiver_rows[i] >= NROWS || receiver_cols[i] >= NCOLS)
+      continue;
+    else
+    {
+      new_vecrow.push_back(receiver_rows[i] );
+      new_vecol.push_back(receiver_cols[i]);
+    }
+  }
+
+  receiver_rows = new_vecrow;
+  receiver_cols = new_vecol;
+
+
 }
+
+
+
+void cppintail::find_nodes_with_no_donors( xt::pytensor<float,2>& DEM)
+{
+  // Attribute containing the no donors nodes
+  no_donor_nodes = std::vector<int>(NROWS * NCOLS);
+  std::vector<int> local_ndonors(NROWS * NCOLS,0);
+  // std::cout << "DEBUG:HERE1" << std::endl;
+  // Looping through the thingy
+  int incrementer = 0;
+  for(size_t i = 0; i < NROWS; i++)
+  for(size_t j = 0; j < NCOLS; j++)
+  {
+    // Ignorign no data
+    if(DEM(i,j) == NODATAVALUE)
+      continue;
+
+    // Getting the receivers
+    std::vector<int> receiver_rows,receiver_cols;
+    // std::cout << "DEBUG:HERE1.5 || " << i << "||" << j << std::endl;
+    this->flowdir_to_receiver_indices(int(i), int(j), receiver_rows,  receiver_cols);
+    // std::cout << "DEBUG:HERE1.6 || " << i << "||" << j << std::endl;
+
+    // Incrementing the receivers
+    for(size_t od=0; od<receiver_rows.size(); od++)
+    {
+      // std::cout << "DEBUG:HERE1.7 || " << receiver_rows[od] << "||" << receiver_cols[od] << std::endl;
+      local_ndonors[row_col_to_node(receiver_rows[od],receiver_cols[od])] += 1; 
+    }
+  }
+  // std::cout << "DEBUG:HERE2" << std::endl;
+
+
+  // hunting for the no donor nodes
+  for(size_t i = 0; i < local_ndonors.size(); i++)
+  {
+    if(local_ndonors[i] == 0)
+    {
+      no_donor_nodes[incrementer]  = int(i);
+    }
+  }
+  // std::cout << "DEBUG:HERE3" << std::endl;
+
+
+  no_donor_nodes.shrink_to_fit();
+
+}
+
+
+
+
+
 
 
 struct tempNode
@@ -368,6 +456,37 @@ void cppintail::compute_DA_slope_exp( double slexponent, xt::pytensor<float,2>& 
   }
   // Done
 }
+
+
+ //###############################################  
+ // Duck transition to general functions
+ //           ,-.
+ //       ,--' ~.).
+ //     ,'         `.
+ //    ; (((__   __)))
+ //    ;  ( (#) ( (#)
+ //    |   \_/___\_/|
+ //   ,"  ,-'    `__".
+ //  (   ( ._   ____`.)--._        _
+ //   `._ `-.`-' \(`-'  _  `-. _,-' `-/`.
+ //    ,')   `.`._))  ,' `.   `.  ,','  ;
+ //  .'  .     `--'  /     ).   `.      ;
+ // ;     `-        /     '  )         ;
+ // \                       ')       ,'
+ //  \                     ,'       ;
+ //   \               `~~~'       ,'
+ //    `.                      _,'
+ //      `.                ,--'
+ //        `-._________,--'
+
+
+//##################################################
+//############# Stack stuff ########################
+//##################################################
+// Adapted from xarray-topo
+
+
+
 
 
 
