@@ -40,7 +40,7 @@ class get_numpy_include(object):
 ext_modules = [
     Extension(
         'pyntail',
-        ['src/main.cpp',"src/cppintail.cpp"],
+        ['src/main.cpp',"src/cppintail.cpp","src/CHONK.cpp"],
         include_dirs=[
             # Path to pybind11 headers
             get_pybind_include(),
