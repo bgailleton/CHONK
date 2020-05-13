@@ -36,6 +36,112 @@
 #include "cppintail.hpp"
 
 
+
+// This empty constructor is just there to have a default one.
+void NodeGraph::create()
+{
+  std::string yo = "I am an empty constructor yo!";
+
+}
+
+
+// This empty constructor is just there to have a default one.
+void NodeGraph::create(xt::pytensor<int,1>& pre_stack,xt::pytensor<int,1>& pre_rec, 
+  xt::pytensor<int,1>& tMF_stack, xt::pytensor<int,2>& tMF_rec, xt::pytensor<double,1>& elevation, 
+  float XMIN, float XMAX, float YMIN, float YMAX, float XRES, float YRES, int NROWS, int NCOLS, float NODATAVALUE)
+{
+  // Initialising a bunch of variable
+  int this_pit_ID = -1;
+  pits_ID = std::vector<int>(pre_stack.size(),0);
+  for (auto& v : pits_ID)
+    v -= 1;
+  xt::pytensor<int,1> pre_contributing_pixels = xt::zeros<int>({pre_stack.size()});
+
+  //First I need the accumulation vector of the prestack
+  for(int i=pre_stack.size()-1; i>=0; i--)
+  {
+    if(pre_stack[i] != pre_rec[pre_stack[i]])
+      pre_contributing_pixels[pre_rec[pre_stack[i]]] += 1 ;
+  }
+
+  // first step is to register the pits before correction
+  // basically detecting where the stack is receiving itself
+  for(size_t i=0; i< pre_stack.size(); i++)
+  {
+    // Getting current node and its receiver
+    int this_node = pre_stack[i];
+    int this_receiver = pre_rec[i];
+    // checking if it is a pit
+    if(this_node == this_receiver)
+    {
+      // Incrementing the pit ID
+      this_pit_ID++;
+      // Register it
+      pits_ID[this_node] = this_pit_ID;
+
+      // The bottom of the pit is this node
+      pits_bottom.push_back(this_node);
+      // its outlet is the first receiver in the corrected stack
+      pits_outlet.push_back(tMF_rec(this_node,0));
+      // initialising the number of pixels to 1
+      pits_npix.push_back(1);
+
+      // Saving the outlet of the elevation temporally
+      double outlet_elevation = elevation[this_node];
+      // initialising the volume of the pit to zero
+      pits_volume.push_back(0);
+      //Initialising the list ofpixels for each pits
+      pits_pixels.push_back({this_node});
+
+      // Getting all the node draining into that pit and detecting which one are below the elevation
+      for(size_t j = i; j <= i+pre_contributing_pixels[this_node]; j++)
+      {
+        // Waht is this node
+        int tested_node = pre_stack[j];
+        // If within the pit, I register it and add to the volume
+        if(elevation[tested_node]<outlet_elevation)
+        {
+          pits_ID[tested_node] = this_pit_ID;
+          pits_volume[this_pit_ID] += XRES*YRES*(outlet_elevation-elevation[tested_node]);
+          pits_npix[this_pit_ID] += 1;
+          pits_pixels[this_pit_ID].push_back(tested_node);
+        }
+      //Done with labelling that pit
+      }
+    // done with checking that node
+    }
+  // Done with labelling all pits
+  }
+
+  // NEED TO CHECK HERE IF THE ARRAYS ARE COPIED OR VIEWS
+  MF_stack = tMF_stack;
+  MF_receivers = tMF_rec;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// OLDER TESTS!!!
+
+
 // This empty constructor is just there to have a default one.
 void cppintail::create()
 {
@@ -484,10 +590,6 @@ void cppintail::compute_DA_slope_exp( double slexponent, xt::pytensor<float,2>& 
 //############# Stack stuff ########################
 //##################################################
 // Adapted from xarray-topo
-
-
-
-
 
 
 

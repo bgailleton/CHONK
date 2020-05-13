@@ -24,6 +24,73 @@
 #include "xtensor/xtensor.hpp" // same
 
 
+// this class organises the DEM nodes in order to solve all equations in the right order. This is the first step of each iteration of the model 
+class NodeGraph
+{
+  public:
+    NodeGraph() { create(); }
+    NodeGraph(xt::pytensor<int,1>& pre_stack,xt::pytensor<int,1>& pre_rec, 
+  xt::pytensor<int,1>& tMF_stack, xt::pytensor<int,2>& tMF_rec, xt::pytensor<double,1>& elevation, 
+  float XMIN, float XMAX, float YMIN, float YMAX, float XRES, float YRES, int NROWS, int NCOLS, float NODATAVALUE)
+    {create( pre_stack, pre_rec, tMF_stack, tMF_rec, elevation, XMIN,  XMAX,  YMIN,  YMAX,  XRES, YRES, NROWS, NCOLS, NODATAVALUE);}
+
+    inline int row_col_to_node(int& row, int& col){return row * NCOLS + col;};
+    inline int row_col_to_node(size_t& row, size_t& col){return int(row * NCOLS + col);};
+    // This function transform the linearised node indice to row/col
+    inline void node_to_row_col(int& node, int& row, int& col)
+    {
+        col = node % NCOLS;
+        row = int((node - col)/NCOLS);
+    };
+
+  protected:
+    // Geometrical/geographical features, their name should be self-explanatory
+    float XMIN;
+    float XMAX;
+    float YMIN;
+    float YMAX;
+    float XRES;
+    float YRES;
+    int NROWS;
+    int NCOLS;
+    float NODATAVALUE;
+
+    // These are the stacks ingested from fastscaplib_fortran
+    xt::pytensor<int,1> MF_stack;
+    xt::pytensor<int,2> MF_receivers;
+
+    // Number of depressions
+    int n_pits;
+    // length=N_nodes, -1 if not in a pit, pit_ID otherwise
+    std::vector<int> pits_ID;
+    // length = n_pits, pit_ID to bottom_nodes
+    std::vector<int> pits_bottom;
+    // length = n_pits, pit_ID to outlet node. If equal to bottom: fluxes can escape the model
+    std::vector<int> pits_outlet; 
+    // legth = n_pits, pit_ID to number of pixels in the pit.
+    std::vector<int> pits_npix; 
+    // list of pixels in each pits
+    std::vector<std::vector<int> > pits_pixels; 
+    // length = n_pits, pit_ID to colume in L^3
+    std::vector<double> pits_volume;
+
+  private:
+    void create();
+    void create(xt::pytensor<int,1>& pre_stack,xt::pytensor<int,1>& pre_rec, 
+  xt::pytensor<int,1>& tMF_stack, xt::pytensor<int,2>& tMF_rec, xt::pytensor<double,1>& elevation, 
+  float XMIN, float XMAX, float YMIN, float YMAX, float XRES, float YRES, int NROWS, int NCOLS, float NODATAVALUE);
+
+
+
+};
+
+
+
+
+
+// Older tests
+
+
 class cppintail
 {
   public:
@@ -104,6 +171,9 @@ class cppintail
     void create(float tXMIN, float tXMAX, float tYMIN, float tYMAX, float tXRES, float tYRES, int tNROWS, int tNCOLS, float tNODATAVALUE);
 
 };
+
+
+
 
 
 
