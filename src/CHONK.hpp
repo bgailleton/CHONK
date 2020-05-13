@@ -28,21 +28,38 @@
 class chonk
 {
   public:
+    // Default constructor
     chonk() { create(); }
 
+    // Merge function
+    void merge(std::vector<chonk> other_chonks);
+
+    // move and split functions
+    // TODO
+
+    // Functions that apply and calculate fluxes
+    // TODO
+
+    // Accessors and modifyers
+    // # Water flux
+    double get_water_flux(){return water_flux;}
+    void set_water_flux(double value){water_flux = value;}
+    // # Erosion flux
+    double get_erosion_flux(){return erosion_flux;}
+    void set_erosion_flux(double value){erosion_flux = value;}
+
   protected:
-    int current_id;
+    // The ID of the chonk
+    int chonkID;
+    // Current location on the graph
+    int current_node;
+    // Current flux of water in the CHONK (in L^3/T)
+    double water_flux;
+    // Current erosion flux in H/T
+    double erosion_flux;
 
   private:
     void create();
 };
-
-
-// void compute_receivers_d8(std::vector<int>& receivers, std::vector<float>& dist2receivers, std::vector<float>& elevation, int nx, int ny, float dx, float dy);
-// void compute_donors(std::vector<int>& ndonors, std::vector<int>&  donors, std::vector<int>&  receivers, int nnodes);
-// int _add2stack(int inode, std::vector<int>& ndonors, std::vector<int>& donors, std::vector<int>& stack, int istack);
-// void compute_stack(std::vector<int>& stack, std::vector<int>& ndonors, std::vector<int>& donors, std::vector<int>& receivers, int& nnodes);
-
-
 
 #endif

@@ -39,21 +39,20 @@
 // This empty constructor is just there to have a default one.
 void chonk::create()
 {
-	std::string yo = "I am an empty constructor yo!";
+  std::string yo = "I am an empty constructor yo!";
 
 }
 
 
-
-
-
-
-
-
-
-
-
-
+void chonk::merge(std::vector<chonk> other_chonks)
+{
+  // The merging function will need to be updated thouroughly!
+  for(auto& tchonk:other_chonks)
+  {
+    this->water_flux += tchonk.get_water_flux();
+  }
+  // Probs add some destroyers here
+}
 
 
 
