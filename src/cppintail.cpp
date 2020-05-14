@@ -47,7 +47,7 @@ void NodeGraph::create()
 
 // This empty constructor is just there to have a default one.
 void NodeGraph::create(xt::pytensor<int,1>& pre_stack,xt::pytensor<int,1>& pre_rec, 
-  xt::pytensor<int,1>& tMF_stack, xt::pytensor<int,2>& tMF_rec, xt::pytensor<double,1>& elevation, 
+  xt::pytensor<int,1>& tMF_stack, xt::pytensor<int,2>& tMF_rec, xt::pytensor<double,1>& elevation, xt::pytensor<double,2>& tMF_length,
   float XMIN, float XMAX, float YMIN, float YMAX, float XRES, float YRES, int NROWS, int NCOLS, float NODATAVALUE)
 {
   // Initialising a bunch of variable
@@ -56,6 +56,10 @@ void NodeGraph::create(xt::pytensor<int,1>& pre_stack,xt::pytensor<int,1>& pre_r
   for (auto& v : pits_ID)
     v -= 1;
   xt::pytensor<int,1> pre_contributing_pixels = xt::zeros<int>({pre_stack.size()});
+  // NEED TO CHECK HERE IF THE ARRAYS ARE COPIED OR VIEWS
+  MF_stack = tMF_stack;
+  MF_receivers = tMF_rec;
+  MF_lengths = tMF_length;
 
   //First I need the accumulation vector of the prestack
   for(int i=pre_stack.size()-1; i>=0; i--)
@@ -113,9 +117,13 @@ void NodeGraph::create(xt::pytensor<int,1>& pre_stack,xt::pytensor<int,1>& pre_r
   // Done with labelling all pits
   }
 
-  // NEED TO CHECK HERE IF THE ARRAYS ARE COPIED OR VIEWS
-  MF_stack = tMF_stack;
-  MF_receivers = tMF_rec;
+
+
+  // finally initialising the chonk network 
+  // chonk_location = std::vector<chonk>(pre_stack.size());
+  // for (size_t i=0; i<pre_stack.size(); i++)
+  //   chonk_location[i] = chonk();
+
 }
 
 
