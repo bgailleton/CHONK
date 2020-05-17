@@ -82,6 +82,8 @@ void NodeGraph::create(xt::pytensor<int,1>& pre_stack,xt::pytensor<int,1>& pre_r
       this_pit_ID++;
       // Register it
       pits_ID[this_node] = this_pit_ID;
+      this->register_deposition_flux[this_node] = 0;
+      this->register_erosion_flux[this_node] = 0;
 
       // The bottom of the pit is this node
       pits_bottom.push_back(this_node);
@@ -106,6 +108,8 @@ void NodeGraph::create(xt::pytensor<int,1>& pre_stack,xt::pytensor<int,1>& pre_r
         if(elevation[tested_node]<outlet_elevation)
         {
           pits_ID[tested_node] = this_pit_ID;
+          deposition_flux[tested_node] = 0;
+          erosion_flux[tested_node] = 0;
           pits_volume[this_pit_ID] += XRES*YRES*(outlet_elevation-elevation[tested_node]);
           pits_npix[this_pit_ID] += 1;
           pits_pixels[this_pit_ID].push_back(tested_node);

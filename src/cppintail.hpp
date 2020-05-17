@@ -49,6 +49,7 @@ class NodeGraph
     //# Stacks and receivers
     int get_MF_stack_at_node(int node){return MF_stack[node];};
     std::vector<int> get_MF_receivers_at_node(int node){std::vector<int>output(8);for(size_t i=0;i<8;i++){output[i] = MF_receivers(node,i);};return output;};
+    std::vector<int> get_MF_donors_at_node(int node){std::vector<int>output(8);for(size_t i=0;i<8;i++){output[i] = MF_donors(node,i);};return output;};
     std::vector<double> get_MF_lengths_at_node(int node){std::vector<double>output(8);for(size_t i=0;i<8;i++){output[i] = MF_lengths(node,i);};return output;};
     
     //# pits
@@ -57,6 +58,10 @@ class NodeGraph
     int get_pits_outlet_at_pit_ID(int ID){return pits_outlet[ID];};
     double get_pits_volume_at_pit_ID(int ID){return pits_volume[ID];};
     std::vector<int> get_pits_pixels_at_pit_ID(int ID){return pits_pixels[ID];};
+    double get_erosion_flux_at_node(int node){return register_erosion_flux[node];}
+    void add_erosion_flux_at_node(int node, double val){register_erosion_flux[node] += val;}
+    double get_deposition_flux_at_node(int node){return register_deposition_flux[node];}
+    void add_deposition_flux_at_node(int node, double val){register_deposition_flux[node] += val;}
 
 
   protected:
@@ -75,6 +80,7 @@ class NodeGraph
     xt::pytensor<int,1> MF_stack;
     xt::pytensor<int,2> MF_receivers;
     xt::pytensor<double,2> MF_lengths;
+    xt::pytensor<double,2> MF_donors;
 
     // Number of depressions
     int n_pits;
@@ -90,6 +96,11 @@ class NodeGraph
     std::vector<std::vector<int> > pits_pixels; 
     // length = n_pits, pit_ID to colume in L^3
     std::vector<double> pits_volume;
+    // These two maps record for each pit node the erosion and deposition that has happened there
+    // This is usefull to inverse the process when filling a pit (or not)
+    std::map<int,double> register_deposition_flux;
+    std::map<int,double> register_erosion_flux;
+
 
   private:
     void create();
