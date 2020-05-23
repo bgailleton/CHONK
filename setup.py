@@ -39,8 +39,8 @@ class get_numpy_include(object):
 
 ext_modules = [
     Extension(
-        'pyntail',
-        ['src/main.cpp',"src/CHONK.cpp","src/cppintail.cpp"],
+        'CHONK_cpp',
+        ['src/main.cpp',"src/CHONK.cpp","src/cppintail.cpp","src/Environment.cpp"],
         include_dirs=[
             # Path to pybind11 headers
             get_pybind_include(),
@@ -105,7 +105,7 @@ class BuildExt(build_ext):
         build_ext.build_extensions(self)
 
 setup(
-    name='pyntail',
+    name='pychonk',
     version=__version__,
     author='Boris Gailleton',
     author_email='b.gailleton@sms.ed.ac.uk',

@@ -30,10 +30,10 @@ class NodeGraph
 {
   public:
     NodeGraph() { create(); }
-    NodeGraph(xt::pytensor<int,1>& pre_stack,xt::pytensor<int,1>& pre_rec, 
-  xt::pytensor<int,1>& tMF_stack, xt::pytensor<int,2>& tMF_rec, xt::pytensor<double,1>& elevation, xt::pytensor<double,2>& tMF_length,
+    NodeGraph(xt::pytensor<int,1>& pre_stack,xt::pytensor<int,1>& pre_rec, xt::pytensor<int,1>& post_rec,
+  xt::pytensor<int,1>& tMF_stack, xt::pytensor<int,2>& tMF_rec, xt::pytensor<int,2>& tMF_don, xt::pytensor<double,1>& elevation, xt::pytensor<double,2>& tMF_length,
   float XMIN, float XMAX, float YMIN, float YMAX, float XRES, float YRES, int NROWS, int NCOLS, float NODATAVALUE)
-    {create( pre_stack, pre_rec, tMF_stack, tMF_rec, elevation, tMF_length, XMIN,  XMAX,  YMIN,  YMAX,  XRES, YRES, NROWS, NCOLS, NODATAVALUE);}
+    {create( pre_stack, pre_rec, post_rec, tMF_stack, tMF_rec, tMF_don, elevation, tMF_length, XMIN,  XMAX,  YMIN,  YMAX,  XRES, YRES, NROWS, NCOLS, NODATAVALUE);}
 
     inline int row_col_to_node(int& row, int& col){return row * NCOLS + col;};
     inline int row_col_to_node(size_t& row, size_t& col){return int(row * NCOLS + col);};
@@ -47,10 +47,11 @@ class NodeGraph
 
     // Accessors/modifiers
     //# Stacks and receivers
-    int get_MF_stack_at_node(int node){return MF_stack[node];};
+    int get_MF_stack_at_i(int i){return MF_stack[i];};
     std::vector<int> get_MF_receivers_at_node(int node){std::vector<int>output(8);for(size_t i=0;i<8;i++){output[i] = MF_receivers(node,i);};return output;};
     std::vector<int> get_MF_donors_at_node(int node){std::vector<int>output(8);for(size_t i=0;i<8;i++){output[i] = MF_donors(node,i);};return output;};
     std::vector<double> get_MF_lengths_at_node(int node){std::vector<double>output(8);for(size_t i=0;i<8;i++){output[i] = MF_lengths(node,i);};return output;};
+
     
     //# pits
     int get_pits_ID_at_node(int node){return pits_ID[node];};
@@ -62,6 +63,11 @@ class NodeGraph
     void add_erosion_flux_at_node(int node, double val){register_erosion_flux[node] += val;}
     double get_deposition_flux_at_node(int node){return register_deposition_flux[node];}
     void add_deposition_flux_at_node(int node, double val){register_deposition_flux[node] += val;}
+    xt::pytensor<int,1> get_all_nodes_in_depression();
+
+    //# DEBUG
+    xt::pytensor<int,1> DEBUG_get_preacc(){return preacc;}
+
 
 
   protected:
@@ -78,6 +84,7 @@ class NodeGraph
 
     // These are the stacks ingested from fastscaplib_fortran
     xt::pytensor<int,1> MF_stack;
+    xt::pytensor<int,1> preacc;
     xt::pytensor<int,2> MF_receivers;
     xt::pytensor<double,2> MF_lengths;
     xt::pytensor<double,2> MF_donors;
@@ -102,10 +109,11 @@ class NodeGraph
     std::map<int,double> register_erosion_flux;
 
 
+
   private:
     void create();
-    void create(xt::pytensor<int,1>& pre_stack,xt::pytensor<int,1>& pre_rec, 
-  xt::pytensor<int,1>& tMF_stack, xt::pytensor<int,2>& tMF_rec, xt::pytensor<double,1>& elevation, xt::pytensor<double,2>& tMF_length,
+    void create(xt::pytensor<int,1>& pre_stack,xt::pytensor<int,1>& pre_rec,xt::pytensor<int,1>& post_rec, 
+  xt::pytensor<int,1>& tMF_stack, xt::pytensor<int,2>& tMF_rec,xt::pytensor<int,2>& tMF_don, xt::pytensor<double,1>& elevation, xt::pytensor<double,2>& tMF_length,
   float XMIN, float XMAX, float YMIN, float YMAX, float XRES, float YRES, int NROWS, int NCOLS, float NODATAVALUE);
 
 

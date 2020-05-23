@@ -37,21 +37,23 @@ class chonk
     // Reset function
     void reset();
     // Does everything that needs to do last when it is the last time this chonk is used
-    void finalise(NodeGraph graph);
+    void finalise(NodeGraph& graph, xt::pytensor<double,1>& surface_elevation_tp1, xt::pytensor<double,1>& sed_height_tp1, double dt);
 
 
     // Merge function(s)
-    void split_and_merge_in_receiving_chonks(std::vector<chonk>& chonkscape, NodeGraph graph);
+    void split_and_merge_in_receiving_chonks(std::vector<chonk>& chonkscape, NodeGraph& graph, xt::pytensor<double,1>& surface_elevation_tp1, xt::pytensor<double,1>& sed_height_tp1, double dt);
 
     // move and split functions
-    void move_to_steepest_descent(xt::pytensor<double,1>& elevation, NodeGraph& graph, double dt, xt::pytensor<double,1>& sed_height_tp1, 
-      xt::pytensor<double,1>& surface_elevation, xt::pytensor<double,1>& surface_elevation_tp1, double Xres, double Yres);
+    void move_to_steepest_descent(NodeGraph& graph, double dt, xt::pytensor<double,1>& sed_height, xt::pytensor<double,1>& sed_height_tp1, 
+  xt::pytensor<double,1>& surface_elevation, xt::pytensor<double,1>& surface_elevation_tp1, double Xres, double Yres, std::vector<chonk>& chonk_network);
+    void move_to_steepest_descent_nodepression(NodeGraph& graph, double dt, xt::pytensor<double,1>& sed_height, xt::pytensor<double,1>& sed_height_tp1, 
+  xt::pytensor<double,1>& surface_elevation, xt::pytensor<double,1>& surface_elevation_tp1, double Xres, double Yres, std::vector<chonk>& chonk_network);
 
     // Functions that apply and calculate fluxes
     //#### In place flux applyer (BEFORE move)
-    inline void inplace_only_drainage_area(double Xres, double Yres);
-    inline void inplace_precipitation_discharge(double Xres, double Yres, xt::pytensor<double,1>& precipitation);
-    inline void inplace_infiltration(double Xres, double Yres, xt::pytensor<double,1>& infiltration);
+    void inplace_only_drainage_area(double Xres, double Yres);
+    void inplace_precipitation_discharge(double Xres, double Yres, xt::pytensor<double,1>& precipitation);
+    void inplace_infiltration(double Xres, double Yres, xt::pytensor<double,1>& infiltration);
 
 
     //#### active flux applyer (AFTER move)
@@ -69,17 +71,26 @@ class chonk
     // # Erosion flux
     double get_erosion_flux(){return erosion_flux;}
     void set_erosion_flux(double value){erosion_flux = value;}
+    // # Deposition flux
+    double get_deposition_flux(){return deposition_flux;}
+    void set_deposition_flux(double value){deposition_flux = value;}
     // # Sediment flux
     double get_sediment_flux(){return sediment_flux;}
     void set_sediment_flux(double value){sediment_flux = value;}
     void add_to_sediment_flux(double value){sediment_flux = value;}
     //# check emptyness 
     bool check_if_empty(){return is_empty;};
+    //# Check if depression solved
+    bool is_depression_solved_at_this_timestep(){return depression_solved_at_this_timestep;};
+    //# other attribute
+    void set_other_attribute(std::string key, double val){other_attributes[key] = val;}
+    double get_other_attribute(std::string key){return other_attributes[key];}
 
 
 
     // Depression solver!
-    void solve_depression_simple(NodeGraph graph, double dt, xt::pytensor<double,1>& sed_height_tp1, xt::pytensor<double,1>& surface_elevation,xt::pytensor<double,1>& surface_elevation_tp1, double Xres, double Yres);
+    void solve_depression_simple(NodeGraph& graph, double dt, xt::pytensor<double,1>& sed_height, xt::pytensor<double,1>& sed_height_tp1, 
+  xt::pytensor<double,1>& surface_elevation,xt::pytensor<double,1>& surface_elevation_tp1, double Xres, double Yres, std::vector<chonk>& chonk_network);
 
 
   protected:
@@ -114,17 +125,14 @@ class chonk
 
 
     // Trackers
-    // Lake depth
-    double lake_depth;
-    // Will have attributes about grain size, composition, ...
-
-    // Specific retainers
-    // Specific atttributes that affect the fluxes but do not depend on the grid but on the intrinsec charateristic of the particle
-    // For example abrasion component function of other litho or concavity,...
+    // I may have a wide range of variables here, variables that I am not sure I will often use.
+    // I think that if I systematically add them as attributes, I will loose some performance
+    // Instead I well assign a map of attribute so that I can add as many as I need, even if less explicit
+    std::map<std::string,double> other_attributes;
 
 
   private:
-    void create(){/* It should never be called explicitely!*/return;};
+    void create();
     void create(int tchonkID, int tcurrent_node, bool tmemory_saver);
 };
 
