@@ -136,6 +136,10 @@ void NodeGraph::create(xt::pytensor<int,1>& pre_stack,xt::pytensor<int,1>& pre_r
   }
   this->preacc = pre_contributing_pixels;
 
+  // Initialising the argument for calculating inherited lake waters
+  this->has_excess_water_from_lake = std::vector<bool>(pre_stack.size(),false);
+  this->pits_excess_water_volume = std::vector<double>(this_pit_ID+1, 0);
+
 }
 
 
@@ -153,6 +157,54 @@ xt::pytensor<int,1> NodeGraph::get_all_nodes_in_depression()
 }
 
 
+void NodeGraph::calculate_inherited_water_from_previous_lakes(xt::pytensor<double,1>& previous_lake_depth, xt::pytensor<int,1>& post_rec)
+{
+
+  // Iterating through the inverse stack
+  std::vector<bool> is_processed(post_rec.size(),false);
+  for(size_t i = 0; i<post_rec.size();i++)
+  {
+    // getting current node ID
+    int this_node = this->MF_stack[i];
+    double this_lake_depth = previous_lake_depth[this_node];
+
+    // Checking if there is any excess of water 
+    if(this_lake_depth == 0)
+    {
+      is_processed[this_node] = true;
+      continue;
+    }
+
+    if(is_processed[this_node])
+      continue;
+    
+    is_processed[this_node] = true;
+    // alright, I have unprocessed excess of water there
+    double excess_volume = this_lake_depth * XRES * YRES;
+
+    // does it fall into an existing pit
+    int this_pit_ID = this->pits_ID[this_node];
+    int outlet_node = -9999; // triggering segfault if this happens not to be modified. #ExtremeDebugging
+    if(this_pit_ID>=0)
+    {
+      // Yes, I am just adding the excess water to the pit outlet
+      this->pits_excess_water_volume[this_pit_ID] += excess_volume;
+      continue;
+    }
+    else
+    {
+      outlet_node = post_rec[this_node];
+    }
+    
+    if(this->has_excess_water_from_lake[outlet_node])
+      excess_volume += node_to_excess_of_water[outlet_node];
+
+    this->node_to_excess_of_water[outlet_node] = excess_volume;
+    this->has_excess_water_from_lake[outlet_node] = true;
+
+  }
+
+}
 
 
 

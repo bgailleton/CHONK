@@ -38,6 +38,8 @@ class chonk
     void reset();
     // Does everything that needs to do last when it is the last time this chonk is used
     void finalise(NodeGraph& graph, xt::pytensor<double,1>& surface_elevation_tp1, xt::pytensor<double,1>& sed_height_tp1, double dt);
+    void add_inherited_water(NodeGraph& graph, double dt);
+
 
 
     // Merge function(s)
@@ -47,6 +49,8 @@ class chonk
     void move_to_steepest_descent(NodeGraph& graph, double dt, xt::pytensor<double,1>& sed_height, xt::pytensor<double,1>& sed_height_tp1, 
   xt::pytensor<double,1>& surface_elevation, xt::pytensor<double,1>& surface_elevation_tp1, double Xres, double Yres, std::vector<chonk>& chonk_network);
     void move_to_steepest_descent_nodepression(NodeGraph& graph, double dt, xt::pytensor<double,1>& sed_height, xt::pytensor<double,1>& sed_height_tp1, 
+  xt::pytensor<double,1>& surface_elevation, xt::pytensor<double,1>& surface_elevation_tp1, double Xres, double Yres, std::vector<chonk>& chonk_network);
+    void move_MF_from_fastscapelib(NodeGraph& graph, xt::pytensor<double,2>& external_weigth_water_fluxes, double dt, xt::pytensor<double,1>& sed_height, xt::pytensor<double,1>& sed_height_tp1, 
   xt::pytensor<double,1>& surface_elevation, xt::pytensor<double,1>& surface_elevation_tp1, double Xres, double Yres, std::vector<chonk>& chonk_network);
 
     // Functions that apply and calculate fluxes

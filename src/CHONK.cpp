@@ -97,21 +97,21 @@ void chonk::finalise(NodeGraph& graph, xt::pytensor<double,1>& surface_elevation
 
   surface_elevation_tp1[this->current_node] -= this->erosion_flux * dt;
   surface_elevation_tp1[this->current_node] += this->deposition_flux * dt;
-  // if(surface_elevation_tp1[current_node]<0)
-  // {
-  //   std::cout << "BEFORE:" << before << " after:" << surface_elevation_tp1[this->current_node] << "err: " << this->erosion_flux * dt << " dep:" << this->deposition_flux * dt << " slope:" << slope_to_rec[0] << std::endl;
-  //   exit(EXIT_SUCCESS);
-  // }
-
-  // if(isnan(surface_elevation_tp1[this->current_node]))
-  // {
-  //   std::cout<< "NAN DETECTED::errate:" << this->erosion_flux << " Dep:" << this->deposition_flux << std::endl;
-  // }
-
+ 
   sed_height_tp1[this->current_node] -= this->erosion_flux * dt;
   if(sed_height_tp1[this->current_node] <0)
     sed_height_tp1[this->current_node] = 0;
   sed_height_tp1[this->current_node] += this->deposition_flux * dt;
+}
+
+void chonk::add_inherited_water(NodeGraph& graph, double dt)
+{
+  bool does_it = graph.does_this_node_has_inhereted_water(this->current_node);
+  if(does_it)
+  {
+    double this_excess = graph.get_node_excess_at_node(this->current_node);
+    this->water_flux += this_excess/dt;
+  }
 }
 
 
@@ -165,21 +165,22 @@ void chonk::move_to_steepest_descent(NodeGraph& graph, double dt, xt::pytensor<d
   // Initialising the checkers to minimum
   int steepest_rec = -9999;
   double steepest_S = -std::numeric_limits<double>::max();
-  // std::cout << "Start" << std::endl;
   // I need the receicing neighbours and the distance to them
   std::vector<int> these_neighbors = graph.get_MF_receivers_at_node(this->current_node);
   std::vector<double> these_lengths = graph.get_MF_lengths_at_node(this->current_node);
 
 
   bool all_minus_1 = true;
-  // std::cout << "1" << std::endl;
   // looping through neighbors
   for(size_t i=0; i<8; i++)
   {
     int this_neightbor = these_neighbors[i];
     // checking if this is a neighbor, nodata will be -1 (fastscapelib standards)
     if(this_neightbor < 0 || this_neightbor >= int(surface_elevation.size()) || this_neightbor == this->current_node)
+    {
       continue;
+    }
+
 
     all_minus_1 = false;
 
@@ -188,18 +189,16 @@ void chonk::move_to_steepest_descent(NodeGraph& graph, double dt, xt::pytensor<d
     if((these_lengths[i] >= Xres) || (these_lengths[i] >= Yres))
       this_slope = (surface_elevation[this->current_node] - surface_elevation[this_neightbor]) / these_lengths[i];
     else
-      this_slope = 0;
-    // NEED TO CHECK WHY IT DDOES THAT!!
-    if(this_slope<0)
     {
       this_slope = 0;
     }
 
 
-    // if(this_slope<0)
-    // {
-    //   std::cout << "Z:" << surface_elevation[this->current_node] << " Zrec:" << surface_elevation[this_neightbor] << " L: " << these_lengths[i] << std::endl;
-    // }
+    // NEED TO CHECK WHY IT DDOES THAT!!
+    if(this_slope<0)
+    {
+      this_slope = 0;
+    }
 
     // checking if the slope is higher and recording the receiver
     if(this_slope>steepest_S)
@@ -210,14 +209,11 @@ void chonk::move_to_steepest_descent(NodeGraph& graph, double dt, xt::pytensor<d
     // Mover to the next step
   }
 
-  // std::cout << "2" << std::endl;
-
 
   // Base level! i am stopping the code there and treating it as a depression already solved to inhibit all the process
   if(steepest_rec == this->current_node || all_minus_1 == true)
   {
     this->depression_solved_at_this_timestep = true;
-    // std::cout << "BL reached" << std::endl;
     return;
   }
 
@@ -227,40 +223,113 @@ void chonk::move_to_steepest_descent(NodeGraph& graph, double dt, xt::pytensor<d
     // stoping the function by calling the return statement
     return; 
   }
-  // std::cout << "3" << std::endl;
 
   // This is the part where I deal with topographic depression now
   int pit_id = graph.get_pits_ID_at_node(current_node);
-  // std::cout << "3.1::" << pit_id << std::endl;
 
   // Is this a pit?
   if(pit_id>=0)
   {
     
-    // std::cout << "pit" << std::endl;
     // Apparently so, let's check if I am at the bottom
     int pit_bottom = graph.get_pits_bottom_at_pit_ID(pit_id);
-    // std::cout << "3.2" << std::endl;
+
     if(current_node == pit_bottom)
     {
-      // std::cout << "solving depression" << std::endl;
       // Need to deal with depressions here!!!!
       this->solve_depression_simple(graph,  dt, sed_height, sed_height_tp1, surface_elevation, surface_elevation_tp1, Xres, Yres, chonk_network);
       // # I WANT TO STOP HERE IF THE DEPRESSION IS SOLVED!!!
       // # The depression solving routine takes care of the receivers and all
-      // std::cout << "done" << std::endl;
       return;
     }
   }
-  // std::cout << "4" << std::endl;
 
-  // std::cout << "done" << std::endl;
   // There is a non-pit neighbor, let's save it with its attributes
   this->receivers.push_back(steepest_rec);
   this->weigth_water_fluxes.push_back(1.);
   this->weigth_sediment_fluxes.push_back(1.);
   this->slope_to_rec.push_back(steepest_S); 
 }
+
+
+// Function where the weights of splitting the water comes from fastscapelib p method
+void chonk::move_MF_from_fastscapelib(NodeGraph& graph, xt::pytensor<double,2>& external_weigth_water_fluxes, double dt, xt::pytensor<double,1>& sed_height, xt::pytensor<double,1>& sed_height_tp1, 
+  xt::pytensor<double,1>& surface_elevation, xt::pytensor<double,1>& surface_elevation_tp1, double Xres, double Yres, std::vector<chonk>& chonk_network)
+{
+
+  // I need the receicing neighbours and the distance to them
+  std::vector<int> these_neighbors = graph.get_MF_receivers_at_node(this->current_node);
+  std::vector<double> these_lengths = graph.get_MF_lengths_at_node(this->current_node);
+
+
+  bool all_minus_1 = true;
+  // looping through neighbors
+  for(size_t i=0; i<8; i++)
+  {
+    int this_neightbor = these_neighbors[i];
+    // checking if this is a neighbor, nodata will be -1 (fastscapelib standards)
+    if(this_neightbor < 0 || this_neightbor >= int(surface_elevation.size()) || this_neightbor == this->current_node)
+    {
+      continue;
+    }
+
+
+    all_minus_1 = false;
+
+    // getting the slope, dz/dx
+    double this_slope = 0;
+    if((these_lengths[i] >= Xres) || (these_lengths[i] >= Yres))
+      this_slope = (surface_elevation[this->current_node] - surface_elevation[this_neightbor]) / these_lengths[i];
+    else
+    {
+      // update:: should not happen anymore
+      this_slope = 0;
+    }
+
+
+    // NEED TO CHECK WHY IT DDOES THAT!!
+    // update:: should not happen anymore
+    if(this_slope<0)
+    {
+      this_slope = 0;
+    }
+
+
+    //IF I REACH PIT BOTTOM I WANNA STOP THE FUNCTION
+    // This is the part where I deal with topographic depression now
+    int pit_id = graph.get_pits_ID_at_node(current_node);
+
+    // Is this a pit?
+    if(pit_id>=0)
+    {
+      
+      // Apparently so, let's check if I am at the bottom
+      int pit_bottom = graph.get_pits_bottom_at_pit_ID(pit_id);
+
+      if(current_node == pit_bottom)
+      {
+        // Need to deal with depressions here!!!!
+        this->solve_depression_simple(graph,  dt, sed_height, sed_height_tp1, surface_elevation, surface_elevation_tp1, Xres, Yres, chonk_network);
+        // # I WANT TO STOP HERE IF THE DEPRESSION IS SOLVED!!!
+        // # The depression solving routine takes care of the receivers and all
+        return;
+      }
+    }
+
+    // There is a non-pit neighbor, let's save it with its attributes
+    double weight = external_weigth_water_fluxes(this->current_node,i);
+    this->receivers.push_back(this_neightbor);
+    this->weigth_water_fluxes.push_back(weight);
+    this->weigth_sediment_fluxes.push_back(weight);
+    this->slope_to_rec.push_back(this_slope); 
+
+
+    // Mover to the next step
+  }
+
+}
+
+
 
 
 // Simplest function we can think of: move the thingy to 
@@ -299,17 +368,6 @@ void chonk::move_to_steepest_descent_nodepression(NodeGraph& graph, double dt, x
       this_slope = 0;
     }
 
-    // if(this_slope>10)
-    // {
-    //    std::cout << "Z:" << surface_elevation[this->current_node] << " Zrec:" << surface_elevation[this_neightbor] << " L: " << these_lengths[i] << std::endl;
-    //    exit(EXIT_SUCCESS);
-    // }
-
-    // if(this_slope<0)
-    // {
-    //   std::cout << "Z:" << surface_elevation[this->current_node] << " Zrec:" << surface_elevation[this_neightbor] << " L: " << these_lengths[i] << std::endl;
-    // }
-
     // checking if the slope is higher and recording the receiver
     if(this_slope>steepest_S)
     {
@@ -318,7 +376,6 @@ void chonk::move_to_steepest_descent_nodepression(NodeGraph& graph, double dt, x
     }
     // Mover to the next step
   }
-  // std::cout << "2" << std::endl;
 
   // Base level! i am stopping the code there and treating it as a depression already solved to inhibit all the process
   if(steepest_rec == this->current_node || all_minus_1 == true)
@@ -456,34 +513,30 @@ bool operator<( const FillNode& lhs, const FillNode& rhs )
 void chonk::solve_depression_simple(NodeGraph& graph, double dt, xt::pytensor<double,1>& sed_height, xt::pytensor<double,1>& sed_height_tp1, 
   xt::pytensor<double,1>& surface_elevation,xt::pytensor<double,1>& surface_elevation_tp1, double Xres, double Yres, std::vector<chonk>& chonk_network)
 {
-  // std::cout << "start the depression stuff" << std::endl;
   // identifying my pit attributes
-  // std::cout << "dep1" << std::endl;
   int pit_id = graph.get_pits_ID_at_node(current_node);
   int pit_outlet = graph.get_pits_outlet_at_pit_ID(pit_id);
   double volume = graph.get_pits_volume_at_pit_ID(pit_id);
   std::vector<int> nodes_in_pit = graph.get_pits_pixels_at_pit_ID(pit_id);
   double elevation_bottom = surface_elevation[current_node];
   double elevation_outlet = surface_elevation[pit_outlet];
-  // std::cout << "dep2" << std::endl;
+  double excess_water_volume = graph.get_excess_water_at_pit_ID(pit_id);
 
   // My receiver will be the pit outlet
   this->receivers.push_back(pit_outlet);
   this->slope_to_rec.push_back(0.);
 
-  // std::cout << "Zout:" << elevation_bottom << " Zbottom:" << elevation_bottom << " Nnodes:" << nodes_in_pit.size() << " vol:" << volume << " node_bot:" << this->current_node << " node_out:" << pit_outlet << std::endl;
+  // double 
 
   // Dealing first with the water fluxes
   // # Volume of water available
-  double total_water = this->water_flux * dt;
+  double total_water = this->water_flux * dt + excess_water_volume;
   // # lake water depths
   double current_water_elev_from_pit_bottom = 0; 
   // # lake water absolute elevation
   double current_water_elev = elevation_bottom;
   // # this will store the nodes that are part of the lake if the depression is not full 
   std::vector<int> underwater_nodes;
-
-  // std::cout << "dep3" << std::endl;
 
 
   // Initialising the water depth in lake /!\ DOES NOT CALCULATE THE WATER DEPTH FOR RIVER! JUST WITHIN DEPRESSIONS
@@ -550,8 +603,6 @@ void chonk::solve_depression_simple(NodeGraph& graph, double dt, xt::pytensor<do
         PriorityQueue.push(this_nenode);
         is_in_queue_lake_depth[node] = true;
       }
-// 
-      // std::cout << "dep3.2.2" << std::endl;
 
       // Now dealing with the lake depth in taht node: the highest priority Fillnode
       // # This get the "top" priority node: i.e. the one with the closest higer elevation to all the nodes already in water
@@ -639,7 +690,7 @@ void chonk::solve_depression_simple(NodeGraph& graph, double dt, xt::pytensor<do
     surface_elevation_tp1[node] = surface_elevation[node];
     // if(surface_elevation_tp1[current_node]<0)
       // std::cout << "2" << std::endl;
-    
+     
     // std::cout << "ELEV CORRECTED:" << surface_elevation_tp1[node] << std::endl; 
     // falling back to the previous amount of sediments
     sed_height_tp1[node] = sed_height[node];

@@ -44,6 +44,9 @@ class NodeGraph
         row = int((node - col)/NCOLS);
     };
 
+    void calculate_inherited_water_from_previous_lakes(xt::pytensor<double,1>& previous_lake_depth, xt::pytensor<int,1>& post_rec);
+
+
 
     // Accessors/modifiers
     //# Stacks and receivers
@@ -63,6 +66,9 @@ class NodeGraph
     void add_erosion_flux_at_node(int node, double val){register_erosion_flux[node] += val;}
     double get_deposition_flux_at_node(int node){return register_deposition_flux[node];}
     void add_deposition_flux_at_node(int node, double val){register_deposition_flux[node] += val;}
+    double get_excess_water_at_pit_ID(int pID){return pits_excess_water_volume[pID];}
+    bool does_this_node_has_inhereted_water(int node) {return has_excess_water_from_lake[node];};
+    double get_node_excess_at_node(int node){return node_to_excess_of_water[node];};
     xt::pytensor<int,1> get_all_nodes_in_depression();
 
     //# DEBUG
@@ -101,13 +107,21 @@ class NodeGraph
     std::vector<int> pits_npix; 
     // list of pixels in each pits
     std::vector<std::vector<int> > pits_pixels; 
-    // length = n_pits, pit_ID to colume in L^3
+    // length = n_pits, pit_ID to volume in L^3
     std::vector<double> pits_volume;
+    // length = n_pits, pit_ID to volume in L^3
+    std::vector<double> pits_excess_water_volume;
+
     // These two maps record for each pit node the erosion and deposition that has happened there
     // This is usefull to inverse the process when filling a pit (or not)
     std::map<int,double> register_deposition_flux;
     std::map<int,double> register_erosion_flux;
 
+    // Dealing with excess of water
+    // length = N_nodes, value: true if it has an excess of water
+    std::vector<bool> has_excess_water_from_lake;
+    // key: node ID, val: excess volume of water due to previous lake (recalculated to be diverted to outlets)
+    std::map<int,double> node_to_excess_of_water;
 
 
   private:

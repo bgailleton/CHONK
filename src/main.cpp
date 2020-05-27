@@ -68,10 +68,12 @@ PYBIND11_MODULE(CHONK_cpp, m)
       .def("get_array2d_double_param", &ModelRunner::get_array2d_double_param)
       .def("DEBUG_modify_double_array_param_inplace", &ModelRunner::DEBUG_modify_double_array_param_inplace)
       .def("get_water_flux",&ModelRunner::get_water_flux)
+      .def("get_erosion_flux",&ModelRunner::get_erosion_flux)
       .def("get_other_attribute", &ModelRunner::get_other_attribute)
       .def("get_all_nodes_in_depression", &ModelRunner::get_all_nodes_in_depression)
       .def("update_timestep", &ModelRunner::update_timestep)
       .def("DEBUG_get_preacc", &ModelRunner::DEBUG_get_preacc)
+      .def("DEBUG_check_weird_val_stacks", &ModelRunner::DEBUG_check_weird_val_stacks)
     ;
 
 
