@@ -62,11 +62,12 @@ class NodeGraph
     int get_pits_outlet_at_pit_ID(int ID){return pits_outlet[ID];};
     double get_pits_volume_at_pit_ID(int ID){return pits_volume[ID];};
     std::vector<int> get_pits_pixels_at_pit_ID(int ID){return pits_pixels[ID];};
+    std::vector<int> get_sub_pits_at_pit_ID(int ID){return sub_depressions[ID];};
     double get_erosion_flux_at_node(int node){return register_erosion_flux[node];}
     void add_erosion_flux_at_node(int node, double val){register_erosion_flux[node] += val;}
     double get_deposition_flux_at_node(int node){return register_deposition_flux[node];}
     void add_deposition_flux_at_node(int node, double val){register_deposition_flux[node] += val;}
-    double get_excess_water_at_pit_ID(int pID){return pits_excess_water_volume[pID];}
+    double get_excess_water_at_pit_ID(int pID){return pits_inherited_water_volume[pID];}
     bool does_this_node_has_inhereted_water(int node) {return has_excess_water_from_lake[node];};
     double get_node_excess_at_node(int node){return node_to_excess_of_water[node];};
     xt::pytensor<int,1> get_all_nodes_in_depression();

@@ -105,12 +105,12 @@ void NodeGraph::create(xt::pytensor<int,1>& pre_stack,xt::pytensor<int,1>& pre_r
     // Getting current node and its receiver pre/post correction
     int this_node = pre_stack[i];
     int this_receiver = pre_rec[this_node];
-    int post_rec = post_rec[this_node];
+    int tpost_rec = post_rec[this_node];
 
     // Checking if it is a pit, which is equivalent to checking if:
     // my node is draining to itself pre-correction but not post-correction
     // If still draining to itself post-correction, it is a model base level, i.e. an outlet 
-    if(this_node == this_receiver && this_receiver != post_rec)
+    if(this_node == this_receiver && this_receiver != tpost_rec)
     {
       // Right, I am at the bottom of a depression, a pit
       // Incrementing the pit ID
@@ -234,7 +234,7 @@ void NodeGraph::create(xt::pytensor<int,1>& pre_stack,xt::pytensor<int,1>& pre_r
   }
 
   // Done with the sub-depression routine
-  
+
   // Initialising the argument for calculating inherited lake waters
   this->has_excess_water_from_lake = std::vector<bool>(pre_stack.size(),false);
   this->pits_inherited_water_volume = std::vector<double>(this_pit_ID+1, 0);
