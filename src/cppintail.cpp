@@ -50,64 +50,114 @@ void NodeGraph::create(xt::pytensor<int,1>& pre_stack,xt::pytensor<int,1>& pre_r
   xt::pytensor<int,1>& tMF_stack, xt::pytensor<int,2>& tMF_rec,xt::pytensor<int,2>& tMF_don, xt::pytensor<double,1>& elevation, xt::pytensor<double,2>& tMF_length,
   float XMIN, float XMAX, float YMIN, float YMAX, float XRES, float YRES, int NROWS, int NCOLS, float NODATAVALUE)
 {
+  
+  // Inithalising general attributes
   this->NROWS = NROWS;
   this->NCOLS = NCOLS;
-  // Initialising a bunch of variable
-  int this_pit_ID = -1;
-  pits_ID = std::vector<int>(pre_stack.size(),0);
-  for (auto& v : pits_ID)
-    v -= 1;
-  xt::pytensor<int,1> pre_contributing_pixels = xt::zeros<int>({pre_stack.size()});
-  // NEED TO CHECK HERE IF THE ARRAYS ARE COPIED OR VIEWS
+  this->XMIN = XMIN;
+  this->XMAX = XMAX;
+  this->YMIN = YMIN;
+  this->YMAX = YMAX;
+  this->XRES = XRES;
+  this->YRES = YRES;
+  this->NODATAVALUE = NODATAVALUE;
   this->MF_stack = tMF_stack;
   this->MF_receivers = tMF_rec;
   this->MF_lengths = tMF_length;
   this->MF_donors = tMF_don;
 
-  //First I need the accumulation vector of the prestack
+  // labelisation for pit ID, starting at -1 as I increment prior to pushing back
+  int this_pit_ID = -1;
+  // this vector will contain -1 if the node is not in a pit and pitID if it is
+  pits_ID = std::vector<int>(pre_stack.size(),-1);
+
+  // I need the pre-accumulation vector to calculate the nodes draining to a certain pit
+  xt::pytensor<int,1> pre_contributing_pixels = xt::zeros<int>({pre_stack.size()});
+  // Initialising my basin array to 0
+  basin_label = xt::zeros<int>({pre_stack.size()});
+
+  // First I need the accumulation vector of the prestack,
+  // I also labelise the basins as it will be needed for the regroupping
+  // To do so I iterate through the stack backward
+  int label = 0;
   for(int i=int(pre_stack.size()-1); i>=0; i--)
   {
-    int this_node = pre_stack(i);
-    int this_rec = pre_rec(this_node);
+    // Current node and its receiver
+    int this_node = pre_stack[i];
+    int this_rec = pre_rec[this_node];
+    // Labelling the basin
+    basin_label[this_node] = label;
+    // If I reach a base level, my node is its own receiver by convention (Braun et Willett, 2013)
     if(this_rec != this_node)
     {
-      pre_contributing_pixels(this_rec) += pre_contributing_pixels(this_node)+1 ;
+      // Adding the accumulation
+      pre_contributing_pixels[this_rec] += pre_contributing_pixels[this_node]+1 ;
+      // Incrementing the label
+      label++;
     }
-    // else
-    // {
-    //   pre_contributing_pixels[this_node] = -1;
-    // }
   }
+  // Done with the pre labelling
 
-  // first step is to register the pits before correction
-  // basically detecting where the stack is receiving itself
+  // First step is to register the pits before correction by Cordonnier et al., 2019
+  // I am therefore detecting where there are internal base levels 
   for(size_t i=0; i< pre_stack.size(); i++)
   {
-    // Getting current node and its receiver
-    int this_node = pre_stack(i);
-    int this_receiver = pre_rec(this_node);
-    // checking if it is a pit
-    if(this_node == this_receiver)
-    {
+    // Getting current node and its receiver pre/post correction
+    int this_node = pre_stack[i];
+    int this_receiver = pre_rec[this_node];
+    int post_rec = post_rec[this_node];
 
+    // Checking if it is a pit, which is equivalent to checking if:
+    // my node is draining to itself pre-correction but not post-correction
+    // If still draining to itself post-correction, it is a model base level, i.e. an outlet 
+    if(this_node == this_receiver && this_receiver != post_rec)
+    {
+      // Right, I am at the bottom of a depression, a pit
       // Incrementing the pit ID
       this_pit_ID++;
-      // Register it
-      pits_ID[this_node] = this_pit_ID;
+
+      // Registering it
+      this->pits_ID[this_node] = this_pit_ID;
+      // I know that I will save the deposition/erosion flux at that node ID to back correct it if necessary
       this->register_deposition_flux[this_node] = 0;
       this->register_erosion_flux[this_node] = 0;
 
-      // The bottom of the pit is this node
+      // The bottom of the pit is this node POTENTIAL OPTIMISATION HERE: PREDEFINE A NUMBER OF NODES IN THE PIT
       pits_bottom.push_back(this_node);
-      // its outlet is the first in the mstack that does NOT fall back into the pit again
-      pits_outlet.push_back(post_rec(this_node));
       // initialising the number of pixels to 1
       pits_npix.push_back(1);
 
-      // Saving the outlet of the elevation temporally
-      double outlet_elevation = elevation[pits_outlet[this_pit_ID]];
-      // if(pits_bottom[this_pit_ID] != pits_outlet[this_pit_ID])
-      //   std::cout<< "ELEVATION BOTTOM:" << elevation[pits_bottom[this_pit_ID]]<< " ELEVATION outel:"   << elevation[pits_outlet[this_pit_ID]] << std::endl ;
+      // I need to find its outlet here, so I will follow the receiving correction until I fall in a node in a different basin
+      int this_pit_outlet = post_rec[this_node]; // starting at this node 
+      int this_basin_label = basin_label[this_node]; // saving the label
+      int label_receiver = basin_label[post_rec[this_pit_outlet]]; // and the receiving label
+      int elevation_node = this_pit_outlet; // the elevation of the outlet will be the highest of the two nodes at the outlet
+      // Iterating until I either find a new basin or an model base-level (depression splilling water out of the model)
+      while(this_basin_label == label_receiver && this_pit_outlet != post_rec[this_pit_outlet])
+      {
+        elevation_node = this_pit_outlet;
+        this_pit_outlet = post_rec[this_pit_outlet];
+        this_basin_label = basin_label[this_pit_outlet];
+        label_receiver = basin_label[post_rec[this_pit_outlet]];
+      }
+
+      // Checking which of the past two nodes have the same elevation
+      if(elevation[elevation_node] < elevation[this_pit_outlet])
+        elevation_node = this_pit_outlet;
+
+      // saving the outlet
+      pits_outlet.push_back(this_pit_outlet);
+
+      // Quack
+      //   __
+      // <(o )___
+      //  ( ._> /
+      //   `---'  
+      // Quack
+
+      // Saving the elevation iof this local outlet
+      double outlet_elevation = elevation[elevation_node];
+
       // initialising the volume of the pit to zero
       pits_volume.push_back(0);
       //Initialising the list ofpixels for each pits
@@ -134,14 +184,62 @@ void NodeGraph::create(xt::pytensor<int,1>& pre_stack,xt::pytensor<int,1>& pre_r
     }
   // Done with labelling all pits
   }
+
+
+//    quack quack  __
+//             ___( o)>
+//             \ <_. )
+//    ~~~~~~~~  `---'  
+
+  // Saving my preacc, I might need it for later (TO DELETE IF NOT)
   this->preacc = pre_contributing_pixels;
 
+  // Now I need to deal with depression hierarchy
+  // Something I may have forgot to consider in the v0.01 of this code: some depression are intricated
+  // A simple solution is to go through the multiple stack and decide which depression is actually a subset of the new one
+  // then when I'll be filling my depressions, I'll jsut have to keep in mind already existing lake depths
+
+  // First initialising the vector to the right size
+  this->sub_depressions = std::vector<std::vector<int> >(pits_npix.size());
+  for (size_t i=0; i<pits_npix.size(); i++)
+    this->sub_depressions[i] = {};
+
+  // keeping track of which pit I processed
+  std::vector<bool> is_pit_processed(pits_npix.size(),false);
+  for(auto& node:this->MF_stack)
+  {
+    int tID = this->pits_ID[node];
+    // Ignoring non pits
+    if(tID <0)
+      continue;
+    // Ignoring already processed pits
+    if(is_pit_processed[tID] == true)
+      continue;
+
+    // unprocessed pit
+    // Its ID:
+    int this_outlet = this->pits_outlet[tID];
+    // Its outlet pit ID
+    int oID = this->pits_ID[this_outlet];
+
+    // My pit is processed
+    is_pit_processed[tID] = true;
+
+    // If my outlet is not a pit, the current pit is not a subset of another large pit
+    if (oID < 0)
+      continue;
+
+    // else it is a subset of its donor pit
+    this->sub_depressions[oID].push_back(tID);
+  }
+
+  // Done with the sub-depression routine
+  
   // Initialising the argument for calculating inherited lake waters
   this->has_excess_water_from_lake = std::vector<bool>(pre_stack.size(),false);
-  this->pits_excess_water_volume = std::vector<double>(this_pit_ID+1, 0);
+  this->pits_inherited_water_volume = std::vector<double>(this_pit_ID+1, 0);
 
 }
-
 
 
 xt::pytensor<int,1> NodeGraph::get_all_nodes_in_depression()
@@ -188,7 +286,7 @@ void NodeGraph::calculate_inherited_water_from_previous_lakes(xt::pytensor<doubl
     if(this_pit_ID>=0)
     {
       // Yes, I am just adding the excess water to the pit outlet
-      this->pits_excess_water_volume[this_pit_ID] += excess_volume;
+      this->pits_inherited_water_volume[this_pit_ID] += excess_volume;
       continue;
     }
     else

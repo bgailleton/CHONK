@@ -91,6 +91,7 @@ class NodeGraph
     // These are the stacks ingested from fastscaplib_fortran
     xt::pytensor<int,1> MF_stack;
     xt::pytensor<int,1> preacc;
+    xt::pytensor<int,1> basin_label;
     xt::pytensor<int,2> MF_receivers;
     xt::pytensor<double,2> MF_lengths;
     xt::pytensor<double,2> MF_donors;
@@ -106,11 +107,14 @@ class NodeGraph
     // legth = n_pits, pit_ID to number of pixels in the pit.
     std::vector<int> pits_npix; 
     // list of pixels in each pits
-    std::vector<std::vector<int> > pits_pixels; 
+    std::vector<std::vector<int> > pits_pixels;
+    // length =  N_pits, value = list of subdepressions IDs 
+    std::vector<std::vector<int> > sub_depressions; 
     // length = n_pits, pit_ID to volume in L^3
     std::vector<double> pits_volume;
-    // length = n_pits, pit_ID to volume in L^3
-    std::vector<double> pits_excess_water_volume;
+    // length = n_pits, pit_ID to inherited volume in L^3
+    std::vector<double> pits_inherited_water_volume;
+    // 
 
     // These two maps record for each pit node the erosion and deposition that has happened there
     // This is usefull to inverse the process when filling a pit (or not)
