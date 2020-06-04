@@ -23,7 +23,7 @@
 #include "xtensor/xarray.hpp"// manages the xtensor array (lower level than the numpy one)
 #include "xtensor/xtensor.hpp" // same
 
-#include "cppintail.hpp"
+#include "nodegraph.hpp"
 
 
 
@@ -78,6 +78,7 @@ class chonk
     // # Deposition flux
     double get_deposition_flux(){return deposition_flux;}
     void set_deposition_flux(double value){deposition_flux = value;}
+    void add_deposition_flux(double value){deposition_flux += value;}
     // # Sediment flux
     double get_sediment_flux(){return sediment_flux;}
     void set_sediment_flux(double value){sediment_flux = value;}
@@ -95,6 +96,9 @@ class chonk
     // Depression solver!
     void solve_depression_simple(NodeGraph& graph, double dt, xt::pytensor<double,1>& sed_height, xt::pytensor<double,1>& sed_height_tp1, 
   xt::pytensor<double,1>& surface_elevation,xt::pytensor<double,1>& surface_elevation_tp1, double Xres, double Yres, std::vector<chonk>& chonk_network);
+    // Sub-depression tree builder
+    void recursion_builder_subdepression_tree(std::set<int>& set_of_depressions, int current_pit_ID, NodeGraph& graph);
+
 
 
   protected:

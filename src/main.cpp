@@ -13,9 +13,9 @@
 #include <pybind11/complex.h>
 #include <pybind11/chrono.h>
 #include <pybind11/functional.h>
-// include "cppintail.hpp"
+// include "nodegraph.hpp"
 
-#include "cppintail.hpp"
+#include "nodegraph.hpp"
 #include "CHONK.hpp"
 #include "Environment.hpp"
 
@@ -68,21 +68,15 @@ PYBIND11_MODULE(CHONK_cpp, m)
       .def("get_array2d_double_param", &ModelRunner::get_array2d_double_param)
       .def("DEBUG_modify_double_array_param_inplace", &ModelRunner::DEBUG_modify_double_array_param_inplace)
       .def("get_water_flux",&ModelRunner::get_water_flux)
+      .def("get_sediment_flux",&ModelRunner::get_sediment_flux)
       .def("get_erosion_flux",&ModelRunner::get_erosion_flux)
       .def("get_other_attribute", &ModelRunner::get_other_attribute)
       .def("get_all_nodes_in_depression", &ModelRunner::get_all_nodes_in_depression)
       .def("update_timestep", &ModelRunner::update_timestep)
       .def("DEBUG_get_preacc", &ModelRunner::DEBUG_get_preacc)
+      .def("DEBUG_get_basin_label", &ModelRunner::DEBUG_get_basin_label)
       .def("DEBUG_check_weird_val_stacks", &ModelRunner::DEBUG_check_weird_val_stacks)
     ;
+    m.def("preprocess_stack", preprocess_stack);
 
-
-    // py::class_<cppintail>(m, "cppintail",py::dynamic_attr())
-    //   .def(py::init<>())
-    //   .def(py::init([](float tXMIN, float tXMAX, float tYMIN, float tYMAX, float tXRES, float tYRES, int tNROWS, int tNCOLS, float tNODATAVALUE){return std::unique_ptr<cppintail>(new cppintail(tXMIN, tXMAX, tYMIN, tYMAX, tXRES, tYRES, tNROWS, tNCOLS, tNODATAVALUE)); }))
-    //   .def("compute_neighbors", &cppintail::compute_neighbors)
-    //   .def("find_nodes_with_no_donors", &cppintail::find_nodes_with_no_donors)
-    //   .def("get_flowdir", &cppintail::get_flowdir)
-      
-    // ;
 }

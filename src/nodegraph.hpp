@@ -1,6 +1,6 @@
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-#ifndef cppintail_HPP
-#define cppintail_HPP
+#ifndef nodegraph_HPP
+#define nodegraph_HPP
 
 // STL imports
 #include <iostream>
@@ -30,10 +30,10 @@ class NodeGraph
 {
   public:
     NodeGraph() { create(); }
-    NodeGraph(xt::pytensor<int,1>& pre_stack,xt::pytensor<int,1>& pre_rec, xt::pytensor<int,1>& post_rec,
+    NodeGraph(xt::pytensor<int,1>& pre_stack,xt::pytensor<int,1>& pre_rec, xt::pytensor<int,1>& post_rec,xt::pytensor<int,1>& post_stack,
   xt::pytensor<int,1>& tMF_stack, xt::pytensor<int,2>& tMF_rec, xt::pytensor<int,2>& tMF_don, xt::pytensor<double,1>& elevation, xt::pytensor<double,2>& tMF_length,
   float XMIN, float XMAX, float YMIN, float YMAX, float XRES, float YRES, int NROWS, int NCOLS, float NODATAVALUE)
-    {create( pre_stack, pre_rec, post_rec, tMF_stack, tMF_rec, tMF_don, elevation, tMF_length, XMIN,  XMAX,  YMIN,  YMAX,  XRES, YRES, NROWS, NCOLS, NODATAVALUE);}
+    {create( pre_stack, pre_rec, post_rec, post_stack, tMF_stack, tMF_rec, tMF_don, elevation, tMF_length, XMIN,  XMAX,  YMIN,  YMAX,  XRES, YRES, NROWS, NCOLS, NODATAVALUE);}
 
     inline int row_col_to_node(int& row, int& col){return row * NCOLS + col;};
     inline int row_col_to_node(size_t& row, size_t& col){return int(row * NCOLS + col);};
@@ -54,12 +54,16 @@ class NodeGraph
     std::vector<int> get_MF_receivers_at_node(int node){std::vector<int>output(8);for(size_t i=0;i<8;i++){output[i] = MF_receivers(node,i);};return output;};
     std::vector<int> get_MF_donors_at_node(int node){std::vector<int>output(8);for(size_t i=0;i<8;i++){output[i] = MF_donors(node,i);};return output;};
     std::vector<double> get_MF_lengths_at_node(int node){std::vector<double>output(8);for(size_t i=0;i<8;i++){output[i] = MF_lengths(node,i);};return output;};
+    xt::pytensor<int,1> get_MF_stack_full(){return MF_stack;}
+    xt::pytensor<int,2> get_MF_rec_full(){return MF_receivers;}
+    xt::pytensor<int,2> get_MF_don_full(){return MF_donors;}
 
     
     //# pits
     int get_pits_ID_at_node(int node){return pits_ID[node];};
     int get_pits_bottom_at_pit_ID(int ID){return pits_bottom[ID];};
     int get_pits_outlet_at_pit_ID(int ID){return pits_outlet[ID];};
+    double get_pits_available_volume_for_sediments_at_pit_ID(int ID){return pits_available_volume_for_sediments[ID];};
     double get_pits_volume_at_pit_ID(int ID){return pits_volume[ID];};
     std::vector<int> get_pits_pixels_at_pit_ID(int ID){return pits_pixels[ID];};
     std::vector<int> get_sub_pits_at_pit_ID(int ID){return sub_depressions[ID];};
@@ -71,9 +75,13 @@ class NodeGraph
     bool does_this_node_has_inhereted_water(int node) {return has_excess_water_from_lake[node];};
     double get_node_excess_at_node(int node){return node_to_excess_of_water[node];};
     xt::pytensor<int,1> get_all_nodes_in_depression();
+    void add_pits_available_volume_for_sediments_at_pit_ID(int ID, double val){pits_available_volume_for_sediments[ID] += val;};
+    int get_pit_basin_label(int ID){return pits_baslab[ID];};
+    bool is_depression(int node){return pit_to_reroute[node];};
 
     //# DEBUG
     xt::pytensor<int,1> DEBUG_get_preacc(){return preacc;}
+    xt::pytensor<int,1> DEBUG_get_basin_label(){return basin_label;}
 
 
 
@@ -97,6 +105,9 @@ class NodeGraph
     xt::pytensor<double,2> MF_lengths;
     xt::pytensor<double,2> MF_donors;
 
+    std::vector<bool> pit_to_reroute;
+
+
     // Number of depressions
     int n_pits;
     // length=N_nodes, -1 if not in a pit, pit_ID otherwise
@@ -107,12 +118,16 @@ class NodeGraph
     std::vector<int> pits_outlet; 
     // legth = n_pits, pit_ID to number of pixels in the pit.
     std::vector<int> pits_npix; 
+    // length = n_pits, pit_ID to basinID.
+    std::vector<int> pits_baslab; 
     // list of pixels in each pits
     std::vector<std::vector<int> > pits_pixels;
     // length =  N_pits, value = list of subdepressions IDs 
     std::vector<std::vector<int> > sub_depressions; 
     // length = n_pits, pit_ID to volume in L^3
     std::vector<double> pits_volume;
+    // length = n_pits, pit_ID to available volume for sediments in L^3
+    std::vector<double> pits_available_volume_for_sediments;
     // length = n_pits, pit_ID to inherited volume in L^3
     std::vector<double> pits_inherited_water_volume;
     // 
@@ -131,7 +146,7 @@ class NodeGraph
 
   private:
     void create();
-    void create(xt::pytensor<int,1>& pre_stack,xt::pytensor<int,1>& pre_rec,xt::pytensor<int,1>& post_rec, 
+    void create(xt::pytensor<int,1>& pre_stack,xt::pytensor<int,1>& pre_rec,xt::pytensor<int,1>& post_rec, xt::pytensor<int,1>& post_stack,
   xt::pytensor<int,1>& tMF_stack, xt::pytensor<int,2>& tMF_rec,xt::pytensor<int,2>& tMF_don, xt::pytensor<double,1>& elevation, xt::pytensor<double,2>& tMF_length,
   float XMIN, float XMAX, float YMIN, float YMAX, float XRES, float YRES, int NROWS, int NCOLS, float NODATAVALUE);
 
@@ -139,6 +154,9 @@ class NodeGraph
 
 };
 
+
+// global functions
+std::vector<xt::pytensor<int,1> > preprocess_stack(xt::pytensor<int,1>& pre_stack, xt::pytensor<int,1>& pre_rec, xt::pytensor<int,1>& post_stack, xt::pytensor<int,1>& post_rec);
 
 
 
