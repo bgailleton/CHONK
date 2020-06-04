@@ -40,7 +40,7 @@ class get_numpy_include(object):
 ext_modules = [
     Extension(
         'CHONK_cpp',
-        ['src/main.cpp',"src/CHONK.cpp","src/cppintail.cpp","src/Environment.cpp"],
+        ['src/main.cpp',"src/CHONK.cpp","src/nodegraph.cpp","src/Environment.cpp"],
         include_dirs=[
             # Path to pybind11 headers
             get_pybind_include(),
