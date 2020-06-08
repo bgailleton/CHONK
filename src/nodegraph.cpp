@@ -52,6 +52,20 @@ void NodeGraph::create(xt::pytensor<int,1>& pre_stack,xt::pytensor<int,1>& pre_r
 
   // I am first correcting the donors using the receivers: the receivers seems alright but somehow my donors are buggy
   // This is simply done by inverting the receiver to the donors
+  // Also extra step I need to remove the duplicate receivers
+  for (size_t i =0; i< post_stack.size(); i++)
+  {
+    std::set<int> setofstuff;
+    for(size_t j=0; j<8;j++)
+    {
+      const bool is_in = setofstuff.find(tMF_rec(i,j)) != setofstuff.end();
+      if(is_in)
+        tMF_rec(i,j) = -1;
+      else
+        setofstuff.insert(tMF_rec(i,j));
+    }
+  }  
+
   xt::pytensor<int,1> ndon = xt::zeros<int>({post_stack.size()});
   for (size_t i =0; i< post_stack.size(); i++)
   {
@@ -126,6 +140,8 @@ void NodeGraph::create(xt::pytensor<int,1>& pre_stack,xt::pytensor<int,1>& pre_r
     }
   }
 
+
+  // Option1:
   // Now ordering my pits by how last they appear in the reverse stack
   // The idea is to process the original pits by order of appearance in the reverse stack
   std::vector<int> order_basin(label+1,-1);
@@ -155,6 +171,7 @@ void NodeGraph::create(xt::pytensor<int,1>& pre_stack,xt::pytensor<int,1>& pre_r
   for(auto node: this->MF_stack)
   {
     std::vector<int> rec = this->get_MF_receivers_at_node(node);
+    // std::vector<int> rec = this->get_MF_donors_at_node(node);
     // Initialising the minimum order to the maximum +1
     int min_order = this_order + 1;
     for(auto recnode:rec)
@@ -185,6 +202,9 @@ void NodeGraph::create(xt::pytensor<int,1>& pre_stack,xt::pytensor<int,1>& pre_r
       incr++;
     }
   }
+
+
+  // Option2: Well I need to find one
 
   return;
 

@@ -366,7 +366,6 @@ void chonk::move_to_steepest_descent_nodepression(NodeGraph& graph, double dt, x
 
     all_minus_1 = false;
     // getting the slope, dz/dx
-    // std::cout << this_neightbor  << "||" << surface_elevation[this->current_node]<< std::endl;
     
     double this_slope = 0;
     if(these_lengths[i] >= Xres)
@@ -440,13 +439,11 @@ void chonk::active_simple_SPL(double n, double m, xt::pytensor<double,1>& K, dou
 {
 
   // I am recording the current sediment fluxes in the model distributed for each receivers
-  // std::cout << "1" << std::endl;
   std::vector<double> pre_sedfluxes;pre_sedfluxes.reserve(this->weigth_sediment_fluxes.size());
   for(auto v:this->weigth_sediment_fluxes)
   {
     pre_sedfluxes.emplace_back(v*this->sediment_flux);
   }
-  // std::cout << "2" << std::endl;
 
   // Calculation current fluxes
   for(size_t i=0; i<this->receivers.size(); i++)
@@ -458,12 +455,6 @@ void chonk::active_simple_SPL(double n, double m, xt::pytensor<double,1>& K, dou
     if(isinf(this_eflux))
       std::cout << this->water_flux << "||" << this->weigth_water_fluxes[i] << "||" << this->slope_to_rec[i] << std::endl;
 
-    // if(this_eflux<0)
-    // {
-    //   std::cout << "DEBUG::errate<0, WF:" << this->water_flux << " wWF:" << this->weigth_water_fluxes[i] << " S:" << this->slope_to_rec[i] << std::endl;
-    // }
-
-    // std::cout << "this_eflux::" << this_eflux << std::endl;
     // stacking the erosion flux
     this->erosion_flux += this_eflux;
 
@@ -475,7 +466,6 @@ void chonk::active_simple_SPL(double n, double m, xt::pytensor<double,1>& K, dou
     pre_sedfluxes[i] += this_eflux * Xres * Yres * dt;
 
   }
-  // std::cout << "3" << std::endl;
 
 
   // Now I need to recalculate the sediment fluxes weights to each receivers
@@ -484,8 +474,6 @@ void chonk::active_simple_SPL(double n, double m, xt::pytensor<double,1>& K, dou
     if(this->sediment_flux>0)
       this->weigth_sediment_fluxes[i] = pre_sedfluxes[i]/this->sediment_flux;
   }
-
-  // std::cout << "4" << std::endl;
 
   // Done
   return;
@@ -560,7 +548,7 @@ void chonk::solve_depression_simple(NodeGraph& graph, double dt, xt::pytensor<do
   std::set<int> depression_tree,baslab_of_depression;
   this->recursion_builder_subdepression_tree(depression_tree, pit_id,  graph);
   // set of depression done
-
+  
   double available_volume_for_sediment = 0;
 
   for(auto tid:depression_tree)
