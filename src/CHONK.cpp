@@ -271,6 +271,26 @@ void chonk::move_MF_from_fastscapelib(NodeGraph& graph, xt::pytensor<double,2>& 
   std::vector<int> these_neighbors = graph.get_MF_receivers_at_node(this->current_node);
   std::vector<double> these_lengths = graph.get_MF_lengths_at_node(this->current_node);
 
+  // eventually correcting the weigths, if I deleted some receivers, the weights are not corrects anymore
+  double sum_weights = 0;
+  for(size_t i=0; i<8; i++)
+  {
+    if(external_weigth_water_fluxes(this->current_node,i)<0 || these_neighbors[i] < 0)
+      continue;
+    else
+      sum_weights += external_weigth_water_fluxes(this->current_node,i);
+  }
+  if(sum_weights != 1)
+  {
+    for(size_t i=0; i<8; i++)
+    {
+      if(external_weigth_water_fluxes(this->current_node,i)<0)
+        continue;
+      else
+        external_weigth_water_fluxes(this->current_node,i) = external_weigth_water_fluxes(this->current_node,i)/sum_weights;
+    }
+  }
+
 
   bool all_minus_1 = true;
   // looping through neighbors
@@ -415,7 +435,7 @@ void chonk::move_to_steepest_descent_nodepression(NodeGraph& graph, double dt, x
 // As opposed to the modification of fluxes linked to the motions of the chonk which needs to be treated later (e,d,...) 
 
 // Simplest scenario possible, the chonk accumulates the drainage area
-void chonk::inplace_only_drainage_area(double Xres, double Yres){this->water_flux += Xres * Yres;};
+void chonk::inplace_only_drainage_area(double Xres, double Yres){this->water_flux += Xres * Yres;}//; std::cout << this->water_flux << "||";};
 
 // Calculate discharge by adding simple precipitation modulator 
 void chonk::inplace_precipitation_discharge(double Xres, double Yres, xt::pytensor<double,1>& precipitation){this->water_flux += Xres * Yres * precipitation[current_node];};

@@ -44,7 +44,11 @@ class NodeGraph
         row = int((node - col)/NCOLS);
     };
 
+    void recursive_progapagate_label(int node, int label, std::vector<bool>& is_processed, std::vector<std::vector<int> >& labelz);
+
     void calculate_inherited_water_from_previous_lakes(xt::pytensor<double,1>& previous_lake_depth, xt::pytensor<int,1>& post_rec);
+
+    void update_receivers_at_node(int node, std::vector<int>& new_receivers);
 
 
 
