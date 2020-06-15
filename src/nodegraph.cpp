@@ -35,6 +35,9 @@
 
 #include "nodegraph.hpp"
 
+#include <boost/graph/graph_traits.hpp>
+#include <boost/graph/adjacency_list.hpp>
+
 
 
 // This empty constructor is just there to have a default one.
@@ -114,7 +117,13 @@ void NodeGraph::create(xt::pytensor<int,1>& pre_stack,xt::pytensor<int,1>& pre_r
 
   pit_to_reroute  = std::vector<bool>(nuint_element,false);
 
-  std::cout <<"URG" << std::endl;
+  std::vector<std::vector<int> > separated_trees;
+  std::map<int,int> BL_to_sep_tree;
+  int index_st = 0;
+  separated_trees.push_back({});
+
+
+  // std::cout <<"URG" << std::endl;
   // Step I:
   // # Order my basin by order of preocessing from top to bottom in the corrected stack
   int incr2 = 0;
@@ -124,6 +133,8 @@ void NodeGraph::create(xt::pytensor<int,1>& pre_stack,xt::pytensor<int,1>& pre_r
     if(pre_rec[node] == node)
     {
       all_base_levels_nocorr.push_back(node);
+      separated_trees[index_st].push_back(node);
+      BL_to_sep_tree[node] = index_st;
       BL_to_index[node] = incr2;
       incr2++;
     
@@ -131,11 +142,16 @@ void NodeGraph::create(xt::pytensor<int,1>& pre_stack,xt::pytensor<int,1>& pre_r
       {
         pit_to_reroute[node] = true;
       }
+      else
+      {
+        separated_trees.push_back({});
+        index_st++;
+      }
     }
     basin_multi_label.emplace_back(std::vector<int>());
   }
   // all_base_levels_nocorr now has all the baselevel nodes ordered by graph solving
-  std::cout <<"URG2" << std::endl;
+  // std::cout <<"URG2" << std::endl;
 
 
   //Step II: label the basins from these nodes on the uncorrected multiple stack
@@ -143,6 +159,7 @@ void NodeGraph::create(xt::pytensor<int,1>& pre_stack,xt::pytensor<int,1>& pre_r
   {
     std::vector<bool> is_noted(nuint_element,false);
     // this->recursive_progapagate_label(node, node,is_noted,basin_multi_label);
+    // Old try, less optimised
     std::queue<int> nodes_to_label;
     nodes_to_label.push(node);
     // std::vector<bool> is_noted(nuint_element,false);
@@ -167,7 +184,7 @@ void NodeGraph::create(xt::pytensor<int,1>& pre_stack,xt::pytensor<int,1>& pre_r
       }
     }
   }
-  std::cout <<"URG3" << std::endl;
+  // std::cout <<"URG3" << std::endl;
 
   for(int i=0; i< nint_element; i++)
   {
@@ -175,51 +192,512 @@ void NodeGraph::create(xt::pytensor<int,1>& pre_stack,xt::pytensor<int,1>& pre_r
   }
 
   xt::pytensor<int,1> new_MF_stack = xt::zeros<int>({nuint_element});
-  // std::vector<std::vector<int> > new_MF_stack(all_base_levels_nocorr.size());
-  // for(auto& v:new_MF_stack)
-  //   new_MF_stack = std::vector<int>();
 
   std::vector<bool> is_processed(nuint_element,false);
   int incr = 0;
-  for(auto BL: all_base_levels_nocorr)
-  {
-    // std::cout << "BL:" << std::endl;
+  int next_node = 0;
 
-    int index = index_in_first_MFstack[BL];
-    // std::cout << BL << "||" << index << std::endl;
-    std::vector<int> temp;
-    for(int j = index; j>=0;j--)
-    {
-      int this_node = this->MF_stack[j];
-
-      if(is_processed[this_node])
-        continue;
-
-      std::vector<int>& baslabs = basin_multi_label[this_node];
-
-      if(std::find(baslabs.begin(), baslabs.end(), BL) != baslabs.end())
-      {
-        is_processed[this_node] = true;
-        temp.push_back(this_node);
-      }
-    }
-    // std::cout << temp.size() << std::endl;
-
-
-    for(int i = int(temp.size()-1); i>=0;i--)
-    // for(size_t i=0; i<temp.size(); i++)
-    {
-      int this_node = temp[i];
-      // std::cout << this_node << std::endl;
-      new_MF_stack[incr] = this_node;
-      incr++;
-    }
-  }
-  std::cout <<"URG4" << std::endl;
-
-  this->MF_stack =  new_MF_stack;
 
   return;
+
+
+
+}
+
+void NodeGraph::recursive_progapagate_label(int node, int label, std::vector<bool>& is_processed, std::vector<std::vector<int> >& labelz)
+{
+  is_processed[node] = true;
+  labelz[node].push_back(label);
+  std::vector<int> donodes = this->get_MF_donors_at_node(node);
+  for(auto nnode:donodes)
+  {
+    if(nnode<0 || is_processed[nnode])
+      continue;
+    this->recursive_progapagate_label(nnode,label, is_processed, labelz);
+  }
+}
+
+void NodeGraph::update_receivers_at_node(int node, std::vector<int>& new_receivers)
+{
+  for(size_t i = 0; i<8; i++)
+  {
+    if(i>=new_receivers.size())
+      this->MF_receivers(node,i) = -1;
+    else
+      this->MF_receivers(node,i) = new_receivers[i];
+  }
+  
+}
+
+
+
+
+
+
+
+
+
+
+xt::pytensor<int,1> NodeGraph::get_all_nodes_in_depression()
+{
+//      _                               _           _ 
+//     | |                             | |         | |
+//   __| | ___ _ __  _ __ ___  ___ __ _| |_ ___  __| |
+//  / _` |/ _ \ '_ \| '__/ _ \/ __/ _` | __/ _ \/ _` |
+// | (_| |  __/ |_) | | |  __/ (_| (_| | ||  __/ (_| |
+//  \__,_|\___| .__/|_|  \___|\___\__,_|\__\___|\__,_|
+//            | |                                     
+//            |_|                                    
+
+  xt::pytensor<int,1> output = xt::zeros<int>({size_t(NROWS*NCOLS)});
+
+  for(auto vec:pits_pixels)
+  {
+    for(auto node:vec)
+      output[node]=1;
+  }
+  return output;
+}
+
+
+
+void NodeGraph::calculate_inherited_water_from_previous_lakes(xt::pytensor<double,1>& previous_lake_depth, xt::pytensor<int,1>& post_rec)
+{
+     // _                               _           _ 
+//     | |                             | |         | |
+//   __| | ___ _ __  _ __ ___  ___ __ _| |_ ___  __| |
+//  / _` |/ _ \ '_ \| '__/ _ \/ __/ _` | __/ _ \/ _` |
+// | (_| |  __/ |_) | | |  __/ (_| (_| | ||  __/ (_| |
+//  \__,_|\___| .__/|_|  \___|\___\__,_|\__\___|\__,_|
+//            | |                                     
+//            |_|                                    
+
+  // Iterating through the inverse stack
+  std::vector<bool> is_processed(post_rec.size(),false);
+  for(size_t i = 0; i<post_rec.size();i++)
+  {
+    // getting current node ID
+    int this_node = this->MF_stack[i];
+    double this_lake_depth = previous_lake_depth[this_node];
+
+    // Checking if there is any excess of water 
+    if(this_lake_depth == 0)
+    {
+      is_processed[this_node] = true;
+      continue;
+    }
+
+    if(is_processed[this_node])
+      continue;
+    
+    is_processed[this_node] = true;
+    // alright, I have unprocessed excess of water there
+    double excess_volume = this_lake_depth * XRES * YRES;
+
+    // does it fall into an existing pit
+    int this_pit_ID = this->pits_ID[this_node];
+    int outlet_node = -9999; // triggering segfault if this happens not to be modified. #ExtremeDebugging
+    if(this_pit_ID>=0)
+    {
+      // Yes, I am just adding the excess water to the pit outlet
+      this->pits_inherited_water_volume[this_pit_ID] += excess_volume;
+      continue;
+    }
+    else
+    {
+      outlet_node = post_rec[this_node];
+    }
+    
+    if(this->has_excess_water_from_lake[outlet_node])
+      excess_volume += node_to_excess_of_water[outlet_node];
+
+    this->node_to_excess_of_water[outlet_node] = excess_volume;
+    this->has_excess_water_from_lake[outlet_node] = true;
+
+  }
+
+}
+
+
+
+
+
+// This function preprocesses the stack after coorection by Cordonnier et al., 2019. It keeps the order but "unroute" the pits so that the depression solving is not affected
+std::vector<xt::pytensor<int,1> > preprocess_stack(xt::pytensor<int,1>& pre_stack, xt::pytensor<int,1>& pre_rec, xt::pytensor<int,1>& post_stack, xt::pytensor<int,1>& post_rec)
+{ 
+// This function was my test #2: I was preprocessng the single flow stack before calculating the multiple stack in the hope to get it right.
+// It crashes the fortran code because it enforced some circularity in the MF stack, which would be quite convoluted to get rid of compared to the new version of the code 
+//      _                               _           _ 
+//     | |                             | |         | |
+//   __| | ___ _ __  _ __ ___  ___ __ _| |_ ___  __| |
+//  / _` |/ _ \ '_ \| '__/ _ \/ __/ _` | __/ _ \/ _` |
+// | (_| |  __/ |_) | | |  __/ (_| (_| | ||  __/ (_| |
+//  \__,_|\___| .__/|_|  \___|\___\__,_|\__\___|\__,_|
+//            | |                                     
+//            |_|                                    
+  // I'll need basin labels
+  xt::pytensor<int,1> baslab = xt::zeros<int>({pre_stack.size()});
+  // I am keeping tracks of the base levels
+  std::vector<int> base_levels;base_levels.reserve(pre_stack.size());
+  std::vector<int> base_levels_index;base_levels_index.reserve(pre_stack.size());
+  // I will return which pits have been rerouted and needs to be processes
+  xt::pytensor<int,1> rerouted_pits = xt::zeros<bool>({pre_stack.size()});
+
+  // First I am labelling the basins
+  int this_label = 0;
+  for(int i = pre_stack.size() -1 ; i>=0; i--)
+  {
+    int this_node = pre_stack[i];
+    int this_receiver = pre_rec[this_node];
+    baslab[this_node] = this_label;
+    // if base-level in the prestack (pre correction) then different basin
+    if(this_node == this_receiver)
+    {
+      if(this_node == 2075)
+        std::cout << "flub: "<< std::endl;
+      base_levels.emplace_back(this_node);
+      base_levels_index.emplace_back(i);
+      this_label++;
+    }
+  }
+  // cleaning space
+  base_levels.shrink_to_fit();
+  base_levels_index.shrink_to_fit();
+
+  // Now I am back calculating the corrections on the stack while keeping the right order in the basin calculations
+  for(size_t i=0; i<base_levels.size(); i++)
+  {   
+    int node = base_levels[i];
+    int index = base_levels_index[i];
+    if(node == 2075)
+        std::cout << "bulf: " << std::endl;
+    if(pre_rec[node] == post_rec[node])
+    {
+      // If the receiver has never been corrected -> this is a true base level and fluxes can escape
+      rerouted_pits[node] = -1;
+      continue;
+    }
+    if(node == 2075)
+        std::cout << "bulf2 " << std::endl;
+
+    // For each correction I gather the node to correct and their receivers
+    std::vector<int> nodes_to_correct;
+    std::vector<int> rec_to_correct;
+
+    // Dealing with current node first
+    int this_node = node;
+    int this_rec = post_rec[node];
+
+    // While I am (i) still in the same basin (ii) the node has been corrected and (iii) I am not at a base-level, I keep on gathering nodes
+    // Note that if I reach a "true" base level it means my depression is outleting outside of the model
+    while(this_rec != pre_rec[this_node] && this_node != this_rec)
+    {
+      if(node == 2075)
+        std::cout << "bulf3 " << std::endl;
+      // Above conditions are met: this node will be to be corrected
+      nodes_to_correct.push_back(this_node);
+      rec_to_correct.push_back(this_rec);
+      // preparing the next one
+      this_node = this_rec;
+      this_rec = post_rec[this_node];
+      if(baslab[this_rec] != baslab[this_node])
+      {
+        nodes_to_correct.push_back(this_node);
+        rec_to_correct.push_back(this_rec);
+        break;
+      }
+    }
+
+    // I have supposidely gathered everything. Just checking I have at least one node in the thingy
+    if(nodes_to_correct.size()>0)
+    {
+      // The pit bottom is rerouted to itself -> CORRECTION: to ensure the mstack to keep the basin order, I think i need to make the receiver
+      int new_receveir_for_base_level = post_rec[nodes_to_correct[nodes_to_correct.size()-1]];
+      while(pre_rec[post_rec[new_receveir_for_base_level]] != pre_rec[new_receveir_for_base_level])
+        new_receveir_for_base_level = post_rec[new_receveir_for_base_level];
+
+      post_rec[nodes_to_correct[0]] = new_receveir_for_base_level;
+
+
+      // For each node, I correct their receiver to the presious one to reroute them to the centre of the pit
+      for(size_t i=1; i< nodes_to_correct.size(); i++)
+      {
+        post_rec[nodes_to_correct[i]] = pre_rec[nodes_to_correct[i]];
+      }
+
+      // I need to correct the stack now
+      for(int j=0; j<nodes_to_correct.size();j++)
+      {
+        post_stack[index + j] = nodes_to_correct[nodes_to_correct.size() - 1 - j];
+      }
+
+      // I mark this node has to be processed
+      rerouted_pits[nodes_to_correct[0]] = 1;
+    }
+    // Done with this base level
+  }
+
+  // For some reason, this function did not modify my arrays in place, idk why... So I return the results instead which could be otpimised in the future to avoid copy
+  std::vector<xt::pytensor<int,1> > output;output.reserve(3);
+  output.emplace_back(post_rec);
+  output.emplace_back(post_stack);
+  output.emplace_back(rerouted_pits);
+
+  // returning output
+  return output;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+//##############################
+
+// // saving a nearly working version here to work on a new one:
+// // This empty constructor is just there to have a default one.
+// void NodeGraph::create(xt::pytensor<int,1>& pre_stack,xt::pytensor<int,1>& pre_rec, xt::pytensor<int,1>& post_rec, xt::pytensor<int,1>& post_stack,
+//   xt::pytensor<int,1>& tMF_stack, xt::pytensor<int,2>& tMF_rec,xt::pytensor<int,2>& tMF_don, xt::pytensor<double,1>& elevation, xt::pytensor<double,2>& tMF_length,
+//   float XMIN, float XMAX, float YMIN, float YMAX, float XRES, float YRES, int NROWS, int NCOLS, float NODATAVALUE)
+// {
+
+//   // I am first correcting the donors using the receivers: the receivers seems alright but somehow my donors are buggy
+//   // This is simply done by inverting the receiver to the donors
+//   // Also extra step I need to remove the duplicate receivers
+//   for (size_t i =0; i< post_stack.size(); i++)
+//   {
+//     std::set<int> setofstuff;
+//     for(size_t j=0; j<8;j++)
+//     {
+//       const bool is_in = setofstuff.find(tMF_rec(i,j)) != setofstuff.end();
+//       if(is_in)
+//         tMF_rec(i,j) = -1;
+//       else
+//         setofstuff.insert(tMF_rec(i,j));
+//     }
+//   }  
+
+//   xt::pytensor<int,1> ndon = xt::zeros<int>({post_stack.size()});
+//   for (size_t i =0; i< post_stack.size(); i++)
+//   {
+//     for(size_t j=0; j<8;j++)
+//     {
+//       int this_rec = tMF_rec(i,j);
+//       if(this_rec<0)
+//         continue;
+//       tMF_don(this_rec,ndon[this_rec]) = int(i);
+//       ndon[this_rec]++;
+//     }
+//   }
+
+//   // And labelling as no data the remaining donors
+//   for (size_t i =0; i< post_stack.size(); i++)
+//   {
+//     for(int j = ndon[i]; j<8; j++)
+//     {
+//       tMF_don(i,j) = -1;
+//     }
+//   }
+  
+//   // Inithalising general attributes
+//   this->NROWS = NROWS;
+//   this->NCOLS = NCOLS;
+//   this->XMIN = XMIN;
+//   this->XMAX = XMAX;
+//   this->YMIN = YMIN;
+//   this->YMAX = YMAX;
+//   this->XRES = XRES;
+//   this->YRES = YRES;
+//   this->NODATAVALUE = NODATAVALUE;
+//   this->MF_stack = tMF_stack;
+//   this->MF_receivers = tMF_rec;
+//   this->MF_lengths = tMF_length;
+//   this->MF_donors = tMF_don;
+
+//   int nint_element = int(this->MF_stack.size());
+//   size_t nuint_element = this->MF_stack.size();
+
+//   // Now I need to post-process the MF stack
+
+//   std::vector<std::vector<int> > basin_multi_label(nuint_element);
+//   std::vector<int> all_base_levels_nocorr, index_in_first_MFstack(nint_element);
+//   std::map<int,int> BL_to_index;
+
+//   pit_to_reroute  = std::vector<bool>(nuint_element,false);
+
+//   std::vector<std::vector<int> > separated_trees;
+//   std::map<int,int> BL_to_sep_tree;
+//   int index_st = 0;
+//   separated_trees.push_back({});
+
+
+//   // std::cout <<"URG" << std::endl;
+//   // Step I:
+//   // # Order my basin by order of preocessing from top to bottom in the corrected stack
+//   int incr2 = 0;
+//   for(int i = nint_element - 1; i>=0; i--)
+//   {
+//     int node = post_stack[i];
+//     if(pre_rec[node] == node)
+//     {
+//       all_base_levels_nocorr.push_back(node);
+//       separated_trees[index_st].push_back(node);
+//       BL_to_sep_tree[node] = index_st;
+//       BL_to_index[node] = incr2;
+//       incr2++;
+    
+//       if(post_rec[node] != node)
+//       {
+//         pit_to_reroute[node] = true;
+//       }
+//       else
+//       {
+//         separated_trees.push_back({});
+//         index_st++;
+//       }
+//     }
+//     basin_multi_label.emplace_back(std::vector<int>());
+//   }
+//   // all_base_levels_nocorr now has all the baselevel nodes ordered by graph solving
+//   // std::cout <<"URG2" << std::endl;
+
+
+//   //Step II: label the basins from these nodes on the uncorrected multiple stack
+//   for(auto node : all_base_levels_nocorr)
+//   {
+//     std::vector<bool> is_noted(nuint_element,false);
+//     // this->recursive_progapagate_label(node, node,is_noted,basin_multi_label);
+//     // Old try, less optimised
+//     std::queue<int> nodes_to_label;
+//     nodes_to_label.push(node);
+//     // std::vector<bool> is_noted(nuint_element,false);
+//     is_noted[node] = true;
+
+//     while(nodes_to_label.empty() == false)
+//     {
+//       int this_node = nodes_to_label.front();
+//       // std::cout << this_node << std::endl;
+//       basin_multi_label[this_node].push_back(node);
+//       nodes_to_label.pop();
+//       std::vector<int> neighbors = this->get_MF_donors_at_node(this_node);
+//       for(auto nenode:neighbors)
+//       {
+//         if(nenode<0 || nenode == this_node || is_noted[nenode])
+//         {
+//           continue;
+//         }
+//         nodes_to_label.push(nenode);
+//         is_noted[nenode] = true;
+
+//       }
+//     }
+//   }
+//   // std::cout <<"URG3" << std::endl;
+
+//   for(int i=0; i< nint_element; i++)
+//   {
+//     index_in_first_MFstack[this->MF_stack[i]] = i;
+//   }
+
+//   xt::pytensor<int,1> new_MF_stack = xt::zeros<int>({nuint_element});
+
+//   std::vector<bool> is_processed(nuint_element,false);
+//   int incr = 0;
+//   int next_node = 0;
+
+//   // version 2:: Does not work so far...
+//   // while (incr<nint_element)
+//   // {
+//   //   int current_basin_tree_id = BL_to_sep_tree[basin_multi_label[this->MF_stack[next_node]][0]];
+//   //   std::cout << current_basin_tree_id << std::endl;
+//   //   std::vector<int>& current_BT = separated_trees[current_basin_tree_id];
+
+//   //   int last_index_start;
+//   //   for(auto BL:current_BT )
+//   //   {
+      
+//   //     int index_start = index_in_first_MFstack[BL];
+//   //     if(is_processed[ this->MF_stack[index_start] ])
+//   //       std:: cout << "FATAERROR::2" << std::endl;
+//   //     int index_stop = index_in_first_MFstack[BL];
+//   //     for(int j = index_start; j>=0;j--)
+//   //     {
+//   //       int this_node = this->MF_stack[j];
+//   //       if(is_processed[this_node])
+//   //         break;
+//   //       index_stop = j;
+
+//   //     }
+
+//   //     for(int i = index_stop; i<=index_start; i++)
+//   //     {
+//   //       int this_node = this->MF_stack[i];
+//   //       new_MF_stack[incr] = this_node;
+//   //       incr++;
+//   //       is_processed[this_node] = true;
+//   //       if(incr>=nint_element)
+//   //         std::cout << "FATALERROR" << std::endl;
+//   //     }
+//   //     last_index_start = index_start;
+//   //   }
+
+
+//   //   if(incr<nint_element)
+//   //     next_node = this->MF_stack[last_index_start+1];
+//   // }
+
+
+//   // version 1, more secure but slower
+//   for(auto BL: all_base_levels_nocorr)
+//   {
+//     // std::cout << "BL:" << std::endl;
+//     int n_element_this_vector = 0;
+//     int index = index_in_first_MFstack[BL];
+//     // std::cout << BL << "||" << index << std::endl;
+//     std::vector<int> temp;temp.reserve(nuint_element);
+//     for(int j = index; j>=0;j--)
+//     {
+//       int this_node = this->MF_stack[j];
+
+//       if(is_processed[this_node])
+//         continue;
+
+//       std::vector<int>& baslabs = basin_multi_label[this_node];
+
+//       if(std::find(baslabs.begin(), baslabs.end(), BL) != baslabs.end())
+//       {
+//         is_processed[this_node] = true;
+//         temp.emplace_back(this_node);
+//         n_element_this_vector++;
+//       }
+//     }
+//     // temp.shrink_to_fit();
+//     // std::cout << temp.size() << std::endl;
+
+
+//     for(int i = int(n_element_this_vector-1); i>=0;i--)
+//     // for(size_t i=0; i<temp.size(); i++)
+//     {
+//       int this_node = temp[i];
+//       // std::cout << this_node << std::endl;
+//       new_MF_stack[incr] = this_node;
+//       incr++;
+//     }
+//   }
+
+//   // std::cout <<"URG4" << std::endl;
+
+//   this->MF_stack =  new_MF_stack;
+//   // std::cout <<"URG5" << std::endl;
+
+//   return;
 
 
   
@@ -547,32 +1025,7 @@ void NodeGraph::create(xt::pytensor<int,1>& pre_stack,xt::pytensor<int,1>& pre_r
 //   this->has_excess_water_from_lake = std::vector<bool>(pre_stack.size(),false);
 //   this->pits_inherited_water_volume = std::vector<double>(this_pit_ID+1, 0);
 
-}
-
-void NodeGraph::recursive_progapagate_label(int node, int label, std::vector<bool>& is_processed, std::vector<std::vector<int> >& labelz)
-{
-  is_processed[node] = true;
-  labelz[node].push_back(label);
-  std::vector<int> donodes = this->get_MF_donors_at_node(node);
-  for(auto nnode:donodes)
-  {
-    if(nnode<0 || is_processed[nnode])
-      continue;
-    this->recursive_progapagate_label(nnode,label, is_processed, labelz);
-  }
-}
-
-void NodeGraph::update_receivers_at_node(int node, std::vector<int>& new_receivers)
-{
-  for(size_t i = 0; i<8; i++)
-  {
-    if(i>=new_receivers.size())
-      this->MF_receivers(node,i) = -1;
-    else
-      this->MF_receivers(node,i) = new_receivers[i];
-  }
-  
-}
+// }
 
 
 
@@ -583,214 +1036,23 @@ void NodeGraph::update_receivers_at_node(int node, std::vector<int>& new_receive
 
 
 
-xt::pytensor<int,1> NodeGraph::get_all_nodes_in_depression()
-{
-//      _                               _           _ 
-//     | |                             | |         | |
-//   __| | ___ _ __  _ __ ___  ___ __ _| |_ ___  __| |
-//  / _` |/ _ \ '_ \| '__/ _ \/ __/ _` | __/ _ \/ _` |
-// | (_| |  __/ |_) | | |  __/ (_| (_| | ||  __/ (_| |
-//  \__,_|\___| .__/|_|  \___|\___\__,_|\__\___|\__,_|
-//            | |                                     
-//            |_|                                    
-
-  xt::pytensor<int,1> output = xt::zeros<int>({size_t(NROWS*NCOLS)});
-
-  for(auto vec:pits_pixels)
-  {
-    for(auto node:vec)
-      output[node]=1;
-  }
-  return output;
-}
-
-
-
-void NodeGraph::calculate_inherited_water_from_previous_lakes(xt::pytensor<double,1>& previous_lake_depth, xt::pytensor<int,1>& post_rec)
-{
-     // _                               _           _ 
-//     | |                             | |         | |
-//   __| | ___ _ __  _ __ ___  ___ __ _| |_ ___  __| |
-//  / _` |/ _ \ '_ \| '__/ _ \/ __/ _` | __/ _ \/ _` |
-// | (_| |  __/ |_) | | |  __/ (_| (_| | ||  __/ (_| |
-//  \__,_|\___| .__/|_|  \___|\___\__,_|\__\___|\__,_|
-//            | |                                     
-//            |_|                                    
-
-  // Iterating through the inverse stack
-  std::vector<bool> is_processed(post_rec.size(),false);
-  for(size_t i = 0; i<post_rec.size();i++)
-  {
-    // getting current node ID
-    int this_node = this->MF_stack[i];
-    double this_lake_depth = previous_lake_depth[this_node];
-
-    // Checking if there is any excess of water 
-    if(this_lake_depth == 0)
-    {
-      is_processed[this_node] = true;
-      continue;
-    }
-
-    if(is_processed[this_node])
-      continue;
-    
-    is_processed[this_node] = true;
-    // alright, I have unprocessed excess of water there
-    double excess_volume = this_lake_depth * XRES * YRES;
-
-    // does it fall into an existing pit
-    int this_pit_ID = this->pits_ID[this_node];
-    int outlet_node = -9999; // triggering segfault if this happens not to be modified. #ExtremeDebugging
-    if(this_pit_ID>=0)
-    {
-      // Yes, I am just adding the excess water to the pit outlet
-      this->pits_inherited_water_volume[this_pit_ID] += excess_volume;
-      continue;
-    }
-    else
-    {
-      outlet_node = post_rec[this_node];
-    }
-    
-    if(this->has_excess_water_from_lake[outlet_node])
-      excess_volume += node_to_excess_of_water[outlet_node];
-
-    this->node_to_excess_of_water[outlet_node] = excess_volume;
-    this->has_excess_water_from_lake[outlet_node] = true;
-
-  }
-
-}
 
 
 
 
 
-// This function preprocesses the stack after coorection by Cordonnier et al., 2019. It keeps the order but "unroute" the pits so that the depression solving is not affected
-std::vector<xt::pytensor<int,1> > preprocess_stack(xt::pytensor<int,1>& pre_stack, xt::pytensor<int,1>& pre_rec, xt::pytensor<int,1>& post_stack, xt::pytensor<int,1>& post_rec)
-{ 
-// This function was my test #2: I was preprocessng the single flow stack before calculating the multiple stack in the hope to get it right.
-// It crashes the fortran code because it enforced some circularity in the MF stack, which would be quite convoluted to get rid of compared to the new version of the code 
-//      _                               _           _ 
-//     | |                             | |         | |
-//   __| | ___ _ __  _ __ ___  ___ __ _| |_ ___  __| |
-//  / _` |/ _ \ '_ \| '__/ _ \/ __/ _` | __/ _ \/ _` |
-// | (_| |  __/ |_) | | |  __/ (_| (_| | ||  __/ (_| |
-//  \__,_|\___| .__/|_|  \___|\___\__,_|\__\___|\__,_|
-//            | |                                     
-//            |_|                                    
-  // I'll need basin labels
-  xt::pytensor<int,1> baslab = xt::zeros<int>({pre_stack.size()});
-  // I am keeping tracks of the base levels
-  std::vector<int> base_levels;base_levels.reserve(pre_stack.size());
-  std::vector<int> base_levels_index;base_levels_index.reserve(pre_stack.size());
-  // I will return which pits have been rerouted and needs to be processes
-  xt::pytensor<int,1> rerouted_pits = xt::zeros<bool>({pre_stack.size()});
-
-  // First I am labelling the basins
-  int this_label = 0;
-  for(int i = pre_stack.size() -1 ; i>=0; i--)
-  {
-    int this_node = pre_stack[i];
-    int this_receiver = pre_rec[this_node];
-    baslab[this_node] = this_label;
-    // if base-level in the prestack (pre correction) then different basin
-    if(this_node == this_receiver)
-    {
-      if(this_node == 2075)
-        std::cout << "flub: "<< std::endl;
-      base_levels.emplace_back(this_node);
-      base_levels_index.emplace_back(i);
-      this_label++;
-    }
-  }
-  // cleaning space
-  base_levels.shrink_to_fit();
-  base_levels_index.shrink_to_fit();
-
-  // Now I am back calculating the corrections on the stack while keeping the right order in the basin calculations
-  for(size_t i=0; i<base_levels.size(); i++)
-  {   
-    int node = base_levels[i];
-    int index = base_levels_index[i];
-    if(node == 2075)
-        std::cout << "bulf: " << std::endl;
-    if(pre_rec[node] == post_rec[node])
-    {
-      // If the receiver has never been corrected -> this is a true base level and fluxes can escape
-      rerouted_pits[node] = -1;
-      continue;
-    }
-    if(node == 2075)
-        std::cout << "bulf2 " << std::endl;
-
-    // For each correction I gather the node to correct and their receivers
-    std::vector<int> nodes_to_correct;
-    std::vector<int> rec_to_correct;
-
-    // Dealing with current node first
-    int this_node = node;
-    int this_rec = post_rec[node];
-
-    // While I am (i) still in the same basin (ii) the node has been corrected and (iii) I am not at a base-level, I keep on gathering nodes
-    // Note that if I reach a "true" base level it means my depression is outleting outside of the model
-    while(this_rec != pre_rec[this_node] && this_node != this_rec)
-    {
-      if(node == 2075)
-        std::cout << "bulf3 " << std::endl;
-      // Above conditions are met: this node will be to be corrected
-      nodes_to_correct.push_back(this_node);
-      rec_to_correct.push_back(this_rec);
-      // preparing the next one
-      this_node = this_rec;
-      this_rec = post_rec[this_node];
-      if(baslab[this_rec] != baslab[this_node])
-      {
-        nodes_to_correct.push_back(this_node);
-        rec_to_correct.push_back(this_rec);
-        break;
-      }
-    }
-
-    // I have supposidely gathered everything. Just checking I have at least one node in the thingy
-    if(nodes_to_correct.size()>0)
-    {
-      // The pit bottom is rerouted to itself -> CORRECTION: to ensure the mstack to keep the basin order, I think i need to make the receiver
-      int new_receveir_for_base_level = post_rec[nodes_to_correct[nodes_to_correct.size()-1]];
-      while(pre_rec[post_rec[new_receveir_for_base_level]] != pre_rec[new_receveir_for_base_level])
-        new_receveir_for_base_level = post_rec[new_receveir_for_base_level];
-
-      post_rec[nodes_to_correct[0]] = new_receveir_for_base_level;
 
 
-      // For each node, I correct their receiver to the presious one to reroute them to the centre of the pit
-      for(size_t i=1; i< nodes_to_correct.size(); i++)
-      {
-        post_rec[nodes_to_correct[i]] = pre_rec[nodes_to_correct[i]];
-      }
 
-      // I need to correct the stack now
-      for(int j=0; j<nodes_to_correct.size();j++)
-      {
-        post_stack[index + j] = nodes_to_correct[nodes_to_correct.size() - 1 - j];
-      }
 
-      // I mark this node has to be processed
-      rerouted_pits[nodes_to_correct[0]] = 1;
-    }
-    // Done with this base level
-  }
 
-  // For some reason, this function did not modify my arrays in place, idk why... So I return the results instead which could be otpimised in the future to avoid copy
-  std::vector<xt::pytensor<int,1> > output;output.reserve(3);
-  output.emplace_back(post_rec);
-  output.emplace_back(post_stack);
-  output.emplace_back(rerouted_pits);
 
-  // returning output
-  return output;
-}
+
+
+
+
+
+
 
 
 
