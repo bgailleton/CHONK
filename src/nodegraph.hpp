@@ -85,7 +85,7 @@ class NodeGraph
 
     //# DEBUG
     xt::pytensor<int,1> DEBUG_get_preacc(){return preacc;}
-    xt::pytensor<int,1> DEBUG_get_basin_label(){return basin_label;}
+    std::vector<std::vector<int> > DEBUG_get_basin_label(){return debug_baslab;}
 
 
 
@@ -146,6 +146,8 @@ class NodeGraph
     std::vector<bool> has_excess_water_from_lake;
     // key: node ID, val: excess volume of water due to previous lake (recalculated to be diverted to outlets)
     std::map<int,double> node_to_excess_of_water;
+
+    std::vector<std::vector<int> > debug_baslab;
 
 
   private:

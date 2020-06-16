@@ -144,6 +144,10 @@ void NodeGraph::create(xt::pytensor<int,1>& pre_stack,xt::pytensor<int,1>& pre_r
       }
       else
       {
+        // std::cout << "[";
+        // for(auto v:separated_trees[index_st])
+        //   std::cout << v << ",";
+        // std::cout << std::endl;
         separated_trees.push_back({});
         index_st++;
       }
@@ -196,6 +200,55 @@ void NodeGraph::create(xt::pytensor<int,1>& pre_stack,xt::pytensor<int,1>& pre_r
   std::vector<bool> is_processed(nuint_element,false);
   int incr = 0;
   int next_node = 0;
+
+  // version 1, more secure but slower
+  for(auto BL: all_base_levels_nocorr)
+  {
+    // std::cout << "BL:" << std::endl;
+    int n_element_this_vector = 0;
+    int index = index_in_first_MFstack[BL];
+    // std::cout << BL << "||" << index << std::endl;
+    std::vector<int> temp;temp.reserve(nuint_element);
+    for(int j = index; j>=0;j--)
+    {
+      int this_node = this->MF_stack[j];
+
+      if(is_processed[this_node])
+        continue;
+
+      std::vector<int>& baslabs = basin_multi_label[this_node];
+
+      if(std::find(baslabs.begin(), baslabs.end(), BL) != baslabs.end())
+      {
+        is_processed[this_node] = true;
+        temp.emplace_back(this_node);
+        n_element_this_vector++;
+      }
+    }
+    // temp.shrink_to_fit();
+    // std::cout << temp.size() << std::endl;
+
+
+    for(int i = int(n_element_this_vector-1); i>=0;i--)
+    // for(size_t i=0; i<temp.size(); i++)
+    {
+      int this_node = temp[i];
+      // std::cout << this_node << std::endl;
+      new_MF_stack[incr] = this_node;
+      incr++;
+    }
+    std::cout << temp[0] << "||" << BL << "||" << incr << std::endl;
+  }
+
+  // std::cout <<"URG4" << std::endl;
+
+  this->MF_stack =  new_MF_stack;
+  // std::cout <<"URG5" << std::endl;
+
+
+  debug_baslab = basin_multi_label;
+  return;
+
 
 
   return;

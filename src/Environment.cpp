@@ -82,9 +82,9 @@ void ModelRunner::initiate_nodegraph()
 
   // This add previous inherited water from previous lakes
   // Note that it "empties" the lake and reinitialise the depth. If there is still a reason to for the lake, it will form it
-  std::cout << "wat" << std::endl;
+  // std::cout << "wat" << std::endl;
   this->process_inherited_water();
-  std::cout << "er" << std::endl;
+  // std::cout << "er" << std::endl;
 }
 
 void ModelRunner::run()
@@ -130,6 +130,7 @@ void ModelRunner::run()
   this->io_int_array2d["m_rec"]= this->graph.get_MF_rec_full();
   this->io_int_array2d["m_don"]= this->graph.get_MF_don_full();
 
+
 }
 
 
@@ -147,6 +148,10 @@ void ModelRunner::finalise()
     if(sed_height_tp1[i]<0)
       sed_height_tp1[i] = 0;
     sed_height_tp1[i] += tchonk.get_deposition_flux() * timestep;
+    // if(isnan(surface_elevation_tp1[i]) )
+    // {
+    //   std::cout << "NAN BECAUSE::" << tchonk.get_deposition_flux() << "||" << tchonk.get_erosion_flux()  << "||" << this->io_double_array["surface_elevation_tp1"][i] << std::endl;
+    // }
   }
 }
 
@@ -358,8 +363,8 @@ int ModelRunner::solve_depression(int node)
             // std::cout << "E" << std::endl;
 
             this->graph.update_receivers_at_node(potential_outlet,recout);
-            // I am also reprocessing this chok so I need to reset it to reinitialise its info
-            this->chonk_network[potential_outlet].reset();
+            // I am also reprocessing this chonk so I need to reset it to reinitialise its info
+            // this->chonk_network[potential_outlet].reset();
             // std::cout << "F" << std::endl;
             // 
             this->chonk_network[potential_outlet].add_to_water_flux(water_wolume / this->timestep);
@@ -502,6 +507,8 @@ int ModelRunner::solve_depression(int node)
     this->chonk_network[this_node].add_deposition_flux(this_depo/this->timestep);
   }
 
+  this->io_double_array["lake_depth"] = lake_depth;
+
   return potential_outlet;
 
 }
@@ -516,8 +523,9 @@ void ModelRunner::process_inherited_water()
     double this_lake_depth = this->io_double_array["lake_depth"][this_node];
     if(this_lake_depth >0)
     {
-      int rec = this->io_int_array["post_rec"][this_node];
-      this->chonk_network[rec].add_to_water_flux(this_lake_depth * this->io_double["x_res"] * this->io_double["y_res"]);
+      // int rec = this->io_int_array["post_rec"][this_node];
+      // int rec = this_node;
+      // this->chonk_network[rec].add_to_water_flux(this_lake_depth * this->io_double["x_res"] * this->io_double["y_res"]);
       this->io_double_array["lake_depth"][this_node] = 0;
     }
   }

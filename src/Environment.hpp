@@ -106,7 +106,7 @@ class ModelRunner
     void DEBUG_modify_double_array_param_inplace(std::string name, int place, double new_val){io_double_array[name][place] = new_val;}
     xt::pytensor<int,1> DEBUG_get_preacc(){return graph.DEBUG_get_preacc();}
     void DEBUG_check_weird_val_stacks();
-    xt::pytensor<int,1> DEBUG_get_basin_label(){return graph.DEBUG_get_basin_label();}
+    std::vector<std::vector<int> > DEBUG_get_basin_label(){return graph.DEBUG_get_basin_label();}
 
 
 

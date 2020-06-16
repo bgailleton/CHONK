@@ -144,6 +144,10 @@ void chonk::split_and_merge_in_receiving_chonks(std::vector<chonk>& chonkscape, 
     // Adding the fluxes*modifyer
     other_chonk.add_to_water_flux(this->water_flux * this->weigth_water_fluxes[i]);
     other_chonk.add_to_sediment_flux(this->sediment_flux * this->weigth_sediment_fluxes[i]);
+    if(chonkID == 5653)
+    {
+      std::cout << this->receivers[i] <<"::HYLIA::" << this->water_flux * this->weigth_water_fluxes[i] << "||" << this->water_flux << "||" << this->weigth_water_fluxes[i] << std::endl;
+    }
 
   }
 
@@ -284,7 +288,7 @@ void chonk::move_MF_from_fastscapelib(NodeGraph& graph, xt::pytensor<double,2>& 
   {
     for(size_t i=0; i<8; i++)
     {
-      if(external_weigth_water_fluxes(this->current_node,i)<0)
+      if(external_weigth_water_fluxes(this->current_node,i)<=0)
         continue;
       else
         external_weigth_water_fluxes(this->current_node,i) = external_weigth_water_fluxes(this->current_node,i)/sum_weights;
@@ -477,7 +481,11 @@ void chonk::active_simple_SPL(double n, double m, xt::pytensor<double,1>& K, dou
 
     // stacking the erosion flux
     this->erosion_flux += this_eflux;
-
+    if(isnan(this->erosion_flux) )
+    {
+      std::cout << "NAN BECAUSE::" << this_eflux << "||" << this->slope_to_rec[i]  << "||";
+      std::cout << this->weigth_water_fluxes[i] << "||" << this->water_flux  << std::endl;
+    }
 
     // What has been eroded moves into the sediment flux (which needs to be converted into a volume)
     this->sediment_flux += this_eflux * Xres * Yres * dt;
