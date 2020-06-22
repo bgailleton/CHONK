@@ -47,49 +47,20 @@ void NodeGraph::create()
 
 }
 
+
 // This empty constructor is just there to have a default one.
 void NodeGraph::create(xt::pytensor<int,1>& pre_stack,xt::pytensor<int,1>& pre_rec, xt::pytensor<int,1>& post_rec, xt::pytensor<int,1>& post_stack,
   xt::pytensor<int,1>& tMF_stack, xt::pytensor<int,2>& tMF_rec,xt::pytensor<int,2>& tMF_don, xt::pytensor<double,1>& elevation, xt::pytensor<double,2>& tMF_length,
   float XMIN, float XMAX, float YMIN, float YMAX, float XRES, float YRES, int NROWS, int NCOLS, float NODATAVALUE)
 {
 
+  // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  // Step N:  
   // I am first correcting the donors using the receivers: the receivers seems alright but somehow my donors are buggy
   // This is simply done by inverting the receiver to the donors
   // Also extra step I need to remove the duplicate receivers
-  for (size_t i =0; i< post_stack.size(); i++)
-  {
-    std::set<int> setofstuff;
-    for(size_t j=0; j<8;j++)
-    {
-      const bool is_in = setofstuff.find(tMF_rec(i,j)) != setofstuff.end();
-      if(is_in)
-        tMF_rec(i,j) = -1;
-      else
-        setofstuff.insert(tMF_rec(i,j));
-    }
-  }  
+  this->initial_correction_of_MF_receivers_and_donors( post_stack, tMF_rec, tMF_don);
 
-  xt::pytensor<int,1> ndon = xt::zeros<int>({post_stack.size()});
-  for (size_t i =0; i< post_stack.size(); i++)
-  {
-    for(size_t j=0; j<8;j++)
-    {
-      int this_rec = tMF_rec(i,j);
-      if(this_rec<0)
-        continue;
-      tMF_don(this_rec,ndon[this_rec]) = int(i);
-      ndon[this_rec]++;
-    }
-  }
-
-  // And labelling as no data the remaining donors
-  for (size_t i =0; i< post_stack.size(); i++)
-  {
-    for(int j = ndon[i]; j<8; j++)
-    {
-      tMF_don(i,j) = -1;
-    }
-  }
   
   // Inithalising general attributes
   this->NROWS = NROWS;
@@ -159,35 +130,57 @@ void NodeGraph::create(xt::pytensor<int,1>& pre_stack,xt::pytensor<int,1>& pre_r
 
 
   //Step II: label the basins from these nodes on the uncorrected multiple stack
-  for(auto node : all_base_levels_nocorr)
+  this->label_basins_MF(basin_multi_label, all_base_levels_nocorr);
+
+  // Step III: breaking my multi-basins nodes to alised nodes to break any cyclicity
+  std::vector<int> VertexDon,  VertexRec; std::vector<double> VertexLength;
+  std::vector<bool> has_aliases;
+  std::unordered_map<int,std::vector<int> > node2aliases;
+  std::vector<int> aliases2nodes; 
+  std::unordered_map<int,int> aliases2ID; 
+  std::vector<std::vector<int> > aliases_rec; 
+  std::vector<std::vector<int> > aliases_length;
+  std::vector<int> aliases_basin_recs;
+  this->generate_vector_of_adjacency_unique_basin(basin_multi_label, VertexDon, VertexRec, VertexLength, has_aliases, node2aliases, aliases2nodes, aliases2ID, aliases_rec, aliases_length,  aliases_basin_recs);
+
+  // Step IV: reroute my pits from top to bottom
+  std::map<int,bool> is_basin_processed;
+  for(auto bas:all_base_levels_nocorr)
   {
-    std::vector<bool> is_noted(nuint_element,false);
-    // this->recursive_progapagate_label(node, node,is_noted,basin_multi_label);
-    // Old try, less optimised
-    std::queue<int> nodes_to_label;
-    nodes_to_label.push(node);
-    // std::vector<bool> is_noted(nuint_element,false);
-    is_noted[node] = true;
-
-    while(nodes_to_label.empty() == false)
-    {
-      int this_node = nodes_to_label.front();
-      // std::cout << this_node << std::endl;
-      basin_multi_label[this_node].push_back(node);
-      nodes_to_label.pop();
-      std::vector<int> neighbors = this->get_MF_donors_at_node(this_node);
-      for(auto nenode:neighbors)
-      {
-        if(nenode<0 || nenode == this_node || is_noted[nenode])
-        {
-          continue;
-        }
-        nodes_to_label.push(nenode);
-        is_noted[nenode] = true;
-
-      }
-    }
+    is_basin_processed[bas] = false;
   }
+  
+
+
+  // for(auto node : all_base_levels_nocorr)
+  // {
+  //   std::vector<bool> is_noted(nuint_element,false);
+  //   // this->recursive_progapagate_label(node, node,is_noted,basin_multi_label);
+  //   // Old try, less optimised
+  //   std::queue<int> nodes_to_label;
+  //   nodes_to_label.push(node);
+  //   // std::vector<bool> is_noted(nuint_element,false);
+  //   is_noted[node] = true;
+
+  //   while(nodes_to_label.empty() == false)
+  //   {
+  //     int this_node = nodes_to_label.front();
+  //     // std::cout << this_node << std::endl;
+  //     basin_multi_label[this_node].push_back(node);
+  //     nodes_to_label.pop();
+  //     std::vector<int> neighbors = this->get_MF_donors_at_node(this_node);
+  //     for(auto nenode:neighbors)
+  //     {
+  //       if(nenode<0 || nenode == this_node || is_noted[nenode])
+  //       {
+  //         continue;
+  //       }
+  //       nodes_to_label.push(nenode);
+  //       is_noted[nenode] = true;
+
+  //     }
+  //   }
+  // }
   // std::cout <<"URG3" << std::endl;
 
   for(int i=0; i< nint_element; i++)
@@ -502,11 +495,198 @@ std::vector<xt::pytensor<int,1> > preprocess_stack(xt::pytensor<int,1>& pre_stac
 
 
 
+// This function correct the multiple flow receivers and donrs which end up with some duplicates probably linked to my homemade corrections.
+// it simply removes duplicate and inverse the corrected receivers, into the donors.
+void NodeGraph::initial_correction_of_MF_receivers_and_donors(xt::pytensor<int,1>& post_stack, xt::pytensor<int,2>& tMF_rec, xt::pytensor<int,2>& tMF_don)
+{
+  for (size_t i =0; i< post_stack.size(); i++)
+  {
+    std::set<int> setofstuff;
+    for(size_t j=0; j<8;j++)
+    {
+      const bool is_in = setofstuff.find(tMF_rec(i,j)) != setofstuff.end();
+      if(is_in)
+        tMF_rec(i,j) = -1;
+      else
+        setofstuff.insert(tMF_rec(i,j));
+    }
+  }  
+
+  xt::pytensor<int,1> ndon = xt::zeros<int>({post_stack.size()});
+  for (size_t i =0; i< post_stack.size(); i++)
+  {
+    for(size_t j=0; j<8;j++)
+    {
+      int this_rec = tMF_rec(i,j);
+      if(this_rec<0)
+        continue;
+      tMF_don(this_rec,ndon[this_rec]) = int(i);
+      ndon[this_rec]++;
+    }
+  }
+
+  // And labelling as no data the remaining donors
+  for (size_t i =0; i< post_stack.size(); i++)
+  {
+    for(int j = ndon[i]; j<8; j++)
+    {
+      tMF_don(i,j) = -1;
+    }
+  }
+}
+
+
+// this functions labels the basins with multiple labels
+void NodeGraph::label_basins_MF(std::vector<std::vector<int> >& MF_labels, std::vector<int>& all_base_levels)
+{
+    //Step II: label the basins from these nodes on the uncorrected multiple stack
+  for(auto node : all_base_levels)
+  {
+    std::vector<bool> is_noted(MF_labels.size(),false);
+    // this->recursive_progapagate_label(node, node,is_noted,basin_multi_label);
+    // Old try, less optimised
+    std::queue<int> nodes_to_label;
+    nodes_to_label.push(node);
+    // std::vector<bool> is_noted(nuint_element,false);
+    is_noted[node] = true;
+
+    while(nodes_to_label.empty() == false)
+    {
+      int this_node = nodes_to_label.front();
+      // std::cout << this_node << std::endl;
+      MF_labels[this_node].push_back(node);
+      nodes_to_label.pop();
+      std::vector<int> neighbors = this->get_MF_donors_at_node(this_node);
+      for(auto nenode:neighbors)
+      {
+        if(nenode<0 || nenode == this_node || is_noted[nenode])
+        {
+          continue;
+        }
+        nodes_to_label.push(nenode);
+        is_noted[nenode] = true;
+
+      }
+    }
+  }
+}
+
+void NodeGraph::generate_vector_of_adjacency_unique_basin(std::vector<std::vector<int> >& MF_labels, std::vector<int>& VertexDon, std::vector<int>& VertexRec, std::vector<double>& VertexLength, 
+  std::vector<bool>& has_aliases, std::unordered_map<int,std::vector<int> >& node2aliases, std::vector<int>& aliases2nodes, std::unordered_map<int,int>& aliases2ID, 
+  std::vector<std::vector<int> >& aliases_rec, std::vector<std::vector<int> >& aliases_length, std::vector<int>& aliases_basin_recs)
+{
+  // Initialising the vectors to a maximum size
+  VertexDon = std::vector<int>();VertexDon.reserve(this->MF_stack.size() * 8);
+  VertexRec = std::vector<int>();VertexRec.reserve(this->MF_stack.size() * 8);
+  VertexLength = std::vector<double>();VertexLength.reserve(this->MF_stack.size() * 8);
+
+  // none of my nodes have aliases so far
+  has_aliases = std::vector<bool>(this->MF_stack.size(),false);
+  std::vector<bool> is_processed(this->MF_stack.size(),false);
+
+  int alincementor = -1;
+
+  int total_size = int(this->MF_stack.size());
+  // Iterating through all the nodes and their donors/receivers
+  for(size_t i=0; i < this->MF_stack.size(); i++)
+  {
+    int node = int(i);
+    if(is_processed[node])
+      continue;
+    // checking if the node belongs to multiple basins
+    if(MF_labels[node].size()==1)
+    {
+      // Simple scenario:
+      // Adding the receivers in the vector ready for directed graph
+      std::vector<int> recnodes = this->get_MF_receivers_at_node(node);
+      for(size_t j=0;j<recnodes.size();j++)
+      {
+        int this_node = recnodes[j];
+        if(this_node<0)
+          continue;
+        if(this_node == node)
+        {
+          is_processed[node] = true;
+
+        }
+        VertexDon.emplace_back(node);
+        VertexRec.emplace_back(this_node);
+        VertexLength.emplace_back(this->MF_lengths(node,j));
+      }
+      is_processed[node] = true;
+    }
+    else
+    {
+      // Preparing the aliases, preprocessing is not processing
+      // gathering the different nodes
+      has_aliases[node] = true;
+      // Getting the different basins crossed by this t
+      auto target_basins = MF_labels[node];
+      // Gathering each aliases preparations: I am first just assigning which part of the node goes where
+      std::vector<int> this_node2aliases;
+      for(auto basin:target_basins)
+      {
+        alincementor++;
+        int this_alias = alincementor + total_size;
+        aliases2ID[this_alias] = alincementor;
+        aliases2nodes.push_back(node);
+        this_node2aliases.push_back(this_alias);
+        aliases_basin_recs.push_back(basin);
+      }
+
+      node2aliases[node] = this_node2aliases;
+
+    }
+  }
+
+  // Second iteration, that time only on node bearing aliases, which should be a small part of all nodes
+  for(size_t i=0; i < this->MF_stack.size(); i++)
+  {
+    int node = int(i);
+    if(is_processed[node])
+      continue;
+    // If not processed yet, it is aliased
+    auto target_basins = MF_labels[node];
+    std::vector<int> recnodes = this->get_MF_receivers_at_node(node);
+    std::vector<double> these_length = this->get_MF_lengths_at_node(node);
+    for(size_t j=0; j<target_basins.size(); j++)
+    {
+      int this_node = node2aliases[node][j];
+      int this_basin = target_basins[j];
+      for(size_t k=0; k< 8; k++)
+      {
+        int recnode = recnodes[k];
+        if(recnode<0)
+          continue;
+        if(has_aliases[recnode] ==  false)
+        {
+          VertexDon.emplace_back(this_node);
+        
+          VertexRec.emplace_back(recnode);
+          VertexLength.emplace_back(these_length[k]);
+
+        }
+        else
+        {
+          for(size_t l =0; l< node2aliases[recnode].size(); l++)
+          {
+            int tested_alias = node2aliases[recnode][l];
+            int this_ID = aliases2ID[tested_alias];
+            if(this_basin != aliases_basin_recs[this_ID])
+              continue;
+            VertexDon.emplace_back(this_node);
+            VertexRec.emplace_back(tested_alias);
+            VertexLength.emplace_back(these_length[k]);
+          }
+        }
+      }
+    }
+  }
 
 
 
 
-
+}
 
 
 

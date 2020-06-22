@@ -49,8 +49,11 @@ class NodeGraph
     void calculate_inherited_water_from_previous_lakes(xt::pytensor<double,1>& previous_lake_depth, xt::pytensor<int,1>& post_rec);
 
     void update_receivers_at_node(int node, std::vector<int>& new_receivers);
-
-
+    void initial_correction_of_MF_receivers_and_donors(xt::pytensor<int,1>& post_stack, xt::pytensor<int,2>& tMF_rec, xt::pytensor<int,2>& tMF_don);
+    void label_basins_MF(std::vector<std::vector<int> >& MF_labels, std::vector<int>& all_base_levels);
+    void generate_vector_of_adjacency_unique_basin(std::vector<std::vector<int> >& MF_labels, std::vector<int>& VertexDon, std::vector<int>& VertexRec, std::vector<double>& VertexLength, 
+  std::vector<bool>& has_aliases, std::unordered_map<int,std::vector<int> >& node2aliases, std::vector<int>& aliases2nodes, std::unordered_map<int,int>& aliases2ID, 
+  std::vector<std::vector<int> >& aliases_rec, std::vector<std::vector<int> >& aliases_length, std::vector<int>& aliases_basin_recs);
 
     // Accessors/modifiers
     //# Stacks and receivers
