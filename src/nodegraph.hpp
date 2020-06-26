@@ -13,6 +13,8 @@
 #include <iostream>
 #include <numeric>
 #include <cmath>
+#include <initializer_list>
+
 
 // All the xtensor requirements
 #include "xtensor-python/pyarray.hpp" // manage the I/O of numpy array
@@ -25,11 +27,11 @@
 
 #include <boost/graph/graph_traits.hpp>
 #include <boost/graph/adjacency_list.hpp>
+#include <boost/property_map/property_map.hpp>
 
-
-typedef boost::property<boost::edge_weight_t, int> EdgeWeightProperty;
-typedef boost::adjacency_list<boost::listS, boost::vecS, boost::directedS, boost::no_property, EdgeWeightProperty > DirectedGraph;
-typedef boost::graph_traits<DirectedGraph>::vertex_descriptor Vertex;
+// typedef boost::property<boost::edge_weight_t, int> EdgeWeightProperty;
+// typedef boost::adjacency_list< boost::vecS, boost::vecS, boost::directedS, boost::no_property > DirectedGraph;
+// typedef boost::graph_traits<DirectedGraph>::vertex_descriptor Vertex;
 
 
 // this class organises the DEM nodes in order to solve all equations in the right order. This is the first step of each iteration of the model 
@@ -275,6 +277,105 @@ class cppintail
 
 };
 
+
+struct Vertex {
+    int val;
+    bool visiting;
+    bool visited;
+    std::vector<int> childNodes;
+};
+
+bool dfs(Vertex& vertex, std::vector<Vertex>& stack, std::vector<int>& next_vertexes, int& index_of_reading, int& index_of_pushing, std::vector<bool>& is_in_queue, std::vector<Vertex>& graph) 
+{
+    vertex.visiting = true;
+    for (auto chid : vertex.childNodes) 
+    {
+        if(chid<0)
+            continue;
+        Vertex childNode = graph[chid];
+        if (childNode.visited == false) 
+        {
+            if(is_in_queue[childNode.val] == false)
+            {
+                next_vertexes[index_of_pushing] = childNode.val;
+                is_in_queue[childNode.val] = true;
+                index_of_pushing++;
+            }
+            // check for back-edge, i.e., cycle
+            if (childNode.visiting) 
+            {
+                return false;
+            }
+
+            bool childResult = dfs(vertex, stack, next_vertexes, index_of_reading, index_of_pushing, is_in_queue, graph);
+            if (childResult == false) 
+            {
+                return false;
+            }
+            
+        }
+    }
+    
+    
+    // now that you have completely visited all the
+    // childNodes of the vertex, push the vertex in the stack
+    stack.emplace_back(vertex);
+
+    // this vertex is processed (all its descendents, i.e,
+    // the nodes that are dependent on
+    // this vertex along with this vertex itself have been visited 
+    // and processed). So mark this vertex as Visited.
+    vertex.visited = true;
+    
+    // mark vertex as visiting as false since we 
+    // have completed visiting all the subtrees of 
+    // the vertex, including itself. So the vertex is no more
+    // in visiting state because it is done visited.
+    // Another reason is (the critical one) now that all the 
+    // descendents of the vertex are visited, any future 
+    // inbound edge to the vertex won't be a back edge anymore. 
+    vertex.visiting = false;  
+
+    return true;
+}
+
+// returns null if no topological sort is possible
+std::vector<int> topological_sort_by_dfs(std::vector<Vertex>& graph, int starting_node) 
+{
+    std::vector<Vertex> stack;
+    std::vector<int> next_vertexes(graph.size(), -1);
+    std::vector<bool> is_in_queue(graph.size(), false);
+    
+    // next_vertexes.reserve(graph.size());
+    next_vertexes[0] = starting_node;
+    is_in_queue[starting_node] = true;
+    int index_of_reading = 0;
+    int index_of_pushing = 1;
+    while(true)
+    {
+        int next_ID = next_vertexes[index_of_reading];
+        index_of_reading++;
+        if(next_ID == -1)
+            break;
+        Vertex vertex = graph[next_ID];
+        if (vertex.visited ==  false) {
+            bool dfs_result = dfs(vertex, stack, next_vertexes, index_of_reading, index_of_pushing, is_in_queue, graph);
+            // if cycle found then there is no topological sort possible
+            if (dfs_result == false) {
+                return {-9999};
+            }
+        }
+    }
+
+    stack.shrink_to_fit();
+    std::vector<int> result;result.reserve(stack.size());
+
+    for (auto vertex : stack) {
+        result.emplace_back(vertex.val);
+    }
+    result.shrink_to_fit();
+    return result;
+}
 
 
 
