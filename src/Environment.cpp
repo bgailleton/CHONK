@@ -37,7 +37,7 @@
 #include "CHONK.hpp"
 #include "nodegraph.hpp"
 
-
+#include <boost/timer/timer.hpp>
 
 // ######################################################################
 // ######################################################################
@@ -630,6 +630,58 @@ void ModelRunner::DEBUG_check_weird_val_stacks()
   }
   std::cout << "FOUND N INVALID: " << non_valid_mfstack << " MSTACK || " << non_valid_mfrec << " MREC || " << non_valid_don << " MDON" << std::endl;
 }
+
+
+
+
+
+
+//#################################################################################
+//#################################################################################
+//#################################################################################
+//#################################################################################
+// OTher functions, with a clear one-off utility
+//#################################################################################
+//#################################################################################
+//#################################################################################
+
+
+
+xt::pytensor<double,1> pop_elevation_to_SS_SF_SPIL(xt::pytensor<int,1>& stack, xt::pytensor<int,1>& rec,xt::pytensor<double,1>& length , xt::pytensor<double,1>& erosion, 
+  xt::pytensor<double,1>& K, double n, double m, double cellarea)
+{
+  // first I need to initialise a couple of variabes
+  xt::pytensor<double,1> A = xt::zeros<double>({stack.size()});
+  xt::pytensor<double,1> elevation = xt::zeros<double>({stack.size()});
+
+  std::vector<int> ndonors(stack.size(),0);
+  // Accunulating drainage area first
+  for(int i =  stack.size(); i>=0; i--)
+  {
+    int this_node = stack[i];
+    A[this_node] += cellarea;
+    int this_rec = rec[this_node];
+    if(this_rec == this_node)
+      continue;
+    A[this_rec] += A[this_node];
+    ndonors[this_rec] += 1;
+  }
+
+
+  for(auto node:stack)
+  {
+    if(node == rec[node])
+      continue;
+    int this_rec = rec[node];
+    elevation[node] = elevation[this_rec] + std::exp(1/n * (std::log(erosion[node]) - m *std::log(A[node]) - std::log(K[node]) ) + std::log(length[node]) );
+  }
+
+  return elevation;
+
+}
+
+
+
 
 
 #endif

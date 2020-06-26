@@ -76,7 +76,11 @@ PYBIND11_MODULE(CHONK_cpp, m)
       .def("DEBUG_get_preacc", &ModelRunner::DEBUG_get_preacc)
       .def("DEBUG_get_basin_label", &ModelRunner::DEBUG_get_basin_label)
       .def("DEBUG_check_weird_val_stacks", &ModelRunner::DEBUG_check_weird_val_stacks)
+      .def("DEBUG_get_graph_rec", &ModelRunner::DEBUG_get_graph_rec)
+      .def("DEBUG_get_node_to_aliases", &ModelRunner::DEBUG_get_node_to_aliases)
+
     ;
     m.def("preprocess_stack", preprocess_stack);
+    m.def("pop_elevation_to_SS_SF_SPIL", pop_elevation_to_SS_SF_SPIL);
 
 }

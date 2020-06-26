@@ -107,7 +107,9 @@ class ModelRunner
     xt::pytensor<int,1> DEBUG_get_preacc(){return graph.DEBUG_get_preacc();}
     void DEBUG_check_weird_val_stacks();
     std::vector<std::vector<int> > DEBUG_get_basin_label(){return graph.DEBUG_get_basin_label();}
-
+    std::vector<std::vector<int> > DEBUG_get_graph_rec(){return graph.DEBUG_get_debug_graph_rec();}
+    std::unordered_map<int,std::vector<int> >  DEBUG_get_node_to_aliases(){return graph.DEBUG_get_node_to_aliases();}
+    
 
 
   protected:
@@ -147,6 +149,9 @@ class ModelRunner
      
 
 };// End of ModelRunner
+
+xt::pytensor<double,1> pop_elevation_to_SS_SF_SPIL(xt::pytensor<int,1>& stack, xt::pytensor<int,1>& rec,xt::pytensor<double,1>& length , xt::pytensor<double,1>& erosion, 
+      xt::pytensor<double,1>& K, double n, double m, double cellarea);
 
 
 #endif

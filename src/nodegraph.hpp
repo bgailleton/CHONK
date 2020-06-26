@@ -23,6 +23,13 @@
 #include "xtensor/xarray.hpp"// manages the xtensor array (lower level than the numpy one)
 #include "xtensor/xtensor.hpp" // same
 
+#include <boost/graph/graph_traits.hpp>
+#include <boost/graph/adjacency_list.hpp>
+
+
+typedef boost::property<boost::edge_weight_t, int> EdgeWeightProperty;
+typedef boost::adjacency_list<boost::listS, boost::vecS, boost::directedS, boost::no_property, EdgeWeightProperty > DirectedGraph;
+typedef boost::graph_traits<DirectedGraph>::vertex_descriptor Vertex;
 
 
 // this class organises the DEM nodes in order to solve all equations in the right order. This is the first step of each iteration of the model 
@@ -49,11 +56,15 @@ class NodeGraph
     void calculate_inherited_water_from_previous_lakes(xt::pytensor<double,1>& previous_lake_depth, xt::pytensor<int,1>& post_rec);
 
     void update_receivers_at_node(int node, std::vector<int>& new_receivers);
-    void initial_correction_of_MF_receivers_and_donors(xt::pytensor<int,1>& post_stack, xt::pytensor<int,2>& tMF_rec, xt::pytensor<int,2>& tMF_don);
-    void label_basins_MF(std::vector<std::vector<int> >& MF_labels, std::vector<int>& all_base_levels);
+    void initial_correction_of_MF_receivers_and_donors(xt::pytensor<int,1>& post_stack, xt::pytensor<int,2>& tMF_rec, xt::pytensor<int,2>& tMF_don,xt::pytensor<double,1>& elevation);
+    void label_basins_MF(std::vector<std::vector<int> >& MF_labels, std::vector<int>& all_base_levels, xt::pytensor<int,1>& post_rec);
     void generate_vector_of_adjacency_unique_basin(std::vector<std::vector<int> >& MF_labels, std::vector<int>& VertexDon, std::vector<int>& VertexRec, std::vector<double>& VertexLength, 
   std::vector<bool>& has_aliases, std::unordered_map<int,std::vector<int> >& node2aliases, std::vector<int>& aliases2nodes, std::unordered_map<int,int>& aliases2ID, 
   std::vector<std::vector<int> >& aliases_rec, std::vector<std::vector<int> >& aliases_length, std::vector<int>& aliases_basin_recs);
+    void link_pit_vertex_to_receivers_or_their_aliases(xt::pytensor<int,1>& post_rec, std::vector<int>& all_base_levels_ordered, std::vector<std::vector<int> >& basin_multi_label,
+  std::vector<bool>& has_aliases, std::vector<int>& VertexDon, std::vector<int>& VertexRec, std::vector<double>& VertexLength, std::unordered_map<int,int>& aliases2ID , 
+  std::vector<int>&aliases_basin_recs,std::unordered_map<int,std::vector<int> > node2aliases, std::vector<int>& aliases2nodes);
+
 
     // Accessors/modifiers
     //# Stacks and receivers
@@ -89,6 +100,10 @@ class NodeGraph
     //# DEBUG
     xt::pytensor<int,1> DEBUG_get_preacc(){return preacc;}
     std::vector<std::vector<int> > DEBUG_get_basin_label(){return debug_baslab;}
+    std::vector<std::vector<int> > DEBUG_get_debug_graph_rec(){return debug_graph_rec;}
+    std::unordered_map<int,std::vector<int> > DEBUG_get_node_to_aliases(){return DEBUG_node_to_aliases;}; 
+
+
 
 
 
@@ -144,13 +159,19 @@ class NodeGraph
     std::map<int,double> register_deposition_flux;
     std::map<int,double> register_erosion_flux;
 
+    std::unordered_map<int,std::vector<int> > DEBUG_node_to_aliases; 
+
     // Dealing with excess of water
     // length = N_nodes, value: true if it has an excess of water
     std::vector<bool> has_excess_water_from_lake;
     // key: node ID, val: excess volume of water due to previous lake (recalculated to be diverted to outlets)
     std::map<int,double> node_to_excess_of_water;
 
+    //Link nodes: nodes that can create cyclicity and need to be aliased
+    std::vector<bool> is_link_node;
+
     std::vector<std::vector<int> > debug_baslab;
+    std::vector<std::vector<int> > debug_graph_rec;
 
 
   private:

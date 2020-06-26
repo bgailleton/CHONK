@@ -37,6 +37,11 @@
 
 #include <boost/graph/graph_traits.hpp>
 #include <boost/graph/adjacency_list.hpp>
+#include <boost/graph/topological_sort.hpp>
+
+#include <chrono>
+// #include <boost/chrono.hpp>
+// #include <boost/timer/timer.hpp>
 
 
 
@@ -53,15 +58,19 @@ void NodeGraph::create(xt::pytensor<int,1>& pre_stack,xt::pytensor<int,1>& pre_r
   xt::pytensor<int,1>& tMF_stack, xt::pytensor<int,2>& tMF_rec,xt::pytensor<int,2>& tMF_don, xt::pytensor<double,1>& elevation, xt::pytensor<double,2>& tMF_length,
   float XMIN, float XMAX, float YMIN, float YMAX, float XRES, float YRES, int NROWS, int NCOLS, float NODATAVALUE)
 {
-
+  auto start = std::chrono::steady_clock::now();
   // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   // Step N:  
   // I am first correcting the donors using the receivers: the receivers seems alright but somehow my donors are buggy
   // This is simply done by inverting the receiver to the donors
   // Also extra step I need to remove the duplicate receivers
-  this->initial_correction_of_MF_receivers_and_donors( post_stack, tMF_rec, tMF_don);
+  this->initial_correction_of_MF_receivers_and_donors( post_stack, tMF_rec, tMF_don, elevation);
+  auto end = std::chrono::steady_clock::now();
+  std::chrono::duration<double>  dat_time = end - start;
+  std::cout<< "TIMER_NODEGRAPH_C1::" << dat_time.count() << std::endl;
+  start = std::chrono::steady_clock::now();
 
-  
+
   // Inithalising general attributes
   this->NROWS = NROWS;
   this->NCOLS = NCOLS;
@@ -130,7 +139,12 @@ void NodeGraph::create(xt::pytensor<int,1>& pre_stack,xt::pytensor<int,1>& pre_r
 
 
   //Step II: label the basins from these nodes on the uncorrected multiple stack
-  this->label_basins_MF(basin_multi_label, all_base_levels_nocorr);
+  this->label_basins_MF(basin_multi_label, all_base_levels_nocorr, post_rec);
+
+  end = std::chrono::steady_clock::now();
+  dat_time = end - start;
+  std::cout<< "TIMER_NODEGRAPH_C2::" << dat_time.count() << std::endl;
+  start = std::chrono::steady_clock::now();
 
   // Step III: breaking my multi-basins nodes to alised nodes to break any cyclicity
   std::vector<int> VertexDon,  VertexRec; std::vector<double> VertexLength;
@@ -142,14 +156,161 @@ void NodeGraph::create(xt::pytensor<int,1>& pre_stack,xt::pytensor<int,1>& pre_r
   std::vector<std::vector<int> > aliases_length;
   std::vector<int> aliases_basin_recs;
   this->generate_vector_of_adjacency_unique_basin(basin_multi_label, VertexDon, VertexRec, VertexLength, has_aliases, node2aliases, aliases2nodes, aliases2ID, aliases_rec, aliases_length,  aliases_basin_recs);
+  end = std::chrono::steady_clock::now();
+  dat_time = end - start;
+  std::cout<< "TIMER_NODEGRAPH_C3::" << dat_time.count() << std::endl;
+  start = std::chrono::steady_clock::now();
 
+  // std::cout << "flubhere" << std::endl;
   // Step IV: reroute my pits from top to bottom
-  std::map<int,bool> is_basin_processed;
-  for(auto bas:all_base_levels_nocorr)
+  this->link_pit_vertex_to_receivers_or_their_aliases(post_rec, all_base_levels_nocorr, basin_multi_label, has_aliases, VertexDon, VertexRec,  
+    VertexLength, aliases2ID ,aliases_basin_recs, node2aliases, aliases2nodes);
+  VertexDon.shrink_to_fit();
+  VertexRec.shrink_to_fit();
+  VertexLength.shrink_to_fit();
+
+  end = std::chrono::steady_clock::now();
+  dat_time = end - start;
+  std::cout<< "TIMER_NODEGRAPH_C4::" << dat_time.count() << std::endl;
+  start = std::chrono::steady_clock::now();
+  //step V: constructing the graph
+  DirectedGraph g;
+
+  for(size_t i=0; i < VertexDon.size(); i++)
   {
-    is_basin_processed[bas] = false;
+    boost::add_edge (VertexDon[i], VertexRec[i], VertexLength[i], g);
+  }
+
+  std::vector<std::vector<int> > temptrec(VertexDon.size());
+  for(size_t i =0; i< VertexRec.size(); i++)
+  {
+    // if(VertexDon[i] == VertexRec[i])
+    //   std::cout << "WARNING:;:NODE IS ITS RECEIVER" << std::endl;
+    int donnode = VertexDon[i];
+    int recnode = VertexRec[i];
+    temptrec[donnode].push_back(recnode);
+
+    if(donnode>=nint_element)
+    {
+      int ID = aliases2ID[donnode];
+      donnode = aliases2nodes[ID];
+    }
+    if(recnode>=nint_element)
+    {
+      int ID = aliases2ID[recnode];
+      recnode = aliases2nodes[ID];
+    }
+
+  }
+
+  debug_graph_rec = temptrec;
+  DEBUG_node_to_aliases = node2aliases;
+
+  end = std::chrono::steady_clock::now();
+  dat_time = end - start;
+  std::cout<< "TIMER_NODEGRAPH_C5::" << dat_time.count() << std::endl;
+  start = std::chrono::steady_clock::now();
+
+
+  std::cout << "THIS WILL TAKE A LOT OF TIME, CHECKING CYCLICITY SYSTEMATICALLY" << std::endl;
+  for (auto node : VertexDon)
+  {
+    // std::cout << "processing::" << node << std::endl;
+    std::queue<int> related_nodes;
+    related_nodes.push(node);
+    std::vector<int> is_in_queue(nuint_element,false);
+    is_in_queue[node] == true;
+    while(related_nodes.size() > 0)
+    {
+      // std::cout << "size = " << related_nodes.size() << std::endl;
+      int this_node = related_nodes.front();
+     
+      related_nodes.pop();
+      std::vector<int> recs = temptrec[this_node];
+      // std::vector<int> recs = this->get_MF_receivers_at_node(this_node);
+
+      for(auto rec:recs)
+      {
+        if(rec == node && this_node != node)
+          std::cout << "CYCLE DETECTED O: " << node << " D: " << this_node << " R: " << rec  << std::endl;
+
+        if(rec < 0 || rec == this_node || is_in_queue[rec] == true)
+          continue;
+
+        related_nodes.push(rec);
+        is_in_queue[rec] = true;
+
+        // if(rec == node)
+        //   std::cout << "CYCLE DETECTED" << std::endl;
+      }
+    }
   }
   
+
+  // boost::add_edge (0, 1, 1, g);
+  // boost::add_edge (0, 2, 1, g);
+  // boost::add_edge (0, 3, 1, g);
+  // boost::add_edge (2, 3, 1, g);
+  // boost::add_edge (2, 1, 1, g);
+  // boost::add_edge (1, 3, 1, g);
+  // boost::add_edge (3, 4, 1, g);
+  // std::cout << "VertexDon::" << VertexDon.size() << std::endl;
+
+  // step VI: topological sort to get teh stack
+  std::vector<Vertex> new_MF_stack;
+  // boost::topological_sort(g, std::back_inserter(new_MF_stack));
+  // std::cout << new_MF_stack.size() << "<<<<<<<" << std::endl;
+
+  // for(int i = int(new_MF_stack.size())-1; i>=0; i--)
+  // {
+  //   std::cout << new_MF_stack[i] << std::endl;
+  // }
+  end = std::chrono::steady_clock::now();
+  dat_time = end - start;
+  std::cout<< "TIMER_NODEGRAPH_C6::" << dat_time.count() << std::endl;
+  start = std::chrono::steady_clock::now();
+  
+  // return;
+
+  // step VII: reimplementing the final stack
+  std::vector<bool> is_in_stack(nuint_element,false);
+  int incr = 0;
+  for(int i = new_MF_stack.size()-1; i>=0; i--)
+  {
+    int j = i - new_MF_stack.size()-1;
+    // std::cout << i << std::endl;
+    int next_node = new_MF_stack[i];
+
+    if(is_link_node[next_node])
+      continue;
+    // std::cout << next_node << "||" ;
+    
+
+    if(next_node>=nint_element)
+    {
+      // then is an alias and need to recover normal node index
+      int ID = aliases2ID[next_node];
+      next_node = aliases2nodes[ID];
+
+    }
+    // std::cout <<next_node << std::endl;
+    // if is already processed, then I do not add
+    if(is_in_stack[next_node])
+      continue;
+
+    // Else add and consider processed
+    this->MF_stack[incr] = next_node;
+    incr++;
+    is_in_stack[next_node] = true;
+
+  }
+
+  end = std::chrono::steady_clock::now();
+  dat_time = end - start;
+  std::cout<< "TIMER_NODEGRAPH_C7::" << dat_time.count() << std::endl;
+  start = std::chrono::steady_clock::now();
+
+
 
 
   // for(auto node : all_base_levels_nocorr)
@@ -183,59 +344,59 @@ void NodeGraph::create(xt::pytensor<int,1>& pre_stack,xt::pytensor<int,1>& pre_r
   // }
   // std::cout <<"URG3" << std::endl;
 
-  for(int i=0; i< nint_element; i++)
-  {
-    index_in_first_MFstack[this->MF_stack[i]] = i;
-  }
+  // for(int i=0; i< nint_element; i++)
+  // {
+  //   index_in_first_MFstack[this->MF_stack[i]] = i;
+  // }
 
-  xt::pytensor<int,1> new_MF_stack = xt::zeros<int>({nuint_element});
+  // xt::pytensor<int,1> new_MF_stack = xt::zeros<int>({nuint_element});
 
-  std::vector<bool> is_processed(nuint_element,false);
-  int incr = 0;
-  int next_node = 0;
+  // std::vector<bool> is_processed(nuint_element,false);
+  // int incr = 0;
+  // int next_node = 0;
 
-  // version 1, more secure but slower
-  for(auto BL: all_base_levels_nocorr)
-  {
-    // std::cout << "BL:" << std::endl;
-    int n_element_this_vector = 0;
-    int index = index_in_first_MFstack[BL];
-    // std::cout << BL << "||" << index << std::endl;
-    std::vector<int> temp;temp.reserve(nuint_element);
-    for(int j = index; j>=0;j--)
-    {
-      int this_node = this->MF_stack[j];
+  // // version 1, more secure but slower
+  // for(auto BL: all_base_levels_nocorr)
+  // {
+  //   // std::cout << "BL:" << std::endl;
+  //   int n_element_this_vector = 0;
+  //   int index = index_in_first_MFstack[BL];
+  //   // std::cout << BL << "||" << index << std::endl;
+  //   std::vector<int> temp;temp.reserve(nuint_element);
+  //   for(int j = index; j>=0;j--)
+  //   {
+  //     int this_node = this->MF_stack[j];
 
-      if(is_processed[this_node])
-        continue;
+  //     if(is_processed[this_node])
+  //       continue;
 
-      std::vector<int>& baslabs = basin_multi_label[this_node];
+  //     std::vector<int>& baslabs = basin_multi_label[this_node];
 
-      if(std::find(baslabs.begin(), baslabs.end(), BL) != baslabs.end())
-      {
-        is_processed[this_node] = true;
-        temp.emplace_back(this_node);
-        n_element_this_vector++;
-      }
-    }
-    // temp.shrink_to_fit();
-    // std::cout << temp.size() << std::endl;
+  //     if(std::find(baslabs.begin(), baslabs.end(), BL) != baslabs.end())
+  //     {
+  //       is_processed[this_node] = true;
+  //       temp.emplace_back(this_node);
+  //       n_element_this_vector++;
+  //     }
+  //   }
+  //   // temp.shrink_to_fit();
+  //   // std::cout << temp.size() << std::endl;
 
 
-    for(int i = int(n_element_this_vector-1); i>=0;i--)
-    // for(size_t i=0; i<temp.size(); i++)
-    {
-      int this_node = temp[i];
-      // std::cout << this_node << std::endl;
-      new_MF_stack[incr] = this_node;
-      incr++;
-    }
-    std::cout << temp[0] << "||" << BL << "||" << incr << std::endl;
-  }
+  //   for(int i = int(n_element_this_vector-1); i>=0;i--)
+  //   // for(size_t i=0; i<temp.size(); i++)
+  //   {
+  //     int this_node = temp[i];
+  //     // std::cout << this_node << std::endl;
+  //     new_MF_stack[incr] = this_node;
+  //     incr++;
+  //   }
+  //   std::cout << temp[0] << "||" << BL << "||" << incr << std::endl;
+  // }
 
-  // std::cout <<"URG4" << std::endl;
+  // // std::cout <<"URG4" << std::endl;
 
-  this->MF_stack =  new_MF_stack;
+  // this->MF_stack =  new_MF_stack;
   // std::cout <<"URG5" << std::endl;
 
 
@@ -497,15 +658,20 @@ std::vector<xt::pytensor<int,1> > preprocess_stack(xt::pytensor<int,1>& pre_stac
 
 // This function correct the multiple flow receivers and donrs which end up with some duplicates probably linked to my homemade corrections.
 // it simply removes duplicate and inverse the corrected receivers, into the donors.
-void NodeGraph::initial_correction_of_MF_receivers_and_donors(xt::pytensor<int,1>& post_stack, xt::pytensor<int,2>& tMF_rec, xt::pytensor<int,2>& tMF_don)
+void NodeGraph::initial_correction_of_MF_receivers_and_donors(xt::pytensor<int,1>& post_stack, xt::pytensor<int,2>& tMF_rec, xt::pytensor<int,2>& tMF_don, xt::pytensor<double,1>& elevation)
 {
   for (size_t i =0; i< post_stack.size(); i++)
   {
     std::set<int> setofstuff;
     for(size_t j=0; j<8;j++)
     {
+      if(tMF_rec(i,j) < 0)
+        continue;
+
       const bool is_in = setofstuff.find(tMF_rec(i,j)) != setofstuff.end();
       if(is_in)
+        tMF_rec(i,j) = -1;
+      else if ( elevation[i]<elevation[tMF_rec(i,j)])
         tMF_rec(i,j) = -1;
       else
         setofstuff.insert(tMF_rec(i,j));
@@ -537,7 +703,8 @@ void NodeGraph::initial_correction_of_MF_receivers_and_donors(xt::pytensor<int,1
 
 
 // this functions labels the basins with multiple labels
-void NodeGraph::label_basins_MF(std::vector<std::vector<int> >& MF_labels, std::vector<int>& all_base_levels)
+// THIS FUNCTION IS REALLY SLOW, NEED WORK
+void NodeGraph::label_basins_MF(std::vector<std::vector<int> >& MF_labels, std::vector<int>& all_base_levels, xt::pytensor<int,1>& post_rec)
 {
     //Step II: label the basins from these nodes on the uncorrected multiple stack
   for(auto node : all_base_levels)
@@ -569,6 +736,33 @@ void NodeGraph::label_basins_MF(std::vector<std::vector<int> >& MF_labels, std::
       }
     }
   }
+
+  std::vector<int> is_basin_processed(post_rec.size(),false);
+
+
+  // Getting the link between basins
+  is_link_node = std::vector<bool>(post_rec.size(), false);
+  for(auto node:all_base_levels)
+  {
+    if(is_basin_processed[node])
+      continue;
+
+    int this_node = node;
+    while(true)
+    {
+      // is_basin_processed[this_node] = true;
+      if(MF_labels[this_node].size()>1 && std::find(MF_labels[this_node].begin(),MF_labels[this_node].end(),node) != MF_labels[this_node].end() )
+      {
+        is_link_node[this_node] = true;
+      }
+      if(this_node == post_rec[this_node])
+        break;
+      this_node = post_rec[this_node];
+      if(std::find(all_base_levels.begin(),all_base_levels.end(),this_node) != all_base_levels.end())
+        break;
+    }
+  }
+
 }
 
 void NodeGraph::generate_vector_of_adjacency_unique_basin(std::vector<std::vector<int> >& MF_labels, std::vector<int>& VertexDon, std::vector<int>& VertexRec, std::vector<double>& VertexLength, 
@@ -594,7 +788,7 @@ void NodeGraph::generate_vector_of_adjacency_unique_basin(std::vector<std::vecto
     if(is_processed[node])
       continue;
     // checking if the node belongs to multiple basins
-    if(MF_labels[node].size()==1)
+    if(is_link_node[node] == false)
     {
       // Simple scenario:
       // Adding the receivers in the vector ready for directed graph
@@ -607,7 +801,7 @@ void NodeGraph::generate_vector_of_adjacency_unique_basin(std::vector<std::vecto
         if(this_node == node)
         {
           is_processed[node] = true;
-
+          break;
         }
         VertexDon.emplace_back(node);
         VertexRec.emplace_back(this_node);
@@ -626,6 +820,7 @@ void NodeGraph::generate_vector_of_adjacency_unique_basin(std::vector<std::vecto
       std::vector<int> this_node2aliases;
       for(auto basin:target_basins)
       {
+        // std::cout << basin << "<<";
         alincementor++;
         int this_alias = alincementor + total_size;
         aliases2ID[this_alias] = alincementor;
@@ -633,11 +828,43 @@ void NodeGraph::generate_vector_of_adjacency_unique_basin(std::vector<std::vecto
         this_node2aliases.push_back(this_alias);
         aliases_basin_recs.push_back(basin);
       }
-
+      // std::cout << std::endl;
       node2aliases[node] = this_node2aliases;
+
+      // // this last step consists in not lossing this node in the graph: I am linking it arbitrarily to its first alias, otherwise the node becomes independent and appear weirdly-early in the stack
+      VertexDon.emplace_back(node);
+      VertexRec.emplace_back(this_node2aliases[0]);
+      VertexLength.emplace_back(1);
+
+      auto donnodes = this->get_MF_donors_at_node(node);
+      for(auto don:donnodes)
+      {
+        if(don<0 || don == node)
+          continue;
+        else
+        {
+          VertexDon.emplace_back(don);
+          VertexRec.emplace_back(node);
+          VertexLength.emplace_back(1);
+          for (auto tal:this_node2aliases)
+          {
+            VertexDon.emplace_back(don);
+            VertexRec.emplace_back(tal);
+            VertexLength.emplace_back(1);
+
+          }
+        }
+
+      }
+
+      // std::cout << node << std::endl;
 
     }
   }
+
+
+  // return;
+  
 
   // Second iteration, that time only on node bearing aliases, which should be a small part of all nodes
   for(size_t i=0; i < this->MF_stack.size(); i++)
@@ -649,25 +876,34 @@ void NodeGraph::generate_vector_of_adjacency_unique_basin(std::vector<std::vecto
     auto target_basins = MF_labels[node];
     std::vector<int> recnodes = this->get_MF_receivers_at_node(node);
     std::vector<double> these_length = this->get_MF_lengths_at_node(node);
-    for(size_t j=0; j<target_basins.size(); j++)
+
+    for(size_t j=0; j<node2aliases[node].size(); j++)
     {
       int this_node = node2aliases[node][j];
-      int this_basin = target_basins[j];
+      int ID = aliases2ID[this_node];
+      int this_basin = aliases_basin_recs[ID];
+      // if(this_node == 250010)
+      //   std::cout << "NODE 250010::belongsto::" << this_basin << "::";
       for(size_t k=0; k< 8; k++)
       {
         int recnode = recnodes[k];
         if(recnode<0)
           continue;
-        if(has_aliases[recnode] ==  false)
+        // if(this_node == 250010)
+        //   std::cout << "has_neighbors::";
+        if(has_aliases[recnode] ==  false && std::find(MF_labels[recnode].begin(),MF_labels[recnode].end(),this_basin) != MF_labels[recnode].end() ) // this_basin == MF_labels[recnode][0]) //  it should only have one basin label if it has no alias
         {
+          // if(this_node == 250010)
+          //   std::cout << "notalias::" << recnode;
           VertexDon.emplace_back(this_node);
-        
           VertexRec.emplace_back(recnode);
           VertexLength.emplace_back(these_length[k]);
 
         }
         else
         {
+          // if(this_node == 250010)
+          //   std::cout << "neighalias::" << recnode;
           for(size_t l =0; l< node2aliases[recnode].size(); l++)
           {
             int tested_alias = node2aliases[recnode][l];
@@ -677,9 +913,11 @@ void NodeGraph::generate_vector_of_adjacency_unique_basin(std::vector<std::vecto
             VertexDon.emplace_back(this_node);
             VertexRec.emplace_back(tested_alias);
             VertexLength.emplace_back(these_length[k]);
+
           }
         }
       }
+      // std::cout << std::endl;
     }
   }
 
@@ -688,6 +926,156 @@ void NodeGraph::generate_vector_of_adjacency_unique_basin(std::vector<std::vecto
 
 }
 
+
+void NodeGraph::link_pit_vertex_to_receivers_or_their_aliases(xt::pytensor<int,1>& post_rec,std::vector<int>& all_base_levels_ordered, std::vector<std::vector<int> >& basin_multi_label,
+std::vector<bool>& has_aliases, std::vector<int>& VertexDon, std::vector<int>& VertexRec, std::vector<double>& VertexLength, std::unordered_map<int,int>& aliases2ID , std::vector<int>&aliases_basin_recs, 
+std::unordered_map<int,std::vector<int> > node2aliases, std::vector<int>& aliases2nodes)//, xt::pytensor<double,1>& elevation)
+{
+
+  // TODO HERE: ADD A HIERARCHY OF BASINS  RATHER THAN ONLY CHECKING IF THE BASIN HAS BEEN PROCESSED!
+  // CURRENT PROBLEM: EACH BASIN IS COUNTED AS PROCESSED ONCE BUT THEY CAN RECEIVE MULTIPLE BASINS SO I JUST NEED TO CHECK IF THEY ARE AFTER IN THE TOP TO DOWN TREE
+
+  // keeping a map of already processed basin, I do not want to stop my flow jsut because it recrosses an already processed basin
+  std::map<int,int> basin_order;
+  std::map<int,int> basin_family;
+  // std::map<int,bool> is_mother_basin;
+
+  // Filling the map for each basin to preprocessed
+  int incrementor_basin_order =0;
+  int incrementor_basin_family =0;
+  for(auto bas:all_base_levels_ordered)
+  {
+    basin_order[bas] = incrementor_basin_order;
+    incrementor_basin_order++;
+    int next_node = bas;
+    while(true)
+    {
+      next_node = post_rec[next_node];
+
+      if(next_node == post_rec[next_node])
+      {
+        basin_family[bas] = next_node;
+        break;
+      }
+    }
+
+  }
+
+  // for(size_t i=0; i< all_base_levels_ordered.size(); i++)
+  // {
+  //   int this_basin = all_base_levels_ordered[i];
+  //   basin_family[this_basin] = incrementor_basin_family;
+  //   int target;
+  //   if(i < all_base_levels_ordered.size()-1)
+  //     target = all_base_levels_ordered[i+1];
+  //   else
+  //     continue;
+
+  //   int next_node = this_basin;
+  //   while(true)
+  //   {
+  //     next_node = post_rec[next_node];
+  //     if(next_node == target)
+  //       break;
+  //     if(next_node == post_rec[next_node])
+  //     {
+  //       incrementor_basin_family++;
+  //       break;
+  //     }
+  //   }
+  // }
+
+  // Now iterating through all base levels
+  for(auto node:all_base_levels_ordered)
+  {
+    int next_node = node;
+    // preparing the rereouting
+    //# switch to stop the reordering when an outlet is found
+    bool keep_on_searching = true;
+    bool is_BL = false;
+    int out_basin = -9999;
+    while(keep_on_searching)
+    {
+      // My next node is the corrected receiver
+      next_node = post_rec[next_node];
+      // If it has not been rerouted by Cordonnier et al 2017, ignore that node
+      if(next_node == post_rec[next_node])
+      {
+        keep_on_searching = false;
+        is_BL = true;
+        break;
+      }
+      // Else I have to check the receivers of the node
+      std::vector<int> these_basins = basin_multi_label[next_node];
+      for( auto gurg:these_basins)
+      {
+        if(gurg != node && basin_order[gurg] > basin_order[node] && basin_family[gurg] == basin_family[node])
+        {
+          // if there is any receiving basin different than the current one that has not been processed already, bingo I can stop the loop
+          keep_on_searching = false;
+          out_basin = gurg;
+          break;
+        }
+      }    
+
+    }
+
+    // if I am a base level, I ignore the next steps (no rerouting)
+    if(is_BL)
+    {
+      continue;
+    }
+
+    // if my first receiver has no aliases (i.e. no cyclicity coming back to the previous basin)
+    // I can then directly push everything into the 
+    if(has_aliases[next_node] == false)
+    {
+      VertexDon.emplace_back(node);
+      VertexRec.emplace_back(next_node);
+      VertexLength.emplace_back(XRES*10); // TODO REPLACE WITH EUCLIDIAN DISTANCE
+    }
+    else
+    {
+      // In this case the node has multiple aliases
+      // Finding the alisases first
+      int save_node = next_node;
+      std::vector<int> aliases = node2aliases[next_node];
+      for(auto al : aliases)
+      {
+        // find the internal ID in the alias vectors
+        int ID = aliases2ID[al];
+        // Getting the unique basin linked to the alias
+        int basID = aliases_basin_recs[ID];
+        // if the alias comes back to the same basin: nope but adding a link to the original node in order to keep it in the general graph and avoid isolation
+        if(basID == node)
+        {
+          VertexDon.emplace_back(save_node);
+          VertexRec.emplace_back(al);
+          VertexLength.emplace_back(1); 
+          continue;
+        }
+        // if the alias goes in an already processed basin: nope
+        if(basin_order[basID]<= basin_order[node] || basID != out_basin || basin_family[basID] != basin_family[node])
+          continue;
+
+        
+        // else, I am keeping it and...
+        next_node = al;
+        // ... breaking the cycle
+        break;
+      }
+      // I should have founbd my outlet and adding it to the vertexes.
+      // std::cout << node << std::endl;
+      VertexDon.emplace_back(node);
+      VertexRec.emplace_back(next_node);
+      VertexLength.emplace_back(XRES*10); // TODO REPLACE WITH EUCLIDIAN DISTANCE
+    }
+    // basin_order[node] = true;/
+
+  }
+
+
+}
 
 
 
