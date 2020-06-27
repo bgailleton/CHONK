@@ -25,9 +25,9 @@
 #include "xtensor/xarray.hpp"// manages the xtensor array (lower level than the numpy one)
 #include "xtensor/xtensor.hpp" // same
 
-#include <boost/graph/graph_traits.hpp>
-#include <boost/graph/adjacency_list.hpp>
-#include <boost/property_map/property_map.hpp>
+// #include <boost/graph/graph_traits.hpp>
+// #include <boost/graph/adjacency_list.hpp>
+// #include <boost/property_map/property_map.hpp>
 
 // typedef boost::property<boost::edge_weight_t, int> EdgeWeightProperty;
 // typedef boost::adjacency_list< boost::vecS, boost::vecS, boost::directedS, boost::no_property > DirectedGraph;
@@ -192,194 +192,108 @@ std::vector<xt::pytensor<int,1> > preprocess_stack(xt::pytensor<int,1>& pre_stac
 
 
 
-
-// Older tests
-
-
-class cppintail
+namespace subtopograph
 {
-  public:
-  
-    cppintail() { create(); }
-    cppintail(float tXMIN, float tXMAX, float tYMIN, float tYMAX, float tXRES, float tYRES, int tNROWS, int tNCOLS, float tNODATAVALUE) { create(tXMIN, tXMAX, tYMIN, tYMAX, tXRES, tYRES, tNROWS, tNCOLS, tNODATAVALUE); }
 
-    void compute_neighbors(xt::pytensor<float,2>& DEM);
-    
-    void flowdir_to_receiver_indices(int nodeID, std::vector<int>& receiver_nodes);
-    void flowdir_to_receiver_indices(int row, int col, std::vector<int>& receiver_rows, std::vector<int>& receiver_cols);
+    struct Vertex;
 
-    void Initialise_MF_stacks(xt::pytensor<float,2>& DEM);
+    bool dfs(Vertex& vertex, std::vector<Vertex>& stack, std::vector<int>& next_vertexes, int& index_of_reading, int& index_of_pushing, std::vector<bool>& is_in_queue, std::vector<Vertex>& graph) ;
 
-    void compute_DA_slope_exp( double slexponent, xt::pytensor<float,2>& DEM);
-
-    void find_nodes_with_no_donors( xt::pytensor<float,2>& DEM);
-
-
-
-    // This function transform the linearised node indice to row/col
-    inline void node_to_row_col(int& node, int& row, int& col)
-    {
-        col = node % NCOLS;
-        row = int((node - col)/NCOLS);
-    };
-
-    inline int row_col_to_node(int& row, int& col){return row * NCOLS + col;};
-    inline int row_col_to_node(size_t& row, size_t& col){return int(row * NCOLS + col);};
-
-
-    //Getter
-    std::vector<int> get_label_from_nodonode(){return label_from_nodonodes;};
-    xt::pytensor<int,2> get_flowdir(){return FLOWDIR;};
-  
-
-  protected:
-
-    // Geometrical/geographical features
-    float XMIN;
-    float XMAX;
-    float YMIN;
-    float YMAX;
-    float XRES;
-    float YRES;
-    int NROWS;
-    int NCOLS;
-    float NODATAVALUE;
-
-    // flow - directions
-    // Binary system to detect where the flow goes
-    // each number is 0 for block and 1 for goes
-    // position is around the pixel:
-    // XXXXXXXX:
-    // 1,2,3
-    // 8,0,4
-    // 7,6,5
-    // For example:
-    // 10010111 means flows in 5 directions
-    xt::pytensor<int,2> FLOWDIR;
-
-    // Drainage Area
-    xt::pytensor<float,2> Drainage_area;
-
-    // Node with no donor
-    std::vector<int> no_donor_nodes, label_from_nodonodes;
-    
-
-    // MF stacks: to deal with multiple flow direction
-    std::vector<int> MF_stack;
+    std::vector<int> topological_sort_by_dfs(std::vector<Vertex>& graph, int starting_node) ;
 
 
 
 
-
-  private:
-    void create();
-    void create(float tXMIN, float tXMAX, float tYMIN, float tYMAX, float tXRES, float tYRES, int tNROWS, int tNCOLS, float tNODATAVALUE);
-
-};
-
-
-struct Vertex {
-    int val;
-    bool visiting;
-    bool visited;
-    std::vector<int> childNodes;
-};
-
-bool dfs(Vertex& vertex, std::vector<Vertex>& stack, std::vector<int>& next_vertexes, int& index_of_reading, int& index_of_pushing, std::vector<bool>& is_in_queue, std::vector<Vertex>& graph) 
-{
-    vertex.visiting = true;
-    for (auto chid : vertex.childNodes) 
-    {
-        if(chid<0)
-            continue;
-        Vertex childNode = graph[chid];
-        if (childNode.visited == false) 
-        {
-            if(is_in_queue[childNode.val] == false)
-            {
-                next_vertexes[index_of_pushing] = childNode.val;
-                is_in_queue[childNode.val] = true;
-                index_of_pushing++;
-            }
-            // check for back-edge, i.e., cycle
-            if (childNode.visiting) 
-            {
-                return false;
-            }
-
-            bool childResult = dfs(vertex, stack, next_vertexes, index_of_reading, index_of_pushing, is_in_queue, graph);
-            if (childResult == false) 
-            {
-                return false;
-            }
-            
-        }
-    }
-    
-    
-    // now that you have completely visited all the
-    // childNodes of the vertex, push the vertex in the stack
-    stack.emplace_back(vertex);
-
-    // this vertex is processed (all its descendents, i.e,
-    // the nodes that are dependent on
-    // this vertex along with this vertex itself have been visited 
-    // and processed). So mark this vertex as Visited.
-    vertex.visited = true;
-    
-    // mark vertex as visiting as false since we 
-    // have completed visiting all the subtrees of 
-    // the vertex, including itself. So the vertex is no more
-    // in visiting state because it is done visited.
-    // Another reason is (the critical one) now that all the 
-    // descendents of the vertex are visited, any future 
-    // inbound edge to the vertex won't be a back edge anymore. 
-    vertex.visiting = false;  
-
-    return true;
-}
-
-// returns null if no topological sort is possible
-std::vector<int> topological_sort_by_dfs(std::vector<Vertex>& graph, int starting_node) 
-{
-    std::vector<Vertex> stack;
-    std::vector<int> next_vertexes(graph.size(), -1);
-    std::vector<bool> is_in_queue(graph.size(), false);
-    
-    // next_vertexes.reserve(graph.size());
-    next_vertexes[0] = starting_node;
-    is_in_queue[starting_node] = true;
-    int index_of_reading = 0;
-    int index_of_pushing = 1;
-    while(true)
-    {
-        int next_ID = next_vertexes[index_of_reading];
-        index_of_reading++;
-        if(next_ID == -1)
-            break;
-        Vertex vertex = graph[next_ID];
-        if (vertex.visited ==  false) {
-            bool dfs_result = dfs(vertex, stack, next_vertexes, index_of_reading, index_of_pushing, is_in_queue, graph);
-            // if cycle found then there is no topological sort possible
-            if (dfs_result == false) {
-                return {-9999};
-            }
-        }
-    }
-
-    stack.shrink_to_fit();
-    std::vector<int> result;result.reserve(stack.size());
-
-    for (auto vertex : stack) {
-        result.emplace_back(vertex.val);
-    }
-    result.shrink_to_fit();
-    return result;
 }
 
 
 
 
+
+
+// // Older tests
+
+
+// class cppintail
+// {
+//   public:
+  
+//     cppintail() { create(); }
+//     cppintail(float tXMIN, float tXMAX, float tYMIN, float tYMAX, float tXRES, float tYRES, int tNROWS, int tNCOLS, float tNODATAVALUE) { create(tXMIN, tXMAX, tYMIN, tYMAX, tXRES, tYRES, tNROWS, tNCOLS, tNODATAVALUE); }
+
+//     void compute_neighbors(xt::pytensor<float,2>& DEM);
+    
+//     void flowdir_to_receiver_indices(int nodeID, std::vector<int>& receiver_nodes);
+//     void flowdir_to_receiver_indices(int row, int col, std::vector<int>& receiver_rows, std::vector<int>& receiver_cols);
+
+//     void Initialise_MF_stacks(xt::pytensor<float,2>& DEM);
+
+//     void compute_DA_slope_exp( double slexponent, xt::pytensor<float,2>& DEM);
+
+//     void find_nodes_with_no_donors( xt::pytensor<float,2>& DEM);
+
+
+
+//     // This function transform the linearised node indice to row/col
+//     inline void node_to_row_col(int& node, int& row, int& col)
+//     {
+//         col = node % NCOLS;
+//         row = int((node - col)/NCOLS);
+//     };
+
+//     inline int row_col_to_node(int& row, int& col){return row * NCOLS + col;};
+//     inline int row_col_to_node(size_t& row, size_t& col){return int(row * NCOLS + col);};
+
+
+//     //Getter
+//     std::vector<int> get_label_from_nodonode(){return label_from_nodonodes;};
+//     xt::pytensor<int,2> get_flowdir(){return FLOWDIR;};
+  
+
+//   protected:
+
+//     // Geometrical/geographical features
+//     float XMIN;
+//     float XMAX;
+//     float YMIN;
+//     float YMAX;
+//     float XRES;
+//     float YRES;
+//     int NROWS;
+//     int NCOLS;
+//     float NODATAVALUE;
+
+//     // flow - directions
+//     // Binary system to detect where the flow goes
+//     // each number is 0 for block and 1 for goes
+//     // position is around the pixel:
+//     // XXXXXXXX:
+//     // 1,2,3
+//     // 8,0,4
+//     // 7,6,5
+//     // For example:
+//     // 10010111 means flows in 5 directions
+//     xt::pytensor<int,2> FLOWDIR;
+
+//     // Drainage Area
+//     xt::pytensor<float,2> Drainage_area;
+
+//     // Node with no donor
+//     std::vector<int> no_donor_nodes, label_from_nodonodes;
+    
+
+//     // MF stacks: to deal with multiple flow direction
+//     std::vector<int> MF_stack;
+
+
+
+
+
+//   private:
+//     void create();
+//     void create(float tXMIN, float tXMAX, float tYMIN, float tYMAX, float tXRES, float tYRES, int tNROWS, int tNCOLS, float tNODATAVALUE);
+
+// };
 
 
 #endif

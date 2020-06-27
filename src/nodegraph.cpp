@@ -35,13 +35,149 @@
 
 #include "nodegraph.hpp"
 
-#include <boost/graph/graph_traits.hpp>
-#include <boost/graph/adjacency_list.hpp>
-#include <boost/graph/topological_sort.hpp>
+// #include <boost/graph/graph_traits.hpp>
+// #include <boost/graph/adjacency_list.hpp>
+// #include <boost/graph/topological_sort.hpp>
 
 #include <chrono>
 // #include <boost/chrono.hpp>
 // #include <boost/timer/timer.hpp>
+
+struct subtopograph::Vertex {
+    int val;
+    bool visiting;
+    bool visited;
+    std::vector<int> childNodes;
+};
+
+bool subtopograph::dfs(subtopograph::Vertex& vertex, std::vector<subtopograph::Vertex>& stack, std::vector<int>& next_vertexes, int& index_of_reading, int& index_of_pushing, std::vector<bool>& is_in_queue, std::vector<subtopograph::Vertex>& graph) 
+{
+    // std::cout << "6.0" << std::endl;
+    vertex.visiting = true;
+    // std::cout << "6.0.1" << std::endl;
+    for (auto chid : vertex.childNodes) 
+    {
+      // std::cout << "6.1" << std::endl;
+      if(chid<0)
+          continue;
+      // std::cout << "6.2" << std::endl;
+      subtopograph::Vertex& childNode = graph[chid];
+
+      // std::cout << "6.3::" << childNode.val << std::endl;
+      if (childNode.visited == false) 
+      {
+        // std::cout << "6.4" << std::endl;
+        if(is_in_queue[childNode.val] == false)
+        {
+          next_vertexes[index_of_pushing] = childNode.val;
+          is_in_queue[childNode.val] = true;
+          index_of_pushing++;
+        }
+        // std::cout << "6.5" << std::endl;
+        // check for back-edge, i.e., cycle
+        if (childNode.visiting) 
+        {
+          return false;
+        }
+        // std::cout << "6.6::" << vertex.val << std::endl;
+
+        bool childResult = dfs(childNode, stack, next_vertexes, index_of_reading, index_of_pushing, is_in_queue, graph);
+
+        if (childResult == false) 
+        {
+          return false;
+        }
+        // std::cout << "6.7" << std::endl;
+            
+      }
+    }
+    
+    // std::cout << "6.8" << std::endl;
+    
+    // now that you have completely visited all the
+    // childNodes of the vertex, push the vertex in the stack
+
+    stack.emplace_back(vertex);
+
+    // std::cout << "6.9" << std::endl;
+
+
+    // this vertex is processed (all its descendents, i.e,
+    // the nodes that are dependent on
+    // this vertex along with this vertex itself have been visited 
+    // and processed). So mark this vertex as Visited.
+    vertex.visited = true;
+    // std::cout << "6.10" << std::endl;
+
+    
+    // mark vertex as visiting as false since we 
+    // have completed visiting all the subtrees of 
+    // the vertex, including itself. So the vertex is no more
+    // in visiting state because it is done visited.
+    // Another reason is (the critical one) now that all the 
+    // descendents of the vertex are visited, any future 
+    // inbound edge to the vertex won't be a back edge anymore. 
+    vertex.visiting = false;  
+    // std::cout << "6.11" << std::endl;
+
+
+    return true;
+}
+
+// returns null if no topological sort is possible
+std::vector<int> subtopograph::topological_sort_by_dfs(std::vector<subtopograph::Vertex>& graph, int starting_node) 
+{
+    std::vector<subtopograph::Vertex> stack;
+    std::vector<int> next_vertexes(graph.size(), -1);
+    std::vector<bool> is_in_queue(graph.size(), false);
+    // std::cout << "1" << std::endl;
+    // next_vertexes.reserve(graph.size());
+    next_vertexes[0] = starting_node;
+    is_in_queue[starting_node] = true;
+    int index_of_reading = 0;
+    int index_of_pushing = 1;
+    // std::cout << "2" << std::endl;
+
+    while(true)
+    {
+        // std::cout << "3" << std::endl;
+
+        int next_ID = next_vertexes[index_of_reading];
+        index_of_reading++;
+        // if(next_ID==1714)
+        //   std::cout << "GURG2.0!!!!!" << std::endl;
+        // std::cout << "4" << std::endl;
+        if(next_ID == -1)
+            break;
+        // std::cout << "5" << std::endl;
+        subtopograph::Vertex vertex = graph[next_ID];
+        // std::cout << "6" << std::endl;
+        if (vertex.visited ==  false) 
+        {
+            bool dfs_result = dfs(vertex, stack, next_vertexes, index_of_reading, index_of_pushing, is_in_queue, graph);
+            // std::cout << "6bis" << std::endl;
+
+            // if cycle found then there is no topological sort possible
+            if (dfs_result == false) 
+            {
+              // std::cout << "gabul" << std::endl;
+                return {-9999};
+            }
+        }
+        // std::cout << "7" << std::endl;
+    }
+
+    stack.shrink_to_fit();
+    std::vector<int> result;result.reserve(stack.size());
+
+    for (auto vertex : stack) {
+        result.emplace_back(vertex.val);
+    }
+    result.shrink_to_fit();
+    return result;
+}
+
+
 
 
 
@@ -91,16 +227,28 @@ void NodeGraph::create(xt::pytensor<int,1>& pre_stack,xt::pytensor<int,1>& pre_r
 
   // Now I need to post-process the MF stack
 
-  std::vector<std::vector<int> > basin_multi_label(nuint_element);
-  std::vector<int> all_base_levels_nocorr, index_in_first_MFstack(nint_element);
+  // std::vector<std::vector<int> > basin_multi_label(nuint_element);
+  std::vector<int> all_base_levels_nocorr; //, index_in_first_MFstack(nint_element);
+  // std::vector<double> elev_BL;
   std::map<int,int> BL_to_index;
 
   pit_to_reroute  = std::vector<bool>(nuint_element,false);
 
+  std::vector<double> separated_trees_elev_BL;
   std::vector<std::vector<int> > separated_trees;
   std::map<int,int> BL_to_sep_tree;
   int index_st = 0;
   separated_trees.push_back({});
+
+  std::vector<bool> labelz(pre_stack.size(), false);
+  int preincr = -1;
+  for (auto sta:pre_stack)
+  {
+    if(sta == pre_rec[sta])
+      preincr++;
+    labelz[sta] = preincr;
+  }
+
 
 
   // std::cout <<"URG" << std::endl;
@@ -113,27 +261,119 @@ void NodeGraph::create(xt::pytensor<int,1>& pre_stack,xt::pytensor<int,1>& pre_r
     if(pre_rec[node] == node)
     {
       all_base_levels_nocorr.push_back(node);
-      separated_trees[index_st].push_back(node);
-      BL_to_sep_tree[node] = index_st;
-      BL_to_index[node] = incr2;
-      incr2++;
-    
+      incr2++;    
       if(post_rec[node] != node)
       {
         pit_to_reroute[node] = true;
       }
-      else
-      {
-        // std::cout << "[";
-        // for(auto v:separated_trees[index_st])
-        //   std::cout << v << ",";
-        // std::cout << std::endl;
-        separated_trees.push_back({});
-        index_st++;
-      }
     }
-    basin_multi_label.emplace_back(std::vector<int>());
+    // basin_multi_label.emplace_back(std::vector<int>());
   }
+
+  end = std::chrono::steady_clock::now();
+  dat_time = end - start;
+  std::cout<< "TIMER_NODEGRAPH_C2::" << dat_time.count() << std::endl;
+  start = std::chrono::steady_clock::now();
+
+
+  std::vector<subtopograph::Vertex> graph;graph.reserve(nuint_element);
+  for(size_t i = 0; i< nuint_element; i++)
+  {
+    subtopograph::Vertex this_vertex;
+    this_vertex.val = int(i);
+    this_vertex.visiting = false;
+    this_vertex.visited = false;
+    auto dons = this->get_MF_donors_at_node(int(i));
+    std::vector<int> donors;
+    for(auto& datd : dons)
+    {
+
+      if(datd != int(i) && datd>=0)
+      {
+        if(elevation[datd] >= elevation[int(i)])
+        {
+          donors.push_back(datd);
+        }
+      }
+      // if(elevation[datd]<elevation[int(i)])
+      // {
+      //   std::cout << "!!!!!!" << std::endl;
+      //   exit(EXIT_FAILURE);
+      // }
+    } 
+    this_vertex.childNodes = donors;
+
+    // if(this_vertex.val == )
+
+    graph.emplace_back(this_vertex);
+  }
+
+  end = std::chrono::steady_clock::now();
+  dat_time = end - start;
+  std::cout<< "TIMER_NODEGRAPH_C3::" << dat_time.count() << std::endl;
+  start = std::chrono::steady_clock::now();
+
+  std::vector<int> pixel_score(nuint_element,0);
+  std::vector<bool> is_in_stack(nuint_element,false);
+  std::vector<std::vector<int> > vecofvec;
+  int incr = this->MF_stack.size() - 1;
+
+
+  for(int no = all_base_levels_nocorr.size()-1 ; no >= 0; no--)
+  // for(int no = 0 ; no < all_base_levels_nocorr.size(); no++)
+  {
+    int node = all_base_levels_nocorr[no];
+    // std::cout << "start the toposort for node "<< node << std::endl;
+    std::vector<int> tempstack = subtopograph::topological_sort_by_dfs(graph, node);
+    // std::cout << "done tid  dah toposort for node "<< node << std::endl;
+
+    for(int i =  tempstack.size() - 1; i>=0;i--)
+    // for(int i =  0; i< tempstack.size();i++)
+    {
+      int this_node = tempstack[i];
+      if(is_in_stack[this_node])
+        continue;
+      this->MF_stack[incr] = this_node;
+      incr--;
+      is_in_stack[this_node] = true; 
+
+
+    }
+    // vecofvec.push_back(tempstack);
+  }
+
+
+  // // int incr = 0;
+  // std::vector<int> incremental_pixel_score(nuint_element,0);
+  // for (int i = vecofvec.size()-1; i >= 0;i--)
+  // // for (int i=0; i<vecofvec.size();i++)
+  // {
+  //   std::vector<int>& this_sub_stack = vecofvec[i];
+  //   for(int j =  this_sub_stack.size() - 1; j>=0;j--)
+  //   // for(int j = 0;j< this_sub_stack.size(); j++)
+  //   {
+  //     int this_node = this_sub_stack[j];
+  //     incremental_pixel_score[this_node] = incremental_pixel_score[this_node] + 1;
+  //     if(incremental_pixel_score[this_node] == pixel_score[this_node])
+  //     {
+  //       this->MF_stack[incr] = this_node;
+  //       // incr++;
+  //       incr--;
+  //     }
+  //   }
+  // }
+  
+  //right now I should have what it takes
+
+  // std::cout << incr + 1 << "/" << this->MF_stack.size() << std::endl;
+
+  end = std::chrono::steady_clock::now();
+  dat_time = end - start;
+  std::cout<< "TIMER_NODEGRAPH_C4::" << dat_time.count() << std::endl;
+  start = std::chrono::steady_clock::now();
+
+
+
   // all_base_levels_nocorr now has all the baselevel nodes ordered by graph solving
   // std::cout <<"URG2" << std::endl;
 
@@ -481,7 +721,7 @@ std::vector<xt::pytensor<int,1> > preprocess_stack(xt::pytensor<int,1>& pre_stac
     int this_node = pre_stack[i];
     int this_receiver = pre_rec[this_node];
     baslab[this_node] = this_label;
-    // if base-level in the prestack (pre correction) then different basin
+    // if base-level in the pre_stack (pre correction) then different basin
     if(this_node == this_receiver)
     {
       if(this_node == 2075)
@@ -1030,6 +1270,8 @@ std::unordered_map<int,std::vector<int> > node2aliases, std::vector<int>& aliase
 
 
 }
+
+
 
 
 
