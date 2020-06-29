@@ -83,4 +83,12 @@ PYBIND11_MODULE(CHONK_cpp, m)
     m.def("preprocess_stack", preprocess_stack);
     m.def("pop_elevation_to_SS_SF_SPIL", pop_elevation_to_SS_SF_SPIL);
 
+    py::class_<NodeGraphV2>(m, "NodeGraph",py::dynamic_attr())
+      .def(py::init<>())
+      .def(py::init([](xt::pytensor<int,1>& D8stack, xt::pytensor<int,1>& D8rec, xt::pytensor<double,1>& D8Length, xt::pytensor<int,2>& Mrec,xt::pytensor<int,2>& Mlength, xt::pytensor<double,1>& elevation, double dx, double dy){return std::unique_ptr<NodeGraphV2>(new NodeGraphV2( D8stack,  D8rec,  D8Length, Mrec, Mlength, elevation,  dx,  dy)); }))
+      .def("get_MF_stack_full", &NodeGraphV2::get_MF_stack_full)
+      ;
+
+
+
 }

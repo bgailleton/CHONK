@@ -60,9 +60,12 @@ void ModelRunner::create(double ttimestep,double tstart_time,std::vector<std::st
 void ModelRunner::initiate_nodegraph()
 {
   // creating the nodegraph and preprocessing the depression nodes
-  this->graph = NodeGraph(this->io_int_array["pre_stack"],this->io_int_array["pre_rec"],this->io_int_array["post_rec"],this->io_int_array["post_stack"] , this->io_int_array["m_stack"], this->io_int_array2d["m_rec"],this->io_int_array2d["m_don"], 
-    this->io_double_array["surface_elevation"], this->io_double_array2d["length"], this->io_double["x_min"], this->io_double["x_max"], this->io_double["y_min"], 
-    this->io_double["y_max"], this->io_double["x_res"], this->io_double["y_res"], this->io_int["n_rows"], this->io_int["n_cols"], this->io_int["no_data"]);
+  // this->graph = NodeGraph(this->io_int_array["pre_stack"],this->io_int_array["pre_rec"],this->io_int_array["post_rec"],this->io_int_array["post_stack"] , this->io_int_array["m_stack"], this->io_int_array2d["m_rec"],this->io_int_array2d["m_don"], 
+  //   this->io_double_array["surface_elevation"], this->io_double_array2d["length"], this->io_double["x_min"], this->io_double["x_max"], this->io_double["y_min"], 
+  //   this->io_double["y_max"], this->io_double["x_res"], this->io_double["y_res"], this->io_int["n_rows"], this->io_int["n_cols"], this->io_int["no_data"]);
+
+  this->graph = NodeGraphV2(this->io_int_array["D8stack"], this->io_int_array["D8rec"], this->io_int_array["D8Length"],
+this->io_int_array2d["Mrec"] , this->io_double_array2d["Mlength"], this->io_double_array["surface_elevation"], this->io_double["dx"], this->io_double["dy"]);
 
   // Chonkification
   if(this->chonk_network.size()>0)

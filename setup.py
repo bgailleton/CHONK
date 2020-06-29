@@ -49,6 +49,7 @@ ext_modules = [
             os.path.join(sys.prefix, 'include'),
             os.path.join(sys.prefix, 'Library', 'include'),
             os.path.join(os.path.dirname(os.path.realpath(__file__)),'src'),
+            os.path.join(os.path.dirname(os.path.realpath(__file__)),'include'),
             'src'
         ],
         language='c++'
