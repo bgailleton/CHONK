@@ -565,14 +565,14 @@ std::vector<int> multiple_stack_fastscape(int n_element, std::vector<Vertex>& gr
       }
     } 
   }
-  // if(nstack < n_element - 1 )
-  // {
-  //   std::cout << "WARNING::STACK UNDERPOPULATED::" << nstack << std::endl;;
-  //   throw std::runtime_error("stack underpopulated somehow:");
-  // }
+  if(nstack < n_element - 1 )
+  {
+    std::cout << "WARNING::STACK UNDERPOPULATED::" << nstack << std::endl;;
+    throw std::runtime_error("stack underpopulated somehow:");
+  }
 
   return stack;
-
+}
 
 
 // Quack
@@ -585,7 +585,7 @@ std::vector<int> multiple_stack_fastscape(int n_element, std::vector<Vertex>& gr
 //             ___( o)>
 //             \ <_. )
 //    ~~~~~~~~  `---'  
-}
+
 
 
 // //  //###############################################  
