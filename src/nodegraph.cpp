@@ -295,32 +295,34 @@ NodeGraphV2::NodeGraphV2(
   int ncols
   )
 {
-  // std::cout << "bulf0" << std::endl;
-
   // Saving general informations
   this->dx = dx;
   this->dy = dy;
   this->cellarea = dx * dy;
   this-> n_element = Sstack.size();
   this-> un_element = Sstack.size();
-  // std::cout << "bulf01" << std::endl;
-  
-  // std::vector<int> pits;pits.reserve(un_element);
+
+  // Initialising the vector of pit to reroute. The pits to reroute are all the local minima that are rerouted to another basin/edge
+  // It does not include non active nodes (i.e. base level of the model/output of the model)
   pits_to_reroute = std::vector<bool>(un_element,false);
-  std::vector<int> pits;
+
+  //# Iterating through the nodes on the stack to gather all the pits
   for(auto node:Sstack)
   {
+    // If a pit is its single-flow receiver and an active node it is a pit to reroute
     if(Srec[node] == node && active_nodes[node])
     {
       pits_to_reroute[node] = true;
-      pits.push_back(node);
     }
   }
-  pits_to_reroute.shrink_to_fit();
 
+  // Now I am labelling my basins
+  //# Initialising the vector of basin labels
   std::vector<int> basin_labels(Sstack.size(),-1);
+  //# Initialising the label to 0
   int label = 0;
-
+  //# Iterating through all my single-flow stack from bottom to top (see Braun and Willett 2013 for meaning of stack)
+  //# if a node is it's receiver then the label becomse that node. The resulting basin vector show which nodes are linked to which
   for(auto node:Sstack)
   {
     if(node == Srec[node])
@@ -329,57 +331,8 @@ NodeGraphV2::NodeGraphV2(
     }
     basin_labels[node] = label;
   }
-  // xt::pytensor<int,1> basin_labels = xt::zeros<int>({un_element});
 
-  // xt::xtensor<double, 2> elevation2D({size_t(nrows),size_t(ncols)});
-  // for(size_t r = 0; r<nrows; r++)
-  //   for(size_t c=0; c<ncols; c++)
-  //   {
-  //     int i = r*ncols+c;
-  //     elevation2D(r,c) = elevation[i];
-  //   }
-
-
-  // Using Cordonnier's algorithm: 
-  // fastscapelib::BasinGraph<int,int,double> Bgraph;
-  //# Computing basins
-  // Bgraph.compute_basins(basin_labels, Sstack, Srec); 
-  // int g =0;
-
-  //# updating receivers
-  // Bgraph.update_receivers<fastscapelib::BasinAlgo::Boruvka, fastscapelib::ConnectType::Simple>(Srec, SLength, basin_labels, Sstack, active_nodes, elevation2D, dx, dy);
-
-
-
-  // // Correcting the receivers according to Cordonnier's new order
-  // for(auto node:pits)
-  // {
-  //   std::cout << "Testing  NODE " << node <<" rec " << Srec[node] << "||" << active_nodes[node] <<  std::endl;
-  //   if(node != Srec[node] && active_nodes[node] == 1)
-  //   {
-  //     std::cout << "PIT!" << std::endl;
-  //     pits_to_reroute[node] = true;
-  //   }
-
-  // }
-
-  std::map<int,int> receiver_basin;
-  // Now I am building a basin tree
-  for(auto pit:pits)
-  {
-
-    int this_basin = basin_labels[pit];
-    // receiver_basin:
-    int trecs = Prec[Prec[pit]];
-    int this_recbasin = basin_labels[trecs];
-    // std::cout << "node " << pit << " give to " << trecs << std::endl;
-    if(this_basin == this_recbasin)
-      throw std::runtime_error("receiver basin of rerouted pit is itself::pitnode:" + std::to_string(this_basin) + " recnode:" + std::to_string(this_recbasin) );
-
-  }
-
-
-
+  // Initialising a temporary donor matrix to match the fastscape one
   xt::pytensor<int,2> Mdon({int(un_element), 8});
   for(size_t i=0;i<un_element;i++)
   for(size_t j=0; j<8;j++)
@@ -388,73 +341,76 @@ NodeGraphV2::NodeGraphV2(
   // Correcting receivers from fastscapelib (removing duplicates and creating the donors array)
   this->initial_correction_of_MF_receivers_and_donors(Mrec, Mdon, elevation);
 
-
-
+  // Initialising the node graph, a vector of Vertexes with their edges
   graph.reserve(un_element);
+  //# I will need a vector gathering the nodes I'll need to check for potential cyclicity
   std::vector<int> node_to_check;
+  //# their target basin
   std::vector<int> force_target_basin;
+  //# and the origin of the pit
   std::vector<int> origin_pit;
-
+  //#Iterating through the nodes
   for(int i=0; i<n_element;i++)
   {
+    // gathering local info for this vertex
     std::vector<int>donors,receivers;
     std::vector<double> length2rec;
-
     for(size_t j=0; j<8;j++)
     {
+      // Getting donors
       int nD = Mdon(i,j);
+      // -1 -> not a donor (fortran does not have easily usable sparse matrix)
       if(nD>=0 && nD != i)
         donors.push_back(nD);
+      // Same with receivers
       int nR = Mrec(i,j);
       if(nR>=0)
       {
         receivers.push_back(nR);
         length2rec.push_back(Mlength(i,j));
       }
-
-      // if(i == 2074)
-      // {
-      //   std::cout << "rec are " ;
-        
-      //   for(auto gugne:receivers)
-      //     std::cout << gugne << "||";
-      //   std::cout << std::endl;
-      // }
     }
-
-
-
+    // Done with classic receivers
+    // If this receiver is a pit to reroute, I need to add to the receiver list the receiver of the outlet
     if(pits_to_reroute[i] == true)
     {
+      //# Node I wanna add
       int tgnode = Prec[Prec[i]];
+      //# Will be a receiver
       receivers.push_back(tgnode);
+      //# I will have to check its own receivers for potential cyclicity
       node_to_check.push_back(tgnode);
+      //# Which pit is it connected to
       origin_pit.push_back(i);
+      //# Arbitrary length
       length2rec.push_back(1);
+      //# The basin I DONT want to reach
       force_target_basin.push_back(i);
-      // if(i == 2074)
-      //  std::cout << i << " rec to  " << tgnode << std::endl;
 
+      // Keepign this check just in case, will remove later. Throw an error in case cyclicity is detected
       if(basin_labels[tgnode] == basin_labels[i])
       {
         throw std::runtime_error("Receiver in same basin!");
       }
     }
 
-    // donors.shrink_to_fit();
-    // receivers.shrink_to_fit();
-    // length2rec.shrink_to_fit();
+    // I need these to initialise my Vertex
     bool false1 = false;
     bool false2 = false;
-
+    // Constructing the vertex in place in the vector. More efficient according to the internet
     graph.emplace_back(Vertex(i,false1,false2,donors,receivers,length2rec));
-
   }
 
+  // Now I am correcting my outlet nodes:
+  // The idea is to force any of its node to be directed to the next basin and avoid any cyclicity. 
+  //# iterating through them
   for(size_t i=0; i< node_to_check.size();i++)
-  {
+  { 
+    //# Gathering the node to check
     int this_node_to_check = node_to_check[i];
+    //# The basin to avoid
     int this_target_basin = force_target_basin[i];
+    // new list of receivers, I am only keeping the ones NOT draining to original basin
     std::vector<int> new_rec;
     for(auto trec:graph[this_node_to_check].receivers)
     {
@@ -464,37 +420,22 @@ NodeGraphV2::NodeGraphV2(
       }
 
     }
-
-
+    // Security check
     if(new_rec.size()==0 && active_nodes[this_node_to_check] == 1 )
       throw std::runtime_error("At node " + std::to_string(this_node_to_check) + " no receivers after corrections! it came from pit " + std::to_string(origin_pit[i]));
+    // Correcting the rec
     graph[this_node_to_check].receivers = new_rec;
   }
 
-  // for(size_t i=0; i< node_to_check_2.size();i++)
-  // {
-  //   int this_node_to_check = node_to_check_2[i];
-  //   int this_target_basin = force_basin_2[i];
-  //   std::vector<int> new_rec;
-  //   for(auto trec:graph[this_node_to_check].receivers)
-  //   {
-  //     if(basin_labels[trec] == this_target_basin)
-  //     {
-  //       new_rec.push_back(trec);
-  //     }
-
-  //   }
-  //   graph[this_node_to_check].receivers = new_rec;
-  // }
-
-  std::string direction = "receivers";
-  // std::vector<int> tMstack = topological_sort_by_dfs(graph,direction);
+  // I am now ready to create my topological order utilising a c++ port of the fortran algorithm from Jean Braun
   Mstack = xt::adapt(multiple_stack_fastscape( n_element, graph));
 
+  // I got my topological order, I can now restore the corrupted receiver I had
   for(size_t i=0; i<node_to_check.size(); i++)
   {
-
+    // New receiver array
     std::vector<int> rec;
+    // Repicking the ones from fastscapelib-fortran
     for(size_t j=0;j<8; j++)
     {
       int trec = Mrec(node_to_check[i],j);
@@ -502,44 +443,18 @@ NodeGraphV2::NodeGraphV2(
       {continue;}
       rec.push_back(trec);
     }
+    // VERY IMPORTANT HERE!!!!!
+    // In the particular case where my outlet is *also* a pit, I do not want to remove its receiver
     if(pits_to_reroute[node_to_check[i]])
       rec.push_back(Prec[Prec[node_to_check[i]]]);
+    // Correcting the Vertex inplace
     graph[node_to_check[i]].receivers = rec;
   }
-    
-  // for(size_t i=0; i<node_to_check_2.size(); i++)
-  // {
-  //   std::vector<int> rec;
-  //   for(size_t j=0;j<8; j++)
-  //   {
-  //     int trec = Mrec(node_to_check[i],j);
-  //     if(trec < 0 || node_to_check_2[i] == trec)
-  //     {continue;}
-  //     rec.push_back(trec);
-  //   }
-  //   graph[node_to_check_2[i]].receivers = rec;
-  // }
-
-
-
-  // if(tMstack[0] == -9999)
-  // {
-  //   std::cout << "NODEGRAPH IS CYCLIC, PREPARE TO CRASH" << std::endl;
-  //   throw std::runtime_error("Cyclic node graph, cannot solve...");
-  // }
-
-  // Mstack = xt::zeros<int>({un_element});
-  // int incr = 0;
-
-  // for(int i = tMstack.size()-1; i>=0;i--)
-  // {
-  //   Mstack[incr] = tMstack[i];
-  //   incr++;
-  // }
-  // std::cout << Mstack[0] << std::endl;
-
-
   
+  //Done
+
+
+  return;
 }
 
 // This function correct the multiple flow receivers and donrs which end up with some duplicates probably linked to my homemade corrections.
@@ -659,59 +574,17 @@ std::vector<int> multiple_stack_fastscape(int n_element, std::vector<Vertex>& gr
   return stack;
 
 
-//   ndon=0
 
-//   do ij=1,nn
-//     do k=1,nrec(ij)
-//       ijk = rec(k,ij)
-//       ndon(ijk)=ndon(ijk)+1
-//       don(ndon(ijk),ijk) = ij
-//     enddo
-//   enddo
-
-//   allocate (vis(nn),parse(nn))
-
-//   nparse=0
-//   nstack=0
-//   stack=0
-//   vis=0
-//   parse=0
-
-//   ! we go through the nodes
-//   do ij=1,nn
-//     ! when we find a "summit" (ie a node that has no donors)
-//     ! we parse it (put it in a stack called parse)
-//     if (ndon(ij).eq.0) then
-//       nparse=nparse+1
-//       parse(nparse)=ij
-//     endif
-//     ! we go through the parsing stack
-//     do while (nparse.gt.0)
-//       ijn=parse(nparse)
-//       nparse=nparse-1
-//       ! we add the node to the stack
-//       nstack=nstack+1
-//       stack(nstack)=ijn
-//       ! for each of its receivers we increment a counter called vis
-//       do  ijk=1,nrec(ijn)
-//         ijr=rec(ijk,ijn)
-//         vis(ijr)=vis(ijr)+1
-//         ! if the counter is equal to the number of donors for that node we add it to the parsing stack
-//         if (vis(ijr).eq.ndon(ijr)) then
-//           nparse=nparse+1
-//           parse(nparse)=ijr
-//         endif
-//       enddo
-//     enddo
-//   enddo
-//   if (nstack.ne.nn) stop 'error in stack'
-
-//   deallocate (ndon,don,vis,parse,h0)
-
-//   return
-
-// end subroutine find_mult_rec
-
+// Quack
+//   __
+// <(o )___
+//  ( ._> /
+//   `---'  
+// Quack
+//    quack quack  __
+//             ___( o)>
+//             \ <_. )
+//    ~~~~~~~~  `---'  
 }
 
 // void find_multiple_receivers_and_donors(xt::pytensor<double>& elevation)
