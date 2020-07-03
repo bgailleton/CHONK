@@ -95,19 +95,30 @@ public:
   NodeGraphV2(
 xt::pytensor<int,1>& D8stack, // D8 original stack
 xt::pytensor<int,1>& D8rec, // D8 original receivers
+xt::pytensor<int,1>& Prec, 
 xt::pytensor<double,1>& D8Length, // D8 length2rec
 xt::pytensor<int,2>& Mrec, // Multiple rec,  - all downslope recs
-xt::pytensor<int,2>& Mlength, // Multiple length, - corresponding length to receivers
+xt::pytensor<double,2>& Mlength, // Multiple length, - corresponding length to receivers
 xt::pytensor<double,1>& elevation, // vectorised elevation
+xt::pytensor<bool,1>& active_nodes,
 double dx,
-double dy
+double dy,
+int nrows,
+int ncols
   );
 
 void initial_correction_of_MF_receivers_and_donors(xt::pytensor<int,2>& tMF_rec, xt::pytensor<int,2>& tMF_don, xt::pytensor<double,1>& elevation);
 
 xt::pytensor<int,1>& get_MF_stack_full_adress(){return Mstack;}
-
 xt::pytensor<int,1> get_MF_stack_full(){return Mstack;}
+std::vector<int>& get_MF_receivers_at_node(int node){return graph[node].receivers;};
+std::vector<int>& get_MF_donors_at_node(int node){return graph[node].donors;};
+std::vector<double>& get_MF_lengths_at_node(int node){return graph[node].length2rec;};
+int get_MF_stack_at_i(int i){return Mstack[i];}
+bool is_depression(int i){return pits_to_reroute[i];}
+void update_receivers_at_node(int node, std::vector<int>& new_receivers);
+void update_donors_at_node(int node, std::vector<int>& new_donors);
+
 
 protected:
 
@@ -123,6 +134,9 @@ protected:
 
 
 };
+
+std::vector<int> multiple_stack_fastscape(int n_element, std::vector<Vertex>& graph);
+
 
 // this class organises the DEM nodes in order to solve all equations in the right order. This is the first step of each iteration of the model 
 // class NodeGraph

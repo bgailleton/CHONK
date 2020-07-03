@@ -86,45 +86,6 @@ void chonk::reset()
   this->slope_to_rec.clear();
 }
 
-void chonk::finalise(NodeGraph& graph, xt::pytensor<double,1>& surface_elevation_tp1, xt::pytensor<double,1>& sed_height_tp1, double dt)
-{
-  //      _                               _           _ 
-  //     | |                             | |         | |
-  //   __| | ___ _ __  _ __ ___  ___ __ _| |_ ___  __| |
-  //  / _` |/ _ \ '_ \| '__/ _ \/ __/ _` | __/ _ \/ _` |
-  // | (_| |  __/ |_) | | |  __/ (_| (_| | ||  __/ (_| |
-  //  \__,_|\___| .__/|_|  \___|\___\__,_|\__\___|\__,_|
-  //            | |                                     
-  //            |_|                                     
-  // registering the erosion for the pit
-  if(graph.get_pits_ID_at_node(this->current_node)>=0)
-  {
-    graph.add_erosion_flux_at_node(this->current_node,this->erosion_flux);
-    graph.add_deposition_flux_at_node(this->current_node,this->deposition_flux);
-  }
-
-  double before =  surface_elevation_tp1[this->current_node];
-
-  surface_elevation_tp1[this->current_node] -= this->erosion_flux * dt;
-  surface_elevation_tp1[this->current_node] += this->deposition_flux * dt;
- 
-  sed_height_tp1[this->current_node] -= this->erosion_flux * dt;
-  if(sed_height_tp1[this->current_node] <0)
-    sed_height_tp1[this->current_node] = 0;
-  sed_height_tp1[this->current_node] += this->deposition_flux * dt;
-}
-
-void chonk::add_inherited_water(NodeGraph& graph, double dt)
-{
-  bool does_it = graph.does_this_node_has_inhereted_water(this->current_node);
-  if(does_it)
-  {
-    double this_excess = graph.get_node_excess_at_node(this->current_node);
-    this->water_flux += this_excess/dt;
-  }
-}
-
-
 
 
 //####################################################
@@ -134,7 +95,7 @@ void chonk::add_inherited_water(NodeGraph& graph, double dt)
 //####################################################
 //
 
-void chonk::split_and_merge_in_receiving_chonks(std::vector<chonk>& chonkscape, NodeGraph& graph, xt::pytensor<double,1>& surface_elevation_tp1, xt::pytensor<double,1>& sed_height_tp1, double dt)
+void chonk::split_and_merge_in_receiving_chonks(std::vector<chonk>& chonkscape, NodeGraphV2& graph, xt::pytensor<double,1>& surface_elevation_tp1, xt::pytensor<double,1>& sed_height_tp1, double dt)
 {
   // Iterating through the receivers
   for(size_t i=0; i < this->receivers.size(); i++)
@@ -144,10 +105,10 @@ void chonk::split_and_merge_in_receiving_chonks(std::vector<chonk>& chonkscape, 
     // Adding the fluxes*modifyer
     other_chonk.add_to_water_flux(this->water_flux * this->weigth_water_fluxes[i]);
     other_chonk.add_to_sediment_flux(this->sediment_flux * this->weigth_sediment_fluxes[i]);
-    if(chonkID == 5653)
-    {
-      std::cout << this->receivers[i] <<"::HYLIA::" << this->water_flux * this->weigth_water_fluxes[i] << "||" << this->water_flux << "||" << this->weigth_water_fluxes[i] << std::endl;
-    }
+    // if(chonkID == 2214)
+    // {
+    //   std::cout << this->receivers[i] <<"::HYLIA::" << this->water_flux * this->weigth_water_fluxes[i] << "||" << this->water_flux << "||" << this->weigth_water_fluxes[i] << std::endl;
+    // }
 
   }
 
@@ -172,7 +133,7 @@ void chonk::split_and_merge_in_receiving_chonks(std::vector<chonk>& chonkscape, 
 
 
 // Simplest function we can think of: move the thingy to 
-void chonk::move_to_steepest_descent(NodeGraph& graph, double dt, xt::pytensor<double,1>& sed_height, xt::pytensor<double,1>& sed_height_tp1, 
+void chonk::move_to_steepest_descent(NodeGraphV2& graph, double dt, xt::pytensor<double,1>& sed_height, xt::pytensor<double,1>& sed_height_tp1, 
   xt::pytensor<double,1>& surface_elevation, xt::pytensor<double,1>& surface_elevation_tp1, double Xres, double Yres, std::vector<chonk>& chonk_network)
 {
   // Find the steepest descent node first
@@ -186,7 +147,7 @@ void chonk::move_to_steepest_descent(NodeGraph& graph, double dt, xt::pytensor<d
 
   bool all_minus_1 = true;
   // looping through neighbors
-  for(size_t i=0; i<8; i++)
+  for(size_t i=0; i<these_neighbors.size(); i++)
   {
     int this_neightbor = these_neighbors[i];
     // checking if this is a neighbor, nodata will be -1 (fastscapelib standards)
@@ -267,46 +228,55 @@ void chonk::move_to_steepest_descent(NodeGraph& graph, double dt, xt::pytensor<d
 
 
 // Function where the weights of splitting the water comes from fastscapelib p method
-void chonk::move_MF_from_fastscapelib(NodeGraph& graph, xt::pytensor<double,2>& external_weigth_water_fluxes, double dt, xt::pytensor<double,1>& sed_height, xt::pytensor<double,1>& sed_height_tp1, 
+void chonk::move_MF_from_fastscapelib(NodeGraphV2& graph, xt::pytensor<double,2>& external_weigth_water_fluxes, double dt, xt::pytensor<double,1>& sed_height, xt::pytensor<double,1>& sed_height_tp1, 
   xt::pytensor<double,1>& surface_elevation, xt::pytensor<double,1>& surface_elevation_tp1, double Xres, double Yres, std::vector<chonk>& chonk_network)
-{
+{ 
+  // std::cout << "1.1" << std::endl;
 
   // I need the receicing neighbours and the distance to them
   std::vector<int> these_neighbors = graph.get_MF_receivers_at_node(this->current_node);
   std::vector<double> these_lengths = graph.get_MF_lengths_at_node(this->current_node);
+  // std::cout << "1.2" << std::endl;
+  if(these_neighbors.size() == 0)
+    return;
 
-  // eventually correcting the weigths, if I deleted some receivers, the weights are not corrects anymore
-  double sum_weights = 0;
-  for(size_t i=0; i<8; i++)
+  std::vector<double> waterweigths(these_neighbors.size());
+  std::vector<double> powerslope(these_neighbors.size());
+  double sumslopes = 0;
+  if(these_neighbors.size() > 1)
   {
-    if(external_weigth_water_fluxes(this->current_node,i)<0 || these_neighbors[i] < 0)
-      continue;
-    else
-      sum_weights += external_weigth_water_fluxes(this->current_node,i);
-  }
-  if(sum_weights != 1)
-  {
-    for(size_t i=0; i<8; i++)
+    for(size_t i=0; i< these_neighbors.size(); i++)
     {
-      if(external_weigth_water_fluxes(this->current_node,i)<=0)
-        continue;
-      else
-        external_weigth_water_fluxes(this->current_node,i) = external_weigth_water_fluxes(this->current_node,i)/sum_weights;
+      double this_slope = (surface_elevation[this->current_node] -  surface_elevation[these_neighbors[i]])/these_lengths[i];
+      // std::cout << this_slope << std::endl;
+      powerslope[i] = std::pow(this_slope,(0.5 + 0.6 * this_slope));
+      sumslopes += powerslope[i];
     }
+    for(size_t i=0; i< these_neighbors.size(); i++)
+    {
+      waterweigths[i] = powerslope[i]/sumslopes;
+    }
+  }
+  else
+  {
+    waterweigths[0] = 1;
+
   }
 
 
   bool all_minus_1 = true;
   // looping through neighbors
-  for(size_t i=0; i<8; i++)
+  for(size_t i=0; i<these_neighbors.size(); i++)
   {
+    // std::cout << "1.4" << std::endl;
     int this_neightbor = these_neighbors[i];
     // checking if this is a neighbor, nodata will be -1 (fastscapelib standards)
-    if(this_neightbor < 0 || this_neightbor >= int(surface_elevation.size()) || this_neightbor == this->current_node)
+    if(this_neightbor < 0 || this_neightbor == this->current_node)
     {
       continue;
     }
 
+    // std::cout << "1.5" << this_neightbor << std::endl;
 
     all_minus_1 = false;
 
@@ -319,6 +289,8 @@ void chonk::move_MF_from_fastscapelib(NodeGraph& graph, xt::pytensor<double,2>& 
       // update:: should not happen anymore
       this_slope = 0;
     }
+    // std::cout << "1.7" << std::endl;
+
 
 
     // NEED TO CHECK WHY IT DDOES THAT!!
@@ -350,9 +322,12 @@ void chonk::move_MF_from_fastscapelib(NodeGraph& graph, xt::pytensor<double,2>& 
     //     return;
     //   }
     // }
+    // std::cout << "1.8" << std::endl;
+
 
     // There is a non-pit neighbor, let's save it with its attributes
-    double weight = external_weigth_water_fluxes(this->current_node,i);
+    double weight = waterweigths[i];
+    // std::cout << "WATER WEIGHT " << weight << std::endl;
     this->receivers.push_back(this_neightbor);
     this->weigth_water_fluxes.push_back(weight);
     this->weigth_sediment_fluxes.push_back(weight);
@@ -365,10 +340,151 @@ void chonk::move_MF_from_fastscapelib(NodeGraph& graph, xt::pytensor<double,2>& 
 }
 
 
+// Function where the weights of splitting the water comes from fastscapelib p method
+void chonk::move_MF_from_fastscapelib_threshold_SF(NodeGraphV2& graph, double threshold_Q, double dt, xt::pytensor<double,1>& sed_height, xt::pytensor<double,1>& sed_height_tp1, 
+  xt::pytensor<double,1>& surface_elevation, xt::pytensor<double,1>& surface_elevation_tp1, double Xres, double Yres, std::vector<chonk>& chonk_network)
+{ 
+  // std::cout << "1.1" << std::endl;
+  if(current_node == 2074)
+    std::cout << "Burf" << std::endl;
+
+  // I need the receicing neighbours and the distance to them
+  std::vector<int> these_neighbors = graph.get_MF_receivers_at_node(this->current_node);
+  std::vector<double> these_lengths = graph.get_MF_lengths_at_node(this->current_node);
+  // std::cout << "1.2" << std::endl;
+  if(these_neighbors.size() == 0)
+    return;
+  if(current_node == 2074)
+    std::cout << "Babadook" << std::endl;
+
+  std::vector<double> waterweigths(these_neighbors.size());
+  std::vector<double> powerslope(these_neighbors.size());
+  double sumslopes = 0;
+  double maxslope = -9999;
+  int id_max_slope = 0;
+  if(these_neighbors.size() > 1)
+  {
+    for(size_t i=0; i< these_neighbors.size(); i++)
+    {
+      double this_slope = (surface_elevation[this->current_node] -  surface_elevation[these_neighbors[i]])/these_lengths[i];
+      if(this_slope>maxslope)
+      {
+        maxslope = this_slope;
+        id_max_slope = i;
+      }
+      // std::cout << this_slope << std::endl;
+      powerslope[i] = std::pow(this_slope,(0.5 + 0.6 * this_slope));
+      sumslopes += powerslope[i];
+    }
+    for(size_t i=0; i< these_neighbors.size(); i++)
+    {
+      waterweigths[i] = powerslope[i]/sumslopes;
+    }
+  }
+  else
+  {
+    waterweigths[0] = 1;
+  }
+
+  if(this->water_flux >= threshold_Q)
+  {
+    for(size_t i=0; i< waterweigths.size(); i++)
+    {
+      if(i==id_max_slope)
+       waterweigths[i] = 1;
+      else
+        waterweigths[i] = 0;
+    }
+  }
+
+
+  bool all_minus_1 = true;
+  // looping through neighbors
+  for(size_t i=0; i<these_neighbors.size(); i++)
+  {
+    // std::cout << "1.4" << std::endl;
+    int this_neightbor = these_neighbors[i];
+    // checking if this is a neighbor, nodata will be -1 (fastscapelib standards)
+    if(this_neightbor < 0 || this_neightbor == this->current_node)
+    {
+      continue;
+    }
+
+    // std::cout << "1.5" << this_neightbor << std::endl;
+
+    all_minus_1 = false;
+
+    // getting the slope, dz/dx
+    double this_slope = 0;
+    if((these_lengths[i] >= Xres) || (these_lengths[i] >= Yres))
+      this_slope = (surface_elevation[this->current_node] - surface_elevation[this_neightbor]) / these_lengths[i];
+    else
+    {
+      // update:: should not happen anymore
+      this_slope = 0;
+    }
+    // std::cout << "1.7" << std::endl;
+
+
+
+    // NEED TO CHECK WHY IT DDOES THAT!!
+    // update:: should not happen anymore
+    if(this_slope<0)
+    {
+      this_slope = 0;
+    }
+
+
+    // DEPRECATED
+    // //IF I REACH PIT BOTTOM I WANNA STOP THE FUNCTION
+    // // This is the part where I deal with topographic depression now
+    // int pit_id = graph.get_pits_ID_at_node(current_node);
+
+    // // Is this a pit?
+    // if(pit_id>=0)
+    // {
+      
+    //   // Apparently so, let's check if I am at the bottom
+    //   int pit_bottom = graph.get_pits_bottom_at_pit_ID(pit_id);
+
+    //   if(current_node == pit_bottom)
+    //   {
+    //     // Need to deal with depressions here!!!!
+    //     this->solve_depression_simple(graph,  dt, sed_height, sed_height_tp1, surface_elevation, surface_elevation_tp1, Xres, Yres, chonk_network);
+    //     // # I WANT TO STOP HERE IF THE DEPRESSION IS SOLVED!!!
+    //     // # The depression solving routine takes care of the receivers and all
+    //     return;
+    //   }
+    // }
+    // std::cout << "1.8" << std::endl;
+
+
+    // There is a non-pit neighbor, let's save it with its attributes
+    double weight = waterweigths[i];
+    // std::cout << "WATER WEIGHT " << weight << std::endl;
+    this->receivers.push_back(this_neightbor);
+    this->weigth_water_fluxes.push_back(weight);
+    this->weigth_sediment_fluxes.push_back(weight);
+    this->slope_to_rec.push_back(this_slope); 
+
+
+    // Mover to the next step
+  }
+  if(current_node == 2074)
+  {
+    for(auto trec:receivers)
+    {
+      std::cout << "burfulb::" << trec << std::endl;
+    }
+  }
+
+}
+
+
 
 
 // Simplest function we can think of: move the thingy to 
-void chonk::move_to_steepest_descent_nodepression(NodeGraph& graph, double dt, xt::pytensor<double,1>& sed_height, xt::pytensor<double,1>& sed_height_tp1, 
+void chonk::move_to_steepest_descent_nodepression(NodeGraphV2& graph, double dt, xt::pytensor<double,1>& sed_height, xt::pytensor<double,1>& sed_height_tp1, 
   xt::pytensor<double,1>& surface_elevation, xt::pytensor<double,1>& surface_elevation_tp1, double Xres, double Yres, std::vector<chonk>& chonk_network)
 {
   // Find the steepest descent node first
@@ -381,7 +497,7 @@ void chonk::move_to_steepest_descent_nodepression(NodeGraph& graph, double dt, x
   std::vector<double> these_lengths = graph.get_MF_lengths_at_node(this->current_node);
   bool all_minus_1 = true;
   // looping through neighbors
-  for(size_t i=0; i<8; i++)
+  for(size_t i=0; i<these_neighbors.size(); i++)
   {
     int this_neightbor = these_neighbors[i];
     // checking if this is a neighbor, nodata will be -1 (fastscapelib standards)
@@ -515,321 +631,321 @@ void chonk::active_simple_SPL(double n, double m, xt::pytensor<double,1>& K, dou
 //########################################################################################
 //########################################################################################
 
-// This is an internal c++ structure I use to sort my nodes into a priority queue
-struct FillNode
-{
-  /// @brief Elevation data.
-  double elevation;
-  /// @brief Row index value.
-  int node;
-};
+// // This is an internal c++ structure I use to sort my nodes into a priority queue
+// struct FillNode
+// {
+//   /// @brief Elevation data.
+//   double elevation;
+//   /// @brief Row index value.
+//   int node;
+// };
 
-// Managing the comparison operators for the fill node, to let the queue know I wanna compare it by elevation values
-// lhs/rhs : left hand side, right hand side
-bool operator>( const FillNode& lhs, const FillNode& rhs )
-{
-  return lhs.elevation > rhs.elevation;
-}
-bool operator<( const FillNode& lhs, const FillNode& rhs )
-{
-  return lhs.elevation < rhs.elevation;
-}
-
-
-// This is the first version of my depression solver. It fills the water ensuring mass balance
-void chonk::solve_depression_simple(NodeGraph& graph, double dt, xt::pytensor<double,1>& sed_height, xt::pytensor<double,1>& sed_height_tp1, 
-  xt::pytensor<double,1>& surface_elevation,xt::pytensor<double,1>& surface_elevation_tp1, double Xres, double Yres, std::vector<chonk>& chonk_network)
-{
-
-  //      _                               _           _ 
-  //     | |                             | |         | |
-  //   __| | ___ _ __  _ __ ___  ___ __ _| |_ ___  __| |
-  //  / _` |/ _ \ '_ \| '__/ _ \/ __/ _` | __/ _ \/ _` |
-  // | (_| |  __/ |_) | | |  __/ (_| (_| | ||  __/ (_| |
-  //  \__,_|\___| .__/|_|  \___|\___\__,_|\__\___|\__,_|
-  //            | |                                     
-  //            |_|                                     
+// // Managing the comparison operators for the fill node, to let the queue know I wanna compare it by elevation values
+// // lhs/rhs : left hand side, right hand side
+// bool operator>( const FillNode& lhs, const FillNode& rhs )
+// {
+//   return lhs.elevation > rhs.elevation;
+// }
+// bool operator<( const FillNode& lhs, const FillNode& rhs )
+// {
+//   return lhs.elevation < rhs.elevation;
+// }
 
 
-  // identifying my pit attributes
-  int pit_id = graph.get_pits_ID_at_node(this->current_node);
-  int pit_outlet = graph.get_pits_outlet_at_pit_ID(pit_id);
-  double volume = graph.get_pits_volume_at_pit_ID(pit_id);
-  std::vector<int> nodes_in_pit;
-  double elevation_bottom = surface_elevation[current_node];
-  double elevation_outlet = surface_elevation[pit_outlet];
-  double excess_water_volume = graph.get_excess_water_at_pit_ID(pit_id);
-  // Dealing with the water fluxes
-  // # Volume of water available
-  double total_water = this->water_flux * dt + excess_water_volume;
-  // # lake water depths
-  double current_water_elev_from_pit_bottom = 0; 
-  // # lake water absolute elevation
-  double current_water_elev = elevation_bottom;
-  // # this will store the nodes that are part of the lake if the depression is not full 
-  std::vector<int> underwater_nodes;
+// // This is the first version of my depression solver. It fills the water ensuring mass balance
+// void chonk::solve_depression_simple(NodeGraphV2& graph, double dt, xt::pytensor<double,1>& sed_height, xt::pytensor<double,1>& sed_height_tp1, 
+//   xt::pytensor<double,1>& surface_elevation,xt::pytensor<double,1>& surface_elevation_tp1, double Xres, double Yres, std::vector<chonk>& chonk_network)
+// {
+
+//   //      _                               _           _ 
+//   //     | |                             | |         | |
+//   //   __| | ___ _ __  _ __ ___  ___ __ _| |_ ___  __| |
+//   //  / _` |/ _ \ '_ \| '__/ _ \/ __/ _` | __/ _ \/ _` |
+//   // | (_| |  __/ |_) | | |  __/ (_| (_| | ||  __/ (_| |
+//   //  \__,_|\___| .__/|_|  \___|\___\__,_|\__\___|\__,_|
+//   //            | |                                     
+//   //            |_|                                     
+
+
+//   // identifying my pit attributes
+//   int pit_id = graph.get_pits_ID_at_node(this->current_node);
+//   int pit_outlet = graph.get_pits_outlet_at_pit_ID(pit_id);
+//   double volume = graph.get_pits_volume_at_pit_ID(pit_id);
+//   std::vector<int> nodes_in_pit;
+//   double elevation_bottom = surface_elevation[current_node];
+//   double elevation_outlet = surface_elevation[pit_outlet];
+//   double excess_water_volume = graph.get_excess_water_at_pit_ID(pit_id);
+//   // Dealing with the water fluxes
+//   // # Volume of water available
+//   double total_water = this->water_flux * dt + excess_water_volume;
+//   // # lake water depths
+//   double current_water_elev_from_pit_bottom = 0; 
+//   // # lake water absolute elevation
+//   double current_water_elev = elevation_bottom;
+//   // # this will store the nodes that are part of the lake if the depression is not full 
+//   std::vector<int> underwater_nodes;
 
 
 
-  // getting the sub-depression tree
-  // std::vector<int> temp_depression_tree = graph.get_sub_pits_at_pit_ID(pit_id);
-  std::set<int> depression_tree,baslab_of_depression;
-  this->recursion_builder_subdepression_tree(depression_tree, pit_id,  graph);
-  // set of depression done
+//   // getting the sub-depression tree
+//   // std::vector<int> temp_depression_tree = graph.get_sub_pits_at_pit_ID(pit_id);
+//   std::set<int> depression_tree,baslab_of_depression;
+//   this->recursion_builder_subdepression_tree(depression_tree, pit_id,  graph);
+//   // set of depression done
   
-  double available_volume_for_sediment = 0;
+//   double available_volume_for_sediment = 0;
 
-  for(auto tid:depression_tree)
-  {
-    if(surface_elevation[graph.get_pits_outlet_at_pit_ID(tid)]>elevation_outlet)
-      elevation_outlet = surface_elevation[graph.get_pits_outlet_at_pit_ID(tid)];
-  }
+//   for(auto tid:depression_tree)
+//   {
+//     if(surface_elevation[graph.get_pits_outlet_at_pit_ID(tid)]>elevation_outlet)
+//       elevation_outlet = surface_elevation[graph.get_pits_outlet_at_pit_ID(tid)];
+//   }
 
-  for(auto tid:depression_tree)
-  {
-    available_volume_for_sediment += graph.get_pits_available_volume_for_sediments_at_pit_ID(tid);
-    baslab_of_depression.insert(graph.get_pit_basin_label(tid));
-    for(auto node:graph.get_pits_pixels_at_pit_ID(tid))
-    {
-      nodes_in_pit.push_back(node);
-      volume +=  (elevation_outlet - surface_elevation[node] - chonk_network[node].get_other_attribute("lake_depth")) * Xres * Yres;
-    }
-  }
+//   for(auto tid:depression_tree)
+//   {
+//     available_volume_for_sediment += graph.get_pits_available_volume_for_sediments_at_pit_ID(tid);
+//     baslab_of_depression.insert(graph.get_pit_basin_label(tid));
+//     for(auto node:graph.get_pits_pixels_at_pit_ID(tid))
+//     {
+//       nodes_in_pit.push_back(node);
+//       volume +=  (elevation_outlet - surface_elevation[node] - chonk_network[node].get_other_attribute("lake_depth")) * Xres * Yres;
+//     }
+//   }
 
-  // Some general stuff:
-  // My receiver will be the pit outlet
-  this->receivers.push_back(pit_outlet);
-  this->slope_to_rec.push_back(0.);
-
-
+//   // Some general stuff:
+//   // My receiver will be the pit outlet
+//   this->receivers.push_back(pit_outlet);
+//   this->slope_to_rec.push_back(0.);
 
 
 
-  // Initialising the water depth in lake /!\ DOES NOT CALCULATE THE WATER DEPTH FOR RIVER! JUST WITHIN DEPRESSIONS
-  // std::vector<double> lake_depths(nodes_in_pit.size(),0); 
-  // std::cout << "Initialised" << std::endl;
-  // Alright Let's go 
-  // checker
-  double last_total_water = total_water;
-  int n_repetition = -1;
-  if(total_water<volume && n_repetition<20)
-  { 
-    if(last_total_water == total_water)
-      n_repetition++;
 
-    last_total_water = total_water;
-    // std::cout << "deptot<vol" << std::endl;
-    // My depression is not filled with water, I need to calculate the extent of the lake and which nodes need to be treated as lake pixel
-    // This is important: erosion/deposition/sediment fluxes for such nodes need to be back-calculated as riverr do not erode in a lake
-    // This also needs to be optimised: I cannot afford highly iterative methods as depressions can be very large (e.g. endoreic basins)
 
-    // std::cout << "not enough water, calculating the water volume" << std::endl;
-    // # This hash table check if a node is already in the filling queue. if depression is incomplete
-    std::map<int,bool> is_in_queue_lake_depth;
-    for(auto node:nodes_in_pit) 
-    {
-      is_in_queue_lake_depth[node] = false;
-    }
+//   // Initialising the water depth in lake /!\ DOES NOT CALCULATE THE WATER DEPTH FOR RIVER! JUST WITHIN DEPRESSIONS
+//   // std::vector<double> lake_depths(nodes_in_pit.size(),0); 
+//   // std::cout << "Initialised" << std::endl;
+//   // Alright Let's go 
+//   // checker
+//   double last_total_water = total_water;
+//   int n_repetition = -1;
+//   if(total_water<volume && n_repetition<20)
+//   { 
+//     if(last_total_water == total_water)
+//       n_repetition++;
 
-    // std::cout << "dep3.1" << std::endl;
-    // First I am initialising a priority queue Data structure: PQ are a bit slower to sort data for small datasets, but it ensure that I only deal with the nodes I need and I believe this is faster (to test against presorted vectors of pit pixels)
-    // # |Initialising a priority Queue here
-    std::priority_queue< FillNode, std::vector<FillNode>, std::greater<FillNode> > PriorityQueue;
-    // # My first working node will be the  bottom pit, ie this node
-    FillNode working_node; working_node.node = this->current_node; working_node.elevation = surface_elevation[this->current_node];
-    is_in_queue_lake_depth[working_node.node] = true;
+//     last_total_water = total_water;
+//     // std::cout << "deptot<vol" << std::endl;
+//     // My depression is not filled with water, I need to calculate the extent of the lake and which nodes need to be treated as lake pixel
+//     // This is important: erosion/deposition/sediment fluxes for such nodes need to be back-calculated as riverr do not erode in a lake
+//     // This also needs to be optimised: I cannot afford highly iterative methods as depressions can be very large (e.g. endoreic basins)
+
+//     // std::cout << "not enough water, calculating the water volume" << std::endl;
+//     // # This hash table check if a node is already in the filling queue. if depression is incomplete
+//     std::map<int,bool> is_in_queue_lake_depth;
+//     for(auto node:nodes_in_pit) 
+//     {
+//       is_in_queue_lake_depth[node] = false;
+//     }
+
+//     // std::cout << "dep3.1" << std::endl;
+//     // First I am initialising a priority queue Data structure: PQ are a bit slower to sort data for small datasets, but it ensure that I only deal with the nodes I need and I believe this is faster (to test against presorted vectors of pit pixels)
+//     // # |Initialising a priority Queue here
+//     std::priority_queue< FillNode, std::vector<FillNode>, std::greater<FillNode> > PriorityQueue;
+//     // # My first working node will be the  bottom pit, ie this node
+//     FillNode working_node; working_node.node = this->current_node; working_node.elevation = surface_elevation[this->current_node];
+//     is_in_queue_lake_depth[working_node.node] = true;
     
-    // If I have less water in total than my pit can handle, then it is 0
-    this->weigth_water_fluxes.push_back(0.);
+//     // If I have less water in total than my pit can handle, then it is 0
+//     this->weigth_water_fluxes.push_back(0.);
 
-    // Next Step: calculating which nodes are under water
-    // # I'll "use" my volume of water until it reaches 0
-    double temp_total_water = total_water;
-    // # To avoid any extra iteration, I save up the number of pixel currently under water to  gradually fill the lake 
-    int n_units = 0;
-    // Starting the loop: filling the lake as long as I wstill have water to offer
-    while(temp_total_water > 0)
-    {
-      // At this point the working node will be underwater whatev happens
-      underwater_nodes.push_back(working_node.node);
-      n_units++;
+//     // Next Step: calculating which nodes are under water
+//     // # I'll "use" my volume of water until it reaches 0
+//     double temp_total_water = total_water;
+//     // # To avoid any extra iteration, I save up the number of pixel currently under water to  gradually fill the lake 
+//     int n_units = 0;
+//     // Starting the loop: filling the lake as long as I wstill have water to offer
+//     while(temp_total_water > 0)
+//     {
+//       // At this point the working node will be underwater whatev happens
+//       underwater_nodes.push_back(working_node.node);
+//       n_units++;
 
-      // First I am pushing all the donor nodes in the queue
-      std::vector<int> nenodes = graph.get_MF_donors_at_node(working_node.node);
-      for(auto node:nenodes)
-      {
-        int tpid = graph.get_pits_ID_at_node(current_node); 
-        int tlab = graph.get_pit_basin_label(tpid);
-        if(is_in_queue_lake_depth[node] == true || baslab_of_depression.find(tlab) == baslab_of_depression.end() || node <0 || node >= surface_elevation.size() || surface_elevation[node]> elevation_outlet)
-          continue;
-        // Very important step here: it does not matter if I am in a sub-depression or not: because I am adding the lake depth, I'll end up with flat surfaces
-        // where sublakes exists and ingest all of them at once then
-        FillNode this_nenode; this_nenode.node = node; this_nenode.elevation = surface_elevation[node] + chonk_network[node].get_other_attribute("lake_depth");
-        PriorityQueue.push(this_nenode);
-        is_in_queue_lake_depth[node] = true;
-      }
+//       // First I am pushing all the donor nodes in the queue
+//       std::vector<int> nenodes = graph.get_MF_donors_at_node(working_node.node);
+//       for(auto node:nenodes)
+//       {
+//         int tpid = graph.get_pits_ID_at_node(current_node); 
+//         int tlab = graph.get_pit_basin_label(tpid);
+//         if(is_in_queue_lake_depth[node] == true || baslab_of_depression.find(tlab) == baslab_of_depression.end() || node <0 || node >= surface_elevation.size() || surface_elevation[node]> elevation_outlet)
+//           continue;
+//         // Very important step here: it does not matter if I am in a sub-depression or not: because I am adding the lake depth, I'll end up with flat surfaces
+//         // where sublakes exists and ingest all of them at once then
+//         FillNode this_nenode; this_nenode.node = node; this_nenode.elevation = surface_elevation[node] + chonk_network[node].get_other_attribute("lake_depth");
+//         PriorityQueue.push(this_nenode);
+//         is_in_queue_lake_depth[node] = true;
+//       }
 
-      // Now dealing with the lake depth in taht node: the highest priority Fillnode
-      // # This get the "top" priority node: i.e. the one with the closest higer elevation to all the nodes already in water
-      if(PriorityQueue.empty())
-        break;
+//       // Now dealing with the lake depth in taht node: the highest priority Fillnode
+//       // # This get the "top" priority node: i.e. the one with the closest higer elevation to all the nodes already in water
+//       if(PriorityQueue.empty())
+//         break;
 
 
-      FillNode lowest_neighbour = PriorityQueue.top();
-      PriorityQueue.pop();
+//       FillNode lowest_neighbour = PriorityQueue.top();
+//       PriorityQueue.pop();
 
-      // std::cout << lowest_neighbour.elevation << std::endl;
-      // if(n_units == 10)
-      //   exit(EXIT_SUCCESS);
-      // # Getting the relative elevation of the neighbor from the bottom of the repression
-      double elev_neighbour_relative = lowest_neighbour.elevation - elevation_bottom;
+//       // std::cout << lowest_neighbour.elevation << std::endl;
+//       // if(n_units == 10)
+//       //   exit(EXIT_SUCCESS);
+//       // # Getting the relative elevation of the neighbor from the bottom of the repression
+//       double elev_neighbour_relative = lowest_neighbour.elevation - elevation_bottom;
 
-      // # this is the important bit: I am adding JUST a layer of water between the current water level and the lowest higher neighbor 
-      temp_total_water -= n_units * Xres * Yres * (elev_neighbour_relative - current_water_elev_from_pit_bottom);
-      // # updating the current water level relative to the bottom
-      current_water_elev_from_pit_bottom = elev_neighbour_relative;
+//       // # this is the important bit: I am adding JUST a layer of water between the current water level and the lowest higher neighbor 
+//       temp_total_water -= n_units * Xres * Yres * (elev_neighbour_relative - current_water_elev_from_pit_bottom);
+//       // # updating the current water level relative to the bottom
+//       current_water_elev_from_pit_bottom = elev_neighbour_relative;
 
-      // std::cout << "dep3.2.3" << std::endl;
+//       // std::cout << "dep3.2.3" << std::endl;
 
-      // I need a last check before moving to the next node:
-      // Have I used too much water
-      if(temp_total_water<0)
-      {
-        // Whoops A bit too much water poured in, need to regulate
-        // # Calculating the extra volume
-        double volume_over = -1 * temp_total_water;
-        // # converting it in elevation
-        double elev_regulator = volume_over/(n_units * Xres * Yres);
-        // # Correcting the water elevation
-        current_water_elev_from_pit_bottom -= elev_regulator;
-      }
-      // std::cout << current_water_elev_from_pit_bottom<< std::endl;
-      // std::cout << "dep3.2.4" << std::endl;
-      // Preparing the next node to be (eventually) processed
-      working_node = lowest_neighbour;
-      // Removing the new working node from the list
-      // Done, moving to the next if I still have water to spare
-    }
-    // std::cout << "dep3.3" << std::endl;
+//       // I need a last check before moving to the next node:
+//       // Have I used too much water
+//       if(temp_total_water<0)
+//       {
+//         // Whoops A bit too much water poured in, need to regulate
+//         // # Calculating the extra volume
+//         double volume_over = -1 * temp_total_water;
+//         // # converting it in elevation
+//         double elev_regulator = volume_over/(n_units * Xres * Yres);
+//         // # Correcting the water elevation
+//         current_water_elev_from_pit_bottom -= elev_regulator;
+//       }
+//       // std::cout << current_water_elev_from_pit_bottom<< std::endl;
+//       // std::cout << "dep3.2.4" << std::endl;
+//       // Preparing the next node to be (eventually) processed
+//       working_node = lowest_neighbour;
+//       // Removing the new working node from the list
+//       // Done, moving to the next if I still have water to spare
+//     }
+//     // std::cout << "dep3.3" << std::endl;
 
-    // My current water level was the pit bottom's one
-    current_water_elev += current_water_elev_from_pit_bottom;
+//     // My current water level was the pit bottom's one
+//     current_water_elev += current_water_elev_from_pit_bottom;
 
-  }
-  else
-  {
-    // that's where it gets funny: I need to fall back to waht average discharge myt outlet will get
-    this->water_flux = (total_water - volume)/dt;
-    this->weigth_water_fluxes.push_back(1.);
-    underwater_nodes = nodes_in_pit;
-    current_water_elev = elevation_outlet;
-    // meh actually that should do the trick 
-  }
+//   }
+//   else
+//   {
+//     // that's where it gets funny: I need to fall back to waht average discharge myt outlet will get
+//     this->water_flux = (total_water - volume)/dt;
+//     this->weigth_water_fluxes.push_back(1.);
+//     underwater_nodes = nodes_in_pit;
+//     current_water_elev = elevation_outlet;
+//     // meh actually that should do the trick 
+//   }
 
-  // std::cout << "dep4" << std::endl;
+//   // std::cout << "dep4" << std::endl;
     
 
-  // std::cout << "cancelling erosion" << std::endl;
-  // Moving to the next important step: I now know which nodes are under water
-  // I need to "cancel" the erosion and deposition that happened on these nodes
-  // as the lake process overwrite them
-  for(auto node : underwater_nodes)
-  {
-    // i saved this information in the nodegraph, specifically for depressions
-    double this_efux = graph.get_erosion_flux_at_node(node);
-    double this_depflux = graph.get_deposition_flux_at_node(node);
+//   // std::cout << "cancelling erosion" << std::endl;
+//   // Moving to the next important step: I now know which nodes are under water
+//   // I need to "cancel" the erosion and deposition that happened on these nodes
+//   // as the lake process overwrite them
+//   for(auto node : underwater_nodes)
+//   {
+//     // i saved this information in the nodegraphV2, specifically for depressions
+//     double this_efux = graph.get_erosion_flux_at_node(node);
+//     double this_depflux = graph.get_deposition_flux_at_node(node);
 
-    chonk_network[node].set_erosion_flux(0.);
-    chonk_network[node].set_other_attribute("lake_depth",current_water_elev - surface_elevation[node]);
+//     chonk_network[node].set_erosion_flux(0.);
+//     chonk_network[node].set_other_attribute("lake_depth",current_water_elev - surface_elevation[node]);
 
-    // "Removing" the eroded sediments from the chonks at that node
-    this->sediment_flux -= this_efux * Xres * Yres * dt;
-    // "Re-adding" the sediments deposited from the chonks at that node
-    this->sediment_flux += this_depflux * Xres * Yres * dt;
-    // Correcting the t+1 elevations
-    surface_elevation_tp1[node] = surface_elevation[node];
+//     // "Removing" the eroded sediments from the chonks at that node
+//     this->sediment_flux -= this_efux * Xres * Yres * dt;
+//     // "Re-adding" the sediments deposited from the chonks at that node
+//     this->sediment_flux += this_depflux * Xres * Yres * dt;
+//     // Correcting the t+1 elevations
+//     surface_elevation_tp1[node] = surface_elevation[node];
 
-    // falling back to the previous amount of sediments
-    sed_height_tp1[node] = sed_height[node];
-  }
-  // done with the back-calculation
+//     // falling back to the previous amount of sediments
+//     sed_height_tp1[node] = sed_height[node];
+//   }
+//   // done with the back-calculation
 
-  if(this->sediment_flux<0)
-  {
-    // std::cout << "YOU NEED TO SORT THAT BUG BORIS::ID7845BCD" << std::endl;
-    this->sediment_flux = 0;
-  }
+//   if(this->sediment_flux<0)
+//   {
+//     // std::cout << "YOU NEED TO SORT THAT BUG BORIS::ID7845BCD" << std::endl;
+//     this->sediment_flux = 0;
+//   }
 
-  // std::cout << "Dealing with sediments" << std::endl;
-  // now dealing with sediment flux
-  if(available_volume_for_sediment < this->sediment_flux)
-  {
-    this->sediment_flux -= available_volume_for_sediment;
+//   // std::cout << "Dealing with sediments" << std::endl;
+//   // now dealing with sediment flux
+//   if(available_volume_for_sediment < this->sediment_flux)
+//   {
+//     this->sediment_flux -= available_volume_for_sediment;
     
-    // removing all accomodation space
-    for(auto tid:depression_tree)
-      graph.add_pits_available_volume_for_sediments_at_pit_ID(tid, - graph.get_pits_available_volume_for_sediments_at_pit_ID(tid));
+//     // removing all accomodation space
+//     for(auto tid:depression_tree)
+//       graph.add_pits_available_volume_for_sediments_at_pit_ID(tid, - graph.get_pits_available_volume_for_sediments_at_pit_ID(tid));
 
-    this->weigth_sediment_fluxes.push_back(1.);
-    // Filling the whole depression
-    for(auto node:underwater_nodes)
-    {
-      sed_height_tp1[node] += current_water_elev_from_pit_bottom;
-      surface_elevation_tp1[node] += current_water_elev_from_pit_bottom;
-      // chonk_network[node].set_deposition_flux(current_water_elev_from_pit_bottom * Xres * Yres / dt);
-    }
-  }
-  else
-  {
-    // getting the proportion of the depression I can fill
-    double prop_fill = this->sediment_flux/available_volume_for_sediment;
-    for(auto node:underwater_nodes)
-    {
-      // calculating the prop of sediment to add
-      double this_addsed = (current_water_elev - surface_elevation[node]) * prop_fill;
-      sed_height_tp1[node] += this_addsed;
-      // removing the available space in that depression
-      graph.add_pits_available_volume_for_sediments_at_pit_ID(graph.get_pits_ID_at_node(node), -this_addsed);
-      // chonk_network[node].set_deposition_flux(this_addsed * Xres * Yres / dt);
-
-
-    }
-    this->sediment_flux = 0;
-    this->weigth_sediment_fluxes.push_back(0);
-  }
+//     this->weigth_sediment_fluxes.push_back(1.);
+//     // Filling the whole depression
+//     for(auto node:underwater_nodes)
+//     {
+//       sed_height_tp1[node] += current_water_elev_from_pit_bottom;
+//       surface_elevation_tp1[node] += current_water_elev_from_pit_bottom;
+//       // chonk_network[node].set_deposition_flux(current_water_elev_from_pit_bottom * Xres * Yres / dt);
+//     }
+//   }
+//   else
+//   {
+//     // getting the proportion of the depression I can fill
+//     double prop_fill = this->sediment_flux/available_volume_for_sediment;
+//     for(auto node:underwater_nodes)
+//     {
+//       // calculating the prop of sediment to add
+//       double this_addsed = (current_water_elev - surface_elevation[node]) * prop_fill;
+//       sed_height_tp1[node] += this_addsed;
+//       // removing the available space in that depression
+//       graph.add_pits_available_volume_for_sediments_at_pit_ID(graph.get_pits_ID_at_node(node), -this_addsed);
+//       // chonk_network[node].set_deposition_flux(this_addsed * Xres * Yres / dt);
 
 
-  // I want to keep record of that as I don't wat to erode if I did the depression
-  this->depression_solved_at_this_timestep = true; 
+//     }
+//     this->sediment_flux = 0;
+//     this->weigth_sediment_fluxes.push_back(0);
+//   }
 
-}
 
-//           .     .  .      +     .      .          .
-//      .       .      .     #       .           .
-//         .      .         ###            .      .      .
-//       .      .   "#:. .:##"##:. .:#"  .      .
-//           .      . "####"###"####"  .
-//        .     "#:.    .:#"###"#:.    .:#"  .        .       .
-//   .             "#########"#########"        .        .
-//         .    "#:.  "####"###"####"  .:#"   .       .
-//      .     .  "#######""##"##""#######"                  .
-//                 ."##"#####"#####"##"           .      .
-//     .   "#:. ...  .:##"###"###"##:.  ... .:#"     .
-//       .     "#######"##"#####"##"#######"      .     .
-//     .    .     "#####""#######""#####"    .      .
-//             .     "      000      "    .     .
-//        .         .   .   000     .        .       .
-// .. .. ..................O000O........................ ...... ...
-// haha Tree...
-void chonk::recursion_builder_subdepression_tree(std::set<int>& set_of_depressions, int current_pit_ID, NodeGraph& graph)
-{
-  // inserting current depression in tree
-  set_of_depressions.insert(current_pit_ID);
-  std::vector<int> temp_depression_tree = graph.get_sub_pits_at_pit_ID(current_pit_ID);
-  // inserting all depression_tree in tree, with their sub depressions in turn
-  for(auto tpID: temp_depression_tree)
-    this->recursion_builder_subdepression_tree(set_of_depressions, tpID, graph);
-}
+//   // I want to keep record of that as I don't wat to erode if I did the depression
+//   this->depression_solved_at_this_timestep = true; 
+
+// }
+
+// //           .     .  .      +     .      .          .
+// //      .       .      .     #       .           .
+// //         .      .         ###            .      .      .
+// //       .      .   "#:. .:##"##:. .:#"  .      .
+// //           .      . "####"###"####"  .
+// //        .     "#:.    .:#"###"#:.    .:#"  .        .       .
+// //   .             "#########"#########"        .        .
+// //         .    "#:.  "####"###"####"  .:#"   .       .
+// //      .     .  "#######""##"##""#######"                  .
+// //                 ."##"#####"#####"##"           .      .
+// //     .   "#:. ...  .:##"###"###"##:.  ... .:#"     .
+// //       .     "#######"##"#####"##"#######"      .     .
+// //     .    .     "#####""#######""#####"    .      .
+// //             .     "      000      "    .     .
+// //        .         .   .   000     .        .       .
+// // .. .. ..................O000O........................ ...... ...
+// // haha Tree...
+// void chonk::recursion_builder_subdepression_tree(std::set<int>& set_of_depressions, int current_pit_ID, NodeGraphV2& graph)
+// {
+//   // inserting current depression in tree
+//   set_of_depressions.insert(current_pit_ID);
+//   std::vector<int> temp_depression_tree = graph.get_sub_pits_at_pit_ID(current_pit_ID);
+//   // inserting all depression_tree in tree, with their sub depressions in turn
+//   for(auto tpID: temp_depression_tree)
+//     this->recursion_builder_subdepression_tree(set_of_depressions, tpID, graph);
+// }
 
 
 #endif

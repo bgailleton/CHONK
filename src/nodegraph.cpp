@@ -12,13 +12,10 @@
 #include <queue>
 #include <limits>
 #include <chrono>
-
 #include "xtensor-python/pyarray.hpp"
 #include "xtensor-python/pytensor.hpp"
 #include "xtensor-python/pyvectorize.hpp"
 #include "xtensor/xadapt.hpp"
-
-
 #include "xtensor/xmath.hpp"
 #include "xtensor/xarray.hpp"
 #include "xtensor/xtensor.hpp"
@@ -29,29 +26,23 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <tuple>
-// #include <pair>
-
 #include <queue>
-
 #include "nodegraph.hpp"
-
-// #include <boost/graph/graph_traits.hpp>
-// #include <boost/graph/adjacency_list.hpp>
-// #include <boost/graph/topological_sort.hpp>
-
 #include <chrono>
-// #include <boost/chrono.hpp>
-// #include <boost/timer/timer.hpp>
 
 
-bool dfs(Vertex& vertex,
- std::vector<Vertex>& stack,
- std::vector<int>& next_vertexes,
- int& index_of_reading,
- int& index_of_pushing,
- std::vector<bool>& is_in_queue,
- std::vector<Vertex>& graph,
- std::string& direction
+// Set of functions managing graph traversal and topological sorts, lightweight and customisable
+
+
+// Depth First Function utilised for customised topological sorting from a custom set of points.
+bool dfs(Vertex& vertex, // The investigated vertex
+ std::vector<Vertex>& stack, // The stack of vertexes (current topological sort)
+ std::vector<int>& next_vertexes, // next vertexes to be investigated during the topological sort
+ int& index_of_reading, // ignore this
+ int& index_of_pushing, // index incrementing the next vertexes in the topological sort ("local modified" topological sort)
+ std::vector<bool>& is_in_queue, // Check if a node has already been added in the next vertexes
+ std::vector<Vertex>& graph, // the original, unsorted graph containing all nodes
+ std::string& direction // Direction being "donors" or "receivers" to deterine in which way the DAG is considered
  ) 
 {
     // std::cout << "6.0" << std::endl;
@@ -128,7 +119,7 @@ bool dfs(Vertex& vertex,
     return true;
 }
 
-
+// SEcond version of the depth first algorithm where the original set of nodes is fixed, eg full topological sorting
 bool dfs(Vertex& vertex,
  std::vector<Vertex>& stack,
  std::vector<Vertex>& graph,
@@ -292,12 +283,16 @@ std::vector<int> topological_sort_by_dfs(std::vector<Vertex>& graph, std::string
 NodeGraphV2::NodeGraphV2(
   xt::pytensor<int,1>& Sstack,
   xt::pytensor<int,1>& Srec, 
+  xt::pytensor<int,1>& Prec, 
   xt::pytensor<double,1>& SLength, 
   xt::pytensor<int,2>& Mrec,
-  xt::pytensor<int,2>& Mlength, 
+  xt::pytensor<double,2>& Mlength, 
   xt::pytensor<double,1>& elevation,
+  xt::pytensor<bool,1>& active_nodes,
   double dx,
-  double dy
+  double dy,
+  int nrows,
+  int ncols
   )
 {
   // std::cout << "bulf0" << std::endl;
@@ -310,27 +305,79 @@ NodeGraphV2::NodeGraphV2(
   this-> un_element = Sstack.size();
   // std::cout << "bulf01" << std::endl;
   
-  std::vector<int> pits;pits.reserve(un_element);
+  // std::vector<int> pits;pits.reserve(un_element);
+  pits_to_reroute = std::vector<bool>(un_element,false);
+  std::vector<int> pits;
+  for(auto node:Sstack)
+  {
+    if(Srec[node] == node && active_nodes[node])
+    {
+      pits_to_reroute[node] = true;
+      pits.push_back(node);
+    }
+  }
+  pits_to_reroute.shrink_to_fit();
+
+  std::vector<int> basin_labels(Sstack.size(),-1);
+  int label = 0;
 
   for(auto node:Sstack)
   {
-    if(Srec[node] == node)
-      pits.emplace_back(node);
+    if(node == Srec[node])
+    {
+      label = node;
+    }
+    basin_labels[node] = label;
   }
+  // xt::pytensor<int,1> basin_labels = xt::zeros<int>({un_element});
 
-  pits.shrink_to_fit();
-
-  xt::pytensor<int,1> basin_labels = xt::zeros<int>({un_element});
-  xt::pytensor<bool,1> active_nodes = xt::ones<bool>({un_element});
+  // xt::xtensor<double, 2> elevation2D({size_t(nrows),size_t(ncols)});
+  // for(size_t r = 0; r<nrows; r++)
+  //   for(size_t c=0; c<ncols; c++)
+  //   {
+  //     int i = r*ncols+c;
+  //     elevation2D(r,c) = elevation[i];
+  //   }
 
 
   // Using Cordonnier's algorithm: 
-  fastscapelib::BasinGraph<int,int,double> Bgraph;
+  // fastscapelib::BasinGraph<int,int,double> Bgraph;
   //# Computing basins
-  Bgraph.compute_basins(basin_labels, Sstack, Srec); 
-  
+  // Bgraph.compute_basins(basin_labels, Sstack, Srec); 
+  // int g =0;
+
   //# updating receivers
-  Bgraph.update_receivers<fastscapelib::BasinAlgo::Boruvka, fastscapelib::ConnectType::Simple>(Srec, SLength, basin_labels, Sstack, active_nodes, elevation, dx, dy);
+  // Bgraph.update_receivers<fastscapelib::BasinAlgo::Boruvka, fastscapelib::ConnectType::Simple>(Srec, SLength, basin_labels, Sstack, active_nodes, elevation2D, dx, dy);
+
+
+
+  // // Correcting the receivers according to Cordonnier's new order
+  // for(auto node:pits)
+  // {
+  //   std::cout << "Testing  NODE " << node <<" rec " << Srec[node] << "||" << active_nodes[node] <<  std::endl;
+  //   if(node != Srec[node] && active_nodes[node] == 1)
+  //   {
+  //     std::cout << "PIT!" << std::endl;
+  //     pits_to_reroute[node] = true;
+  //   }
+
+  // }
+
+  std::map<int,int> receiver_basin;
+  // Now I am building a basin tree
+  for(auto pit:pits)
+  {
+
+    int this_basin = basin_labels[pit];
+    // receiver_basin:
+    int trecs = Prec[Prec[pit]];
+    int this_recbasin = basin_labels[trecs];
+    // std::cout << "node " << pit << " give to " << trecs << std::endl;
+    if(this_basin == this_recbasin)
+      throw std::runtime_error("receiver basin of rerouted pit is itself::pitnode:" + std::to_string(this_basin) + " recnode:" + std::to_string(this_recbasin) );
+
+  }
+
 
 
   xt::pytensor<int,2> Mdon({int(un_element), 8});
@@ -341,46 +388,62 @@ NodeGraphV2::NodeGraphV2(
   // Correcting receivers from fastscapelib (removing duplicates and creating the donors array)
   this->initial_correction_of_MF_receivers_and_donors(Mrec, Mdon, elevation);
 
-  // Correcting the receivers according to Cordonnier's new order
-  pits_to_reroute = std::vector<bool>(un_element,false);
-  for(auto node:pits)
-  {
-    if(node != Srec[node])
-      pits_to_reroute[node] = true;
 
-  }
 
   graph.reserve(un_element);
+  std::vector<int> node_to_check;
+  std::vector<int> force_target_basin;
+  std::vector<int> origin_pit;
 
   for(int i=0; i<n_element;i++)
   {
     std::vector<int>donors,receivers;
     std::vector<double> length2rec;
-    donors.reserve(8);
-    receivers.reserve(8);
-    length2rec.reserve(8);
+
     for(size_t j=0; j<8;j++)
     {
       int nD = Mdon(i,j);
       if(nD>=0 && nD != i)
-        donors.emplace_back(nD);
+        donors.push_back(nD);
       int nR = Mrec(i,j);
-      if(nR>=0 && nR != i)
+      if(nR>=0)
       {
-        receivers.emplace_back(nR);
-        length2rec.emplace_back(Mlength(i,j));
+        receivers.push_back(nR);
+        length2rec.push_back(Mlength(i,j));
       }
-      
+
+      // if(i == 2074)
+      // {
+      //   std::cout << "rec are " ;
+        
+      //   for(auto gugne:receivers)
+      //     std::cout << gugne << "||";
+      //   std::cout << std::endl;
+      // }
     }
+
+
+
     if(pits_to_reroute[i] == true)
     {
-      receivers.emplace_back(Srec[i]);
+      int tgnode = Prec[Prec[i]];
+      receivers.push_back(tgnode);
+      node_to_check.push_back(tgnode);
+      origin_pit.push_back(i);
+      length2rec.push_back(1);
+      force_target_basin.push_back(i);
+      // if(i == 2074)
+      //  std::cout << i << " rec to  " << tgnode << std::endl;
 
+      if(basin_labels[tgnode] == basin_labels[i])
+      {
+        throw std::runtime_error("Receiver in same basin!");
+      }
     }
 
-    donors.shrink_to_fit();
-    receivers.shrink_to_fit();
-    length2rec.shrink_to_fit();
+    // donors.shrink_to_fit();
+    // receivers.shrink_to_fit();
+    // length2rec.shrink_to_fit();
     bool false1 = false;
     bool false2 = false;
 
@@ -388,9 +451,93 @@ NodeGraphV2::NodeGraphV2(
 
   }
 
+  for(size_t i=0; i< node_to_check.size();i++)
+  {
+    int this_node_to_check = node_to_check[i];
+    int this_target_basin = force_target_basin[i];
+    std::vector<int> new_rec;
+    for(auto trec:graph[this_node_to_check].receivers)
+    {
+      if(basin_labels[trec] != this_target_basin || trec == this_node_to_check || active_nodes[trec] == false)
+      {
+        new_rec.push_back(trec);
+      }
+
+    }
+
+
+    if(new_rec.size()==0 && active_nodes[this_node_to_check] == 1 )
+      throw std::runtime_error("At node " + std::to_string(this_node_to_check) + " no receivers after corrections! it came from pit " + std::to_string(origin_pit[i]));
+    graph[this_node_to_check].receivers = new_rec;
+  }
+
+  // for(size_t i=0; i< node_to_check_2.size();i++)
+  // {
+  //   int this_node_to_check = node_to_check_2[i];
+  //   int this_target_basin = force_basin_2[i];
+  //   std::vector<int> new_rec;
+  //   for(auto trec:graph[this_node_to_check].receivers)
+  //   {
+  //     if(basin_labels[trec] == this_target_basin)
+  //     {
+  //       new_rec.push_back(trec);
+  //     }
+
+  //   }
+  //   graph[this_node_to_check].receivers = new_rec;
+  // }
+
   std::string direction = "receivers";
-  Mstack = xt::adapt(topological_sort_by_dfs(graph,direction));
-  std::cout << Mstack[0] << std::endl;
+  // std::vector<int> tMstack = topological_sort_by_dfs(graph,direction);
+  Mstack = xt::adapt(multiple_stack_fastscape( n_element, graph));
+
+  for(size_t i=0; i<node_to_check.size(); i++)
+  {
+
+    std::vector<int> rec;
+    for(size_t j=0;j<8; j++)
+    {
+      int trec = Mrec(node_to_check[i],j);
+      if(trec < 0 || node_to_check[i] == trec)
+      {continue;}
+      rec.push_back(trec);
+    }
+    if(pits_to_reroute[node_to_check[i]])
+      rec.push_back(Prec[Prec[node_to_check[i]]]);
+    graph[node_to_check[i]].receivers = rec;
+  }
+    
+  // for(size_t i=0; i<node_to_check_2.size(); i++)
+  // {
+  //   std::vector<int> rec;
+  //   for(size_t j=0;j<8; j++)
+  //   {
+  //     int trec = Mrec(node_to_check[i],j);
+  //     if(trec < 0 || node_to_check_2[i] == trec)
+  //     {continue;}
+  //     rec.push_back(trec);
+  //   }
+  //   graph[node_to_check_2[i]].receivers = rec;
+  // }
+
+
+
+  // if(tMstack[0] == -9999)
+  // {
+  //   std::cout << "NODEGRAPH IS CYCLIC, PREPARE TO CRASH" << std::endl;
+  //   throw std::runtime_error("Cyclic node graph, cannot solve...");
+  // }
+
+  // Mstack = xt::zeros<int>({un_element});
+  // int incr = 0;
+
+  // for(int i = tMstack.size()-1; i>=0;i--)
+  // {
+  //   Mstack[incr] = tMstack[i];
+  //   incr++;
+  // }
+  // std::cout << Mstack[0] << std::endl;
+
 
   
 }
@@ -439,6 +586,206 @@ void NodeGraphV2::initial_correction_of_MF_receivers_and_donors(xt::pytensor<int
     }
   }
 }
+
+void NodeGraphV2::update_receivers_at_node(int node, std::vector<int>& new_receivers)
+{
+  if(is_depression(node) == false)
+    this->graph[node].receivers = new_receivers;
+  else
+    new_receivers = {};
+}
+void NodeGraphV2::update_donors_at_node(int node, std::vector<int>& new_donors)
+{
+  this->graph[node].donors = new_donors;
+}
+
+
+std::vector<int> multiple_stack_fastscape(int n_element, std::vector<Vertex>& graph)
+{
+
+  std::vector<int>ndon(n_element,0);
+  for(size_t i=0; i<n_element;i++)
+  {
+    for(auto trec:graph[i].receivers)
+    {
+      ndon[trec]  = ndon[trec] + 1;
+    }
+  }
+
+  std::vector<int> vis(n_element,0), parse(n_element,-1), stack(n_element,0);
+  
+  int nparse = -1;
+  int nstack = -1;
+
+
+  // we go through the nodes
+  for(size_t i=0; i<n_element;i++)
+  {
+    // when we find a "summit" (ie a node that has no donors)
+    // we parse it (put it in a stack called parse)
+    if (ndon[i] == 0)
+    {
+      nparse =  nparse+1;
+      parse[nparse] = i;
+    }
+    // we go through the parsing stack
+    while (nparse > -1)
+    {
+      int ijn = parse[nparse];
+      nparse = nparse-1;
+      nstack = nstack+1;
+
+      stack[nstack] = ijn;
+      for(int ijk=0; ijk < graph[ijn].receivers.size();ijk++)
+      {
+        int ijr = graph[ijn].receivers[ijk];
+        vis[ijr] = vis[ijr]+1;
+        // if the counter is equal to the number of donors for that node we add it to the parsing stack
+        if (vis[ijr] == ndon[ijr])
+        {
+          nparse=nparse+1;
+          parse[nparse]=ijr;
+        }
+        
+      }
+    } 
+  }
+  // if(nstack < n_element - 1 )
+  // {
+  //   std::cout << "WARNING::STACK UNDERPOPULATED::" << nstack << std::endl;;
+  //   throw std::runtime_error("stack underpopulated somehow:");
+  // }
+
+  return stack;
+
+
+//   ndon=0
+
+//   do ij=1,nn
+//     do k=1,nrec(ij)
+//       ijk = rec(k,ij)
+//       ndon(ijk)=ndon(ijk)+1
+//       don(ndon(ijk),ijk) = ij
+//     enddo
+//   enddo
+
+//   allocate (vis(nn),parse(nn))
+
+//   nparse=0
+//   nstack=0
+//   stack=0
+//   vis=0
+//   parse=0
+
+//   ! we go through the nodes
+//   do ij=1,nn
+//     ! when we find a "summit" (ie a node that has no donors)
+//     ! we parse it (put it in a stack called parse)
+//     if (ndon(ij).eq.0) then
+//       nparse=nparse+1
+//       parse(nparse)=ij
+//     endif
+//     ! we go through the parsing stack
+//     do while (nparse.gt.0)
+//       ijn=parse(nparse)
+//       nparse=nparse-1
+//       ! we add the node to the stack
+//       nstack=nstack+1
+//       stack(nstack)=ijn
+//       ! for each of its receivers we increment a counter called vis
+//       do  ijk=1,nrec(ijn)
+//         ijr=rec(ijk,ijn)
+//         vis(ijr)=vis(ijr)+1
+//         ! if the counter is equal to the number of donors for that node we add it to the parsing stack
+//         if (vis(ijr).eq.ndon(ijr)) then
+//           nparse=nparse+1
+//           parse(nparse)=ijr
+//         endif
+//       enddo
+//     enddo
+//   enddo
+//   if (nstack.ne.nn) stop 'error in stack'
+
+//   deallocate (ndon,don,vis,parse,h0)
+
+//   return
+
+// end subroutine find_mult_rec
+
+}
+
+// void find_multiple_receivers_and_donors(xt::pytensor<double>& elevation)
+// {
+
+  
+
+
+
+//   do j=bounds_j1,bounds_j2
+//     do i=bounds_i1,bounds_i2
+//       ij = (j-1)*nx + i
+//       slopemax = 0.
+//       do jj=-1,1
+//         jjj= j + jj
+//         if (jjj.lt.1.and.bounds_ycyclic) jjj=jjj+ny
+//         jjj=max(jjj,1)
+//         if (jjj.gt.ny.and.bounds_ycyclic) jjj=jjj-ny
+//         jjj=min(jjj,ny)
+//         do ii=-1,1
+//           iii = i + ii
+//           if (iii.lt.1.and.bounds_xcyclic) iii=iii+nx
+//           iii=max(iii,1)
+//           if (iii.gt.nx.and.bounds_xcyclic) iii=iii-nx
+//           iii=min(iii,nx)
+//           ijk = (jjj-1)*nx + iii
+//           if (h0(ij).gt.h0(ijk)) then
+//             nrec(ij)=nrec(ij)+1
+//             rec(nrec(ij),ij) = ijk
+//             lrec(nrec(ij),ij) = sqrt((ii*dx)**2 + (jj*dy)**2)
+//             wrec(nrec(ij),ij) = (h0(ij) - h0(ijk))/lrec(nrec(ij),ij)
+//           endif
+//         enddo
+//       enddo
+//     enddo
+//   enddo
+// }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

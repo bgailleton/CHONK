@@ -71,21 +71,17 @@ PYBIND11_MODULE(CHONK_cpp, m)
       .def("get_sediment_flux",&ModelRunner::get_sediment_flux)
       .def("get_erosion_flux",&ModelRunner::get_erosion_flux)
       .def("get_other_attribute", &ModelRunner::get_other_attribute)
-      .def("get_all_nodes_in_depression", &ModelRunner::get_all_nodes_in_depression)
       .def("update_timestep", &ModelRunner::update_timestep)
-      .def("DEBUG_get_preacc", &ModelRunner::DEBUG_get_preacc)
-      .def("DEBUG_get_basin_label", &ModelRunner::DEBUG_get_basin_label)
       .def("DEBUG_check_weird_val_stacks", &ModelRunner::DEBUG_check_weird_val_stacks)
-      .def("DEBUG_get_graph_rec", &ModelRunner::DEBUG_get_graph_rec)
-      .def("DEBUG_get_node_to_aliases", &ModelRunner::DEBUG_get_node_to_aliases)
+      .def("DEBUG_get_receivers_at_node", &ModelRunner::DEBUG_get_receivers_at_node)
 
     ;
-    m.def("preprocess_stack", preprocess_stack);
     m.def("pop_elevation_to_SS_SF_SPIL", pop_elevation_to_SS_SF_SPIL);
 
     py::class_<NodeGraphV2>(m, "NodeGraph",py::dynamic_attr())
       .def(py::init<>())
-      .def(py::init([](xt::pytensor<int,1>& D8stack, xt::pytensor<int,1>& D8rec, xt::pytensor<double,1>& D8Length, xt::pytensor<int,2>& Mrec,xt::pytensor<int,2>& Mlength, xt::pytensor<double,1>& elevation, double dx, double dy){return std::unique_ptr<NodeGraphV2>(new NodeGraphV2( D8stack,  D8rec,  D8Length, Mrec, Mlength, elevation,  dx,  dy)); }))
+      .def(py::init([](xt::pytensor<int,1>& D8stack, xt::pytensor<int,1>& D8rec, xt::pytensor<int,1>& Prec, xt::pytensor<double,1>& D8Length, xt::pytensor<int,2>& Mrec,xt::pytensor<double,2>& Mlength, xt::pytensor<double,1>& elevation,xt::pytensor<bool,1>& active_nodes, 
+        double dx, double dy, int nrows, int ncols){return std::unique_ptr<NodeGraphV2>(new NodeGraphV2( D8stack,  D8rec, Prec,  D8Length, Mrec, Mlength, elevation,active_nodes,  dx,  dy, nrows, ncols)); }))
       .def("get_MF_stack_full", &NodeGraphV2::get_MF_stack_full)
       ;
 

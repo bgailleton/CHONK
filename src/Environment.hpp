@@ -77,6 +77,8 @@ class ModelRunner
     void manage_fluxes_after_moving_prep(chonk& this_chonk);
 
     int solve_depression(int node);
+    int solve_depressionv2(int node);
+
 
     void process_inherited_water();
 
@@ -95,20 +97,15 @@ class ModelRunner
     xt::pytensor<double,1> get_sediment_flux();
     // # return generic attribute
     xt::pytensor<double,1> get_other_attribute(std::string key);
-    //# return nodes in depression
-    xt::pytensor<int,1> get_all_nodes_in_depression(){return graph.get_all_nodes_in_depression();}
-
 
 
     // DEBUGGING FUNCTIONS
     // ~ These have weird functionality you probably do not need, or very hacky slow process to check something works right
     // ~ Just Ignore
     void DEBUG_modify_double_array_param_inplace(std::string name, int place, double new_val){io_double_array[name][place] = new_val;}
-    xt::pytensor<int,1> DEBUG_get_preacc(){return graph.DEBUG_get_preacc();}
+    std::vector<int> DEBUG_get_receivers_at_node(int node){return this->graph.get_MF_receivers_at_node(node);}
+
     void DEBUG_check_weird_val_stacks();
-    std::vector<std::vector<int> > DEBUG_get_basin_label(){return graph.DEBUG_get_basin_label();}
-    std::vector<std::vector<int> > DEBUG_get_graph_rec(){return graph.DEBUG_get_debug_graph_rec();}
-    std::unordered_map<int,std::vector<int> >  DEBUG_get_node_to_aliases(){return graph.DEBUG_get_node_to_aliases();}
     
 
 
@@ -127,7 +124,7 @@ class ModelRunner
     std::string move_method;
 
     // The nodegraph of the model
-    NodeGraph graph;
+    NodeGraphV2 graph;
 
     // Chonk network
     std::vector<chonk> chonk_network;
