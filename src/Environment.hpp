@@ -71,14 +71,20 @@ class Lake
     Lake() {};
     // Default initialiser
     Lake(int lake_id)
-    {this->lake_id = lake_id; n_nodes = 0; surface = 0; volume = 0; water_elevation = 0; outlet_node = -9999; nodes = std::vector<int>();}
+    {this->lake_id = lake_id; n_nodes = 0; surface = 0; volume = 0; water_elevation = 0; outlet_node = -9999; nodes = std::vector<int>(); depths = std::vector<double>();}
 
     // This function ingests a set of new nodes in the lake
     void ingest_nodes_in_lake(std::vector<int>& new_nodes);
     // This functions ingest a whole existing lake into the current one *slurp*
     void ingest_other_lake(Lake& other_lake, std::vector<int>& lake_network);
     // initialisation of a lake from an outlet pit:
-    void initial_lake_fill();
+    void initial_lake_fill(
+      double water_wolume,
+      int originode,
+      std::vector<int>& node_in_lake,
+      std::vector<Lake>& lake_network,
+      xt::pytensor<double,1> surface_elevation
+    );
 
   
   protected:
@@ -96,6 +102,8 @@ class Lake
     int outlet_node;
     // Vector of node in the lake
     std::vector<int> nodes;
+    // Vector of Depths in the lake
+    std::vector<double> depths;
     // The priority queue containing the nodes not in the lake yet but bordering the lake
     std::priority_queue< nodium, std::vector<nodium>, std::greater<nodium> > depressionfiller;
 

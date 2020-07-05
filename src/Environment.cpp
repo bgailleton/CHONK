@@ -158,9 +158,9 @@ void ModelRunner::run()
 
     if(this->graph.is_depression(node))
     {
-      lake_network.push_back();
+      lake_network.push_back(Lake(lake_incrementor));
+      lake_incrementor++;
     }
-
 
     // first step is to apply the right move method, to prepare the chonk to move
     // std::cout << "3" << std::endl;
@@ -791,10 +791,17 @@ void Lake::ingest_other_lake(Lake& other_lake, std::vector<int>& lake_network)
   return;
 }
 
+// Fill a lake with a certain amount of water for the first time of the run
+void Lake::initial_lake_fill(
+  double water_wolume,
+  int originode,
+  std::vector<int>& node_in_lake,
+  std::vector<Lake>& lake_network,
+  xt::pytensor<double,1> surface_elevation
 
-void Lake::initial_lake_fill()
+  )
 {
-  
+
   return;
 }
 
