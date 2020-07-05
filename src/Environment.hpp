@@ -36,9 +36,74 @@
 #include "nodegraph.hpp" // same
 #include "CHONK.hpp" // same
 
+// #####################################################
+// ############# Node structure ########################
+// #####################################################
+
+// the class nodium is just used for the priority queue struture when solving lakes.
+// it is a very small class that combine a node index and its elevation when I insert it within the PQ
+// The operators are defined in the cpp file.
+class nodium
+{
+  public:
+    // empty constructor
+    nodium(){};
+    // Constructor by default
+    nodium(int node,double elevation){this->node = node; this->elevation = elevation;};
+    // Elevation data
+    double elevation;
+    // Node index
+    int node;
+};
 
 
-// The simple model runner run a model with spatially uniform set of law. It allows 2D heterogeneities in specific parameters though (e.g. differential erodibility)
+
+// #####################################################
+// ############# Lake ##################################
+// #####################################################
+
+// the lake class manages dynamically the filling of actual lakes: i.e. the part of depression filled with water and sediments
+class Lake
+{
+  
+  public:
+    // Empty constructor
+    Lake() {};
+    // Default initialiser
+    Lake(int lake_id)
+    {this->lake_id = lake_id; n_nodes = 0; surface = 0; volume = 0; water_elevation = 0; outlet_node = -9999; nodes = std::vector<int>();}
+
+    // This function ingests a set of new nodes in the lake
+    void ingest_nodes_in_lake(std::vector<int>& new_nodes);
+    // This functions ingest a whole existing lake into the current one *slurp*
+    void ingest_other_lake(Lake& other_lake, std::vector<int>& lake_network);
+    // initialisation of a lake from an outlet pit:
+    void initial_lake_fill();
+
+  
+  protected:
+    // Lake ID, i.e. the lake place in the parent environment vector of lakes
+    int lake_id;
+    // Number of nodes in the lake/underwater
+    int n_nodes;
+    // The surface area of the lake in L^2
+    double surface;
+    // the volume of the lake in L^3
+    double volume;
+    // the absolute elevation of the water surface
+    double water_elevation;
+    // The node outletting the lake
+    int outlet_node;
+    // Vector of node in the lake
+    std::vector<int> nodes;
+    // The priority queue containing the nodes not in the lake yet but bordering the lake
+    std::priority_queue< nodium, std::vector<nodium>, std::greater<nodium> > depressionfiller;
+
+};
+
+
+
+// The modelrunner manages the whole model run, it brings together the node graph, te chonks and the lakes while processing I/O and running the timesteps
 class ModelRunner
 {
   public:
@@ -76,7 +141,7 @@ class ModelRunner
 
     void manage_fluxes_after_moving_prep(chonk& this_chonk);
 
-    int solve_depression(int node);
+    // int solve_depression(int node);
     int solve_depressionv2(int node);
 
 
@@ -132,6 +197,14 @@ class ModelRunner
     // method checkers
     std::map<std::string,bool> is_method_passive;
 
+    // Lake Network
+    //# This increments the lake vector
+    int lake_incrementor;
+    //# The vector containing all the different lake entities. Dynamically resized to the number of lakes
+    std::vector<Lake> lake_network;
+    //# Vetor containing the lake ID for each nodes of the landscape. -1 -> NAL node: Not A Lake
+    std::vector<int> node_in_lake;
+
     // parameters
     std::map<std::string, int> io_int;
     std::map<std::string, double> io_double;
@@ -146,6 +219,14 @@ class ModelRunner
      
 
 };// End of ModelRunner
+
+
+
+
+
+
+
+
 
 xt::pytensor<double,1> pop_elevation_to_SS_SF_SPIL(xt::pytensor<int,1>& stack, xt::pytensor<int,1>& rec,xt::pytensor<double,1>& length , xt::pytensor<double,1>& erosion, 
       xt::pytensor<double,1>& K, double n, double m, double cellarea);
