@@ -320,7 +320,7 @@ int ModelRunner::solve_depressionv2(int node)
   // I am making these aliases to avoid the cost of accessing the map element each nodes
 
   // Getting the total volume of water arriving in this depression: Q * dt
-  double water_wolume = this->chonk_network[node].get_water_flux() * timestep;
+  double water_volume = this->chonk_network[node].get_water_flux() * timestep;
   // My first node to be processed is the pit
   nodium working_node( node, surface_elevation[node] + lake_depth[node]);
 
@@ -343,9 +343,9 @@ int ModelRunner::solve_depressionv2(int node)
   // Temp boolean I need to break the loop in some specific cases (e.g. an edge is reach and my water escapes)
   bool break_main_loop = false;
   // Now filling the depression, doing it while I have enough water to do so
-  while(water_wolume>0 && depressionfiller.empty() == false)
+  while(water_volume>0 && depressionfiller.empty() == false)
   {
-    std::cout << "bulf: " << working_node.node << ":" << working_node.elevation << "||" << water_wolume << std::endl;
+    std::cout << "bulf: " << working_node.node << ":" << working_node.elevation << "||" << water_volume << std::endl;
     // At the start of this loop, my working node is in the depression
     n_nodes_underwater++;
     working_node =  depressionfiller.top();
@@ -391,7 +391,7 @@ int ModelRunner::solve_depressionv2(int node)
 
     nodium next_node = depressionfiller.top();
 
-    water_wolume -= n_nodes_underwater * this->io_double["dx"] * this->io_double["dy"] * (next_node.elevation + lake_depth[next_node.node] - current_water_level);
+    water_volume -= n_nodes_underwater * this->io_double["dx"] * this->io_double["dy"] * (next_node.elevation + lake_depth[next_node.node] - current_water_level);
 
     current_water_level = next_node.elevation + lake_depth[next_node.node];
 
@@ -413,243 +413,6 @@ int ModelRunner::solve_depressionv2(int node)
 
 }
 
-// // This function is the main algorithm managing depression solving
-// int ModelRunner::solve_depression(int node)
-// {
-//   // Gathering the depression rerouter, I'll need it to check when I reach another pit vs true base level
-//   // xt::pytensor<int,1>& depressions = this->io_int_array["depression_to_reroute"];
-//   xt::pytensor<double,1>& surface_elevation = this->io_double_array["surface_elevation"];
-//   xt::pytensor<double,1>& lake_depth = this->io_double_array["lake_depth"];
-//   // I am making these aliases to avoid the cost of accessing the map element each nodes
-
-//   // Getting the total volume of water arriving in this depression: Q * dt
-//   double water_wolume = this->chonk_network[node].get_water_flux() * timestep;
-//   // My first node to be processed is the pit
-//   nodium working_node; working_node.node = node; working_node.elevation = surface_elevation[node] + lake_depth[node];
-
-//   // Initialising the priority queue I will be using to processed my nodes
-//   std::priority_queue< nodium, std::vector<nodium>, std::greater<nodium> > depressionfiller;
-//   // Adding my first node in it
-//   // depressionfiller.push(working_node);
-//   // NO i am not doing that cause I'll be processing the first working node twice if I do so
-  
-//   // I'll be keeping track of how many and which nodes are in this depression
-//   int n_nodes_underwater = 0;
-//   std::vector<int> underwater_nodes;
-//   std::vector<bool> is_underwater(this->io_int["n_elements"], false);
-//   std::vector<bool> is_in_queue(this->io_int["n_elements"], false);
-
-//   // My current water level is the elevation of this node + eventually preexisting lake water from THIS timestep
-//   double current_water_level = surface_elevation[node] + lake_depth[node];
-//   // I will track my outlet status
-//   int potential_outlet = -9999;
-//   // Temp boolean I need to break the loop in some specific cases (e.g. an edge is reach and my water escapes)
-//   bool break_main_loop = false;
-//   // Now filling the depression, doing it while I have enough water to do so
-//   while(water_wolume>0)
-//   {
-//     // std::cout << "bulf: " << working_node.node << ":" << working_node.elevation << std::endl;
-//     // At the start of this loop, my working node is in the depression
-//     n_nodes_underwater++;
-//     underwater_nodes.push_back(working_node.node);
-//     is_underwater[working_node.node] = true;
-//     is_in_queue[working_node.node] = true;
-
-//     // HEre, checking if this node outlets the depression
-//     // I am getting all the receivers of the current working node, i.e. the downslope neighbors of my current one
-//     std::vector<int> recnodes = graph.get_MF_receivers_at_node(working_node.node);
-//     std::vector<int> extra_donodes;
-//     // iterating through each of them
-//     for(auto nenode:recnodes)
-//     {
-//       // Checking if valid (-1 = not a downslope neighbour)
-//       if(nenode<0 || nenode == node)
-//         continue;
-
-//      // If I am at the first node, my receiver will be meself but I still want to keep on processing the pit so I am ignoring this check (node being the pit bottom)
-//       if(nenode != node)
-//       {
-//         // If my node is its own receiver, I am outletting outside and loosing my fluxes
-//         if(nenode == working_node.node && this->graph.is_depression(nenode) == false)
-//         {
-//           // std::cout << "OUTLETTING THE MODEL:" << nenode << std::endl; 
-//           // I am therefore at a baselevel and the fluxes can escape
-//           potential_outlet = -1;
-//           // i'll stop with this depression
-//           break_main_loop = true;
-//         }
-
-//         if(is_underwater[nenode] == false && lake_depth[nenode] <=0)
-//         {
-//           if(surface_elevation[nenode] + lake_depth[nenode] < surface_elevation[working_node.node] + lake_depth[working_node.node] )
-//           {
-//             // outlet! transmitting the water flux to this receiver
-//             potential_outlet = working_node.node;
-//             std::cout << "Original Node : "<< node <<" OUTLETTING THE LAKE:" << potential_outlet << std::endl; 
-
-//             break_main_loop = true;
-//             // std::cout << "C" << std::endl;
-//             std::vector<int> recout = this->graph.get_MF_receivers_at_node(potential_outlet);
-//             // std::cout << "D" << std::endl;
-//             for(auto& rn:recout)
-//             {
-//               if(rn == -1 || rn == node)
-//                 continue;
-//               if(is_underwater[rn])
-//                 rn = -1;
-//             }
-//             // std::cout << "E" << std::endl;
-
-//             this->graph.update_receivers_at_node(potential_outlet,recout);
-//             // I am also reprocessing this chonk so I need to reset it to reinitialise its info
-//             // this->chonk_network[potential_outlet].reset();
-//             // std::cout << "F" << std::endl;
-//             // 
-//             this->chonk_network[potential_outlet].add_to_water_flux(water_wolume / this->timestep);
-//             // std::cout << "G" << std::endl;
-//           }
-//         }
-//         if(surface_elevation[nenode] + lake_depth[nenode] >= working_node.elevation)
-//         {
-//           extra_donodes.push_back(nenode);
-//         }
-//       }
-//     }
-//     // done with checking receiver
-
-//     // I am getting out of the loop if conditions are met
-//     if(break_main_loop)
-//       break;
-
-//     // otherwise I can just add all my neighbours into the queue
-//     // getting all upslope neighbors
-//     std::vector<int> donodes = graph.get_MF_donors_at_node(working_node.node);
-//     for(auto onode:extra_donodes)
-//       donodes.push_back(onode);
-//     // iterating thorough these
-//     for(auto nenode:donodes)
-//     {
-//       // checking if valid
-//       if(nenode<0)
-//         continue;
-//       if(is_in_queue[nenode])
-//         continue;
-//       // pushing this node in the queue: it will get sorted automatically in the queue
-//       // Note that I am adding the node with its elevation
-//       nodium newnode; newnode.node = nenode; newnode.elevation = surface_elevation[nenode] + lake_depth[nenode];
-//       depressionfiller.push(newnode);
-//       is_in_queue[nenode] = true;
-//     }
-
-//     // nodium next_node;
-
-//     // if(depressionfiller.empty() == false)
-//     // {
-//     //   // My potential next node is the top priority on the Queue
-//     //   next_node = depressionfiller.top();
-//     //   depressionfiller.pop(); // removing it from the queue
-//     //   water_wolume -= n_nodes_underwater * this->io_double["dx"] * this->io_double["dy"] * (next_node.elevation - current_water_level);
-//     //   current_water_level = next_node.elevation;
-//     // }
-//     // else
-//     // {
-//     //   current_water_level += water_wolume / (n_nodes_underwater * this->io_double["dx"] * this->io_double["dy"]);
-//     //   break;
-//     // }
-
-//     if(depressionfiller.empty())
-//       break;
-
-//     // My potential next node is the top priority on the Queue
-//     nodium next_node = depressionfiller.top();
-//     depressionfiller.pop(); // removing it from the queue
-
-//     // I am rising my whole lake level to the one of the neighbor, and removing the volume added to the total water
-//     water_wolume -= n_nodes_underwater * this->io_double["dx"] * this->io_double["dy"] * (next_node.elevation - current_water_level);
-//     current_water_level = next_node.elevation;
-
-//     // my next node to process is that one
-//     working_node = next_node;
-
-//     //
-//     if(water_wolume <0)
-//     {
-//       // I have too much water
-//       double excess_water = abs(water_wolume);
-//       current_water_level -= excess_water / (n_nodes_underwater * this->io_double["dx"] * this->io_double["dy"]);
-//       break;
-//     }
-//     // Moving to my next node if I still have some water
-  
-//   } 
-
-//   // Right now let's take care of the sediment
-//   // I have a given volume of sediment
-//   double sediment_volume =  this->chonk_network[node].get_sediment_flux();
-//   double depression_volume = 0;
-//   // last thing about water: I need to change the lake depth for the nodes underwater, 
-//   // At the same time I will cancel any erosion/deposition that happened in these CHONKs
-//   for( auto this_node:underwater_nodes) 
-//   {
-//     // registering the lake deposition flux (converted into in rate of height change by unit of time) in case some lake deposition already happened in an upstream sub-depression
-//     double lake_deposition_flux_already_there = this->chonk_network[this_node].get_other_attribute("height_lake_sediments_tp1")/this->timestep;
-//     // Adding lake depth
-//     lake_depth[this_node] = current_water_level - surface_elevation[this_node];
-//     // Note I am acknowledging the sediment height already deposited
-//     depression_volume += (lake_depth[this_node] - lake_deposition_flux_already_there * this->timestep) * this->io_double["dx"] * this->io_double["dy"];
-//     // Registering current erosion
-//     double eflux = this->chonk_network[this_node].get_erosion_flux();
-//     // cancelling all erosion
-//     this->chonk_network[this_node].set_erosion_flux(0.);
-//     // removing the cancelled erosion due to covid-19 from the sediment flux (note the conversion from rate of elevation change for one unit of time to a volume)
-//     sediment_volume += -1*(this->io_double["dx"] * this->io_double["dy"] * eflux * this->timestep);
-//     sediment_volume += (this->chonk_network[this_node].get_deposition_flux() - lake_deposition_flux_already_there) * this->io_double["dx"] * this->io_double["dy"] * timestep ;
-//     this->chonk_network[this_node].set_sediment_flux(0.);
-//         // I am readding the cancelled deposition to the sediment flux (conversion to volume)
-//     // Setting my deposition flux to only my lake one
-//     this->chonk_network[this_node].set_deposition_flux(lake_deposition_flux_already_there);
-//     // std::cout << lake_deposition_flux_already_there << std::endl;
-//   } 
-
-  
-//   // std::cout << sediment_volume << std::endl;
-//   // I can fill a certain proportion of the depression
-//   double proportion_filled = sediment_volume/water_wolume;
-
-//   // Cheking if I have an excess of sediment and if I can transmit them to a receiver
-//   double excess_sediments = 0;
-//   if(proportion_filled>1)
-//   {
-//     excess_sediments = proportion_filled - 1;
-//     // if my receiver is more than -1: it has a receiver which can receive the excess
-//     if(potential_outlet > -1)
-//     {
-//       proportion_filled = 1;
-//       this->chonk_network[potential_outlet].add_to_sediment_flux(excess_sediments * sediment_volume);
-//     }
-//     else if(potential_outlet == -1)
-//     {
-//       // in that case, the sediment can escape the model simply
-//       proportion_filled = 1;
-//     }
-//     // Last case, potential_outlet == -9999, it would mean I have more sediment volume than water but no outlet at all! 
-//     // It may happen in very small depression eventually. I chose to keep the mass balance and depositate a sediment "column", this can require work if I start to see unreasonable columns appearing.
-//   }
-
-//   // Applying the change
-//   for(auto this_node:underwater_nodes)
-//   {
-//     double this_depo = (lake_depth[this_node] - this->chonk_network[this_node].get_other_attribute("height_lake_sediments_tp1")) * proportion_filled;
-//     // std::cout << this_depo << "||" << proportion_filled << "||" << sediment_volume <<std::endl;
-//     this->chonk_network[this_node].set_other_attribute("height_lake_sediments_tp1", this_depo);
-//     this->chonk_network[this_node].add_deposition_flux(this_depo/this->timestep);
-//   }
-
-//   this->io_double_array["lake_depth"] = lake_depth;
-
-//   return potential_outlet;
-
-// }
 
 
 void ModelRunner::process_inherited_water()
@@ -780,32 +543,228 @@ void ModelRunner::DEBUG_check_weird_val_stacks()
 //#################################################################################
 
 
-
-void Lake::ingest_nodes_in_lake(std::vector<int>& new_nodes)
+void Lake::ingest_other_lake(
+   Lake& other_lake,
+   std::vector<int>& node_in_lake, 
+   std::vector<bool>& is_in_queue
+   )
 {
-  return;
-}
+  // getting the attributes of the other lake
+  std::vector<int>& these_nodes = other_lake.get_lake_nodes();
+  std::vector<int>& these_node_in_queue = other_lake.get_lake_nodes_in_queue();
+  std::unordered_map<int,double>& these_depths = other_lake.get_lake_depths();
+  std::priority_queue< nodium, std::vector<nodium>, std::greater<nodium> >& this_PQ = other_lake.get_lake_priority_queue();
 
-void Lake::ingest_other_lake(Lake& other_lake, std::vector<int>& lake_network)
-{
+  // merging them into this lake while node forgetting to label them as visited and everything like that
+  for(auto node:these_nodes)
+  {
+    this->nodes.push_back(node);
+    node_in_lake[node] = this->lake_id;
+  }
+
+  for(auto node:these_node_in_queue)
+  {
+    this->node_in_queue.push_back(node);
+    is_in_queue[node] = true;
+  }
+
+  this->depths.insert(these_depths.begin(), these_depths.end());
+
+  this->n_nodes += other_lake.get_n_nodes();
+
+  // Transferring the PQ (not ideal but meh...)
+  while(this_PQ.empty() == false)
+  {
+    nodium this_nodium = this_PQ.top();
+    is_in_queue[this_nodium.node] = true;
+    this->depressionfiller.emplace(this_nodium);
+    this_PQ.pop();
+  }
+
+  // Deleting this lake
+  other_lake = Lake();
+
   return;
 }
 
 // Fill a lake with a certain amount of water for the first time of the run
-void Lake::initial_lake_fill(
-  double water_wolume,
+void Lake::pour_water_in_lake(
+  double water_volume,
   int originode,
   std::vector<int>& node_in_lake,
+  std::vector<int>& is_processed,
+  xt::pytensor<int,1>& active_nodes,
   std::vector<Lake>& lake_network,
-  xt::pytensor<double,1> surface_elevation
-
+  xt::pytensor<double,1> surface_elevation,
+  NodeGraphV2& graph,
+  double cellarea,
+  double dt,
+  std::vector<chonk>& chonk_network
   )
 {
+
+  // First checking if this node is in a lake, if yes it means the lake has already been initialised and 
+  // We are pouring water from another lake 
+  if(node_in_lake[originode] == -1)
+  {
+    // Emplacing the node in the queue, It will be the first to be processed
+    depressionfiller.emplace( nodium( originode,surface_elevation[originode] ) );
+
+    // this function fills an original lake, hence there is no lake depth yet:
+    this->water_elevation = surface_elevation[originode];
+  }
+
+  // no matter if I am filling a new lake or an old one:
+  // I am filling a vector of nodes already in teh system (Queue or lake)
+  std::vector<bool> is_in_queue(node_in_lake.size(),false);
+  for(auto nq:this->node_in_queue)
+    is_in_queue[nq] = true;
+
+  // I am processing new nodes while I still have water OR still nodes upstream (if an outlet in encountered, the loop is breaked anually)
+  while(depressionfiller.empty() == false && water_volume > 0 )
+  {
+    // Getting the next node and ...
+    nodium next_node = this->depressionfiller.top();
+    // ... removing it from the priority queue 
+    this->depressionfiller.pop();
+
+    // Initialising a dummy outlet
+    int outlet = -9999;
+    // Adding the upstream neighbors to the queue and checking if there is an outlet node
+    outlet = this->check_neighbors_for_outlet_or_existing_lakes(next_node, graph, node_in_lake, lake_network, surface_elevation, is_in_queue);
+
+    // If I have an outlet, then the outlet node is positive
+    if(outlet>=0)
+    {
+      // I therefore save it and break the loop
+      this->outlet_node = next_node.node;
+      break;
+    }
+
+    // Otehr wise, I do not have an outlet and I can save this node as in depression
+    this->nodes.push_back(next_node.node);
+    this->n_nodes ++;
+
+    //Decreasing water volume by filling teh lake
+    water_volume -= this->n_nodes * cellarea * (next_node.elevation - water_elevation);
+
+    // At this point I either have enough water to carry on or I stop the process
+  }
+
+  // Labelling the node in depression as belonging to this lake and saving their depth
+  for(auto Unot:nodes)
+  {
+    this->depths[Unot] = this->water_elevation - surface_elevation[Unot];
+    node_in_lake[Unot] = this->lake_id;
+  }
+
+  // Transmitting the water flux to the SS receiver not in the lake
+  if(water_volume > 0 && this->outlet_node >= 0)
+  {
+    // If the node is inactive, ie if its code is 0, the fluxes can escape the system and we stop it here
+    if(active_nodes[this->outlet_node] > 0)
+    {
+      // Otherwise: calculating the outflux: water_volume_remaining divided by the time step
+      double out_water_rate = water_volume/dt;
+      // Getting all the receivers and the length to the oulet
+      std::vector<int>& receivers = graph.get_MF_receivers_at_node_no_rerouting(this->outlet_node);
+      std::vector<double>& length = graph.get_MF_lengths_at_node(this->outlet_node);
+      // And finding the steepest slope 
+      int SS_ID = -9999; 
+      double SS = -9999; // hmmmm I may need to change this name
+      for(size_t i=0; i<receivers.size(); i++)
+      {
+        double this_slope = (surface_elevation[this->outlet_node] - surface_elevation[receivers[i]])/length[i];
+        if(this_slope>SS)
+        {
+          SS = this_slope;
+          SS_ID = receivers[i];
+        }
+      }
+
+      // temporary check, I shall delete it when I'll be sure of it
+      if(SS_ID<0)
+        throw std::runtime_error(" The lake has an outlet with no downlslope neighbors ??? This is not possible, check Lake::initial_lake_fill or warn Boris that it happened");
+
+      // redirecting the water to the SS rec
+      chonk_network[SS_ID].add_to_water_flux(out_water_rate);
+    }
+  }
 
   return;
 }
 
+// This function checks all the neighbours of a pixel node and return -9999 if there is no receivers
+// And the node index if there is a receiver
+// 
+int Lake::check_neighbors_for_outlet_or_existing_lakes(
+  nodium& next_node, 
+  NodeGraphV2& graph, 
+  std::vector<int>& node_in_lake, 
+  std::vector<Lake>& lake_network,
+  xt::pytensor<double,1>& surface_elevation,
+  std::vector<bool>& is_in_queue
+  )
+{
+  // Getting all neighbors: receivers AND donors
+  std::vector<int>& neightbors = graph.get_MF_receivers_at_node_no_rerouting(next_node.node);
+  std::vector<int>& dons = graph.get_MF_donors_at_node(next_node.node);
+  neightbors.insert(neightbors.end(),dons.begin(),dons.end());
 
+
+  int outlet = -9999;
+  // checking all neighbors
+  for(auto node : neightbors)
+  {
+    // Check if the neighbour is a lake, if it is, I am gathering the ID and the depths
+    int lake_index = -1;
+    if(node_in_lake[node] > -1)
+      lake_index = node_in_lake[node];
+    double this_depth = 0.;
+    if(lake_index >= 0)
+      this_depth = lake_network[lake_index].get_lake_depth_at_node(node, node_in_lake);
+
+    // it gives me the elevation to be considered
+    double tested_elevation = surface_elevation[node] + this_depth;
+
+    // however if there is another lake, I am ingesting it
+    if(lake_index> -1)
+    {
+      this->ingest_other_lake(lake_network[lake_index], node_in_lake, is_in_queue);
+      continue;
+    }
+
+    // If my neighbor is not in queue and at a higher elevation: I ingest it in the system
+    if(tested_elevation >= this->water_elevation && is_in_queue[node] == false)
+    {
+      this->depressionfiller.emplace(nodium(node,tested_elevation));
+      is_in_queue[node] = true;
+      this->node_in_queue.push_back(node);
+    }
+    // Else, if not in queue and has lower elevation, then it IS an outlet
+    else if(is_in_queue[false])
+    {
+      this->outlet_node = node;
+      break;
+    }
+
+    // Moving to the next neighbour
+  }
+  // outlet is >= 0 -> tehre is an outlet
+
+  return outlet;
+}
+
+
+
+double Lake::get_lake_depth_at_node(int node, std::vector<int>& node_in_lake)
+{
+  if(node_in_lake[node] == this->lake_id)
+  {
+    return depths[node];
+  }
+  return 0.;
+}
 
 
 

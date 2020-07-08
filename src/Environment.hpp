@@ -71,21 +71,44 @@ class Lake
     Lake() {};
     // Default initialiser
     Lake(int lake_id)
-    {this->lake_id = lake_id; n_nodes = 0; surface = 0; volume = 0; water_elevation = 0; outlet_node = -9999; nodes = std::vector<int>(); depths = std::vector<double>();}
+    {this->lake_id = lake_id; n_nodes = 0; surface = 0; volume = 0; water_elevation = 0; outlet_node = -9999; nodes = std::vector<int>(); }
 
-    // This function ingests a set of new nodes in the lake
-    void ingest_nodes_in_lake(std::vector<int>& new_nodes);
     // This functions ingest a whole existing lake into the current one *slurp*
-    void ingest_other_lake(Lake& other_lake, std::vector<int>& lake_network);
-    // initialisation of a lake from an outlet pit:
-    void initial_lake_fill(
+    void ingest_other_lake(
+       Lake& other_lake,
+       std::vector<int>& node_in_lake, 
+       std::vector<bool>& is_in_queue
+    );
+
+    void pour_water_in_lake(
       double water_wolume,
       int originode,
       std::vector<int>& node_in_lake,
+      std::vector<int>& is_processed,
+      xt::pytensor<int,1>& active_nodes,
       std::vector<Lake>& lake_network,
-      xt::pytensor<double,1> surface_elevation
+      xt::pytensor<double,1> surface_elevation,
+      NodeGraphV2& graph,
+      double cellarea,
+      double dt,
+      std::vector<chonk>& chonk_network
     );
 
+    int check_neighbors_for_outlet_or_existing_lakes(
+      nodium& next_node, 
+      NodeGraphV2& graph, 
+      std::vector<int>& node_in_lake, 
+      std::vector<Lake>& lake_network,
+      xt::pytensor<double,1>& surface_elevation,
+      std::vector<bool>& is_in_queue
+    );
+
+    double get_lake_depth_at_node(int node, std::vector<int>& node_in_lake);
+    std::vector<int>& get_lake_nodes(){return nodes;}
+    std::vector<int>& get_lake_nodes_in_queue(){return node_in_queue;}
+    std::unordered_map<int,double>& get_lake_depths(){return depths;}
+    std::priority_queue< nodium, std::vector<nodium>, std::greater<nodium> >& get_lake_priority_queue(){return depressionfiller;}
+    int get_n_nodes(){return n_nodes;};
   
   protected:
     // Lake ID, i.e. the lake place in the parent environment vector of lakes
@@ -102,8 +125,10 @@ class Lake
     int outlet_node;
     // Vector of node in the lake
     std::vector<int> nodes;
+    // Vector of nodes that are or have been in the queue
+    std::vector<int> node_in_queue;
     // Vector of Depths in the lake
-    std::vector<double> depths;
+    std::unordered_map<int,double> depths;
     // The priority queue containing the nodes not in the lake yet but bordering the lake
     std::priority_queue< nodium, std::vector<nodium>, std::greater<nodium> > depressionfiller;
 

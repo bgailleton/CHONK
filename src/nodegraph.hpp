@@ -114,6 +114,8 @@ xt::pytensor<int,1>& get_MF_stack_full_adress(){return Mstack;}
 xt::pytensor<int,1> get_MF_stack_full(){return Mstack;}
 //# Returns a vector of the receivers at a certain node
 std::vector<int>& get_MF_receivers_at_node(int node){return graph[node].receivers;};
+//# Returns a vector of receivers without any rerouted pit (pits won't have any receivers)
+std::vector<int>& get_MF_receivers_at_node_no_rerouting(int node){if(is_depression(node)){std::vector<int>bagul; return bagul;} else {return graph[node].receivers;} };
 //# Returns a vector of the donors at a certain node
 std::vector<int>& get_MF_donors_at_node(int node){return graph[node].donors;};
 //# Returns a vector of the lengths to receivers at a certain node
