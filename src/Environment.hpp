@@ -104,12 +104,18 @@ class Lake
     );
 
     double get_lake_depth_at_node(int node, std::vector<int>& node_in_lake);
+    double set_lake_depth_at_node(int node, double value){depths[node] = value;};
+
+    double get_lake_volume(){return this->volume;}
+    double set_lake_volume(double value){ this->volume = value;}
+
     std::vector<int>& get_lake_nodes(){return nodes;}
     std::vector<int>& get_lake_nodes_in_queue(){return node_in_queue;}
     std::unordered_map<int,double>& get_lake_depths(){return depths;}
     std::priority_queue< nodium, std::vector<nodium>, std::greater<nodium> >& get_lake_priority_queue(){return depressionfiller;}
     int get_n_nodes(){return n_nodes;};
-  
+    int get_lake_id(){return lake_id;};
+
   protected:
     // Lake ID, i.e. the lake place in the parent environment vector of lakes
     int lake_id;

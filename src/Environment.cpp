@@ -414,22 +414,91 @@ int ModelRunner::solve_depressionv2(int node)
 }
 
 
-
+// This function processes every existing lakes and check if the new topography has an outlet for them
+// if it does , it empty what needs to be emptied at the outlet
+// whatever remains after all of this is added to each nodes separatedly which simulates mass-balance
+// POSSIBLE OPTIMISATION::Recreating lake objects, but I would need a bit of refactoring the Lake object. Will seee if this is very slow
 void ModelRunner::process_inherited_water()
 {
-  // At the moment, I cannot really be fucked, let's just ttransfer it to the receiver
-  for(size_t i = 0; i < this->io_int["n_elements"]; i++)
+  for(auto& tlake:this->lake_network)
   {
-    int this_node = int(i);
-    double this_lake_depth = this->io_double_array["lake_depth"][this_node];
-    if(this_lake_depth >0)
+    // getting node underwater
+    std::vector<int>& unodes = tlake.get_lake_nodes();
+    if(unodes.size() == 0)
+      continue;
+
+    // going through all the nodes and gathering the potenial outlets
+    // With the new topography, we can imagine a rare case whenre several breaches are opened in the lake within one timestep
+    // It is unlikely that they would happened at the same time in real life so I just decide to drain it to the steepest descent one assuming it would arrive first
+    // I have to say that this might be controversial, but also would only happen in very rare cases, even never to be fair
+    std::set<int> outlets;
+
+    xt::pytensor<double,1>& surface_elevation = this->io_double_array["surface_elevation"];
+
+    for(auto node:unodes)
     {
-      // int rec = this->io_int_array["post_rec"][this_node];
-      // int rec = this_node;
-      // this->chonk_network[rec].add_to_water_flux(this_lake_depth * this->io_double["dx"] * this->io_double["dy"]);
-      this->io_double_array["lake_depth"][this_node] = 0;
+      std::vector<int>& neightbors = graph.get_MF_receivers_at_node_no_rerouting(node);
+      std::vector<int>& dons = graph.get_MF_donors_at_node(node);
+      neightbors.insert(neightbors.end(),dons.begin(),dons.end());
+      double elenode = surface_elevation[node] + tlake.get_lake_depth_at_node(node, node_in_lake);
+      for(auto nenode:neightbors)
+      {
+        int this_lake_id = tlake.get_lake_id();
+        if(this->node_in_lake[nenode] == this_lake_id)
+          continue;
+        double this_depth = 0.;
+
+        if(this_lake_id >= 0)
+          this_depth = this->lake_network[this_lake_id].get_lake_depth_at_node(nenode, node_in_lake);
+
+        double tselev = this_depth + surface_elevation[nenode];
+        if(tselev < elenode)
+        {
+          if(outlets.find(nenode) != outlets.end())
+            continue;
+          outlets.insert(nenode);
+        }
+      }
     }
+
+    if(outlets.size() > 0)
+    {
+      double min_elev = std::numeric_limits<double>::max();
+      int toutlet = -9999;
+      for(auto node:outlets)
+      {
+        double this_elev = surface_elevation[node];
+        // if(this->node_in_lake[nenode]>=0)
+        //   this_elev += this->lake_network[this[node_in_lake[node]]].get_lake_depth_at_node(node, node_in_lake);
+        if(this_elev < min_elev)
+        {
+          toutlet = node;
+          min_elev = this_elev;
+        }
+      }
+      // Now I need to remove the water from the lake
+      double volume_to_transfer = 0;
+      for(auto node:unodes)
+      {
+        double this_elevation  = surface_elevation[node] + tlake.get_lake_depth_at_node(node, node_in_lake);
+        double delta_elevation = this_elevation - min_elev;
+        double tvolume = delta_elevation * this->io_double["dx"] * this->io_double["dy"];
+        tlake.set_lake_depth_at_node(node, min_elev);
+        volume_to_transfer += tvolume;
+      }
+
+      tlake.set_lake_volume(tlake.get_lake_volume() - volume_to_transfer);
+      this->chonk_network[toutlet].add_to_water_flux(volume_to_transfer/timestep);
+    }
+
+    // And finally refeeding the water to the rest
+    for(auto node:unodes)
+      this->chonk_network[node].add_to_water_flux( tlake.get_lake_depth_at_node(node, this->node_in_lake) * this->io_double["dx"] * this->io_double["dy"]);
+
   }
+
+  // Done with reshuffling the water
+
 }
 
 //#################################################
@@ -687,7 +756,13 @@ void Lake::pour_water_in_lake(
         throw std::runtime_error(" The lake has an outlet with no downlslope neighbors ??? This is not possible, check Lake::initial_lake_fill or warn Boris that it happened");
 
       // redirecting the water to the SS rec
-      chonk_network[SS_ID].add_to_water_flux(out_water_rate);
+      if(is_processed[SS_ID] == false)
+        chonk_network[SS_ID].add_to_water_flux(out_water_rate);
+      else
+      {
+        // My oulet is already preprocessed which means an underfilled lake lies bellow
+        std::pair<std::vector<int>, std::vector<double> > output_lakes = this->find_downstream_lakes_and_prop(SS_ID);
+      }
     }
   }
 
@@ -755,6 +830,14 @@ int Lake::check_neighbors_for_outlet_or_existing_lakes(
   return outlet;
 }
 
+std::pair<std::vector<int>, std::vector<double> >  Lake::find_downstream_lakes_and_prop(int SS_ID, NodeGraphV2& graph, int n_elements, std::vector<>)
+{
+  // Using an already processed vector to not readd
+  std::vector<bool> this_processed(n_elements,false);
+  // basically here I wneed to reprocess all nodes dowstream of that one!
+  // if processed -> 
+
+}
 
 
 double Lake::get_lake_depth_at_node(int node, std::vector<int>& node_in_lake)
@@ -765,6 +848,9 @@ double Lake::get_lake_depth_at_node(int node, std::vector<int>& node_in_lake)
   }
   return 0.;
 }
+
+
+
 
 
 
