@@ -115,7 +115,7 @@ xt::pytensor<int,1> get_MF_stack_full(){return Mstack;}
 //# Returns a vector of the receivers at a certain node
 std::vector<int>& get_MF_receivers_at_node(int node){return graph[node].receivers;};
 //# Returns a vector of receivers without any rerouted pit (pits won't have any receivers)
-std::vector<int>& get_MF_receivers_at_node_no_rerouting(int node){if(is_depression(node)){std::vector<int>bagul; return bagul;} else {return graph[node].receivers;} };
+std::vector<int>& get_MF_receivers_at_node_no_rerouting(int node){if(is_depression(node)){return empty_vector;} else {return graph[node].receivers;} };
 //# Returns a vector of the donors at a certain node
 std::vector<int>& get_MF_donors_at_node(int node){return graph[node].donors;};
 //# Returns a vector of the lengths to receivers at a certain node
@@ -128,6 +128,8 @@ bool is_depression(int i){return pits_to_reroute[i];}
 void update_receivers_at_node(int node, std::vector<int>& new_receivers);
 //# Update the donors at a node
 void update_donors_at_node(int node, std::vector<int>& new_donors);
+
+std::vector<int> get_broken_nodes(){return not_in_stack;}
 
 
 protected:
@@ -149,11 +151,15 @@ protected:
   // The topological order of from top to bottom
   xt::pytensor<int,1> Mstack;
 
+  std::vector<int> not_in_stack;
+
+  std::vector<int> empty_vector;
+
 };
 
 
 // Topological order algorithm for multiple receivers adapted from FORTRAN
 // Original author: Jean Braun
-std::vector<int> multiple_stack_fastscape(int n_element, std::vector<Vertex>& graph);
+std::vector<int> multiple_stack_fastscape(int n_element, std::vector<Vertex>& graph, std::vector<int>& not_in_stack);
 
 #endif

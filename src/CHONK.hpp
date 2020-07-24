@@ -40,7 +40,8 @@ class chonk
 
     // Merge function(s)
     void split_and_merge_in_receiving_chonks(std::vector<chonk>& chonkscape, NodeGraphV2& graph, xt::pytensor<double,1>& surface_elevation_tp1, xt::pytensor<double,1>& sed_height_tp1, double dt);
-
+    void split_and_merge_in_receiving_chonks(std::vector<chonk>& chonkscape, NodeGraphV2& graph, double dt);
+    void split_and_merge_in_receiving_chonks_ignore_some(std::vector<chonk>& chonkscape, NodeGraphV2& graph, double dt, std::vector<int>& to_ignore);
     // move and split functions
     void move_to_steepest_descent(NodeGraphV2& graph, double dt, xt::pytensor<double,1>& sed_height, xt::pytensor<double,1>& sed_height_tp1, 
   xt::pytensor<double,1>& surface_elevation, xt::pytensor<double,1>& surface_elevation_tp1, double Xres, double Yres, std::vector<chonk>& chonk_network);
@@ -87,7 +88,10 @@ class chonk
     //# other attribute
     void set_other_attribute(std::string key, double val){other_attributes[key] = val;}
     double get_other_attribute(std::string key){return other_attributes[key];}
-
+    // receivers
+    std::vector<int>& get_chonk_receivers(){return receivers;}
+    // water weights
+    std::vector<double>& get_chonk_water_weight(){return weigth_water_fluxes;}
 
 
     // Depression solver!
@@ -95,7 +99,8 @@ class chonk
   xt::pytensor<double,1>& surface_elevation,xt::pytensor<double,1>& surface_elevation_tp1, double Xres, double Yres, std::vector<chonk>& chonk_network);
     // Sub-depression tree builder
     void recursion_builder_subdepression_tree(std::set<int>& set_of_depressions, int current_pit_ID, NodeGraphV2& graph);
-
+    // reinitialise moving preparation by clearing all vectors of move
+    void reinitialise_moving_prep(){receivers.clear();weigth_water_fluxes.clear();weigth_sediment_fluxes.clear();slope_to_rec.clear();return;}
 
 
   protected:

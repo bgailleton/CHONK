@@ -119,7 +119,7 @@ bool dfs(Vertex& vertex, // The investigated vertex
     return true;
 }
 
-// SEcond version of the depth first algorithm where the original set of nodes is fixed, eg full topological sorting
+// Second version of the depth first algorithm where the original set of nodes is fixed, eg full topological sorting
 bool dfs(Vertex& vertex,
  std::vector<Vertex>& stack,
  std::vector<Vertex>& graph,
@@ -428,7 +428,7 @@ NodeGraphV2::NodeGraphV2(
   }
 
   // I am now ready to create my topological order utilising a c++ port of the fortran algorithm from Jean Braun
-  Mstack = xt::adapt(multiple_stack_fastscape( n_element, graph));
+  Mstack = xt::adapt(multiple_stack_fastscape( n_element, graph, this->not_in_stack));
 
   // I got my topological order, I can now restore the corrupted receiver I had
   for(size_t i=0; i<node_to_check.size(); i++)
@@ -515,7 +515,7 @@ void NodeGraphV2::update_donors_at_node(int node, std::vector<int>& new_donors)
 }
 
 
-std::vector<int> multiple_stack_fastscape(int n_element, std::vector<Vertex>& graph)
+std::vector<int> multiple_stack_fastscape(int n_element, std::vector<Vertex>& graph, std::vector<int>& not_in_stack)
 {
 
   std::vector<int>ndon(n_element,0);
@@ -527,7 +527,7 @@ std::vector<int> multiple_stack_fastscape(int n_element, std::vector<Vertex>& gr
     }
   }
 
-  std::vector<int> vis(n_element,0), parse(n_element,-1), stack(n_element,0);
+  std::vector<int> vis(n_element,0), parse(n_element,-1), stack(n_element,-9999);
   
   int nparse = -1;
   int nstack = -1;
@@ -567,8 +567,27 @@ std::vector<int> multiple_stack_fastscape(int n_element, std::vector<Vertex>& gr
   }
   if(nstack < n_element - 1 )
   {
-    std::cout << "WARNING::STACK UNDERPOPULATED::" << nstack << std::endl;;
-    throw std::runtime_error("stack underpopulated somehow:");
+    std::cout << "WARNING::STACK UNDERPOPULATED::" << nstack << "/" << stack.size() << std::endl;
+    std::cout << "Investigating ..." << std::endl;
+    std::vector<bool> is_in_stack(stack.size(),false);
+    for(auto& node: stack)
+    {
+      if(node >=0)
+        is_in_stack[node] = true;
+      else
+        node = 0;
+    }
+    std::cout << "identifying the ghost nodes ..." << std::endl;
+    for(int i=0; i< int(is_in_stack.size()); i++)
+    {
+      if(is_in_stack[i] == false)
+        not_in_stack.push_back(i);
+    }
+    std::cout << "Got them! you can access the ghost nodes with model.get_broken_nodes()" << std::endl;
+    std::cout << "Important: If this happens at the start of the model with a random surface for few timesteps this is not critical." << std::endl;
+    std::cout << "If it happens in the middle of a run with a mature mountain this is a problem." << std::endl;
+
+    // throw std::runtime_error("stack underpopulated somehow:");
   }
 
   return stack;

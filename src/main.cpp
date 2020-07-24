@@ -74,6 +74,8 @@ PYBIND11_MODULE(CHONK_cpp, m)
       .def("update_timestep", &ModelRunner::update_timestep)
       .def("DEBUG_check_weird_val_stacks", &ModelRunner::DEBUG_check_weird_val_stacks)
       .def("DEBUG_get_receivers_at_node", &ModelRunner::DEBUG_get_receivers_at_node)
+      .def("set_lake_switch", &ModelRunner::set_lake_switch)
+      .def("get_broken_nodes", &ModelRunner::get_broken_nodes)
 
     ;
     m.def("pop_elevation_to_SS_SF_SPIL", pop_elevation_to_SS_SF_SPIL);

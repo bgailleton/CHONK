@@ -97,6 +97,12 @@ void chonk::reset()
 
 void chonk::split_and_merge_in_receiving_chonks(std::vector<chonk>& chonkscape, NodeGraphV2& graph, xt::pytensor<double,1>& surface_elevation_tp1, xt::pytensor<double,1>& sed_height_tp1, double dt)
 {
+  // KEEPING FOR LEGACY COMPATIBILITY
+  this->split_and_merge_in_receiving_chonks(chonkscape, graph,  dt);
+}
+
+void chonk::split_and_merge_in_receiving_chonks(std::vector<chonk>& chonkscape, NodeGraphV2& graph, double dt)
+{
   // Iterating through the receivers
   for(size_t i=0; i < this->receivers.size(); i++)
   {
@@ -105,20 +111,34 @@ void chonk::split_and_merge_in_receiving_chonks(std::vector<chonk>& chonkscape, 
     // Adding the fluxes*modifyer
     other_chonk.add_to_water_flux(this->water_flux * this->weigth_water_fluxes[i]);
     other_chonk.add_to_sediment_flux(this->sediment_flux * this->weigth_sediment_fluxes[i]);
-    // if(chonkID == 2214)
-    // {
-    //   std::cout << this->receivers[i] <<"::HYLIA::" << this->water_flux * this->weigth_water_fluxes[i] << "||" << this->water_flux << "||" << this->weigth_water_fluxes[i] << std::endl;
-    // }
-
   }
-
-  // // finaliseing the chonk at the end of its duty
-  // this->finalise(graph, surface_elevation_tp1, sed_height_tp1,dt);
 
   // and kill this chonk is memory saving is activated
   if(memory_saver)
     this->reset();
 }
+
+void chonk::split_and_merge_in_receiving_chonks_ignore_some(std::vector<chonk>& chonkscape, NodeGraphV2& graph, double dt, std::vector<int>& to_ignore)
+{
+  // Iterating through the receivers
+  for(size_t i=0; i < this->receivers.size(); i++)
+  {
+    // if this is in the ignoring list then
+    if(std::find(to_ignore.begin(), to_ignore.end(), this->receivers[i])!= to_ignore.end())
+      continue;
+    // Adressing the chonk
+    chonk& other_chonk = chonkscape[this->receivers[i]];
+    // Adding the fluxes*modifyer
+    other_chonk.add_to_water_flux(this->water_flux * this->weigth_water_fluxes[i]);
+    other_chonk.add_to_sediment_flux(this->sediment_flux * this->weigth_sediment_fluxes[i]);
+  }
+
+  // and kill this chonk is memory saving is activated
+  if(memory_saver)
+    this->reset();
+
+}
+
 
 
 
@@ -344,9 +364,7 @@ void chonk::move_MF_from_fastscapelib(NodeGraphV2& graph, xt::pytensor<double,2>
 void chonk::move_MF_from_fastscapelib_threshold_SF(NodeGraphV2& graph, double threshold_Q, double dt, xt::pytensor<double,1>& sed_height, xt::pytensor<double,1>& sed_height_tp1, 
   xt::pytensor<double,1>& surface_elevation, xt::pytensor<double,1>& surface_elevation_tp1, double Xres, double Yres, std::vector<chonk>& chonk_network)
 { 
-  // std::cout << "1.1" << std::endl;
-  if(current_node == 2074)
-    std::cout << "Burf" << std::endl;
+
 
   // I need the receicing neighbours and the distance to them
   std::vector<int> these_neighbors = graph.get_MF_receivers_at_node(this->current_node);
@@ -354,8 +372,7 @@ void chonk::move_MF_from_fastscapelib_threshold_SF(NodeGraphV2& graph, double th
   // std::cout << "1.2" << std::endl;
   if(these_neighbors.size() == 0)
     return;
-  if(current_node == 2074)
-    std::cout << "Babadook" << std::endl;
+
 
   std::vector<double> waterweigths(these_neighbors.size());
   std::vector<double> powerslope(these_neighbors.size());
@@ -470,13 +487,7 @@ void chonk::move_MF_from_fastscapelib_threshold_SF(NodeGraphV2& graph, double th
 
     // Mover to the next step
   }
-  if(current_node == 2074)
-  {
-    for(auto trec:receivers)
-    {
-      std::cout << "burfulb::" << trec << std::endl;
-    }
-  }
+
 
 }
 

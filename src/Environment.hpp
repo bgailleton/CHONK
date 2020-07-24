@@ -71,7 +71,7 @@ class Lake
     Lake() {};
     // Default initialiser
     Lake(int lake_id)
-    {this->lake_id = lake_id; n_nodes = 0; surface = 0; volume = 0; water_elevation = 0; outlet_node = -9999; nodes = std::vector<int>(); }
+    {this->lake_id = lake_id; n_nodes = 0; surface = 0; volume = 0; water_elevation = 0; outlet_node = -9999; nodes = std::vector<int>(); has_been_ingeted = -9999; }
 
     // This functions ingest a whole existing lake into the current one *slurp*
     void ingest_other_lake(
@@ -84,10 +84,10 @@ class Lake
       double water_wolume,
       int originode,
       std::vector<int>& node_in_lake,
-      std::vector<int>& is_processed,
+      std::vector<bool>& is_processed,
       xt::pytensor<int,1>& active_nodes,
       std::vector<Lake>& lake_network,
-      xt::pytensor<double,1> surface_elevation,
+      xt::pytensor<double,1>& surface_elevation,
       NodeGraphV2& graph,
       double cellarea,
       double dt,
@@ -115,6 +115,10 @@ class Lake
     std::priority_queue< nodium, std::vector<nodium>, std::greater<nodium> >& get_lake_priority_queue(){return depressionfiller;}
     int get_n_nodes(){return n_nodes;};
     int get_lake_id(){return lake_id;};
+    int get_parent_lake(){return has_been_ingeted;}
+    int set_parent_lake(int value){has_been_ingeted = value;}
+    int get_lake_outlet(){return this->outlet_node;}
+
 
   protected:
     // Lake ID, i.e. the lake place in the parent environment vector of lakes
@@ -129,6 +133,8 @@ class Lake
     double water_elevation;
     // The node outletting the lake
     int outlet_node;
+    // the index of the lake which ate this one
+    int has_been_ingeted;
     // Vector of node in the lake
     std::vector<int> nodes;
     // Vector of nodes that are or have been in the queue
@@ -189,7 +195,7 @@ class ModelRunner
     void finalise();
 
 
-
+    void find_underfilled_lakes_already_processed_and_give_water(int SS_ID, std::vector<bool>& is_processed );
 
 
 
@@ -211,7 +217,10 @@ class ModelRunner
 
     void DEBUG_check_weird_val_stacks();
     
+    std::vector<std::string>& get_ordered_flux_method(){return ordered_flux_methods;}; 
 
+    void set_lake_switch(bool value){lake_solver = value;}
+    std::vector<int> get_broken_nodes(){return graph.get_broken_nodes();}
 
   protected:
 
@@ -219,6 +228,9 @@ class ModelRunner
     double timestep;
     double start_time;
     double current_time;
+
+    // lake switch
+    bool lake_solver;
 
 
     // All the methods affecting the fluxes in the right order you want to apply it 
