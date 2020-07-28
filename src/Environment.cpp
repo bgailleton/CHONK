@@ -40,6 +40,7 @@
 #include <boost/timer/timer.hpp>
 
 
+
 // Managing the comparison operators for the fill node, to let the queue know I wanna compare it by elevation values
 // lhs/rhs : left hand side, right hand side
 bool operator>( const nodium& lhs, const nodium& rhs )
@@ -123,9 +124,9 @@ this->io_int["n_rows"], this->io_int["n_cols"]);
 
   // This add previous inherited water from previous lakes
   // Note that it "empties" the lake and reinitialise the depth. If there is still a reason to for the lake, it will form it
-  std::cout << "wat" << std::endl;
+  // std::cout << "wat" << std::endl;
   this->process_inherited_water();
-  std::cout << "er" << std::endl;
+  // std::cout << "er" << std::endl;
 
   // Also initialising the Lake graph
   //# no lakes so far
@@ -150,7 +151,6 @@ void ModelRunner::run()
   xt::pytensor<int,1>& inctive_nodes = this->io_int_array["active_nodes"];
   xt::pytensor<double,1>&surface_elevation =  this->io_double_array["surface_elevation"];
   double cellarea = this->io_double["dx"] * this->io_double["dy"];
-  std::cout << "0" << std::endl;
   for(int i=0; i<io_int["n_elements"]; i++)
   {
 
@@ -167,30 +167,23 @@ void ModelRunner::run()
     {
       if(this->graph.is_depression(node))
       {
-        std::cout << "3" << std::endl;
         this->lake_network.push_back(Lake(lake_incrementor));
-        std::cout << "3.1" << std::endl;
 
         double water_volume = this->chonk_network[node].get_water_flux() * timestep;
-        std::cout << "3.2" << std::endl;
 
         this->lake_network[lake_incrementor].pour_water_in_lake(water_volume,node, 
         node_in_lake, is_processed, inctive_nodes,lake_network, surface_elevation,graph, cellarea, timestep,chonk_network);
-        std::cout << "3.3" << std::endl;
         
         int outlet = this->lake_network[lake_incrementor].get_lake_outlet();
-        std::cout << "3.3.0" << std::endl;
 
         if(outlet >=0)
         {
           if(is_processed[outlet])
           {
-            std::cout << "3.3.1" << std::endl;
             this->find_underfilled_lakes_already_processed_and_give_water(outlet, is_processed);
           }
         }
         // check outlet and call it
-        std::cout << "3.4" << std::endl;
 
         lake_incrementor++;
 
@@ -684,24 +677,24 @@ void Lake::ingest_other_lake(
   std::vector<int>& these_node_in_queue = other_lake.get_lake_nodes_in_queue();
   std::unordered_map<int,double>& these_depths = other_lake.get_lake_depths();
   std::priority_queue< nodium, std::vector<nodium>, std::greater<nodium> >& this_PQ = other_lake.get_lake_priority_queue();
-  std::cout << "Yum1" << std::endl;
+  // std::cout << "Yum1" << std::endl;
   // merging them into this lake while node forgetting to label them as visited and everything like that
   for(auto node:these_nodes)
   {
     this->nodes.push_back(node);
     node_in_lake[node] = this->lake_id;
   }
-  std::cout << "Yum2" << std::endl;
+  // std::cout << "Yum2" << std::endl;
 
   for(auto node:these_node_in_queue)
   {
     this->node_in_queue.push_back(node);
     is_in_queue[node] = true;
   }
-  std::cout << "Yum3" << std::endl;
+  // std::cout << "Yum3" << std::endl;
 
   this->depths.insert(these_depths.begin(), these_depths.end());
-  std::cout << "Yum4" << std::endl;
+  // std::cout << "Yum4" << std::endl;
   std::cout << this->get_lake_id() << std::endl;
   std::cout << other_lake.get_lake_id() << std::endl;
 
@@ -719,13 +712,13 @@ void Lake::ingest_other_lake(
 
   // Deleting this lake and setting its parent lake
   int save_ID = other_lake.get_lake_id();
-  std::cout << "Yum4.1" << std::endl;
+  // std::cout << "Yum4.1" << std::endl;
   Lake temp = Lake(save_ID);
-  std::cout << "Yum4.2" << std::endl;
+  // std::cout << "Yum4.2" << std::endl;
   other_lake = temp;
-  std::cout << "Yum4.5" << std::endl;
+  // std::cout << "Yum4.5" << std::endl;
   other_lake.set_parent_lake(this->lake_id);
-  std::cout << "Yum5" << std::endl;
+  // std::cout << "Yum5" << std::endl;
 
   return;
 }
@@ -808,7 +801,6 @@ void Lake::pour_water_in_lake(
 
     // At this point I either have enough water to carry on or I stop the process
   }
-  std::cout << "1" << std::endl;
 
   // Labelling the node in depression as belonging to this lake and saving their depth
   for(auto Unot:nodes)
@@ -816,17 +808,14 @@ void Lake::pour_water_in_lake(
     this->depths[Unot] = this->water_elevation - surface_elevation[Unot];
     node_in_lake[Unot] = this->lake_id;
   }
-  std::cout << "2" << std::endl;
 
 
   // Transmitting the water flux to the SS receiver not in the lake
   if(water_volume > 0 && this->outlet_node >= 0)
   {
-    std::cout << "2.1" << std::endl;
     // If the node is inactive, ie if its code is 0, the fluxes can escape the system and we stop it here
     if(active_nodes[this->outlet_node] > 0)
     {
-      std::cout << "2.1.1" << std::endl;
       // Otherwise: calculating the outflux: water_volume_remaining divided by the time step
       double out_water_rate = water_volume/dt;
       // Getting all the receivers and the length to the oulet
@@ -835,7 +824,6 @@ void Lake::pour_water_in_lake(
       // And finding the steepest slope 
       int SS_ID = -9999; 
       double SS = -9999; // hmmmm I may need to change this name
-      std::cout << "2.1.2" << std::endl;
       for(size_t i=0; i<receivers.size(); i++)
       {
         std::cout << "All need to be positive:" << this->outlet_node << "||" << receivers[i]  << "||" << receivers.size() << std::endl;
@@ -847,7 +835,6 @@ void Lake::pour_water_in_lake(
           SS_ID = receivers[i];
         }
       }
-      std::cout << "2.1.3" << std::endl;
 
       // temporary check, I shall delete it when I'll be sure of it
       if(SS_ID<0)
@@ -862,10 +849,8 @@ void Lake::pour_water_in_lake(
       this->outlet_node = SS_ID;
 
     }
-    std::cout << "2.2" << std::endl;
 
   }
-  std::cout << "3" << std::endl;
 
 
   return;

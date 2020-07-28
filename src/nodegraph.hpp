@@ -31,6 +31,7 @@
 // #include "fastscapelib/union_find.hpp"
 // #include "fastscapelib/utils.hpp"
 
+void set_DEBUG_switch_nodegraph(std::vector<std::string> params, std::vector<bool> values );
 
 
 // Vertx class: A class that manage one vertex: a node, its ID, receivers, length, donors, ...
@@ -129,8 +130,19 @@ void update_receivers_at_node(int node, std::vector<int>& new_receivers);
 //# Update the donors at a node
 void update_donors_at_node(int node, std::vector<int>& new_donors);
 
+void compute_receveivers_and_donors(xt::pytensor<bool,1>& active_nodes, xt::pytensor<double,1>& elevation);
+
+
 std::vector<int> get_broken_nodes(){return not_in_stack;}
 
+void fix_cyclicity(
+  std::vector<int>& node_to_check,
+  xt::pytensor<int,1>& Sstack,
+  xt::pytensor<int,1>& Srec,
+  xt::pytensor<int,1>& Prec,
+  xt::pytensor<int,2>& Mrec,
+  int correction_level
+  );
 
 protected:
 
@@ -138,6 +150,8 @@ protected:
   std::vector<Vertex> graph;
   // Integer number of elements
   int n_element;
+  int nrows;
+  int ncols;
   // Unsigned integer of number of element
   size_t un_element;
   // (deprecated?) cell area
@@ -160,6 +174,6 @@ protected:
 
 // Topological order algorithm for multiple receivers adapted from FORTRAN
 // Original author: Jean Braun
-std::vector<int> multiple_stack_fastscape(int n_element, std::vector<Vertex>& graph, std::vector<int>& not_in_stack);
+std::vector<int> multiple_stack_fastscape(int n_element, std::vector<Vertex>& graph, std::vector<int>& not_in_stack, bool& has_failed);
 
 #endif

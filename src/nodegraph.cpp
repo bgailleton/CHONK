@@ -31,6 +31,24 @@
 #include <chrono>
 
 
+
+bool SAFE_STACK_STOPPER = false;
+bool EXTENSIVE_STACK_INFO = false;
+
+void set_DEBUG_switch_nodegraph(std::vector<std::string> params, std::vector<bool> values )
+{
+  for(size_t i=0; i<params.size();i++)
+  {
+    std::string param = params[i];
+    bool value = values[i];
+    std::cout << "Setting " << param << " to " << value << std::endl;
+    if(param == "SAFE_STACK_STOPPER")
+      SAFE_STACK_STOPPER = value;
+    else if (param == "EXTENSIVE_STACK_INFO")
+      EXTENSIVE_STACK_INFO = value;
+  }
+}
+
 // Set of functions managing graph traversal and topological sorts, lightweight and customisable
 
 
@@ -301,6 +319,8 @@ NodeGraphV2::NodeGraphV2(
   this->cellarea = dx * dy;
   this-> n_element = Sstack.size();
   this-> un_element = Sstack.size();
+  this->nrows = nrows;
+  this->ncols = ncols;
 
   // Initialising the vector of pit to reroute. The pits to reroute are all the local minima that are rerouted to another basin/edge
   // It does not include non active nodes (i.e. base level of the model/output of the model)
@@ -428,7 +448,22 @@ NodeGraphV2::NodeGraphV2(
   }
 
   // I am now ready to create my topological order utilising a c++ port of the fortran algorithm from Jean Braun
-  Mstack = xt::adapt(multiple_stack_fastscape( n_element, graph, this->not_in_stack));
+  bool has_failed = false;
+  Mstack = xt::adapt(multiple_stack_fastscape( n_element, graph, this->not_in_stack, has_failed));
+  // int correction_level = 2;
+  // while(has_failed)
+  // {
+  //   std::cout << "Fast stack calculation has failed, correcting it, this slows down the model, if significantly remind me to sort this problem" << std::endl;
+  //   this->fix_cyclicity(node_to_check, Sstack, Srec,Prec,Mrec, correction_level);
+  //   has_failed = false;
+  //   std::cout << this->not_in_stack.size() << " nodes not in stack before" << std::endl;
+  //   this->not_in_stack ={};
+  //   Mstack = xt::adapt(multiple_stack_fastscape( n_element, graph, this->not_in_stack, has_failed));
+  //   std::cout << this->not_in_stack.size() << " nodes not in stack after" << std::endl;
+  //   correction_level ++;
+  //   // if(has_failed)
+  //   //   throw std::runtime_error("Stack failed second iteration, critical error");
+  // }
 
   // I got my topological order, I can now restore the corrupted receiver I had
   for(size_t i=0; i<node_to_check.size(); i++)
@@ -455,6 +490,115 @@ NodeGraphV2::NodeGraphV2(
 
 
   return;
+}
+
+
+void NodeGraphV2::fix_cyclicity(
+  std::vector<int>& node_to_check,
+  xt::pytensor<int,1>& Sstack,
+  xt::pytensor<int,1>& Srec,
+  xt::pytensor<int,1>& Prec,
+  xt::pytensor<int,2>& Mrec,
+  int correction_level
+
+
+  )
+{
+  std::vector<bool> is_not_in_stack(this->un_element,false);
+  for(auto& node:this->not_in_stack)
+    is_not_in_stack[node] = true;
+
+  std::vector<int> nodes_to_double_check;
+
+   // TRY 1: failed
+  // for(auto& node:node_to_check)
+  // {
+  //   if(is_not_in_stack[node])
+  //     nodes_to_double_check.push_back(node);
+
+  // }
+  // std::cout << "Potential problem on nodes::";
+  // for (auto node: nodes_to_double_check)
+  //   std::cout << node << "||";
+  // std::cout << std::endl;
+  // std::cout << " I am on it ..." << std::endl;
+
+  // std::vector<int> index_in_oStack(this->un_element);
+  // for(size_t i =0; i< Sstack.size();i++)
+  //   index_in_oStack[Sstack[i]] = int(i);
+
+  // for(auto& node: nodes_to_double_check)
+  // {
+  //   std::vector<int> old_rec = this->graph[node].receivers;
+  //   int min_rec = std::numeric_limits<int>::min();
+  //   int tid_stack = std::numeric_limits<int>::min();
+  //   for(auto rec:old_rec)
+  //   {
+  //     if(index_in_oStack[rec]>tid_stack)
+  //     {
+  //       tid_stack = index_in_oStack[rec];
+  //       min_rec = rec;
+  //     }
+  //   }
+  //   if(old_rec.size()>0)
+  //     this->graph[node].receivers = {min_rec};
+  // }
+
+  // TRY 2:
+  // Label the basins and identify the pits in the nodes to correct
+  std::cout << "1" << std::endl;
+  std::vector<int> baslab(this->un_element);
+  int tlabel = Sstack[0];
+  for(size_t i=0; i< this->un_element; i++)
+  {
+    if(Sstack[i] == Srec[Sstack[i]])
+    {
+      tlabel = Sstack[i];
+      nodes_to_double_check.push_back(Sstack[i]);
+
+    }
+    baslab[Sstack[i]] = tlabel;
+  }
+  std::cout << "2" << std::endl;
+
+  for(auto node:nodes_to_double_check)
+  {
+    int new_rec = node;
+    // std::cout << "2::" << new_rec << std::endl;
+
+    for(int i=1;i<=correction_level;i++)
+    {
+      new_rec = Prec[new_rec];
+      if(i<correction_level)
+      {
+        std::vector<int> gurg;
+        for(size_t j =0 ; j<8;j++)
+        {
+          if(Mrec(new_rec,j)>=0)
+            gurg.push_back(Mrec(new_rec,j));
+        }
+        this->graph[new_rec].receivers = gurg;
+      }
+      else
+      {
+        int target_basin = baslab[target_basin];
+        std::vector<int> gurg;
+        for(auto rec:this->graph[new_rec].receivers)
+        {
+          if(baslab[rec] == target_basin)
+            gurg.push_back(rec);
+        }
+        this->graph[new_rec].receivers = gurg;
+        this->graph[node].receivers = {new_rec};
+      }
+    }
+
+  }
+
+
+  //identify the pits 
+
+  std::cout << "I tried something, it should work." << std::endl;
 }
 
 // This function correct the multiple flow receivers and donrs which end up with some duplicates probably linked to my homemade corrections.
@@ -502,6 +646,52 @@ void NodeGraphV2::initial_correction_of_MF_receivers_and_donors(xt::pytensor<int
   }
 }
 
+//Homemade_calculation of receivers and donors
+void NodeGraphV2::compute_receveivers_and_donors(xt::pytensor<bool,1>& active_nodes, xt::pytensor<double,1>& elevation)
+{
+
+  // these vectors are additioned to the node indice to test the neighbors
+  std::vector<std::vector<int> > neighbors;
+  neighbors.push_back({-ncols - 1, - ncols, - ncols + 1, -1,1,ncols - 1, ncols, ncols + 1 }); // internal node 0
+  neighbors.push_back({(nrows - 1) * ncols - 1, (nrows - 1) * ncols, (nrows - 1) * ncols + 1, -1,1,ncols - 1, ncols, ncols + 1 });// periodic_first_row 1
+  neighbors.push_back({-ncols - 1, - ncols, - ncols + 1, -1,1,- (nrows - 1) * ncols - 1, - (nrows - 1) * ncols, - (nrows - 1) * ncols + 1 });// periodic_last_row 2
+  neighbors.push_back({- 1, - ncols, - ncols + 1, (ncols - 1),1, 2 * ncols - 1, ncols, ncols + 1 });// periodic_first_col 3
+  neighbors.push_back({-ncols - 1, - ncols, - 2 * ncols + 1, -1,-(ncols -1), ncols - 1, ncols,  1 }); //periodic last_col 4
+
+  for(int i =0; i< active_nodes.size(); i++)
+  {
+    if(active_nodes[i] == false)
+      continue;
+    std::vector<int> receivers,donors;
+    int checker;
+    if(i<ncols)
+      checker = 1;
+    else if (i >= this->n_element - ncols)
+      checker = 2;
+    else if(i % ncols == 0 || i == 0)
+      checker = 3;
+    else if(i % (ncols - 1))
+      checker = 4;
+    else
+      checker = 0;
+
+    double this_elev = elevation[i];
+    double test_elev;
+    for(auto& node:neighbors[checker])
+    {
+      test_elev = elevation[node];
+      if(test_elev<this_elev)
+        receivers.push_back(node);
+      else if(test_elev>this_elev)
+        donors.push_back(node);
+    }
+    this->graph[i].receivers = receivers;
+    this->graph[i].donors = donors;
+  }
+
+
+}
+
 void NodeGraphV2::update_receivers_at_node(int node, std::vector<int>& new_receivers)
 {
   if(is_depression(node) == false)
@@ -515,7 +705,7 @@ void NodeGraphV2::update_donors_at_node(int node, std::vector<int>& new_donors)
 }
 
 
-std::vector<int> multiple_stack_fastscape(int n_element, std::vector<Vertex>& graph, std::vector<int>& not_in_stack)
+std::vector<int> multiple_stack_fastscape(int n_element, std::vector<Vertex>& graph, std::vector<int>& not_in_stack, bool& has_failed)
 {
 
   std::vector<int>ndon(n_element,0);
@@ -567,6 +757,7 @@ std::vector<int> multiple_stack_fastscape(int n_element, std::vector<Vertex>& gr
   }
   if(nstack < n_element - 1 )
   {
+    has_failed = true;
     std::cout << "WARNING::STACK UNDERPOPULATED::" << nstack << "/" << stack.size() << std::endl;
     std::cout << "Investigating ..." << std::endl;
     std::vector<bool> is_in_stack(stack.size(),false);
@@ -584,11 +775,97 @@ std::vector<int> multiple_stack_fastscape(int n_element, std::vector<Vertex>& gr
         not_in_stack.push_back(i);
     }
     std::cout << "Got them! you can access the ghost nodes with model.get_broken_nodes()" << std::endl;
-    std::cout << "Important: If this happens at the start of the model with a random surface for few timesteps this is not critical." << std::endl;
-    std::cout << "If it happens in the middle of a run with a mature mountain this is a problem." << std::endl;
+    if(EXTENSIVE_STACK_INFO == false)
+    {
+      std::cout << "Important: If this happens at the start of the model with a random surface for few timesteps this is not critical." << std::endl;
+      std::cout << "If it happens in the middle of a run with a mature mountain this is a problem." << std::endl;
+      std::cout << "You can activate the SAFE_STACK_STOPPER switch to automatically stop if this happens," << std::endl;
+      std::cout << "You can activate the EXTENSIVE_STACK_INFO switch to get extensive debugging report, be aware that it might involve (time-)expensive calculations" << std::endl;
+    }
+    else
+    {
+      // get index_in_stack
+      std::vector<int> index_in_stack(stack.size());
+      int incrid = 0;
+      for(auto node:stack)
+      {
+        if(node >= 0 )
+        index_in_stack[node] = incrid;
+        incrid++;
+      }
 
-    // throw std::runtime_error("stack underpopulated somehow:");
+      // Find isolated nodes
+      std::vector<int> isolated_nodes;
+      std::vector<int> min_donor;
+      std::vector<int> score;
+      for(auto node:not_in_stack)
+      {
+        int min_ID = std::numeric_limits<int>::max();
+        int min_score = std::numeric_limits<int>::max();
+        bool found = false;
+        for(auto tnode:graph[node].donors)
+        {
+
+          if(is_in_stack[tnode])
+          {
+            if(index_in_stack[tnode]<min_score)
+            {
+              min_score = index_in_stack[tnode];
+              min_ID = tnode;
+              found = true;
+            }
+          }
+        }
+        if(found)
+        {
+          isolated_nodes.push_back(node);
+          min_donor.push_back(min_ID);
+          score.push_back(min_score);
+        }
+
+      }
+
+      std::cout << " isolated Nodes connected to donors in stack: ID|DONORS|ID_IN_STACK" << std::endl;
+      for(size_t i=0;i<isolated_nodes.size();i++)
+      {
+        std::cout << isolated_nodes[i] << "|" << min_donor[i] << "|" << score[i] << std::endl;
+      }
+
+      std::cout << "Now checking for cyclicity ..." << std::endl;
+
+      for(int i =0; i< int(stack.size()); i++)
+      {
+        std::vector<bool> inqueue(stack.size(),false);
+        std::queue<int> Q;
+        Q.push(i);
+        inqueue[i] = true;
+        while(Q.empty() == false)
+        {
+          int nnode = Q.front();
+          Q.pop();
+          for(auto node:graph[nnode].receivers)
+          {
+            if(node == i)
+              std::cout << "CYCLICITY DECTEDTED:" << i << ":->...->" << nnode << ":-->" << i << ", is node in stack? " << std::to_string(is_in_stack[i]) << std::endl;
+
+            if(inqueue[node])
+              continue;
+            inqueue[node] = true;
+            Q.push(node);
+          }
+        }
+      }
+
+
+    }
+
+
+
+
+    if(SAFE_STACK_STOPPER)
+      throw std::runtime_error("stack underpopulated, SAFE_STACK_STOPPER triggered (CHONK.set_DEBUG_switch_nodegraph(['SAFE_STACK_STOPPER'],false) to deactivate).");
   }
+  std::cout << "BUTE::" << SAFE_STACK_STOPPER << std::endl;
 
   return stack;
 }

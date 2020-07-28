@@ -78,6 +78,7 @@ PYBIND11_MODULE(CHONK_cpp, m)
       .def("get_broken_nodes", &ModelRunner::get_broken_nodes)
 
     ;
+    m.def("set_DEBUG_switch_nodegraph",set_DEBUG_switch_nodegraph);
     m.def("pop_elevation_to_SS_SF_SPIL", pop_elevation_to_SS_SF_SPIL);
 
     py::class_<NodeGraphV2>(m, "NodeGraph",py::dynamic_attr())
