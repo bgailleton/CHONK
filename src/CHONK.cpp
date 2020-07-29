@@ -432,7 +432,7 @@ void chonk::move_MF_from_fastscapelib_threshold_SF(NodeGraphV2& graph, double th
 
     // getting the slope, dz/dx
     double this_slope = 0;
-    std::cout << these_lengths.size() << std::endl;
+    // std::cout << these_lengths.size() << std::endl;
     if((these_lengths[i] >= Xres) || (these_lengths[i] >= Yres))
       this_slope = (surface_elevation[this->current_node] - surface_elevation[this_neightbor]) / these_lengths[i];
     else

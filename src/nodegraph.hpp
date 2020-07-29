@@ -59,7 +59,9 @@ public:
   // bool visiting; // bool for DFS
   // bool visited; // bool for DFS
   std::vector<int> donors; // list of child nodes in teh donor direction
+  std::vector<int> Sdonors; // list of child nodes in teh donor direction
   std::vector<int> receivers; // list of child nodes in the receivers direction
+  int Sreceivers; // list of child nodes in the receivers direction
   std::vector<double> length2rec; // list of length to receiver node
   std::vector<double> length2don; // list of length to receiver node
 };
@@ -151,6 +153,11 @@ void fix_cyclicity(
   int correction_level
   );
 
+void compute_stack();
+
+int _add2stack(int& inode, int& istack);
+
+
 protected:
 
   // Node graph: vector of all vertexes in the DEM
@@ -171,6 +178,7 @@ protected:
   std::vector<bool> pits_to_reroute;
   // The topological order of from top to bottom
   xt::pytensor<int,1> Mstack;
+  xt::pytensor<int,1> Sstack;
 
   std::vector<int> not_in_stack;
 

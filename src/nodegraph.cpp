@@ -453,7 +453,7 @@ void NodeGraphV2::compute_receveivers_and_donors(xt::pytensor<bool,1>& active_no
       checker = 2;
     else if(i % ncols == 0 || i == 0)
       checker = 3;
-    else if(i + 1 % (ncols) == 0 )
+    else if((i + 1) % (ncols) == 0 )
       checker = 4;
     else
       checker = 0;
@@ -485,17 +485,17 @@ void NodeGraphV2::compute_receveivers_and_donors(xt::pytensor<bool,1>& active_no
     this->graph[i].length2rec = length2rec;
     this->graph[i].length2don = length2don;
 
-    // if(i==4750)
-    // {
-    //   std::cout << "CHECKER WAS :: " << checker << std::endl;
-    //   std::cout << "receivers::";
-    //   for(auto r:receivers)
-    //     std::cout << r << "||";
-    //   std::cout<<std::endl << "donors::";
-    //   for(auto r:donors)
-    //     std::cout << r << "||";
-    //   std::cout<<std::endl;
-    // }
+    if(i==6299)
+    {
+      std::cout << "CHECKER WAS :: " << checker << std::endl;
+      std::cout << "receivers::";
+      for(auto r:receivers)
+        std::cout << r << "||";
+      std::cout<<std::endl << "donors::";
+      for(auto r:donors)
+        std::cout << r << "||";
+      std::cout<<std::endl;
+    }
   }
 
 
@@ -689,8 +689,40 @@ std::vector<int> multiple_stack_fastscape(int n_element, std::vector<Vertex>& gr
 //    quack quack  __
 //             ___( o)>
 //             \ <_. )
-//    ~~~~~~~~  `---'  
+//    ~~~~~~~~  `---' 
 
+
+
+
+
+// the following functions are a portage of xarray-topo to get the single stack and the depression solver working
+void NodeGraphV2::compute_stack()
+{    
+  int istack = 0;
+
+  for (int inode = 0; inode< this->n_element;inode++)
+  {
+    if (this->graph[inode].Sreceivers == inode)
+    {
+      Sstack[istack] = inode;
+      istack ++;
+      istack = this->_add2stack(inode, istack);
+    }
+  }
+}
+
+int NodeGraphV2::_add2stack(int& inode, int& istack)
+{
+  for(int k = 0; k < int(this->graph[inode].Sdonors.size());k++)
+  {
+    int idonor = this->graph[inode].Sdonors[k];
+    Sstack[istack] = idonor;
+    istack ++;
+    istack = this->_add2stack(idonor, istack);
+  }
+
+  return istack;
+}
 
 
 // //  //###############################################  
