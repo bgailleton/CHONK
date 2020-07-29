@@ -19,6 +19,8 @@
 #include "xtensor/xmath.hpp"
 #include "xtensor/xarray.hpp"
 #include "xtensor/xtensor.hpp"
+#include "xtensor/xsort.hpp"
+#include "xtensor/xbuilder.hpp"
 #include <iostream>
 #include <numeric>
 #include <cmath>
@@ -816,7 +818,7 @@ void NodeGraphV2::compute_basins(xt::pytensor<bool,1>& active_nodes)
   this->npits = ipit;
 }
 
-void NodeGraphV2::correct_flowrouting()
+void NodeGraphV2::correct_flowrouting(xt::pytensor<bool,1>& active_nodes, xt::pytensor<double,1>& elevation)
 {
     // """Ensure that no flow is captured in sinks.
 
@@ -829,18 +831,23 @@ void NodeGraphV2::correct_flowrouting()
     // # theory of planar graph -> max nb. of connections known
     int nconn_max = this->nbasins * 3;
     xt::pytensor<int,2> conn_basins = xt::zeros<int>({nconn_max,2}); // np.empty((nconn_max, 2), dtype=np.intp)
+    for(size_t i=0;i<nconn_max;i++)
+    {
+      conn_basins(i,1) = -2;
+      conn_basins(i,0) = -2;
+    }
     xt::pytensor<int,2> conn_nodes = xt::zeros<int>({nconn_max,2}); //    conn_nodes = np.empty((nconn_max, 2), dtype=np.intp)
+    for(size_t i=0;i<nconn_max;i++)
+    {
+      conn_nodes(i,1) = -2;
+      conn_nodes(i,0) = -2;
+    }
     xt::pytensor<double,1> conn_weights = xt::zeros<double>({nconn_max}); //conn_weights = np.empty(nconn_max, dtype=np.float64)
+    for(auto& v:conn_weights)
+      v = -2;
 
-    //STOPPED HERE
-    // nconn, basin0 = _connect_basins(
-    //     conn_basins, conn_nodes, conn_weights,
-    //     nbasins, basins, outlets, receivers, stack,
-    //     active_nodes, elevation, nx, ny)
-
-    // conn_basins = np.resize(conn_basins, (nconn, 2))
-    // conn_nodes = np.resize(conn_nodes, (nconn, 2))
-    // conn_weights = np.resize(conn_weights, nconn)
+    int nconn, basin0;
+    this->_connect_basins(conn_basins, conn_nodes, conn_weights, active_nodes, elevation, nconn, basin0);
 
     // if method == 'mst_linear':
     //     mstree = _compute_mst_linear(conn_basins, conn_weights, nbasins)
@@ -848,8 +855,10 @@ void NodeGraphV2::correct_flowrouting()
     //     mstree = _compute_mst_kruskal(conn_basins, conn_weights, nbasins)
     // else:
     //     raise ValueError("invalid flow correction method %r" % method)
+    xt::xtensor<int,1> mstree = _compute_mst_kruskal(conn_basins, conn_weights);
 
-    // _orient_basin_tree(conn_basins, conn_nodes, nbasins, basin0, mstree)
+    this->_orient_basin_tree(conn_basins,conn_nodes,basin0, mstree);
+
     // _update_pits_receivers(receivers, dist2receivers, outlets,
     //                        conn_basins, conn_nodes,
     //                        mstree, elevation, nx, dx, dy)
@@ -1007,6 +1016,133 @@ void NodeGraphV2::_connect_basins(xt::pytensor<int,2>& conn_basins, xt::pytensor
 
   return;
 }
+
+
+// """Compute the minimum spanning tree of the (undirected) basin graph.
+
+// The method used here is Kruskal's algorithm. Applied to a fully
+// connected graph, the complexity of the algorithm is O(m log m)
+// where `m` is the number of edges.
+
+// """
+xt::xtensor<int,1> NodeGraphV2::_compute_mst_kruskal(xt::pytensor<int,2>& conn_basins, xt::pytensor<double,1>& conn_weights)
+{
+  xt::xtensor<int,1> mstree = xt::empty<int>({nbasins - 1});
+  int mstree_size = 0;
+
+  // # sort edges
+  auto sort_id = xt::argsort(conn_weights);
+
+  UnionFind uf(nbasins);
+
+  for (auto& eid : sort_id)
+  {
+    // ignoring not basin
+    if(conn_weights[eid] == -2)
+      continue;
+
+    int b0 = conn_basins(eid, 0);
+    int b1 = conn_basins(eid, 1);
+
+    if (uf.Find(b0) != uf.Find(b1))
+    {
+      mstree[mstree_size] = eid;
+      mstree_size ++;
+      uf.Union(b0, b1);
+    }
+  }
+
+  return mstree;
+}
+
+// """Orient the graph (tree) of basins so that the edges are directed in
+// the inverse of the flow direction.
+
+// If needed, swap values given for each edges (row) in `conn_basins`
+// and `conn_nodes`.
+
+// """
+void NodeGraphV2::_orient_basin_tree(xt::pytensor<int,2>& conn_basins, xt::pytensor<int,2>& conn_nodes, int& basin0, xt::xtensor<int,1>& tree)
+{
+  // # nodes connections
+  xt::xtensor<int,1> nodes_connects_size = xt::zeros<int>({this->nbasins});
+  xt::xtensor<int,1> nodes_connects_ptr = xt::empty<int>({this->nbasins});
+
+  // # parse the edges to compute the number of edges per node
+  for (auto& i : tree)
+  {
+    nodes_connects_size[conn_basins(i, 0)]++;
+    nodes_connects_size[conn_basins(i, 1)]++;
+  }
+
+  // # compute the id of first edge in adjacency table
+  nodes_connects_ptr[0] = 0;
+  // for i in range(1, nbasins):
+  for (int i = 1; i < nbasins; i++)
+  {
+    nodes_connects_ptr[i] = (nodes_connects_ptr[i - 1] + nodes_connects_size[i - 1]);
+    nodes_connects_size[i - 1] = 0;
+  }
+
+  // # create the adjacency table
+  int nodes_adjacency_size = nodes_connects_ptr[-1] + nodes_connects_size[-1];
+  nodes_connects_size[-1] = 0;
+  xt::xtensor<int,1> nodes_adjacency = xt::zeros<int>({nodes_adjacency_size});
+
+  // # parse the edges to update the adjacency
+  for (auto& i : tree)
+  {
+    int n1 = conn_basins(i, 0);
+    int n2 = conn_basins(i, 1);
+    nodes_adjacency[nodes_connects_ptr[n1] + nodes_connects_size[n1]] = i;
+    nodes_adjacency[nodes_connects_ptr[n2] + nodes_connects_size[n2]] = i;
+    nodes_connects_size[n1] ++;
+    nodes_connects_size[n2] ++;
+  }
+
+
+  // # depth-first parse of the tree, starting from basin0
+  // # stack of node, parent
+  xt::xtensor<int,2> stack = xt::empty<int>({nbasins, 2});
+  int stack_size = 1;
+  stack(0,0) = basin0;// (basin0, basin0)
+  stack(0,1) = basin0;
+
+  while (stack_size > 0)
+  {
+    // # get parsed node
+    stack_size -= 1;
+    int node = stack(stack_size, 0);
+    int parent = stack(stack_size, 1);
+
+    // # for each edge of the graph
+    // for i in range(nodes_connects_ptr[node], nodes_connects_ptr[node] + nodes_connects_size[node])
+    for( int i = nodes_connects_ptr[node]; i< nodes_connects_ptr[node] + nodes_connects_size[node]; i++) 
+    {
+      int edge_id = nodes_adjacency[i];
+
+      // # the edge comming from the parent node has already been updated.
+      // # in this case, the edge is (parent, node)
+      if (conn_basins(edge_id, 0) == parent && node != parent || conn_basins(edge_id, 0) == -2)
+          continue;
+
+      // # we want the edge to be (node, next)
+      // # we check if the first node of the edge is not "node"
+      if(node != conn_basins(edge_id, 0))
+      {
+        // # swap n1 and n2
+        conn_basins(edge_id, 0), conn_basins(edge_id, 1) = (conn_basins(edge_id, 1), conn_basins(edge_id, 0));
+        // # swap p1 and p2
+        conn_nodes(edge_id, 0), conn_nodes(edge_id, 1) = (conn_nodes(edge_id, 1), conn_nodes(edge_id, 0));
+      }
+      // # add the opposite node to the stack
+      stack[stack_size] = (conn_basins(edge_id, 1), node);
+      stack_size ++;
+    }
+  }
+}
+
+
 
 // //  //###############################################  
 // //  // 

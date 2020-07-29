@@ -168,9 +168,11 @@ int _add2stack(int& inode, int& istack);
 // Compute the Single flow basin labels and the pits
 void compute_basins(xt::pytensor<bool,1>& active_nodes);
 
-void correct_flowrouting();
+void correct_flowrouting(xt::pytensor<bool,1>& active_nodes, xt::pytensor<double,1>& elevation);
 void _connect_basins(xt::pytensor<int,2>& conn_basins, xt::pytensor<int,2>& conn_nodes, xt::pytensor<double,1>& conn_weights,          
                    xt::pytensor<bool,1>& active_nodes, xt::pytensor<double,1>& elevation, int& nconn, int& basin0);
+xt::xtensor<int,1> _compute_mst_kruskal(xt::pytensor<int,2>& conn_basins, xt::pytensor<double,1>& conn_weights);
+void _orient_basin_tree(xt::pytensor<int,2>& conn_basins, xt::pytensor<int,2>& conn_nodes, int& basin0, xt::xtensor<int,1>& tree);
 
 
 protected:
@@ -210,6 +212,58 @@ protected:
 
 };
 
+// _unionfind_spec = [
+//     ('_parent', nb.intp[:]),
+//     ('_rank', nb.intp[:]),
+// ]
+
+
+// @nb.jitclass(_unionfind_spec)
+class UnionFind
+{
+  public:
+    UnionFind(int size)
+    {
+      this->_parent = xt::arange(0, size) ;
+      this->_rank = xt::zeros<int>({size}) ;
+    };
+
+    void Union(int x, int y)
+    {
+      int xroot = this->Find(x);
+      int yroot = this->Find(y);
+
+      if (xroot != yroot)
+      {
+        if(this->_rank[xroot] < this->_rank[yroot])
+            this->_parent[xroot] = yroot;
+        else
+        {
+          this->_parent[yroot] = xroot;
+          if(this->_rank[xroot] == this->_rank[yroot])
+            this->_rank[xroot] ++;
+        }
+      }
+    }
+
+    int Find(int& x)
+    {
+      int xp = x,xc;
+      while (true)
+      {
+        xc = xp;
+        xp = this->_parent[xc];
+        if (xp == xc)
+          break;
+      }
+      this->_parent[x] = xc;
+      return xc;
+    }
+
+    xt::xtensor<int,1> _parent;
+    xt::xtensor<int,1> _rank;
+
+};
 
 // Topological order algorithm for multiple receivers adapted from FORTRAN
 // Original author: Jean Braun
