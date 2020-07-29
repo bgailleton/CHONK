@@ -1143,6 +1143,48 @@ void NodeGraphV2::_orient_basin_tree(xt::pytensor<int,2>& conn_basins, xt::pyten
 }
 
 
+// """Update receivers of pit nodes (and possibly lowest pass nodes)
+// based on basin connectivity.
+
+// Distances to receivers are also updated. An infinite distance is
+// arbitrarily assigned to pit nodes.
+
+// A minimum spanning tree of the basin graph is used here. Edges of
+// the graph are also assumed to be oriented in the inverse of flow direction.
+
+// """
+void NodeGraphV2::_update_pits_receivers(xt::pytensor<int,2>& conn_basins,xt::pytensor<int,2>& conn_nodes, xt::xtensor<int,1>& mstree, xt::pytensor<double,1>& elevation)
+{
+  // for i in mstree:
+  for(auto& i : mstree)
+  {
+    if(i<0)
+      continue;
+
+    int node_to = conn_nodes(i, 0);
+    int node_from = conn_nodes(i, 1);
+
+    // # skip open basins
+    if (node_from == -1)
+        continue;
+
+    int outlet_from = this->SBasinOutlets[conn_basins(i, 1)];
+
+    if (elevation[node_from] < elevation[node_to])
+    {
+     this->graph[outlet_from].Sreceivers = node_to;
+     this->graph[outlet_from].length2Srec = this->dx*1000; // just to have a length but it should not actually be used
+    }
+    else
+    {
+      this->graph[outlet_from].Sreceivers = node_from;
+      this->graph[node_from].Sreceivers = node_to;
+      this->graph[outlet_from].length2Srec = this->dx*1000; // just to have a length but it should not actually be used
+      this->graph[node_from].Sreceivers = this->dx; // TODO correct here the correct distance. Should not be used anyway. 
+    }
+  }
+}
+
 
 // //  //###############################################  
 // //  // 
