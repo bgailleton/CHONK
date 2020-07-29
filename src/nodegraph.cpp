@@ -52,6 +52,8 @@ void set_DEBUG_switch_nodegraph(std::vector<std::string> params, std::vector<boo
 
 
 
+
+
 NodeGraphV2::NodeGraphV2(
   xt::pytensor<int,1>& Sstack,
   xt::pytensor<int,1>& Srec, 
@@ -75,6 +77,16 @@ NodeGraphV2::NodeGraphV2(
   this-> un_element = Sstack.size();
   this->nrows = nrows;
   this->ncols = ncols;
+
+  // these vectors are additioned to the node indice to test the neighbors
+  this->neightbourer.push_back({-ncols - 1, - ncols, - ncols + 1, -1,1,ncols - 1, ncols, ncols + 1 }); // internal node 0
+  this->neightbourer.push_back({(nrows - 1) * ncols - 1, (nrows - 1) * ncols, (nrows - 1) * ncols + 1, -1,1,ncols - 1, ncols, ncols + 1 });// periodic_first_row 1
+  this->neightbourer.push_back({-ncols - 1, - ncols, - ncols + 1, -1,1,- (nrows - 1) * ncols - 1, - (nrows - 1) * ncols, - (nrows - 1) * ncols + 1 });// periodic_last_row 2
+  this->neightbourer.push_back({- 1, - ncols, - ncols + 1, (ncols - 1),1, 2 * ncols - 1, ncols, ncols + 1 });// periodic_first_col 3
+  this->neightbourer.push_back({-ncols - 1, - ncols, - 2 * ncols + 1, -1,-(ncols -1), ncols - 1, ncols,  1 }); //periodic last_col 4
+
+  double diag = std::sqrt(std::pow(dx,2) + std::pow(dy,2));
+  this->lengthener = {diag,dy,diag,dx,dx,diag,dy,diag};
 
   // Initialising the vector of pit to reroute. The pits to reroute are all the local minima that are rerouted to another basin/edge
   // It does not include non active nodes (i.e. base level of the model/output of the model)
@@ -429,17 +441,6 @@ void NodeGraphV2::compute_receveivers_and_donors(xt::pytensor<bool,1>& active_no
 void NodeGraphV2::compute_receveivers_and_donors(xt::pytensor<bool,1>& active_nodes, xt::pytensor<double,1>& elevation, std::vector<int>& nodes_to_compute)
 {
 
-  // these vectors are additioned to the node indice to test the neighbors
-  std::vector<std::vector<int> > neighbors;
-  neighbors.push_back({-ncols - 1, - ncols, - ncols + 1, -1,1,ncols - 1, ncols, ncols + 1 }); // internal node 0
-  neighbors.push_back({(nrows - 1) * ncols - 1, (nrows - 1) * ncols, (nrows - 1) * ncols + 1, -1,1,ncols - 1, ncols, ncols + 1 });// periodic_first_row 1
-  neighbors.push_back({-ncols - 1, - ncols, - ncols + 1, -1,1,- (nrows - 1) * ncols - 1, - (nrows - 1) * ncols, - (nrows - 1) * ncols + 1 });// periodic_last_row 2
-  neighbors.push_back({- 1, - ncols, - ncols + 1, (ncols - 1),1, 2 * ncols - 1, ncols, ncols + 1 });// periodic_first_col 3
-  neighbors.push_back({-ncols - 1, - ncols, - 2 * ncols + 1, -1,-(ncols -1), ncols - 1, ncols,  1 }); //periodic last_col 4
-
-  double diag = std::sqrt(std::pow(dx,2) + std::pow(dy,2));
-  std::vector<double> l2r = {diag,dy,diag,dx,dx,diag,dy,diag};
-
   for(auto& i:nodes_to_compute)
   {
     if(active_nodes[i] == false)
@@ -464,7 +465,7 @@ void NodeGraphV2::compute_receveivers_and_donors(xt::pytensor<bool,1>& active_no
     double& this_elev = elevation[i];
     double test_elev;
     int idL = -1;
-    for(auto& adder:neighbors[checker])
+    for(auto& adder:this->neightbourer[checker])
     {
       int node = i+adder;
       idL++;
@@ -472,12 +473,12 @@ void NodeGraphV2::compute_receveivers_and_donors(xt::pytensor<bool,1>& active_no
       if(test_elev<this_elev)
       {
         receivers.push_back(node);
-        length2rec.push_back(l2r[idL]);
+        length2rec.push_back(this->lengthener[idL]);
       }
       else if(test_elev>this_elev)
       {
         donors.push_back(node);
-        length2don.push_back(l2r[idL]);
+        length2don.push_back(this->lengthener[idL]);
       }
     }
     this->graph[i].receivers = receivers;
@@ -499,6 +500,68 @@ void NodeGraphV2::compute_receveivers_and_donors(xt::pytensor<bool,1>& active_no
   }
 
 
+}
+
+void NodeGraphV2::get_D8_neighbors(int i, xt::pytensor<bool,1>& active_nodes, std::vector<int>& neightbouring_nodes, std::vector<double>& length2neigh)
+{
+  // these vectors are additioned to the node indice to test the neighbors
+  neightbouring_nodes = std::vector<int>();
+  length2neigh = std::vector<double>();
+
+  if(active_nodes[i] == false)
+    return;
+
+  int checker;
+  if(i<ncols)
+    checker = 1;
+  else if (i >= this->n_element - ncols)
+    checker = 2;
+  else if(i % ncols == 0 || i == 0)
+    checker = 3;
+  else if((i + 1) % (ncols) == 0 )
+    checker = 4;
+  else
+    checker = 0;
+
+  int idL = -1;
+  for(auto& adder:this->neightbourer[checker])
+  {
+    int node = i+adder;
+    idL++;
+    neightbouring_nodes.push_back(node);
+    length2neigh.push_back(this->lengthener[idL]);
+  }
+}
+
+void NodeGraphV2::get_D4_neighbors(int i, xt::pytensor<bool,1>& active_nodes, std::vector<int>& neightbouring_nodes, std::vector<double>& length2neigh)
+{
+  // these vectors are additioned to the node indice to test the neighbors
+  neightbouring_nodes = std::vector<int>();
+  length2neigh = std::vector<double>();
+
+  if(active_nodes[i] == false)
+    return;
+
+  int checker;
+  if(i<ncols)
+    checker = 1;
+  else if (i >= this->n_element - ncols)
+    checker = 2;
+  else if(i % ncols == 0 || i == 0)
+    checker = 3;
+  else if((i + 1) % (ncols) == 0 )
+    checker = 4;
+  else
+    checker = 0;
+
+  std::vector<size_t> looper_D4  = {1,3,4,6};
+  for(auto it:looper_D4)
+  {
+    int adder = this->neightbourer[checker][it]; 
+    int node = i+adder;
+    neightbouring_nodes.push_back(node);
+    length2neigh.push_back(this->lengthener[it]);
+  }
 }
 
 void NodeGraphV2::update_receivers_at_node(int node, std::vector<int>& new_receivers)
@@ -724,6 +787,226 @@ int NodeGraphV2::_add2stack(int& inode, int& istack)
   return istack;
 }
 
+
+void NodeGraphV2::compute_basins(xt::pytensor<bool,1>& active_nodes)
+{
+  int ibasin = -1, istack,irec;
+  int ipit = 0;
+  SBasinID = xt::zeros<int>({this->un_element});
+
+  for(int inode=0; inode<this->n_element;inode++)
+  {  
+    istack = this->Sstack[inode];
+    irec = this->graph[istack].Sreceivers;
+
+    if (irec == istack)
+    {
+      ibasin ++;
+      SBasinOutlets.push_back(istack);
+      if(active_nodes[istack])
+      {
+        pits.push_back(istack);
+        ipit++;
+      }
+    }
+    SBasinID[istack] = ibasin;
+  }
+
+  this->nbasins = ibasin + 1;
+  this->npits = ipit;
+}
+
+void NodeGraphV2::correct_flowrouting()
+{
+    // """Ensure that no flow is captured in sinks.
+
+    // If needed, update `receivers`, `dist2receivers`, `ndonors`,
+    // `donors` and `stack`.
+
+    // """
+    int& nnodes = this->n_element;
+
+    // # theory of planar graph -> max nb. of connections known
+    int nconn_max = this->nbasins * 3;
+    xt::pytensor<int,2> conn_basins = xt::zeros<int>({nconn_max,2}); // np.empty((nconn_max, 2), dtype=np.intp)
+    xt::pytensor<int,2> conn_nodes = xt::zeros<int>({nconn_max,2}); //    conn_nodes = np.empty((nconn_max, 2), dtype=np.intp)
+    xt::pytensor<double,1> conn_weights = xt::zeros<double>({nconn_max}); //conn_weights = np.empty(nconn_max, dtype=np.float64)
+
+    //STOPPED HERE
+    // nconn, basin0 = _connect_basins(
+    //     conn_basins, conn_nodes, conn_weights,
+    //     nbasins, basins, outlets, receivers, stack,
+    //     active_nodes, elevation, nx, ny)
+
+    // conn_basins = np.resize(conn_basins, (nconn, 2))
+    // conn_nodes = np.resize(conn_nodes, (nconn, 2))
+    // conn_weights = np.resize(conn_weights, nconn)
+
+    // if method == 'mst_linear':
+    //     mstree = _compute_mst_linear(conn_basins, conn_weights, nbasins)
+    // elif method == 'mst_kruskal':
+    //     mstree = _compute_mst_kruskal(conn_basins, conn_weights, nbasins)
+    // else:
+    //     raise ValueError("invalid flow correction method %r" % method)
+
+    // _orient_basin_tree(conn_basins, conn_nodes, nbasins, basin0, mstree)
+    // _update_pits_receivers(receivers, dist2receivers, outlets,
+    //                        conn_basins, conn_nodes,
+    //                        mstree, elevation, nx, dx, dy)
+    // compute_donors(ndonors, donors, receivers, nnodes)
+    // compute_stack(stack, ndonors, donors, receivers, nnodes)
+}
+
+// """Connect adjacent basins together through their lowest pass.
+
+// Creates an (undirected) graph of basins and their connections.
+
+// The resulting graph is defined by:
+
+// - `conn_basins` (nconn, 2): ids of adjacent basins forming the edges
+// - `conn_nodes` (nconn, 2): ids of grid nodes forming the lowest passes
+//   between two adjacent basins.
+// - `conn_weights` (nconn) weights assigned to the edges. It is equal to the
+//   elevations of the passes, i.e., the highest elevation found for each
+//   node couples defining the passes.
+
+// The function returns:
+
+// - `nconn` : number of edges.
+// - `basin0` : id of one open basin (i.e., where `outlets[id]` is not a
+//   pit node) given as reference.
+
+// The algorithm parses each grid node of the flow-ordered stack and checks if
+// the node and (each of) its neighbors together form the lowest pass between
+// two different basins.
+
+// Node neighbor lookup doesn't include diagonals to ensure that the
+// resulting graph of connected basins is always planar.
+
+// Connections between open basins are handled differently:
+
+// Instead of finding connections between adjacent basins, virtual
+// connections are added between one given basin and all other
+// basins.  This may save a lot of uneccessary computation, while it
+// ensures a connected graph (i.e., every node has at least an edge),
+// as required for applying minimum spanning tree algorithms implemented in
+// this package.
+
+// """
+void NodeGraphV2::_connect_basins(xt::pytensor<int,2>& conn_basins, xt::pytensor<int,2>& conn_nodes, xt::pytensor<double,1>& conn_weights,          
+                   xt::pytensor<bool,1>& active_nodes, xt::pytensor<double,1>& elevation, int& nconn, int& basin0)
+{
+  int iconn = 0;
+
+  basin0 = -1; //intp?
+  int ibasin = 0;
+
+  xt::pytensor<int,1> conn_pos = xt::zeros<int>({size_t(this->nbasins)}); //np.full(nbasins, -1, dtype=np.intp)
+  for(auto& v:conn_pos)
+    v = -1;
+
+
+  xt::pytensor<int,1> conn_pos_used = xt::zeros<int>({size_t(this->nbasins)});  // conn_pos_used = np.empty(nbasins, dtype=np.intp)
+
+  int conn_pos_used_size = 0;
+
+  bool iactive = false;
+
+  // # king (D4) neighbor lookup
+  std::vector<int> dr = {0, -1, 1, 0};
+  std::vector<int> dc = {-1, 0, 0, 1};
+
+  for(auto& istack : this->Sstack)
+  {
+    int irec = this->graph[istack].Sreceivers;
+
+    // # new basin
+    if(irec == istack)
+    {
+      ibasin = this->SBasinID[istack];
+      iactive = active_nodes[istack];
+
+      // for iused in conn_pos_used[:conn_pos_used_size]
+      for(int iused = 0; iused < conn_pos_used_size;iused++)
+      {
+        conn_pos[conn_pos_used[iused]] = -1;
+      }
+
+      conn_pos_used_size = 0;
+
+      if (iactive == false)
+      {
+        if(basin0 == -1)
+            basin0 = ibasin;
+        else
+        {
+          // conn_basins[iconn] = (basin0, ibasin);
+          conn_basins(iconn,0) = basin0;
+          conn_basins(iconn,1) = ibasin;
+
+          // conn_nodes[iconn] = (-1, -1)
+          conn_nodes(iconn,0) = -1;
+          conn_nodes(iconn,1) = -1;
+
+          conn_weights[iconn] = std::numeric_limits<double>::min();
+          iconn ++;
+        }
+      }
+    }
+
+    if(iactive)
+    {
+      std::vector<int> D4n;
+      std::vector<double> D4l;
+      this->get_D4_neighbors(istack,active_nodes, D4n, D4l);
+      for(auto ineighbor:D4n)
+      {
+
+        int ineighbor_basin = SBasinID[ineighbor];
+        int ineighbor_outlet = SBasinOutlets[ineighbor_basin];
+
+        // # skip same basin or already connected adjacent basin
+        // # don't skip adjacent basin if it's an open basin
+        if(ibasin >= ineighbor_basin && active_nodes[ineighbor_outlet])
+          continue;
+
+        double weight = std::max(elevation[istack], elevation[ineighbor]);
+        int conn_idx = conn_pos[ineighbor_basin];
+
+        // # add new connection
+        if(conn_idx == -1)
+        {
+          // conn_basins[iconn] = (ibasin, ineighbor_basin);
+          conn_basins(iconn,0) = ibasin;
+          conn_basins(iconn,1) = ineighbor_basin;
+          // conn_nodes[iconn] = (istack, ineighbor);
+          conn_nodes(iconn,0) = istack;
+          conn_nodes(iconn,1) = ineighbor;
+
+          conn_weights[iconn] = weight;
+
+          conn_pos[ineighbor_basin] = iconn;
+          iconn ++;
+
+          conn_pos_used[conn_pos_used_size] = ineighbor_basin;
+          conn_pos_used_size ++;
+        }
+
+        // # update existing connection
+        else if (weight < conn_weights[conn_idx])
+        {
+          // conn_nodes[conn_idx] = (istack, ineighbor);
+          conn_nodes(conn_idx,0) = istack;
+          conn_nodes(conn_idx,0) = ineighbor;
+          conn_weights[conn_idx] = weight;
+        }
+      }
+    }
+  }
+  nconn = iconn;
+
+  return;
+}
 
 // //  //###############################################  
 // //  // 

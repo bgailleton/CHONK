@@ -63,6 +63,7 @@ public:
   std::vector<int> receivers; // list of child nodes in the receivers direction
   int Sreceivers; // list of child nodes in the receivers direction
   std::vector<double> length2rec; // list of length to receiver node
+  double length2Srec; // length to steepest receiver node
   std::vector<double> length2don; // list of length to receiver node
 };
 
@@ -142,6 +143,11 @@ void update_donors_at_node(int node, std::vector<int>& new_donors);
 void compute_receveivers_and_donors(xt::pytensor<bool,1>& active_nodes, xt::pytensor<double,1>& elevation);
 void compute_receveivers_and_donors(xt::pytensor<bool,1>& active_nodes, xt::pytensor<double,1>& elevation, std::vector<int>& nodes_to_compute);
 
+void get_D8_neighbors(int i, xt::pytensor<bool,1>& active_nodes, std::vector<int>& neightbouring_nodes, std::vector<double>& length2neigh);
+
+void get_D4_neighbors(int i, xt::pytensor<bool,1>& active_nodes, std::vector<int>& neightbouring_nodes, std::vector<double>& length2neigh);
+
+
 std::vector<int> get_broken_nodes(){return not_in_stack;}
 
 void fix_cyclicity(
@@ -153,9 +159,18 @@ void fix_cyclicity(
   int correction_level
   );
 
+// Single flow stack
+// # Main function
 void compute_stack();
-
+// # recursive function
 int _add2stack(int& inode, int& istack);
+
+// Compute the Single flow basin labels and the pits
+void compute_basins(xt::pytensor<bool,1>& active_nodes);
+
+void correct_flowrouting();
+void _connect_basins(xt::pytensor<int,2>& conn_basins, xt::pytensor<int,2>& conn_nodes, xt::pytensor<double,1>& conn_weights,          
+                   xt::pytensor<bool,1>& active_nodes, xt::pytensor<double,1>& elevation, int& nconn, int& basin0);
 
 
 protected:
@@ -179,10 +194,19 @@ protected:
   // The topological order of from top to bottom
   xt::pytensor<int,1> Mstack;
   xt::pytensor<int,1> Sstack;
+  xt::pytensor<int,1> SBasinID;
 
+  std::vector<int> SBasinOutlets;
+  std::vector<int> pits;
+  int nbasins;
+  int npits;
   std::vector<int> not_in_stack;
 
   std::vector<int> empty_vector;
+
+  // helpers
+  std::vector<std::vector<int> > neightbourer;
+  std::vector<double> lengthener;
 
 };
 
