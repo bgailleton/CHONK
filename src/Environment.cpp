@@ -157,10 +157,8 @@ void ModelRunner::run()
  
     int node = this->graph.get_MF_stack_at_i(i);
     is_processed[node] = true;
-    // std::cout << "1:" << node << std::endl;
 
     this->manage_fluxes_before_moving_prep(this->chonk_network[node]);
-    // std::cout << "2" << std::endl;
 
 
     if(this->lake_solver)
@@ -193,17 +191,13 @@ void ModelRunner::run()
     }
 
     // first step is to apply the right move method, to prepare the chonk to move
-    // std::cout << "3" << std::endl;
     this->manage_move_prep(this->chonk_network[node]);
-    // std::cout << "4" << std::endl;
     this->manage_fluxes_after_moving_prep(this->chonk_network[node]);
-    // std::cout << "5" << std::endl;
     this->chonk_network[node].split_and_merge_in_receiving_chonks(this->chonk_network, this->graph, this->io_double_array["surface_elevation_tp1"], io_double_array["sed_height_tp1"], this->timestep);
     
   }
   std::cout << "Ending the run" << std::endl;
   this->finalise(); //TODO
-  // std::cout << "GURG" << std::endl;
 
   
 
@@ -232,16 +226,11 @@ void ModelRunner::finalise()
       int lakeid = node_in_lake[i];
       double tdepth = lake_network[lakeid].get_lake_depth_at_node(i,node_in_lake);
       tlake_depth[i] = tdepth;
-      // std::cout << "LAKEDEPTH::" << i << "::" << tdepth << std::endl;
     }
     else
     {
       tlake_depth[i] = 0;
     }
-    // if(isnan(surface_elevation_tp1[i]) )
-    // {
-    //   std::cout << "NAN BECAUSE::" << tchonk.get_deposition_flux() << "||" << tchonk.get_erosion_flux()  << "||" << this->io_double_array["surface_elevation_tp1"][i] << std::endl;
-    // }
   }
 
   this->io_double_array["lake_depth"] = tlake_depth;
@@ -390,7 +379,6 @@ int ModelRunner::solve_depressionv2(int node)
   // Now filling the depression, doing it while I have enough water to do so
   while(water_volume>0 && depressionfiller.empty() == false)
   {
-    std::cout << "bulf: " << working_node.node << ":" << working_node.elevation << "||" << water_volume << std::endl;
     // At the start of this loop, my working node is in the depression
     n_nodes_underwater++;
     working_node =  depressionfiller.top();
@@ -677,26 +665,20 @@ void Lake::ingest_other_lake(
   std::vector<int>& these_node_in_queue = other_lake.get_lake_nodes_in_queue();
   std::unordered_map<int,double>& these_depths = other_lake.get_lake_depths();
   std::priority_queue< nodium, std::vector<nodium>, std::greater<nodium> >& this_PQ = other_lake.get_lake_priority_queue();
-  // std::cout << "Yum1" << std::endl;
   // merging them into this lake while node forgetting to label them as visited and everything like that
   for(auto node:these_nodes)
   {
     this->nodes.push_back(node);
     node_in_lake[node] = this->lake_id;
   }
-  // std::cout << "Yum2" << std::endl;
 
   for(auto node:these_node_in_queue)
   {
     this->node_in_queue.push_back(node);
     is_in_queue[node] = true;
   }
-  // std::cout << "Yum3" << std::endl;
 
   this->depths.insert(these_depths.begin(), these_depths.end());
-  // std::cout << "Yum4" << std::endl;
-  std::cout << this->get_lake_id() << std::endl;
-  std::cout << other_lake.get_lake_id() << std::endl;
 
   this->n_nodes += other_lake.get_n_nodes();
 
@@ -712,13 +694,9 @@ void Lake::ingest_other_lake(
 
   // Deleting this lake and setting its parent lake
   int save_ID = other_lake.get_lake_id();
-  // std::cout << "Yum4.1" << std::endl;
   Lake temp = Lake(save_ID);
-  // std::cout << "Yum4.2" << std::endl;
   other_lake = temp;
-  // std::cout << "Yum4.5" << std::endl;
   other_lake.set_parent_lake(this->lake_id);
-  // std::cout << "Yum5" << std::endl;
 
   return;
 }
@@ -747,11 +725,9 @@ void Lake::pour_water_in_lake(
 
   // First checking if this node is in a lake, if yes it means the lake has already been initialised and 
   // We are pouring water from another lake 
-  // std::cout << "3.1.1" << stdΩ¥::endl;
 
   if(node_in_lake[originode] == -1)
   {
-    // std::cout << "3.1.2" << sΩ¥td::endl;
     // Emplacing the node in the queue, It will be the first to be processed
     depressionfiller.emplace( nodium( originode,surface_elevation[originode] ) );
 
@@ -760,28 +736,22 @@ void Lake::pour_water_in_lake(
     is_in_queue[originode] = true;
 
   }
-  // std::cout << "3.1.3" << std::endl;
 
 
-  // std::cout << "3.1.3.2" << std::endl;
 
   // I am processing new nodes while I still have water OR still nodes upstream (if an outlet in encountered, the loop is breaked anually)
   while(depressionfiller.empty() == false && water_volume > 0 )
   {
     // Getting the next node and ...
-    // std::cout << "3.1.3.3" << std::endl;
     nodium next_node = this->depressionfiller.top();
     this->water_elevation = next_node.elevation;
     // ... removing it from the priority queue 
     this->depressionfiller.pop();
-    // std::cout << "3.1.3.4" << std::endl;
     // Initialising a dummy outlet
     int outlet = -9999;
-    // std::cout << "before_neighbor_checking" << std::endl;
 
     // Adding the upstream neighbors to the queue and checking if there is an outlet node
     outlet = this->check_neighbors_for_outlet_or_existing_lakes(next_node, graph, node_in_lake, lake_network, surface_elevation, is_in_queue);
-    // std::cout << "after_neighbor_checking::" << outlet << std::endl;
 
     // If I have an outlet, then the outlet node is positive
     if(outlet>=0)
@@ -826,7 +796,6 @@ void Lake::pour_water_in_lake(
       double SS = -9999; // hmmmm I may need to change this name
       for(size_t i=0; i<receivers.size(); i++)
       {
-        std::cout << "All need to be positive:" << this->outlet_node << "||" << receivers[i]  << "||" << receivers.size() << std::endl;
 
         double this_slope = (surface_elevation[this->outlet_node] - surface_elevation[receivers[i]])/length[i];
         if(this_slope>SS)
@@ -880,7 +849,6 @@ int Lake::check_neighbors_for_outlet_or_existing_lakes(
   for (auto d:dons)
     neightbors.emplace_back(d);
 
-  // std::cout << "burf1" << std::endl;
   int outlet = -9999;
   // checking all neighbors
   for(auto node : neightbors)
@@ -900,10 +868,8 @@ int Lake::check_neighbors_for_outlet_or_existing_lakes(
       this_depth = lake_network[lake_index].get_lake_depth_at_node(node, node_in_lake);
 
 
-    // std::cout << "burf2" << node << std::endl;
     // it gives me the elevation to be considered
     double tested_elevation = surface_elevation[node] + this_depth;
-    // std::cout << "burf2.5" << node << std::endl;
 
     // however if there is another lake, I am ingesting it
     if(lake_index> -1 )
@@ -912,7 +878,6 @@ int Lake::check_neighbors_for_outlet_or_existing_lakes(
       continue;
     }
 
-    // std::cout << "burf3" << std::endl;
 
 
     // If my neighbor is not in queue and at a higher elevation: I ingest it in the system

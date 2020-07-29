@@ -44,41 +44,48 @@ public:
   // Useful constructor
   Vertex(
     int& val, // node ID
-    bool& visiting,  // bool for DFS
-    bool& visited,  // bool for DFS
     std::vector<int>& donors,  // child vertex in the donors direction
     std::vector<int>& receivers, // child vertex in the receiver direction
-    std::vector<double>& length2rec // length to each child vertex in the receiver direction
-    ){this->val = val; this->visiting = visiting; this->visited = visited; this->donors = donors; this->receivers = receivers; this->length2rec = length2rec;}
+    std::vector<double>& length2rec, // length to each child vertex in the receiver direction
+    std::vector<double>& length2don // length to each child vertex in the receiver direction
+    ){this->val = val; this->donors = donors; this->receivers = receivers; this->length2rec = length2rec;this->length2don = length2don;}
+  // Useful constructor with no vector
+  Vertex(
+    int& val // node ID
+    ){this->val = val;}
+
 
   int val; //  ID in the node graph
-  bool visiting; // bool for DFS
-  bool visited; // bool for DFS
+  // bool visiting; // bool for DFS
+  // bool visited; // bool for DFS
   std::vector<int> donors; // list of child nodes in teh donor direction
   std::vector<int> receivers; // list of child nodes in the receivers direction
   std::vector<double> length2rec; // list of length to receiver node
+  std::vector<double> length2don; // list of length to receiver node
 };
 
 
-// Depth first search algorithms for generic graph traversal (I do not use it anymore, but it is here just in case)
-bool dfs(
-  Vertex& vertex, 
-  std::vector<Vertex>& stack, 
-  std::vector<int>& next_vertexes, 
-  int& index_of_reading, 
-  int& index_of_pushing, 
-  std::vector<bool>& is_in_queue, 
-  std::vector<Vertex>& graph,
-  std::string& direction
-  ) ;
-bool dfs(Vertex& vertex,
-std::vector<Vertex>& stack,
-std::vector<Vertex>& graph,
-std::string& direction
-) ;
-// Generic topological sort using DFS algorithm
-std::vector<int> topological_sort_by_dfs(std::vector<Vertex>& graph, int starting_node, std::string& direction) ;
-std::vector<int> topological_sort_by_dfs(std::vector<Vertex>& graph, std::string& direction) ;
+//Deprecated
+
+// // Depth first search algorithms for generic graph traversal (I do not use it anymore, but it is here just in case)
+// bool dfs(
+//   Vertex& vertex, 
+//   std::vector<Vertex>& stack, 
+//   std::vector<int>& next_vertexes, 
+//   int& index_of_reading, 
+//   int& index_of_pushing, 
+//   std::vector<bool>& is_in_queue, 
+//   std::vector<Vertex>& graph,
+//   std::string& direction
+//   ) ;
+// bool dfs(Vertex& vertex,
+// std::vector<Vertex>& stack,
+// std::vector<Vertex>& graph,
+// std::string& direction
+// ) ;
+// // Generic topological sort using DFS algorithm
+// std::vector<int> topological_sort_by_dfs(std::vector<Vertex>& graph, int starting_node, std::string& direction) ;
+// std::vector<int> topological_sort_by_dfs(std::vector<Vertex>& graph, std::string& direction) ;
 
 
 
