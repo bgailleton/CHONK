@@ -156,34 +156,43 @@ void ModelRunner::run()
 
  
     int node = this->graph.get_MF_stack_at_i(i);
+    // std::cout << node << std::endl;
     is_processed[node] = true;
 
     this->manage_fluxes_before_moving_prep(this->chonk_network[node]);
+    // std::cout << "flux" << std::endl;
 
 
     if(this->lake_solver)
     {
       if(this->graph.is_depression(node))
       {
+        // std::cout << "starting lake solving" << std::endl;
+
         this->lake_network.push_back(Lake(lake_incrementor));
 
         double water_volume = this->chonk_network[node].get_water_flux() * timestep;
+        // std::cout << "Pouring water in lake " << std::endl;
 
         this->lake_network[lake_incrementor].pour_water_in_lake(water_volume,node, 
         node_in_lake, is_processed, inctive_nodes,lake_network, surface_elevation,graph, cellarea, timestep,chonk_network);
         
         int outlet = this->lake_network[lake_incrementor].get_lake_outlet();
+        // std::cout << "done " << std::endl;
 
         if(outlet >=0)
         {
           if(is_processed[outlet])
           {
+            // std::cout << "outlet needs reprocessing " << std::endl;
+
             this->find_underfilled_lakes_already_processed_and_give_water(outlet, is_processed);
           }
         }
         // check outlet and call it
 
         lake_incrementor++;
+        // std::cout << "done with lake " << std::endl;
 
         continue;
 
@@ -192,8 +201,11 @@ void ModelRunner::run()
 
     // first step is to apply the right move method, to prepare the chonk to move
     this->manage_move_prep(this->chonk_network[node]);
+    // std::cout << "prep" << std::endl;
     this->manage_fluxes_after_moving_prep(this->chonk_network[node]);
+    // std::cout << "bite" << std::endl;
     this->chonk_network[node].split_and_merge_in_receiving_chonks(this->chonk_network, this->graph, this->io_double_array["surface_elevation_tp1"], io_double_array["sed_height_tp1"], this->timestep);
+    // std::cout << "garg" << std::endl;
     
   }
   std::cout << "Ending the run" << std::endl;

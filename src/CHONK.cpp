@@ -365,11 +365,9 @@ void chonk::move_MF_from_fastscapelib_threshold_SF(NodeGraphV2& graph, double th
   xt::pytensor<double,1>& surface_elevation, xt::pytensor<double,1>& surface_elevation_tp1, double Xres, double Yres, std::vector<chonk>& chonk_network)
 { 
 
-
   // I need the receicing neighbours and the distance to them
   std::vector<int> these_neighbors = graph.get_MF_receivers_at_node(this->current_node);
   std::vector<double> these_lengths = graph.get_MF_lengths_at_node(this->current_node);
-  // std::cout << "1.2" << std::endl;
   if(these_neighbors.size() == 0)
     return;
 
@@ -379,17 +377,18 @@ void chonk::move_MF_from_fastscapelib_threshold_SF(NodeGraphV2& graph, double th
   double sumslopes = 0;
   double maxslope = -9999;
   int id_max_slope = 0;
+
   if(these_neighbors.size() > 1)
   {
     for(size_t i=0; i< these_neighbors.size(); i++)
     {
+
       double this_slope = (surface_elevation[this->current_node] -  surface_elevation[these_neighbors[i]])/these_lengths[i];
       if(this_slope>maxslope)
       {
         maxslope = this_slope;
         id_max_slope = i;
       }
-      // std::cout << this_slope << std::endl;
       powerslope[i] = std::pow(this_slope,(0.5 + 0.6 * this_slope));
       sumslopes += powerslope[i];
     }
@@ -433,6 +432,7 @@ void chonk::move_MF_from_fastscapelib_threshold_SF(NodeGraphV2& graph, double th
 
     // getting the slope, dz/dx
     double this_slope = 0;
+    std::cout << these_lengths.size() << std::endl;
     if((these_lengths[i] >= Xres) || (these_lengths[i] >= Yres))
       this_slope = (surface_elevation[this->current_node] - surface_elevation[this_neightbor]) / these_lengths[i];
     else

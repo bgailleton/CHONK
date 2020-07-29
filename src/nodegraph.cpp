@@ -191,19 +191,23 @@ NodeGraphV2::NodeGraphV2(
     int this_target_basin = force_target_basin[i];
     // new list of receivers, I am only keeping the ones NOT draining to original basin
     std::vector<int> new_rec;
+    std::vector<double> new_length;
+    int idL=0;
     for(auto trec:graph[this_node_to_check].receivers)
     {
       if(basin_labels[trec] != this_target_basin || trec == this_node_to_check || active_nodes[trec] == false)
       {
         new_rec.push_back(trec);
+        new_length.push_back(this->graph[this_node_to_check].length2rec[idL]);
       }
-
+      idL++;
     }
     // Security check
     if(new_rec.size()==0 && active_nodes[this_node_to_check] == 1 )
       throw std::runtime_error("At node " + std::to_string(this_node_to_check) + " no receivers after corrections! it came from pit " + std::to_string(origin_pit[i]));
     // Correcting the rec
-    graph[this_node_to_check].receivers = new_rec;
+    this->graph[this_node_to_check].receivers = new_rec;
+    this->graph[this_node_to_check].length2rec = new_length;
   }
 
   // I am now ready to create my topological order utilising a c++ port of the fortran algorithm from Jean Braun
@@ -227,22 +231,29 @@ NodeGraphV2::NodeGraphV2(
   // I got my topological order, I can now restore the corrupted receiver I had
   for(size_t i=0; i<node_to_check.size(); i++)
   {
-    // New receiver array
-    std::vector<int> rec;
-    // Repicking the ones from fastscapelib-fortran
-    for(size_t j=0;j<8; j++)
-    {
-      int trec = Mrec(node_to_check[i],j);
-      if(trec < 0 || node_to_check[i] == trec)
-      {continue;}
-      rec.push_back(trec);
-    }
+    // // New receiver array
+    // std::vector<int> rec;
+    // // Repicking the ones from fastscapelib-fortran
+    // for(size_t j=0;j<8; j++)
+    // {
+    //   int trec = Mrec(node_to_check[i],j);
+    //   if(trec < 0 || node_to_check[i] == trec)
+    //   {continue;}
+    //   rec.push_back(trec);
+    // }
+    std::vector<int> to_recompute = {node_to_check[i]};
+    this->compute_receveivers_and_donors(active_nodes,elevation,to_recompute);
+
     // VERY IMPORTANT HERE!!!!!
     // In the particular case where my outlet is *also* a pit, I do not want to remove its receiver
     if(pits_to_reroute[node_to_check[i]])
-      rec.push_back(Prec[Prec[node_to_check[i]]]);
-    // Correcting the Vertex inplace
-    graph[node_to_check[i]].receivers = rec;
+    {
+      this->graph[node_to_check[i]].receivers.push_back(Prec[Prec[node_to_check[i]]]);
+      this->graph[node_to_check[i]].length2rec.push_back(1);
+    }
+
+    // // Correcting the Vertex inplace
+    // graph[node_to_check[i]].receivers = rec;
   }
   
   //Done
@@ -408,6 +419,15 @@ void NodeGraphV2::initial_correction_of_MF_receivers_and_donors(xt::pytensor<int
 //Homemade_calculation of receivers and donors
 void NodeGraphV2::compute_receveivers_and_donors(xt::pytensor<bool,1>& active_nodes, xt::pytensor<double,1>& elevation)
 {
+  std::vector<int> nodes_to_compute;
+  nodes_to_compute.reserve(this->un_element);
+  for(int i=0;i<this->un_element;i++)
+    nodes_to_compute.emplace_back(i);
+  this->compute_receveivers_and_donors(active_nodes,  elevation, nodes_to_compute);
+}
+
+void NodeGraphV2::compute_receveivers_and_donors(xt::pytensor<bool,1>& active_nodes, xt::pytensor<double,1>& elevation, std::vector<int>& nodes_to_compute)
+{
 
   // these vectors are additioned to the node indice to test the neighbors
   std::vector<std::vector<int> > neighbors;
@@ -420,7 +440,7 @@ void NodeGraphV2::compute_receveivers_and_donors(xt::pytensor<bool,1>& active_no
   double diag = std::sqrt(std::pow(dx,2) + std::pow(dy,2));
   std::vector<double> l2r = {diag,dy,diag,dx,dx,diag,dy,diag};
 
-  for(int i =0; i< active_nodes.size(); i++)
+  for(auto& i:nodes_to_compute)
   {
     if(active_nodes[i] == false)
       continue;

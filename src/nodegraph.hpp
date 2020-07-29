@@ -138,7 +138,7 @@ void update_receivers_at_node(int node, std::vector<int>& new_receivers);
 void update_donors_at_node(int node, std::vector<int>& new_donors);
 
 void compute_receveivers_and_donors(xt::pytensor<bool,1>& active_nodes, xt::pytensor<double,1>& elevation);
-
+void compute_receveivers_and_donors(xt::pytensor<bool,1>& active_nodes, xt::pytensor<double,1>& elevation, std::vector<int>& nodes_to_compute);
 
 std::vector<int> get_broken_nodes(){return not_in_stack;}
 
