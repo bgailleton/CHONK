@@ -83,8 +83,8 @@ PYBIND11_MODULE(CHONK_cpp, m)
 
     py::class_<NodeGraphV2>(m, "NodeGraph",py::dynamic_attr())
       .def(py::init<>())
-      .def(py::init([](xt::pytensor<int,1>& D8stack, xt::pytensor<int,1>& D8rec, xt::pytensor<int,1>& Prec, xt::pytensor<double,1>& D8Length, xt::pytensor<int,2>& Mrec,xt::pytensor<double,2>& Mlength, xt::pytensor<double,1>& elevation,xt::pytensor<bool,1>& active_nodes, 
-        double dx, double dy, int nrows, int ncols){return std::unique_ptr<NodeGraphV2>(new NodeGraphV2( D8stack,  D8rec, Prec,  D8Length, Mrec, Mlength, elevation,active_nodes,  dx,  dy, nrows, ncols)); }))
+      .def(py::init([]( xt::pytensor<double,1>& elevation,xt::pytensor<bool,1>& active_nodes, 
+        double dx, double dy, int nrows, int ncols){return std::unique_ptr<NodeGraphV2>(new NodeGraphV2( elevation,active_nodes,  dx,  dy, nrows, ncols)); }))
       .def("get_MF_stack_full", &NodeGraphV2::get_MF_stack_full)
       ;
 

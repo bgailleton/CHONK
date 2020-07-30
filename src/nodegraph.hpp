@@ -101,12 +101,6 @@ public:
 
   // Contructor for grid-type DEM from fastscape
   NodeGraphV2(
-xt::pytensor<int,1>& D8stack, // D8 original stack
-xt::pytensor<int,1>& D8rec, // D8 original receivers
-xt::pytensor<int,1>& Prec, 
-xt::pytensor<double,1>& D8Length, // D8 length2rec
-xt::pytensor<int,2>& Mrec, // Multiple rec,  - all downslope recs
-xt::pytensor<double,2>& Mlength, // Multiple length, - corresponding length to receivers
 xt::pytensor<double,1>& elevation, // vectorised elevation
 xt::pytensor<bool,1>& active_nodes, // array of active node - ie true where the node has erosion and stuff, false when it allows fluxes to escape
 double dx, // resolution in x
@@ -147,6 +141,7 @@ void get_D8_neighbors(int i, xt::pytensor<bool,1>& active_nodes, std::vector<int
 
 void get_D4_neighbors(int i, xt::pytensor<bool,1>& active_nodes, std::vector<int>& neightbouring_nodes, std::vector<double>& length2neigh);
 
+int get_Srec(int i) {return this->graph[i].Sreceivers;}
 
 std::vector<int> get_broken_nodes(){return not_in_stack;}
 
@@ -167,7 +162,7 @@ int _add2stack(int& inode, int& istack);
 
 // Compute the Single flow basin labels and the pits
 void compute_basins(xt::pytensor<bool,1>& active_nodes);
-
+void compute_pits(xt::pytensor<bool,1>& active_nodes);
 void correct_flowrouting(xt::pytensor<bool,1>& active_nodes, xt::pytensor<double,1>& elevation);
 void _connect_basins(xt::pytensor<int,2>& conn_basins, xt::pytensor<int,2>& conn_nodes, xt::pytensor<double,1>& conn_weights,          
                    xt::pytensor<bool,1>& active_nodes, xt::pytensor<double,1>& elevation, int& nconn, int& basin0);
@@ -229,7 +224,7 @@ class UnionFind
       this->_rank = xt::zeros<int>({size}) ;
     };
 
-    void Union(int x, int y)
+    void Union(int& x, int& y)
     {
       int xroot = this->Find(x);
       int yroot = this->Find(y);

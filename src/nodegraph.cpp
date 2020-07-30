@@ -57,12 +57,6 @@ void set_DEBUG_switch_nodegraph(std::vector<std::string> params, std::vector<boo
 
 
 NodeGraphV2::NodeGraphV2(
-  xt::pytensor<int,1>& Sstack,
-  xt::pytensor<int,1>& Srec, 
-  xt::pytensor<int,1>& Prec, 
-  xt::pytensor<double,1>& SLength, 
-  xt::pytensor<int,2>& Mrec,
-  xt::pytensor<double,2>& Mlength, 
   xt::pytensor<double,1>& elevation,
   xt::pytensor<bool,1>& active_nodes,
   double dx,
@@ -75,8 +69,8 @@ NodeGraphV2::NodeGraphV2(
   this->dx = dx;
   this->dy = dy;
   this->cellarea = dx * dy;
-  this-> n_element = Sstack.size();
-  this-> un_element = Sstack.size();
+  this->n_element = nrows*ncols;
+  this->un_element = nrows*ncols;
   this->nrows = nrows;
   this->ncols = ncols;
 
@@ -85,7 +79,7 @@ NodeGraphV2::NodeGraphV2(
   this->neightbourer.push_back({(nrows - 1) * ncols - 1, (nrows - 1) * ncols, (nrows - 1) * ncols + 1, -1,1,ncols - 1, ncols, ncols + 1 });// periodic_first_row 1
   this->neightbourer.push_back({-ncols - 1, - ncols, - ncols + 1, -1,1,- (nrows - 1) * ncols - 1, - (nrows - 1) * ncols, - (nrows - 1) * ncols + 1 });// periodic_last_row 2
   this->neightbourer.push_back({- 1, - ncols, - ncols + 1, (ncols - 1),1, 2 * ncols - 1, ncols, ncols + 1 });// periodic_first_col 3
-  this->neightbourer.push_back({-ncols - 1, - ncols, - 2 * ncols + 1, -1,-(ncols -1), ncols - 1, ncols,  1 }); //periodic last_col 4
+  this->neightbourer.push_back({-ncols - 1, - ncols, - 2 * ncols + 1, -1,-ncols + 1, ncols - 1, ncols, 1 }); //periodic last_col 4
 
   double diag = std::sqrt(std::pow(dx,2) + std::pow(dy,2));
   this->lengthener = {diag,dy,diag,dx,dx,diag,dy,diag};
@@ -94,46 +88,50 @@ NodeGraphV2::NodeGraphV2(
   // It does not include non active nodes (i.e. base level of the model/output of the model)
   pits_to_reroute = std::vector<bool>(un_element,false);
 
+    graph.reserve(un_element);
+  for(int i=0; i<n_element;i++)
+    graph.emplace_back(Vertex(i));
+
+  // computing receivers and donors information, multi and SS flow
+  this->compute_receveivers_and_donors(active_nodes,elevation);
+
+  // computing the original Single flow topological order
+  this->Sstack = xt::zeros<int>({this->n_element});
+  this->compute_stack();
+
+  // Computing basin info from stack
+  this->compute_basins(active_nodes);
+  this->compute_pits(active_nodes);
+
   //# Iterating through the nodes on the stack to gather all the pits
-  for(auto node:Sstack)
+  for(auto node:this->Sstack)
   {
     // If a pit is its single-flow receiver and an active node it is a pit to reroute
-    if(Srec[node] == node && active_nodes[node])
+    if(this->graph[node].Sreceivers == node && active_nodes[node])
     {
       pits_to_reroute[node] = true;
     }
   }
 
-  // Now I am labelling my basins
+
+    // Now I am labelling my basins
   //# Initialising the vector of basin labels
-  std::vector<int> basin_labels(Sstack.size(),-1);
+  std::vector<int> basin_labels(this->Sstack.size(),-1);
   //# Initialising the label to 0
   int label = 0;
   //# Iterating through all my single-flow stack from bottom to top (see Braun and Willett 2013 for meaning of stack)
   //# if a node is it's receiver then the label becomse that node. The resulting basin vector show which nodes are linked to which
-  for(auto node:Sstack)
+  for(auto node:this->Sstack)
   {
-    if(node == Srec[node])
+    if(node == this->graph[node].Sreceivers)
     {
       label = node;
     }
     basin_labels[node] = label;
   }
 
-  // // Initialising a temporary donor matrix to match the fastscape one
-  // xt::pytensor<int,2> Mdon({int(un_element), 8});
-  // for(size_t i=0;i<un_element;i++)
-  // for(size_t j=0; j<8;j++)
-  //   Mdon(i,j) = -1;
+  this->correct_flowrouting(active_nodes, elevation);
 
-  // // Correcting receivers from fastscapelib (removing duplicates and creating the donors array)
-  // this->initial_correction_of_MF_receivers_and_donors(Mrec, Mdon, elevation);
-
-  graph.reserve(un_element);
-  for(int i=0; i<n_element;i++)
-    graph.emplace_back(Vertex(i));
-
-  this->compute_receveivers_and_donors(active_nodes,elevation);
 
   // Initialising the node graph, a vector of Vertexes with their edges
   //# I will need a vector gathering the nodes I'll need to check for potential cyclicity
@@ -145,30 +143,13 @@ NodeGraphV2::NodeGraphV2(
   //#Iterating through the nodes
   for(int i=0; i<n_element;i++)
   {
-    // // gathering local info for this vertex
-    // std::vector<int>donors,receivers;
-    // std::vector<double> length2rec;
-    // for(size_t j=0; j<8;j++)
-    // {
-    //   // Getting donors
-    //   int nD = Mdon(i,j);
-    //   // -1 -> not a donor (fortran does not have easily usable sparse matrix)
-    //   if(nD>=0 && nD != i)
-    //     donors.push_back(nD);
-    //   // Same with receivers
-    //   int nR = Mrec(i,j);
-    //   if(nR>=0)
-    //   {
-    //     receivers.push_back(nR);
-    //     length2rec.push_back(Mlength(i,j));
-    //   }
-    // }
-    // Done with classic receivers
     // If this receiver is a pit to reroute, I need to add to the receiver list the receiver of the outlet
     if(pits_to_reroute[i] == true)
     {
       //# Node I wanna add
-      int tgnode = Prec[Prec[i]];
+      int tgnode = this->graph[i].Sreceivers;
+      if(pits_to_reroute[tgnode] == false)
+        tgnode = this->graph[tgnode].Sreceivers;
       //# Will be a receiver
       this->graph[i].receivers.push_back(tgnode);
       //# I will have to check its own receivers for potential cyclicity
@@ -176,14 +157,14 @@ NodeGraphV2::NodeGraphV2(
       //# Which pit is it connected to
       origin_pit.push_back(i);
       //# Arbitrary length
-      this->graph[i].length2rec.push_back(1);
+      this->graph[i].length2rec.push_back(dx*10000.);
       //# The basin I DONT want to reach
       force_target_basin.push_back(i);
 
       // Keepign this check just in case, will remove later. Throw an error in case cyclicity is detected
       if(basin_labels[tgnode] == basin_labels[i])
       {
-        throw std::runtime_error("Receiver in same basin!");
+        throw std::runtime_error("Receiver in same basin! Node " + std::to_string(i) + " gives to " + std::to_string(this->graph[i].Sreceivers) + " gives to " + std::to_string(tgnode));
       }
     }
 
@@ -227,20 +208,7 @@ NodeGraphV2::NodeGraphV2(
   // I am now ready to create my topological order utilising a c++ port of the fortran algorithm from Jean Braun
   bool has_failed = false;
   Mstack = xt::adapt(multiple_stack_fastscape( n_element, graph, this->not_in_stack, has_failed));
-  // int correction_level = 2;
-  // while(has_failed)
-  // {
-  //   std::cout << "Fast stack calculation has failed, correcting it, this slows down the model, if significantly remind me to sort this problem" << std::endl;
-  //   this->fix_cyclicity(node_to_check, Sstack, Srec,Prec,Mrec, correction_level);
-  //   has_failed = false;
-  //   std::cout << this->not_in_stack.size() << " nodes not in stack before" << std::endl;
-  //   this->not_in_stack ={};
-  //   Mstack = xt::adapt(multiple_stack_fastscape( n_element, graph, this->not_in_stack, has_failed));
-  //   std::cout << this->not_in_stack.size() << " nodes not in stack after" << std::endl;
-  //   correction_level ++;
-  //   // if(has_failed)
-  //   //   throw std::runtime_error("Stack failed second iteration, critical error");
-  // }
+
 
   // I got my topological order, I can now restore the corrupted receiver I had
   for(size_t i=0; i<node_to_check.size(); i++)
@@ -262,8 +230,8 @@ NodeGraphV2::NodeGraphV2(
     // In the particular case where my outlet is *also* a pit, I do not want to remove its receiver
     if(pits_to_reroute[node_to_check[i]])
     {
-      this->graph[node_to_check[i]].receivers.push_back(Prec[Prec[node_to_check[i]]]);
-      this->graph[node_to_check[i]].length2rec.push_back(1);
+      this->graph[node_to_check[i]].receivers.push_back(this->graph[this->graph[node_to_check[i]].Sreceivers].Sreceivers);
+      this->graph[node_to_check[i]].length2rec.push_back(dx * 10000.);
     }
 
     // // Correcting the Vertex inplace
@@ -294,43 +262,9 @@ void NodeGraphV2::fix_cyclicity(
 
   std::vector<int> nodes_to_double_check;
 
-   // TRY 1: failed
-  // for(auto& node:node_to_check)
-  // {
-  //   if(is_not_in_stack[node])
-  //     nodes_to_double_check.push_back(node);
-
-  // }
-  // std::cout << "Potential problem on nodes::";
-  // for (auto node: nodes_to_double_check)
-  //   std::cout << node << "||";
-  // std::cout << std::endl;
-  // std::cout << " I am on it ..." << std::endl;
-
-  // std::vector<int> index_in_oStack(this->un_element);
-  // for(size_t i =0; i< Sstack.size();i++)
-  //   index_in_oStack[Sstack[i]] = int(i);
-
-  // for(auto& node: nodes_to_double_check)
-  // {
-  //   std::vector<int> old_rec = this->graph[node].receivers;
-  //   int min_rec = std::numeric_limits<int>::min();
-  //   int tid_stack = std::numeric_limits<int>::min();
-  //   for(auto rec:old_rec)
-  //   {
-  //     if(index_in_oStack[rec]>tid_stack)
-  //     {
-  //       tid_stack = index_in_oStack[rec];
-  //       min_rec = rec;
-  //     }
-  //   }
-  //   if(old_rec.size()>0)
-  //     this->graph[node].receivers = {min_rec};
-  // }
 
   // TRY 2:
   // Label the basins and identify the pits in the nodes to correct
-  std::cout << "1" << std::endl;
   std::vector<int> baslab(this->un_element);
   int tlabel = Sstack[0];
   for(size_t i=0; i< this->un_element; i++)
@@ -343,7 +277,6 @@ void NodeGraphV2::fix_cyclicity(
     }
     baslab[Sstack[i]] = tlabel;
   }
-  std::cout << "2" << std::endl;
 
   for(auto node:nodes_to_double_check)
   {
@@ -446,7 +379,10 @@ void NodeGraphV2::compute_receveivers_and_donors(xt::pytensor<bool,1>& active_no
   for(auto& i:nodes_to_compute)
   {
     if(active_nodes[i] == false)
+    {
+      this->graph[i].Sreceivers = i;
       continue;
+    }
     std::vector<int> receivers,donors;
     std::vector<double> length2rec,length2don;
     int checker;
@@ -461,11 +397,11 @@ void NodeGraphV2::compute_receveivers_and_donors(xt::pytensor<bool,1>& active_no
     else
       checker = 0;
 
-    // if(checker>0)
-    //   std::cout << "CHECKER IS " << checker << " ||";
 
     double& this_elev = elevation[i];
     double test_elev;
+    double SS = std::numeric_limits<double>::min();
+    int SSid = -1;
     int idL = -1;
     for(auto& adder:this->neightbourer[checker])
     {
@@ -476,6 +412,12 @@ void NodeGraphV2::compute_receveivers_and_donors(xt::pytensor<bool,1>& active_no
       {
         receivers.push_back(node);
         length2rec.push_back(this->lengthener[idL]);
+        double slope = (this_elev - test_elev)/ this->lengthener[idL];
+        if(slope>SS)
+        {
+          SS = slope;
+          SSid = node;
+        }
       }
       else if(test_elev>this_elev)
       {
@@ -487,18 +429,16 @@ void NodeGraphV2::compute_receveivers_and_donors(xt::pytensor<bool,1>& active_no
     this->graph[i].donors = donors;
     this->graph[i].length2rec = length2rec;
     this->graph[i].length2don = length2don;
-
-    if(i==6299)
-    {
-      std::cout << "CHECKER WAS :: " << checker << std::endl;
-      std::cout << "receivers::";
-      for(auto r:receivers)
-        std::cout << r << "||";
-      std::cout<<std::endl << "donors::";
-      for(auto r:donors)
-        std::cout << r << "||";
-      std::cout<<std::endl;
+    if(SSid>=0)
+    {  
+      this->graph[i].Sreceivers = SSid;
+      this->graph[SSid].Sdonors.push_back(i);
     }
+    else
+    {
+      this->graph[i].Sreceivers = i;
+    }
+
   }
 
 
@@ -739,7 +679,6 @@ std::vector<int> multiple_stack_fastscape(int n_element, std::vector<Vertex>& gr
     if(SAFE_STACK_STOPPER)
       throw std::runtime_error("stack underpopulated, SAFE_STACK_STOPPER triggered (CHONK.set_DEBUG_switch_nodegraph(['SAFE_STACK_STOPPER'],false) to deactivate).");
   }
-  std::cout << "BUTE::" << SAFE_STACK_STOPPER << std::endl;
 
   return stack;
 }
@@ -769,7 +708,7 @@ void NodeGraphV2::compute_stack()
   {
     if (this->graph[inode].Sreceivers == inode)
     {
-      Sstack[istack] = inode;
+      this->Sstack[istack] = inode;
       istack ++;
       istack = this->_add2stack(inode, istack);
     }
@@ -793,7 +732,6 @@ int NodeGraphV2::_add2stack(int& inode, int& istack)
 void NodeGraphV2::compute_basins(xt::pytensor<bool,1>& active_nodes)
 {
   int ibasin = -1, istack,irec;
-  int ipit = 0;
   SBasinID = xt::zeros<int>({this->un_element});
 
   for(int inode=0; inode<this->n_element;inode++)
@@ -805,17 +743,29 @@ void NodeGraphV2::compute_basins(xt::pytensor<bool,1>& active_nodes)
     {
       ibasin ++;
       SBasinOutlets.push_back(istack);
-      if(active_nodes[istack])
-      {
-        pits.push_back(istack);
-        ipit++;
-      }
     }
     SBasinID[istack] = ibasin;
   }
 
   this->nbasins = ibasin + 1;
+}
+
+void NodeGraphV2::compute_pits(xt::pytensor<bool,1>& active_nodes)
+{
+  int ipit = 0;
+
+  for (int ibasin = 0; ibasin<nbasins; ibasin++)
+  {
+    int inode = this->SBasinOutlets[ibasin];
+
+    if (active_nodes[inode])
+    {
+      pits.push_back(inode);
+      ipit += 1;
+    }
+  }
   this->npits = ipit;
+
 }
 
 void NodeGraphV2::correct_flowrouting(xt::pytensor<bool,1>& active_nodes, xt::pytensor<double,1>& elevation)
@@ -829,7 +779,7 @@ void NodeGraphV2::correct_flowrouting(xt::pytensor<bool,1>& active_nodes, xt::py
     int& nnodes = this->n_element;
 
     // # theory of planar graph -> max nb. of connections known
-    int nconn_max = this->nbasins * 3;
+    int nconn_max = this->nbasins * 7;
     xt::pytensor<int,2> conn_basins = xt::zeros<int>({nconn_max,2}); // np.empty((nconn_max, 2), dtype=np.intp)
     for(size_t i=0;i<nconn_max;i++)
     {
@@ -848,6 +798,37 @@ void NodeGraphV2::correct_flowrouting(xt::pytensor<bool,1>& active_nodes, xt::py
 
     int nconn, basin0;
     this->_connect_basins(conn_basins, conn_nodes, conn_weights, active_nodes, elevation, nconn, basin0);
+    
+    int scb = nconn, scn = nconn, scw = nconn;
+    // for(size_t i=0;i<nconn_max;i++)
+    // {
+    //   if(scb == -1 && conn_basins(i,0) == -2)
+    //     scb = int(i);
+    //   if(scn == -1 && conn_nodes(i,0) == -2)
+    //     scn = int(i);
+    //   if(scw == -1 && conn_weights(i) == -2)
+    //     scw = int(i);
+    // }
+
+    xt::pytensor<int,2> conn_basins_2 = xt::zeros<int>({scb,2});
+    xt::pytensor<int,2> conn_nodes_2 = xt::zeros<int>({scn,2});
+    xt::pytensor<double,1> conn_weights_2 = xt::zeros<double>({scw}); //conn_weights = np.empty(nconn_max, dtype=np.float64)
+
+    for(size_t i=0; i<scb ; i++)
+    {
+      conn_basins_2(i,0) = conn_basins(i,0);
+      conn_basins_2(i,1) = conn_basins(i,1);
+    }
+    for(size_t i=0; i<scn ; i++)
+    {
+      conn_nodes_2(i,0) = conn_nodes(i,0);
+      conn_nodes_2(i,1) = conn_nodes(i,1);
+    }
+
+    for(size_t i=0; i<scw ; i++)
+      conn_weights_2[i] = conn_weights[i];
+
+
 
     // if method == 'mst_linear':
     //     mstree = _compute_mst_linear(conn_basins, conn_weights, nbasins)
@@ -855,9 +836,11 @@ void NodeGraphV2::correct_flowrouting(xt::pytensor<bool,1>& active_nodes, xt::py
     //     mstree = _compute_mst_kruskal(conn_basins, conn_weights, nbasins)
     // else:
     //     raise ValueError("invalid flow correction method %r" % method)
-    xt::xtensor<int,1> mstree = _compute_mst_kruskal(conn_basins, conn_weights);
+    xt::xtensor<int,1> mstree = _compute_mst_kruskal(conn_basins_2, conn_weights_2);
 
-    this->_orient_basin_tree(conn_basins,conn_nodes,basin0, mstree);
+    this->_orient_basin_tree(conn_basins_2,conn_nodes_2,basin0, mstree);
+    this->_update_pits_receivers(conn_basins_2, conn_nodes_2, mstree, elevation);    
+
 
     // _update_pits_receivers(receivers, dist2receivers, outlets,
     //                        conn_basins, conn_nodes,
@@ -910,20 +893,16 @@ void NodeGraphV2::_connect_basins(xt::pytensor<int,2>& conn_basins, xt::pytensor
   basin0 = -1; //intp?
   int ibasin = 0;
 
-  xt::pytensor<int,1> conn_pos = xt::zeros<int>({size_t(this->nbasins)}); //np.full(nbasins, -1, dtype=np.intp)
+  xt::pytensor<int,1> conn_pos = xt::zeros<int>({this->nbasins}); //np.full(nbasins, -1, dtype=np.intp)
   for(auto& v:conn_pos)
     v = -1;
 
 
-  xt::pytensor<int,1> conn_pos_used = xt::zeros<int>({size_t(this->nbasins)});  // conn_pos_used = np.empty(nbasins, dtype=np.intp)
+  xt::pytensor<int,1> conn_pos_used = xt::empty<int>({this->nbasins});  // conn_pos_used = np.empty(nbasins, dtype=np.intp)
 
   int conn_pos_used_size = 0;
 
   bool iactive = false;
-
-  // # king (D4) neighbor lookup
-  std::vector<int> dr = {0, -1, 1, 0};
-  std::vector<int> dc = {-1, 0, 0, 1};
 
   for(auto& istack : this->Sstack)
   {
@@ -957,7 +936,7 @@ void NodeGraphV2::_connect_basins(xt::pytensor<int,2>& conn_basins, xt::pytensor
           conn_nodes(iconn,0) = -1;
           conn_nodes(iconn,1) = -1;
 
-          conn_weights[iconn] = std::numeric_limits<double>::min();
+          conn_weights[iconn] = - std::numeric_limits<double>::max();
           iconn ++;
         }
       }
@@ -967,7 +946,7 @@ void NodeGraphV2::_connect_basins(xt::pytensor<int,2>& conn_basins, xt::pytensor
     {
       std::vector<int> D4n;
       std::vector<double> D4l;
-      this->get_D4_neighbors(istack,active_nodes, D4n, D4l);
+      this->get_D8_neighbors(istack,active_nodes, D4n, D4l);
       for(auto ineighbor:D4n)
       {
 
@@ -1006,7 +985,7 @@ void NodeGraphV2::_connect_basins(xt::pytensor<int,2>& conn_basins, xt::pytensor
         {
           // conn_nodes[conn_idx] = (istack, ineighbor);
           conn_nodes(conn_idx,0) = istack;
-          conn_nodes(conn_idx,0) = ineighbor;
+          conn_nodes(conn_idx,1) = ineighbor;
           conn_weights[conn_idx] = weight;
         }
       }
@@ -1033,14 +1012,11 @@ xt::xtensor<int,1> NodeGraphV2::_compute_mst_kruskal(xt::pytensor<int,2>& conn_b
   // # sort edges
   auto sort_id = xt::argsort(conn_weights);
 
+
   UnionFind uf(nbasins);
 
   for (auto& eid : sort_id)
   {
-    // ignoring not basin
-    if(conn_weights[eid] == -2)
-      continue;
-
     int b0 = conn_basins(eid, 0);
     int b1 = conn_basins(eid, 1);
 
@@ -1051,7 +1027,6 @@ xt::xtensor<int,1> NodeGraphV2::_compute_mst_kruskal(xt::pytensor<int,2>& conn_b
       uf.Union(b0, b1);
     }
   }
-
   return mstree;
 }
 
@@ -1071,9 +1046,12 @@ void NodeGraphV2::_orient_basin_tree(xt::pytensor<int,2>& conn_basins, xt::pyten
   // # parse the edges to compute the number of edges per node
   for (auto& i : tree)
   {
+    // if(i<0)
+    //   // std::cout << i << "||";
     nodes_connects_size[conn_basins(i, 0)]++;
     nodes_connects_size[conn_basins(i, 1)]++;
   }
+  std::cout << std::endl;
 
   // # compute the id of first edge in adjacency table
   nodes_connects_ptr[0] = 0;
@@ -1085,13 +1063,14 @@ void NodeGraphV2::_orient_basin_tree(xt::pytensor<int,2>& conn_basins, xt::pyten
   }
 
   // # create the adjacency table
-  int nodes_adjacency_size = nodes_connects_ptr[-1] + nodes_connects_size[-1];
-  nodes_connects_size[-1] = 0;
+  int nodes_adjacency_size = nodes_connects_ptr[nbasins - 1] + nodes_connects_size[nbasins - 1];
+  nodes_connects_size[this->nbasins -1] = 0;
   xt::xtensor<int,1> nodes_adjacency = xt::zeros<int>({nodes_adjacency_size});
 
   // # parse the edges to update the adjacency
   for (auto& i : tree)
   {
+
     int n1 = conn_basins(i, 0);
     int n2 = conn_basins(i, 1);
     nodes_adjacency[nodes_connects_ptr[n1] + nodes_connects_size[n1]] = i;
@@ -1108,22 +1087,26 @@ void NodeGraphV2::_orient_basin_tree(xt::pytensor<int,2>& conn_basins, xt::pyten
   stack(0,0) = basin0;// (basin0, basin0)
   stack(0,1) = basin0;
 
+  
+  // CHEKCED UNTIL HERE
+  int n_turn=0;
   while (stack_size > 0)
   {
+    n_turn++;
     // # get parsed node
-    stack_size -= 1;
+    stack_size = stack_size - 1;
     int node = stack(stack_size, 0);
     int parent = stack(stack_size, 1);
 
     // # for each edge of the graph
     // for i in range(nodes_connects_ptr[node], nodes_connects_ptr[node] + nodes_connects_size[node])
-    for( int i = nodes_connects_ptr[node]; i< nodes_connects_ptr[node] + nodes_connects_size[node]; i++) 
+    for( int i = nodes_connects_ptr[node]; i < (nodes_connects_ptr[node] + nodes_connects_size[node]); i++) 
     {
       int edge_id = nodes_adjacency[i];
 
       // # the edge comming from the parent node has already been updated.
       // # in this case, the edge is (parent, node)
-      if (conn_basins(edge_id, 0) == parent && node != parent || conn_basins(edge_id, 0) == -2)
+      if (conn_basins(edge_id, 0) == parent && node != parent)
           continue;
 
       // # we want the edge to be (node, next)
@@ -1131,15 +1114,24 @@ void NodeGraphV2::_orient_basin_tree(xt::pytensor<int,2>& conn_basins, xt::pyten
       if(node != conn_basins(edge_id, 0))
       {
         // # swap n1 and n2
-        conn_basins(edge_id, 0), conn_basins(edge_id, 1) = (conn_basins(edge_id, 1), conn_basins(edge_id, 0));
+        int cb1 = conn_basins(edge_id, 1);
+        int cb0 = conn_basins(edge_id, 0);
+        conn_basins(edge_id, 0) = cb1;
+        conn_basins(edge_id, 1) = cb0;
+
+        cb1 = conn_nodes(edge_id, 1);
+        cb0 = conn_nodes(edge_id, 0);
         // # swap p1 and p2
-        conn_nodes(edge_id, 0), conn_nodes(edge_id, 1) = (conn_nodes(edge_id, 1), conn_nodes(edge_id, 0));
+        conn_nodes(edge_id, 0) = cb1;
+        conn_nodes(edge_id, 1) = cb0;
       }
       // # add the opposite node to the stack
-      stack[stack_size] = (conn_basins(edge_id, 1), node);
+      stack(stack_size,0) = conn_basins(edge_id, 1);
+      stack(stack_size,1) = node;
       stack_size ++;
     }
   }
+
 }
 
 
@@ -1158,8 +1150,6 @@ void NodeGraphV2::_update_pits_receivers(xt::pytensor<int,2>& conn_basins,xt::py
   // for i in mstree:
   for(auto& i : mstree)
   {
-    if(i<0)
-      continue;
 
     int node_to = conn_nodes(i, 0);
     int node_from = conn_nodes(i, 1);
@@ -1168,7 +1158,11 @@ void NodeGraphV2::_update_pits_receivers(xt::pytensor<int,2>& conn_basins,xt::py
     if (node_from == -1)
         continue;
 
+
     int outlet_from = this->SBasinOutlets[conn_basins(i, 1)];
+
+
+    std::cout << "linking " << outlet_from << " with " << node_to << " or " << node_from << std::endl;
 
     if (elevation[node_from] < elevation[node_to])
     {
@@ -1180,7 +1174,7 @@ void NodeGraphV2::_update_pits_receivers(xt::pytensor<int,2>& conn_basins,xt::py
       this->graph[outlet_from].Sreceivers = node_from;
       this->graph[node_from].Sreceivers = node_to;
       this->graph[outlet_from].length2Srec = this->dx*1000; // just to have a length but it should not actually be used
-      this->graph[node_from].Sreceivers = this->dx; // TODO correct here the correct distance. Should not be used anyway. 
+      this->graph[node_from].length2Srec = this->dx; // TODO correct here the correct distance. Should not be used anyway. 
     }
   }
 }

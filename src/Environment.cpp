@@ -79,7 +79,7 @@ void ModelRunner::initiate_nodegraph()
   // this->graph = NodeGraph(this->io_int_array["pre_stack"],this->io_int_array["pre_rec"],this->io_int_array["post_rec"],this->io_int_array["post_stack"] , this->io_int_array["m_stack"], this->io_int_array2d["m_rec"],this->io_int_array2d["m_don"], 
   //   this->io_double_array["surface_elevation"], this->io_double_array2d["length"], this->io_double["x_min"], this->io_double["x_max"], this->io_double["y_min"], 
   //   this->io_double["y_max"], this->io_double["dx"], this->io_double["dy"], this->io_int["n_rows"], this->io_int["n_cols"], this->io_int["no_data"]);
-  xt::pytensor<bool,1> active_nodes = xt::zeros<bool>({this->io_int_array["D8stack"].size()});
+  xt::pytensor<bool,1> active_nodes = xt::zeros<bool>({this->io_int_array["active_nodes"].size()});
   xt::pytensor<int,1>& inctive_nodes = this->io_int_array["active_nodes"];
 
   for(size_t i =0; i<inctive_nodes.size(); i++)
@@ -90,8 +90,7 @@ void ModelRunner::initiate_nodegraph()
     else
       active_nodes[i] = false;
   }
-  this->graph = NodeGraphV2(this->io_int_array["D8stack"], this->io_int_array["D8rec"], this->io_int_array["Prec"], this->io_double_array["D8Length"],
-this->io_int_array2d["Mrec"] , this->io_double_array2d["Mlength"], this->io_double_array["surface_elevation"], active_nodes,this->io_double["dx"], this->io_double["dy"],
+  this->graph = NodeGraphV2(this->io_double_array["surface_elevation"], active_nodes,this->io_double["dx"], this->io_double["dy"],
 this->io_int["n_rows"], this->io_int["n_cols"]);
 
   std::cout << "done, sorting few stuff around ..." << std::endl;
@@ -119,8 +118,6 @@ this->io_int["n_rows"], this->io_int["n_cols"]);
   {
     this->chonk_network.emplace_back(chonk(int(i), int(i), false));
   }
-
-  this->io_int_array["MF_stack"] = graph.get_MF_stack_full();
 
   // This add previous inherited water from previous lakes
   // Note that it "empties" the lake and reinitialise the depth. If there is still a reason to for the lake, it will form it
@@ -198,6 +195,8 @@ void ModelRunner::run()
 
       }
     }
+    else
+      this->chonk_network[this->graph.get_Srec(i)].add_to_water_flux(this->chonk_network[i].get_water_flux());
 
     // first step is to apply the right move method, to prepare the chonk to move
     this->manage_move_prep(this->chonk_network[node]);
