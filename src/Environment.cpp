@@ -164,33 +164,39 @@ void ModelRunner::run()
     {
       if(this->graph.is_depression(node))
       {
-        // std::cout << "starting lake solving" << std::endl;
-
+        // incrementing a new lake
         this->lake_network.push_back(Lake(lake_incrementor));
-
+        
+        // Getting the total volume of water
         double water_volume = this->chonk_network[node].get_water_flux() * timestep;
-        // std::cout << "Pouring water in lake " << std::endl;
-
+        
+        // adding the water into the lake
         this->lake_network[lake_incrementor].pour_water_in_lake(water_volume,node, 
         node_in_lake, is_processed, inctive_nodes,lake_network, surface_elevation,graph, cellarea, timestep,chonk_network);
-        
+    
+        // getting potential outlet
         int outlet = this->lake_network[lake_incrementor].get_lake_outlet();
-        // std::cout << "done " << std::endl;
 
-        if(outlet >=0)
+        if(outlet >= 0)
         {
-          if(is_processed[outlet])
+          // then is outlet
+          // I first need to reprocess outlet. Outlets are special nodes, I forced them to have a single outlet, because a lake will not spread water all around
+          //#1: reprocess lake outlet, note that it has already be reconditionned in the lake functions
+          this->manage_fluxes_after_moving_prep(this->chonk_network[outlet]);
+          this->chonk_network[outlet].split_and_merge_in_receiving_chonks(this->chonk_network, this->graph, this->io_double_array["surface_elevation_tp1"], io_double_array["sed_height_tp1"], this->timestep);
+          //#2 Is special node, has only one receiver, need to get the checking from dat
+          int node_to_check = this->chonk_network[outlet].get_chonk_receivers()[0];
+          if(is_processed[node_to_check ])
           {
-            // std::cout << "outlet needs reprocessing " << std::endl;
-
-            this->find_underfilled_lakes_already_processed_and_give_water(outlet, is_processed);
+            // This node_to_check  has already been processed
+            this->find_underfilled_lakes_already_processed_and_give_water(node_to_check , is_processed);
           }
         }
-        // check outlet and call it
 
+        // Done with lake management
+        // Incrementing the lake ID
         lake_incrementor++;
-        // std::cout << "done with lake " << std::endl;
-
+        // And skip the end of the run
         continue;
 
       }
@@ -824,9 +830,19 @@ void Lake::pour_water_in_lake(
         // throw std::runtime_error(" The lake has an outlet with no downlslope neighbors ??? This is not possible, check Lake::initial_lake_fill or warn Boris that it happened");
       }
 
-      // redirecting the water to the SS rec
-      chonk_network[SS_ID].add_to_water_flux(out_water_rate);
-      this->outlet_node = SS_ID;
+      // resetting the outlet CHONK
+      chonk_network[this->outlet_node].reinitialise_moving_prep();
+      // forcing the new water flux
+      chonk_network[this->outlet_node].set_water_flux(out_water_rate);
+      // Forcing receivers
+      std::vector<int> rec = {SS_ID};
+      std::vector<double> wwf = {1.};
+      std::vector<double> wws = {1.};
+      std::vector<double> Strec = {SS};
+      chonk_network[this->outlet_node].external_moving_prep(rec,wwf,wws,Strec);
+
+      // ready for re calculation, but it needs to be in the env object
+
 
     }
 
@@ -898,11 +914,11 @@ int Lake::check_neighbors_for_outlet_or_existing_lakes(
       is_in_queue[node] = true;
       this->node_in_queue.push_back(node);
     }
-    // Else, if not in queue and has lower elevation, then it IS an outlet
+    // Else, if not in queue and has lower elevation, then the current mother node IS an outlet
     else if(is_in_queue[node] == false)
     {
-      this->outlet_node = node;
-      break;
+      this->outlet_node = next_node.node;
+      // break; // not breaking the loop: I want to get all myneighbors in the queue for potential repouring water in the thingy
     }
 
     // Moving to the next neighbour
