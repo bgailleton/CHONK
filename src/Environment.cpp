@@ -167,6 +167,9 @@ void ModelRunner::run()
         
         // Getting the total volume of water
         double water_volume = this->chonk_network[node].get_water_flux() * timestep;
+        double sedvol  = this->chonk_network[node].get_sediment_flux();
+
+        this->lake_network[lake_incrementor].pour_sediment_into_lake(sedvol);
         
         // adding the water into the lake
         this->lake_network[lake_incrementor].pour_water_in_lake(water_volume,node, 
@@ -200,7 +203,19 @@ void ModelRunner::run()
       }
     }
     else
-      this->chonk_network[this->graph.get_Srec(i)].add_to_water_flux(this->chonk_network[i].get_water_flux());
+    {
+      if(inctive_nodes[node])
+      {
+        int next_node = this->graph.get_Srec(node);
+        if(graph.is_depression(next_node) == false)
+          next_node = this->graph.get_Srec(next_node);
+
+        this->chonk_network[next_node].add_to_water_flux(this->chonk_network[node].get_water_flux());
+        if(is_processed[next_node] == true)
+          throw std::runtime_error("FATAL_ERROR::NG24, node " + std::to_string(node) + " gives water to " + std::to_string(next_node) + " but is processed already");
+      }
+      continue;
+    }
 
     // first step is to apply the right move method, to prepare the chonk to move
     this->manage_move_prep(this->chonk_network[node]);
@@ -558,6 +573,10 @@ void ModelRunner::process_inherited_water()
 
 }
 
+
+
+
+
 //#################################################
 //#################################################
 //#################################################
@@ -706,6 +725,7 @@ void Lake::ingest_other_lake(
     this_PQ.pop();
   }
 
+  this->volume_of_sediment = other_lake.get_volume_of_sediment();
 
   // Deleting this lake and setting its parent lake
   int save_ID = other_lake.get_lake_id();
@@ -714,6 +734,11 @@ void Lake::ingest_other_lake(
   other_lake.set_parent_lake(this->lake_id);
 
   return;
+}
+
+void Lake::pour_sediment_into_lake(double sediment_volume)
+{
+  this->volume_of_sediment += sediment_volume;
 }
 
 // Fill a lake with a certain amount of water for the first time of the run
@@ -782,8 +807,9 @@ void Lake::pour_water_in_lake(
     this->n_nodes ++;
 
     //Decreasing water volume by filling teh lake
-    water_volume -= this->n_nodes * cellarea * (this->water_elevation - next_node.elevation );
-
+    double dV = this->n_nodes * cellarea * (this->water_elevation - next_node.elevation );
+    water_volume -= dV;
+    this->volume += dV;
     // At this point I either have enough water to carry on or I stop the process
   }
 
@@ -823,7 +849,8 @@ void Lake::pour_water_in_lake(
       // temporary check, I shall delete it when I'll be sure of it
       if(SS_ID<0)
       {
-        std::cout << "Warning::lake outlet is itself a lake bottom? is it normal?" << std::endl;
+        // std::cout << "Warning::lake outlet is itself a lake bottom? is it normal?" << std::endl;
+        // yes it can be
         SS_ID = this->outlet_node;
         // throw std::runtime_error(" The lake has an outlet with no downlslope neighbors ??? This is not possible, check Lake::initial_lake_fill or warn Boris that it happened");
       }
@@ -838,6 +865,14 @@ void Lake::pour_water_in_lake(
       std::vector<double> wws = {1.};
       std::vector<double> Strec = {SS};
       chonk_network[this->outlet_node].external_moving_prep(rec,wwf,wws,Strec);
+      if(this->volume_of_sediment > this->volume)
+      {
+        double outsed = this->volume_of_sediment - this->volume;
+        this->volume_of_sediment -= outsed;
+        chonk_network[this->outlet_node].set_sediment_flux(outsed);
+      }
+      else
+        chonk_network[this->outlet_node].set_sediment_flux(0.);
 
       // ready for re calculation, but it needs to be in the env object
 
@@ -939,7 +974,7 @@ void  ModelRunner::find_underfilled_lakes_already_processed_and_give_water(int S
   // Using an already processed vector to not readd
   std::vector<bool> to_reprocessed(n_elements,false);
   std::vector<int> traversal(n_elements,-9999); // -9999 is nodata
-  std::unordered_map<int,double> to_add_in_lakes;
+  std::unordered_map<int,double> to_add_in_lakes, to_add_in_lakes_sed_edition;
   traversal[0] = SS_ID;
   to_reprocessed[SS_ID] = true;
   // basically here I wneed to reprocess all nodes dowstream of that one!
@@ -995,13 +1030,15 @@ void  ModelRunner::find_underfilled_lakes_already_processed_and_give_water(int S
     std::vector<int> to_ignore;
     std::vector<int>& crec = chonk_network[node].get_chonk_receivers();
     std::vector<double>& cwawe = chonk_network[node].get_chonk_water_weight();
+    std::vector<double>& csedw = chonk_network[node].get_chonk_sediment_weight();
     for(size_t i=0; i<crec.size(); i++)
     {
       if(node_in_lake[crec[i]]>=0)
       {
         to_ignore.push_back(crec[i]);
         int lake_to_consider = node_in_lake[crec[i]];
-        to_add_in_lakes[lake_to_consider] += cwawe[i] * dt;
+        to_add_in_lakes[lake_to_consider] += cwawe[i] * chonk_network[crec[i]].get_water_flux() * dt;
+        to_add_in_lakes_sed_edition[lake_to_consider] += chonk_network[crec[i]].get_sediment_flux() * csedw[i];
       }
     }
 
@@ -1014,6 +1051,8 @@ void  ModelRunner::find_underfilled_lakes_already_processed_and_give_water(int S
     if(lake_network[lake_to_fill].get_parent_lake()>=0)
       lake_to_fill = lake_network[lake_to_fill].get_parent_lake();
     double water_volume = x.second;
+
+    this->lake_network[lake_to_fill].pour_sediment_into_lake(to_add_in_lakes_sed_edition[lake_to_fill]);
 
     this->lake_network[lake_to_fill].pour_water_in_lake(water_volume,lake_network[lake_to_fill].get_lake_nodes()[0], // pouring water in a random nodfe in the lake, it does not matter
   node_in_lake, is_processed, active_nodes,lake_network, surface_elevation,graph, cellarea, timestep,chonk_network);

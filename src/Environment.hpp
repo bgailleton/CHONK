@@ -73,7 +73,7 @@ class Lake
     Lake() {};
     // Default initialiser
     Lake(int lake_id)
-    {this->lake_id = lake_id; n_nodes = 0; surface = 0; volume = 0; water_elevation = 0; outlet_node = -9999; nodes = std::vector<int>(); has_been_ingeted = -9999; }
+    {this->lake_id = lake_id; n_nodes = 0; surface = 0; volume = 0; water_elevation = 0; outlet_node = -9999; nodes = std::vector<int>(); has_been_ingeted = -9999; volume_of_sediment = 0.; }
 
     // This functions ingest a whole existing lake into the current one *slurp*
     void ingest_other_lake(
@@ -81,6 +81,8 @@ class Lake
        std::vector<int>& node_in_lake, 
        std::vector<bool>& is_in_queue
     );
+
+    void pour_sediment_into_lake(double sediment_volume);
 
     void pour_water_in_lake(
       double water_wolume,
@@ -111,6 +113,8 @@ class Lake
     double get_lake_volume(){return this->volume;}
     double set_lake_volume(double value){ this->volume = value;}
 
+    double get_volume_of_sediment(){return volume_of_sediment;}
+
     std::vector<int>& get_lake_nodes(){return nodes;}
     std::vector<int>& get_lake_nodes_in_queue(){return node_in_queue;}
     std::unordered_map<int,double>& get_lake_depths(){return depths;}
@@ -133,6 +137,8 @@ class Lake
     double volume;
     // the absolute elevation of the water surface
     double water_elevation;
+    //Sediments
+    double volume_of_sediment;
     // The node outletting the lake
     int outlet_node;
     // the index of the lake which ate this one

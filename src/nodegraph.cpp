@@ -190,7 +190,7 @@ NodeGraphV2::NodeGraphV2(
     int idL=0;
     for(auto trec:graph[this_node_to_check].receivers)
     {
-      if(basin_labels[trec] != this_target_basin || trec == this_node_to_check || active_nodes[trec] == false)
+      if(basin_labels[trec] != this_target_basin  || active_nodes[trec] == false) //|| trec == this_node_to_check??
       {
         new_rec.push_back(trec);
         new_length.push_back(this->graph[this_node_to_check].length2rec[idL]);
@@ -207,7 +207,7 @@ NodeGraphV2::NodeGraphV2(
 
   // I am now ready to create my topological order utilising a c++ port of the fortran algorithm from Jean Braun
   bool has_failed = false;
-  Mstack = xt::adapt(multiple_stack_fastscape( n_element, graph, this->not_in_stack, has_failed));
+  Mstack = xt::adapt(multiple_stack_fastscape( n_element, graph, this->not_in_stack, has_failed, active_nodes));
 
 
   // I got my topological order, I can now restore the corrupted receiver I had
@@ -381,6 +381,7 @@ void NodeGraphV2::compute_receveivers_and_donors(xt::pytensor<bool,1>& active_no
     if(active_nodes[i] == false)
     {
       this->graph[i].Sreceivers = i;
+      // this->graph[i].receivers.push_back(i);
       continue;
     }
     std::vector<int> receivers,donors;
@@ -519,7 +520,7 @@ void NodeGraphV2::update_donors_at_node(int node, std::vector<int>& new_donors)
 }
 
 
-std::vector<int> multiple_stack_fastscape(int n_element, std::vector<Vertex>& graph, std::vector<int>& not_in_stack, bool& has_failed)
+std::vector<int> multiple_stack_fastscape(int n_element, std::vector<Vertex>& graph, std::vector<int>& not_in_stack, bool& has_failed, xt::pytensor<bool,1>& active_nodes)
 {
 
   std::vector<int>ndon(n_element,0);
@@ -536,6 +537,7 @@ std::vector<int> multiple_stack_fastscape(int n_element, std::vector<Vertex>& gr
   int nparse = -1;
   int nstack = -1;
 
+  int correcter = 0;
 
   // we go through the nodes
   for(size_t i=0; i<n_element;i++)
@@ -552,9 +554,17 @@ std::vector<int> multiple_stack_fastscape(int n_element, std::vector<Vertex>& gr
     {
       int ijn = parse[nparse];
       nparse = nparse-1;
-      nstack = nstack+1;
 
-      stack[nstack] = ijn;
+      if(active_nodes[ijn])
+      {
+        nstack = nstack+1;
+        stack[nstack] = ijn;
+      }
+      else
+      {
+        correcter++;
+      }
+
       for(int ijk=0; ijk < graph[ijn].receivers.size();ijk++)
       {
         int ijr = graph[ijn].receivers[ijk];
@@ -565,10 +575,21 @@ std::vector<int> multiple_stack_fastscape(int n_element, std::vector<Vertex>& gr
           nparse=nparse+1;
           parse[nparse]=ijr;
         }
+
         
       }
     } 
   }
+
+  for(size_t i=0; i<n_element;i++)
+  {
+    if(active_nodes[i])
+      continue;
+    nstack++;
+    stack[nstack] = int(i);
+  }
+
+
   if(nstack < n_element - 1 )
   {
     has_failed = true;
@@ -1162,7 +1183,7 @@ void NodeGraphV2::_update_pits_receivers(xt::pytensor<int,2>& conn_basins,xt::py
     int outlet_from = this->SBasinOutlets[conn_basins(i, 1)];
 
 
-    std::cout << "linking " << outlet_from << " with " << node_to << " or " << node_from << std::endl;
+    // std::cout << "linking " << outlet_from << " with " << node_to << " or " << node_from << std::endl;
 
     if (elevation[node_from] < elevation[node_to])
     {
@@ -1171,10 +1192,10 @@ void NodeGraphV2::_update_pits_receivers(xt::pytensor<int,2>& conn_basins,xt::py
     }
     else
     {
-      this->graph[outlet_from].Sreceivers = node_from;
-      this->graph[node_from].Sreceivers = node_to;
+      this->graph[outlet_from].Sreceivers = node_to;
+      // this->graph[node_from].Sreceivers = node_to;
       this->graph[outlet_from].length2Srec = this->dx*1000; // just to have a length but it should not actually be used
-      this->graph[node_from].length2Srec = this->dx; // TODO correct here the correct distance. Should not be used anyway. 
+      // this->graph[node_from].length2Srec = this->dx; // TODO correct here the correct distance. Should not be used anyway. 
     }
   }
 }

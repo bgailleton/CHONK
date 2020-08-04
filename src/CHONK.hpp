@@ -92,6 +92,7 @@ class chonk
     std::vector<int>& get_chonk_receivers(){return receivers;}
     // water weights
     std::vector<double>& get_chonk_water_weight(){return weigth_water_fluxes;}
+    std::vector<double>& get_chonk_sediment_weight(){return weigth_sediment_fluxes;}
 
 
     // Depression solver!
