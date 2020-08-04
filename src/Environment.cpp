@@ -142,6 +142,7 @@ void ModelRunner::run()
 
   // Alright now I need to loop from top to bottom
   std::cout << "Starting the run" << std::endl;
+  // Keeping track of which node is processed, for debugging and lake management
   std::vector<bool> is_processed(io_int["n_elements"],false);
 
   // Aliases
@@ -153,12 +154,9 @@ void ModelRunner::run()
 
  
     int node = this->graph.get_MF_stack_at_i(i);
-    // std::cout << node << std::endl;
     is_processed[node] = true;
 
     this->manage_fluxes_before_moving_prep(this->chonk_network[node]);
-    // std::cout << "flux" << std::endl;
-
 
     if(this->lake_solver)
     {
@@ -775,7 +773,7 @@ void Lake::pour_water_in_lake(
     {
       // I therefore save it and break the loop
       this->outlet_node = outlet;
-      std::cout <<"OUTLET FOUND::" << this->outlet_node << std::endl;
+      // std::cout <<"OUTLET FOUND::" << this->outlet_node << std::endl;
       break;
     }
 

@@ -111,6 +111,7 @@ void chonk::split_and_merge_in_receiving_chonks(std::vector<chonk>& chonkscape, 
     // Adding the fluxes*modifyer
     other_chonk.add_to_water_flux(this->water_flux * this->weigth_water_fluxes[i]);
     other_chonk.add_to_sediment_flux(this->sediment_flux * this->weigth_sediment_fluxes[i]);
+    // std::cout << "SEDFLUXDEBUG::" << this->sediment_flux << "||" << this->weigth_sediment_fluxes[i] << "||water::" << this->weigth_water_fluxes[i] << std::endl;
   }
 
   // and kill this chonk is memory saving is activated
@@ -591,7 +592,7 @@ void chonk::active_simple_SPL(double n, double m, xt::pytensor<double,1>& K, dou
 
   // I am recording the current sediment fluxes in the model distributed for each receivers
   std::vector<double> pre_sedfluxes;pre_sedfluxes.reserve(this->weigth_sediment_fluxes.size());
-  for(auto v:this->weigth_sediment_fluxes)
+  for(auto& v:this->weigth_sediment_fluxes)
   {
     pre_sedfluxes.emplace_back(v*this->sediment_flux);
   }
@@ -603,16 +604,16 @@ void chonk::active_simple_SPL(double n, double m, xt::pytensor<double,1>& K, dou
     // calculating the flux E = K s^n A^m
     double this_eflux = std::pow(this->water_flux * this->weigth_water_fluxes[i],m) * std::pow(this->slope_to_rec[i],n) * K[this->current_node];
 
-    if(isinf(this_eflux))
-      std::cout << this->water_flux << "||" << this->weigth_water_fluxes[i] << "||" << this->slope_to_rec[i] << std::endl;
+    // if(isinf(this_eflux))
+    //   std::cout << this->water_flux << "||" << this->weigth_water_fluxes[i] << "||" << this->slope_to_rec[i] << std::endl;
 
     // stacking the erosion flux
     this->erosion_flux += this_eflux;
-    if(isnan(this->erosion_flux) )
-    {
-      std::cout << "NAN BECAUSE::" << this_eflux << "||" << this->slope_to_rec[i]  << "||";
-      std::cout << this->weigth_water_fluxes[i] << "||" << this->water_flux  << std::endl;
-    }
+    // if(isnan(this->erosion_flux) )
+    // {
+    //   std::cout << "NAN BECAUSE::" << this_eflux << "||" << this->slope_to_rec[i]  << "||";
+    //   std::cout << this->weigth_water_fluxes[i] << "||" << this->water_flux  << std::endl;
+    // }
 
     // What has been eroded moves into the sediment flux (which needs to be converted into a volume)
     this->sediment_flux += this_eflux * Xres * Yres * dt;

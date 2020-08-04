@@ -80,7 +80,7 @@ class chonk
     // # Sediment flux
     double get_sediment_flux(){return sediment_flux;}
     void set_sediment_flux(double value){sediment_flux = value;}
-    void add_to_sediment_flux(double value){sediment_flux = value;}
+    void add_to_sediment_flux(double value){sediment_flux += value;}
     //# check emptyness 
     bool check_if_empty(){return is_empty;};
     //# Check if depression solved
