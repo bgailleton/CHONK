@@ -263,6 +263,6 @@ class UnionFind
 
 // Topological order algorithm for multiple receivers adapted from FORTRAN
 // Original author: Jean Braun
-std::vector<int> multiple_stack_fastscape(int n_element, std::vector<Vertex>& graph, std::vector<int>& not_in_stack, bool& has_failed, xt::pytensor<bool,1>& active_nodes);
+std::vector<int> multiple_stack_fastscape(int n_element, std::vector<Vertex>& graph, std::vector<int>& not_in_stack, bool& has_failed);
 
 #endif

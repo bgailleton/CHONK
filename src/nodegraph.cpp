@@ -207,7 +207,7 @@ NodeGraphV2::NodeGraphV2(
 
   // I am now ready to create my topological order utilising a c++ port of the fortran algorithm from Jean Braun
   bool has_failed = false;
-  Mstack = xt::adapt(multiple_stack_fastscape( n_element, graph, this->not_in_stack, has_failed, active_nodes));
+  Mstack = xt::adapt(multiple_stack_fastscape( n_element, graph, this->not_in_stack, has_failed));
 
 
   // I got my topological order, I can now restore the corrupted receiver I had
@@ -381,7 +381,6 @@ void NodeGraphV2::compute_receveivers_and_donors(xt::pytensor<bool,1>& active_no
     if(active_nodes[i] == false)
     {
       this->graph[i].Sreceivers = i;
-      // this->graph[i].receivers.push_back(i);
       continue;
     }
     std::vector<int> receivers,donors;
@@ -520,7 +519,7 @@ void NodeGraphV2::update_donors_at_node(int node, std::vector<int>& new_donors)
 }
 
 
-std::vector<int> multiple_stack_fastscape(int n_element, std::vector<Vertex>& graph, std::vector<int>& not_in_stack, bool& has_failed, xt::pytensor<bool,1>& active_nodes)
+std::vector<int> multiple_stack_fastscape(int n_element, std::vector<Vertex>& graph, std::vector<int>& not_in_stack, bool& has_failed)
 {
 
   std::vector<int>ndon(n_element,0);
@@ -537,7 +536,6 @@ std::vector<int> multiple_stack_fastscape(int n_element, std::vector<Vertex>& gr
   int nparse = -1;
   int nstack = -1;
 
-  int correcter = 0;
 
   // we go through the nodes
   for(size_t i=0; i<n_element;i++)
@@ -554,17 +552,9 @@ std::vector<int> multiple_stack_fastscape(int n_element, std::vector<Vertex>& gr
     {
       int ijn = parse[nparse];
       nparse = nparse-1;
+      nstack = nstack+1;
 
-      if(active_nodes[ijn])
-      {
-        nstack = nstack+1;
-        stack[nstack] = ijn;
-      }
-      else
-      {
-        correcter++;
-      }
-
+      stack[nstack] = ijn;
       for(int ijk=0; ijk < graph[ijn].receivers.size();ijk++)
       {
         int ijr = graph[ijn].receivers[ijk];
@@ -575,21 +565,10 @@ std::vector<int> multiple_stack_fastscape(int n_element, std::vector<Vertex>& gr
           nparse=nparse+1;
           parse[nparse]=ijr;
         }
-
         
       }
     } 
   }
-
-  for(size_t i=0; i<n_element;i++)
-  {
-    if(active_nodes[i])
-      continue;
-    nstack++;
-    stack[nstack] = int(i);
-  }
-
-
   if(nstack < n_element - 1 )
   {
     has_failed = true;
