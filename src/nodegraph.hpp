@@ -170,6 +170,11 @@ xt::xtensor<int,1> _compute_mst_kruskal(xt::pytensor<int,2>& conn_basins, xt::py
 void _orient_basin_tree(xt::pytensor<int,2>& conn_basins, xt::pytensor<int,2>& conn_nodes, int& basin0, xt::xtensor<int,1>& tree);
 void _update_pits_receivers(xt::pytensor<int,2>& conn_basins,xt::pytensor<int,2>& conn_nodes, xt::xtensor<int,1>& mstree, xt::pytensor<double,1>& elevation);
 
+std::vector<std::vector<int> > get_DEBUG_connbas() {return  DEBUG_connbas;}
+std::vector<std::vector<int> > get_DEBUG_connode() {return  DEBUG_connode;}
+std::vector<int> get_mstree(){std::vector<int> output; for(auto abs: mstree){output.push_back(SBasinOutlets[abs]);}; return output;}
+std::vector<std::vector<int> > get_mstree_translated(){return this->mstree_translated;}
+
 
 protected:
 
@@ -193,6 +198,11 @@ protected:
   xt::pytensor<int,1> Mstack;
   xt::pytensor<int,1> Sstack;
   xt::pytensor<int,1> SBasinID;
+  xt::xtensor<int,1> mstree;
+  std::vector<std::vector<int> > mstree_translated;
+
+  std::vector<std::vector<int> > DEBUG_connbas;
+  std::vector<std::vector<int> > DEBUG_connode;
 
   std::vector<int> SBasinOutlets;
   std::vector<int> pits;

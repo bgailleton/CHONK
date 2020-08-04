@@ -222,6 +222,13 @@ class ModelRunner
     // ~ Just Ignore
     void DEBUG_modify_double_array_param_inplace(std::string name, int place, double new_val){io_double_array[name][place] = new_val;}
     std::vector<int> DEBUG_get_receivers_at_node(int node){return this->graph.get_MF_receivers_at_node(node);}
+    int DEBUG_get_Sreceivers_at_node(int node){return this->graph.get_Srec(node);}
+
+    std::vector<std::vector<int> > get_DEBUG_connbas(){return this->graph.get_DEBUG_connbas();};
+    std::vector<std::vector<int> > get_DEBUG_connode(){return this->graph.get_DEBUG_connode();};
+    std::vector<int> get_mstree(){return this->graph.get_mstree();}
+    std::vector<std::vector<int> > get_mstree_translated(){return this->graph.get_mstree_translated();}
+
 
     void DEBUG_check_weird_val_stacks();
     
@@ -278,7 +285,6 @@ class ModelRunner
      
 
 };// End of ModelRunner
-
 
 
 

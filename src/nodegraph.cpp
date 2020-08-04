@@ -733,7 +733,6 @@ void NodeGraphV2::compute_basins(xt::pytensor<bool,1>& active_nodes)
 {
   int ibasin = -1, istack,irec;
   SBasinID = xt::zeros<int>({this->un_element});
-
   for(int inode=0; inode<this->n_element;inode++)
   {  
     istack = this->Sstack[inode];
@@ -818,17 +817,19 @@ void NodeGraphV2::correct_flowrouting(xt::pytensor<bool,1>& active_nodes, xt::py
     {
       conn_basins_2(i,0) = conn_basins(i,0);
       conn_basins_2(i,1) = conn_basins(i,1);
+      DEBUG_connbas.push_back({SBasinOutlets[conn_basins(i,0)],SBasinOutlets[conn_basins(i,1)]});
     }
     for(size_t i=0; i<scn ; i++)
     {
       conn_nodes_2(i,0) = conn_nodes(i,0);
       conn_nodes_2(i,1) = conn_nodes(i,1);
+      DEBUG_connode.push_back({conn_nodes(i,0),conn_nodes(i,1)});
     }
 
     for(size_t i=0; i<scw ; i++)
       conn_weights_2[i] = conn_weights[i];
 
-
+    int g = 6;
 
     // if method == 'mst_linear':
     //     mstree = _compute_mst_linear(conn_basins, conn_weights, nbasins)
@@ -836,7 +837,7 @@ void NodeGraphV2::correct_flowrouting(xt::pytensor<bool,1>& active_nodes, xt::py
     //     mstree = _compute_mst_kruskal(conn_basins, conn_weights, nbasins)
     // else:
     //     raise ValueError("invalid flow correction method %r" % method)
-    xt::xtensor<int,1> mstree = _compute_mst_kruskal(conn_basins_2, conn_weights_2);
+    mstree = _compute_mst_kruskal(conn_basins_2, conn_weights_2);
 
     this->_orient_basin_tree(conn_basins_2,conn_nodes_2,basin0, mstree);
     this->_update_pits_receivers(conn_basins_2, conn_nodes_2, mstree, elevation);    
@@ -1015,14 +1016,17 @@ xt::xtensor<int,1> NodeGraphV2::_compute_mst_kruskal(xt::pytensor<int,2>& conn_b
 
   UnionFind uf(nbasins);
 
-  for (auto& eid : sort_id)
+  for (auto eid : sort_id)
   {
+    // if(eid > 1000000 || eid <0)
+      // std::cout << "FLURB::" << eid << std::endl; 
     int b0 = conn_basins(eid, 0);
     int b1 = conn_basins(eid, 1);
 
     if (uf.Find(b0) != uf.Find(b1))
     {
       mstree[mstree_size] = eid;
+      mstree_translated.push_back({SBasinOutlets[b0],SBasinOutlets[b1]});
       mstree_size ++;
       uf.Union(b0, b1);
     }

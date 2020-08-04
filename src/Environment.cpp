@@ -211,7 +211,7 @@ void ModelRunner::run()
           next_node = this->graph.get_Srec(next_node);
 
         this->chonk_network[next_node].add_to_water_flux(this->chonk_network[node].get_water_flux());
-        if(is_processed[next_node] == true)
+        if(is_processed[next_node] == true )
           throw std::runtime_error("FATAL_ERROR::NG24, node " + std::to_string(node) + " gives water to " + std::to_string(next_node) + " but is processed already");
       }
       continue;
