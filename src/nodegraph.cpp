@@ -224,7 +224,7 @@ NodeGraphV2::NodeGraphV2(
     //   rec.push_back(trec);
     // }
     std::vector<int> to_recompute = {node_to_check[i]};
-    this->compute_receveivers_and_donors(active_nodes,elevation,to_recompute);
+    this->recompute_multi_receveivers_and_donors(active_nodes,elevation,to_recompute);
 
     // VERY IMPORTANT HERE!!!!!
     // In the particular case where my outlet is *also* a pit, I do not want to remove its receiver
@@ -438,6 +438,60 @@ void NodeGraphV2::compute_receveivers_and_donors(xt::pytensor<bool,1>& active_no
     {
       this->graph[i].Sreceivers = i;
     }
+
+  }
+
+
+}
+
+void NodeGraphV2::recompute_multi_receveivers_and_donors(xt::pytensor<bool,1>& active_nodes, xt::pytensor<double,1>& elevation, std::vector<int>& nodes_to_compute)
+{
+
+  for(auto& i:nodes_to_compute)
+  {
+    if(active_nodes[i] == false)
+    {
+      this->graph[i].Sreceivers = i;
+      continue;
+    }
+    std::vector<int> receivers,donors;
+    std::vector<double> length2rec,length2don;
+    int checker;
+    if(i<ncols)
+      checker = 1;
+    else if (i >= this->n_element - ncols)
+      checker = 2;
+    else if(i % ncols == 0 || i == 0)
+      checker = 3;
+    else if((i + 1) % (ncols) == 0 )
+      checker = 4;
+    else
+      checker = 0;
+
+
+    double& this_elev = elevation[i];
+    double test_elev;
+    int idL = -1;
+    for(auto& adder:this->neightbourer[checker])
+    {
+      int node = i+adder;
+      idL++;
+      test_elev = elevation[node];
+      if(test_elev<this_elev)
+      {
+        receivers.push_back(node);
+        length2rec.push_back(this->lengthener[idL]);
+      }
+      else if(test_elev>this_elev)
+      {
+        donors.push_back(node);
+        length2don.push_back(this->lengthener[idL]);
+      }
+    }
+    this->graph[i].receivers = receivers;
+    this->graph[i].donors = donors;
+    this->graph[i].length2rec = length2rec;
+    this->graph[i].length2don = length2don;
 
   }
 
@@ -1048,7 +1102,7 @@ void NodeGraphV2::_orient_basin_tree(xt::pytensor<int,2>& conn_basins, xt::pyten
   xt::xtensor<int,1> nodes_connects_ptr = xt::empty<int>({this->nbasins});
 
   // # parse the edges to compute the number of edges per node
-  for (auto& i : tree)
+  for (auto i : tree)
   {
     // if(i<0)
     //   // std::cout << i << "||";
@@ -1072,7 +1126,7 @@ void NodeGraphV2::_orient_basin_tree(xt::pytensor<int,2>& conn_basins, xt::pyten
   xt::xtensor<int,1> nodes_adjacency = xt::zeros<int>({nodes_adjacency_size});
 
   // # parse the edges to update the adjacency
-  for (auto& i : tree)
+  for (auto i : tree)
   {
 
     int n1 = conn_basins(i, 0);
@@ -1111,7 +1165,11 @@ void NodeGraphV2::_orient_basin_tree(xt::pytensor<int,2>& conn_basins, xt::pyten
       // # the edge comming from the parent node has already been updated.
       // # in this case, the edge is (parent, node)
       if (conn_basins(edge_id, 0) == parent && node != parent)
+      {
+          // std::cout << SBasinOutlets[conn_basins(edge_id, 0)] << "||" << SBasinOutlets[conn_basins(edge_id, 1)] << std::endl;
           continue;
+      }
+      // std::cout << "GUR::" << SBasinOutlets[conn_basins(edge_id, 0)] << "||" << SBasinOutlets[conn_basins(edge_id, 1)] << std::endl;
 
       // # we want the edge to be (node, next)
       // # we check if the first node of the edge is not "node"
@@ -1152,7 +1210,7 @@ void NodeGraphV2::_orient_basin_tree(xt::pytensor<int,2>& conn_basins, xt::pyten
 void NodeGraphV2::_update_pits_receivers(xt::pytensor<int,2>& conn_basins,xt::pytensor<int,2>& conn_nodes, xt::xtensor<int,1>& mstree, xt::pytensor<double,1>& elevation)
 {
   // for i in mstree:
-  for(auto& i : mstree)
+  for(auto i : mstree)
   {
 
     int node_to = conn_nodes(i, 0);
@@ -1160,26 +1218,30 @@ void NodeGraphV2::_update_pits_receivers(xt::pytensor<int,2>& conn_basins,xt::py
 
     // # skip open basins
     if (node_from == -1)
+    {
         continue;
+    }
+      // std::cout << SBasinOutlets[conn_basins(i,0)] << "-" << SBasinOutlets[conn_basins(i,1)] << "--" << << "||";
+
 
 
     int outlet_from = this->SBasinOutlets[conn_basins(i, 1)];
 
 
-    // std::cout << "linking " << outlet_from << " with " << node_to << " or " << node_from << std::endl;
+    // std::cout << outlet_from << "->" << node_to << " || ";
 
-    if (elevation[node_from] < elevation[node_to])
-    {
+    // if (elevation[node_from] < elevation[node_to])
+    // {
      this->graph[outlet_from].Sreceivers = node_to;
      this->graph[outlet_from].length2Srec = this->dx*1000; // just to have a length but it should not actually be used
-    }
-    else
-    {
-      this->graph[outlet_from].Sreceivers = node_to;
-      // this->graph[node_from].Sreceivers = node_to;
-      this->graph[outlet_from].length2Srec = this->dx*1000; // just to have a length but it should not actually be used
-      // this->graph[node_from].length2Srec = this->dx; // TODO correct here the correct distance. Should not be used anyway. 
-    }
+    // }
+    // else
+    // {
+    //   this->graph[outlet_from].Sreceivers = node_to;
+    //   // this->graph[node_from].Sreceivers = node_to;
+    //   this->graph[outlet_from].length2Srec = this->dx*1000; // just to have a length but it should not actually be used
+    //   // this->graph[node_from].length2Srec = this->dx; // TODO correct here the correct distance. Should not be used anyway. 
+    // }
   }
 }
 

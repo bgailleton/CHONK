@@ -176,6 +176,9 @@ std::vector<int> get_mstree(){std::vector<int> output; for(auto abs: mstree){out
 std::vector<std::vector<int> > get_mstree_translated(){return this->mstree_translated;}
 
 
+
+void recompute_multi_receveivers_and_donors(xt::pytensor<bool,1>& active_nodes, xt::pytensor<double,1>& elevation, std::vector<int>& nodes_to_compute);
+
 protected:
 
   // Node graph: vector of all vertexes in the DEM
