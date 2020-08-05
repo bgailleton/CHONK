@@ -204,7 +204,10 @@ class ModelRunner
 
 
     void find_underfilled_lakes_already_processed_and_give_water(int SS_ID, std::vector<bool>& is_processed );
+    void process_node(int& node, std::vector<bool>& is_processed, int& lake_incrementor, int& underfilled_lake,
+  xt::pytensor<int,1>& inctive_nodes, double& cellarea, xt::pytensor<double,1>& surface_elevation);
 
+    void find_nodes_to_reprocess(int start, std::vector<bool>& is_processed, std::vector<int>& nodes_to_reprocess, std::vector<int>& nodes_to_relake);
 
 
     // Accessing functions (so far only works when memory mode is normal)

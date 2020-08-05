@@ -237,6 +237,11 @@ NodeGraphV2::NodeGraphV2(
     // // Correcting the Vertex inplace
     // graph[node_to_check[i]].receivers = rec;
   }
+
+  // Last step: implementing the index in the stack
+  this->index_in_Mstack = xt::zeros<int>({this->n_element});
+  for(int i = 0; i< this->n_element ; i++)
+    this->index_in_Mstack[this->Mstack[i]] = i;
   
   //Done
 
@@ -1244,6 +1249,9 @@ void NodeGraphV2::_update_pits_receivers(xt::pytensor<int,2>& conn_basins,xt::py
     // }
   }
 }
+
+
+
 
 
 // //  //###############################################  

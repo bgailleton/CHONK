@@ -127,6 +127,8 @@ std::vector<int>& get_MF_donors_at_node(int node){return graph[node].donors;};
 std::vector<double>& get_MF_lengths_at_node(int node){return graph[node].length2rec;};
 //# Returns node at index i in the MF stack
 int get_MF_stack_at_i(int i){return Mstack[i];}
+// TODO
+int get_index_MF_stack_at_i(int i){return index_in_Mstack[i];}
 //# Check if the pit is to be rerouted
 bool is_depression(int i){return pits_to_reroute[i];}
 //# Update the receivers at node
@@ -199,6 +201,7 @@ protected:
   std::vector<bool> pits_to_reroute;
   // The topological order of from top to bottom
   xt::pytensor<int,1> Mstack;
+  xt::pytensor<int,1> index_in_Mstack;
   xt::pytensor<int,1> Sstack;
   xt::pytensor<int,1> SBasinID;
   xt::xtensor<int,1> mstree;
