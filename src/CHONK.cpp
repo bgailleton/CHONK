@@ -104,6 +104,7 @@ void chonk::split_and_merge_in_receiving_chonks(std::vector<chonk>& chonkscape, 
 void chonk::split_and_merge_in_receiving_chonks(std::vector<chonk>& chonkscape, NodeGraphV2& graph, double dt)
 {
   // Iterating through the receivers
+
   for(size_t i=0; i < this->receivers.size(); i++)
   {
     // Adressing the chonk
@@ -122,10 +123,15 @@ void chonk::split_and_merge_in_receiving_chonks(std::vector<chonk>& chonkscape, 
 void chonk::cancel_split_and_merge_in_receiving_chonks(std::vector<chonk>& chonkscape, NodeGraphV2& graph, double dt)
 {
   // Iterating through the receivers
+
   for(size_t i=0; i < this->receivers.size(); i++)
   {
     // Adressing the chonk
     chonk& other_chonk = chonkscape[this->receivers[i]];
+
+    // if(this->receivers[i] == 7745)
+    //   std::cout << "BURFULBULKU::" << -1 * this->water_flux * this->weigth_water_fluxes[i] << std::endl;
+
     // Adding the fluxes*modifyer
     other_chonk.add_to_water_flux( -1 * this->water_flux * this->weigth_water_fluxes[i]);
     other_chonk.add_to_sediment_flux( -1 * this->sediment_flux * this->weigth_sediment_fluxes[i]);
@@ -585,7 +591,8 @@ void chonk::move_to_steepest_descent_nodepression(NodeGraphV2& graph, double dt,
 // As opposed to the modification of fluxes linked to the motions of the chonk which needs to be treated later (e,d,...) 
 
 // Simplest scenario possible, the chonk accumulates the drainage area
-void chonk::inplace_only_drainage_area(double Xres, double Yres){this->water_flux += Xres * Yres;}//; std::cout << this->water_flux << "||";};
+      
+void chonk::inplace_only_drainage_area(double Xres, double Yres){this->water_flux += Xres * Yres; }//; std::cout << this->water_flux << "||";};
 
 // Calculate discharge by adding simple precipitation modulator 
 void chonk::inplace_precipitation_discharge(double Xres, double Yres, xt::pytensor<double,1>& precipitation){this->water_flux += Xres * Yres * precipitation[current_node];};

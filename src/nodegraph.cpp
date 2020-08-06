@@ -53,9 +53,6 @@ void set_DEBUG_switch_nodegraph(std::vector<std::string> params, std::vector<boo
 
 
 
-
-
-
 NodeGraphV2::NodeGraphV2(
   xt::pytensor<double,1>& elevation,
   xt::pytensor<bool,1>& active_nodes,
@@ -210,6 +207,9 @@ NodeGraphV2::NodeGraphV2(
   Mstack = xt::adapt(multiple_stack_fastscape( n_element, graph, this->not_in_stack, has_failed));
 
 
+  // DEBUG CHECKING
+  // this->is_MF_outet_SF_outlet(); 
+
   // I got my topological order, I can now restore the corrupted receiver I had
   for(size_t i=0; i<node_to_check.size(); i++)
   {
@@ -227,12 +227,12 @@ NodeGraphV2::NodeGraphV2(
     this->recompute_multi_receveivers_and_donors(active_nodes,elevation,to_recompute);
 
     // VERY IMPORTANT HERE!!!!!
-    // In the particular case where my outlet is *also* a pit, I do not want to remove its receiver
-    if(pits_to_reroute[node_to_check[i]])
-    {
-      this->graph[node_to_check[i]].receivers.push_back(this->graph[this->graph[node_to_check[i]].Sreceivers].Sreceivers);
-      this->graph[node_to_check[i]].length2rec.push_back(dx * 10000.);
-    }
+    // In the particular case where my outlet is *also* a pit, I do not want to remove its receiver Y though???
+    // if(pits_to_reroute[node_to_check[i]])
+    // {
+    //   this->graph[node_to_check[i]].receivers.push_back(this->graph[this->graph[node_to_check[i]].Sreceivers].Sreceivers);
+    //   this->graph[node_to_check[i]].length2rec.push_back(dx * 10000.);
+    // }
 
     // // Correcting the Vertex inplace
     // graph[node_to_check[i]].receivers = rec;
@@ -248,6 +248,32 @@ NodeGraphV2::NodeGraphV2(
 
   return;
 }
+
+// void is_MF_outet_SF_outlet(xt::pytensor<double,1>& elevation, xt::pytensor<bool,1>& active_nodes)
+// {
+//   std::vector<int> SF_outlets;
+//   std::vector<int> MF_outlets;
+//   for(auto n: this->pits_to_reroute)
+//   {
+//     SF_outlets.push_back(this->graph.Sreceivers);
+//     std::priority_queue< nodium, std::vector<nodium>, std::greater<nodium> > depressionfiller;
+//     std::vector<bool> is_in_Q(false, this->n_element);
+//     depressionfiller.emplace(nodium(n,elevation[n]));
+//     is_in_Q[n] = true;
+//     while(depressionfiller.empty() == false)
+//     {
+//       nodium next_node = depressionfiller.top();
+//       depressionfiller.pop();
+//       std::vector<int> d8; 
+//       std::vector<double> d8l;
+//       this->get_D8_neighbors(next_node.node, active_nodes, d8, d8l);
+//       for(auto )
+//     }
+ 
+//    }
+
+
+// }
 
 
 void NodeGraphV2::fix_cyclicity(
@@ -510,6 +536,37 @@ void NodeGraphV2::get_D8_neighbors(int i, xt::pytensor<bool,1>& active_nodes, st
   length2neigh = std::vector<double>();
 
   if(active_nodes[i] == false)
+    return;
+
+  int checker;
+  if(i<ncols)
+    checker = 1;
+  else if (i >= this->n_element - ncols)
+    checker = 2;
+  else if(i % ncols == 0 || i == 0)
+    checker = 3;
+  else if((i + 1) % (ncols) == 0 )
+    checker = 4;
+  else
+    checker = 0;
+
+  int idL = -1;
+  for(auto& adder:this->neightbourer[checker])
+  {
+    int node = i+adder;
+    idL++;
+    neightbouring_nodes.push_back(node);
+    length2neigh.push_back(this->lengthener[idL]);
+  }
+}
+
+void NodeGraphV2::get_D8_neighbors(int i, xt::pytensor<int,1>& active_nodes, std::vector<int>& neightbouring_nodes, std::vector<double>& length2neigh)
+{
+  // these vectors are additioned to the node indice to test the neighbors
+  neightbouring_nodes = std::vector<int>();
+  length2neigh = std::vector<double>();
+
+  if(active_nodes[i] == 0)
     return;
 
   int checker;

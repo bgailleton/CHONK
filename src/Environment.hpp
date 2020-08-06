@@ -79,7 +79,8 @@ class Lake
     void ingest_other_lake(
        Lake& other_lake,
        std::vector<int>& node_in_lake, 
-       std::vector<bool>& is_in_queue
+       std::vector<bool>& is_in_queue,
+       std::vector<Lake>& lake_network
     );
 
     void pour_sediment_into_lake(double sediment_volume);
@@ -104,7 +105,8 @@ class Lake
       std::vector<int>& node_in_lake, 
       std::vector<Lake>& lake_network,
       xt::pytensor<double,1>& surface_elevation,
-      std::vector<bool>& is_in_queue
+      std::vector<bool>& is_in_queue,
+      xt::pytensor<int,1>& active_nodes
     );
 
     double get_lake_depth_at_node(int node, std::vector<int>& node_in_lake);
@@ -124,6 +126,7 @@ class Lake
     int get_parent_lake(){return has_been_ingeted;}
     int set_parent_lake(int value){has_been_ingeted = value;}
     int get_lake_outlet(){return this->outlet_node;}
+    std::vector<int> get_ingested_lakes(){return ingested_lakes;}
 
 
   protected:
@@ -143,6 +146,7 @@ class Lake
     int outlet_node;
     // the index of the lake which ate this one
     int has_been_ingeted;
+    std::vector<int> ingested_lakes; 
     // Vector of node in the lake
     std::vector<int> nodes;
     // Vector of nodes that are or have been in the queue
@@ -205,9 +209,10 @@ class ModelRunner
 
     void find_underfilled_lakes_already_processed_and_give_water(int SS_ID, std::vector<bool>& is_processed );
     void process_node(int& node, std::vector<bool>& is_processed, int& lake_incrementor, int& underfilled_lake,
-  xt::pytensor<int,1>& inctive_nodes, double& cellarea, xt::pytensor<double,1>& surface_elevation);
-
-    void find_nodes_to_reprocess(int start, std::vector<bool>& is_processed, std::vector<int>& nodes_to_reprocess, std::vector<int>& nodes_to_relake);
+  xt::pytensor<int,1>& inctive_nodes, double& cellarea, xt::pytensor<double,1>& surface_elevation, bool need_move_prep);
+void process_node_nolake_for_sure(int& node, std::vector<bool>& is_processed, int& lake_incrementor, int& underfilled_lake,
+  xt::pytensor<int,1>& inctive_nodes, double& cellarea, xt::pytensor<double,1>& surface_elevation, bool need_move_prep);
+    void find_nodes_to_reprocess(int start, std::vector<bool>& is_processed, std::vector<int>& nodes_to_reprocess, std::vector<int>& nodes_to_relake, int lake_to_avoid);
 
 
     // Accessing functions (so far only works when memory mode is normal)
