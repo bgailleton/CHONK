@@ -119,6 +119,24 @@ void chonk::split_and_merge_in_receiving_chonks(std::vector<chonk>& chonkscape, 
     this->reset();
 }
 
+void chonk::cancel_split_and_merge_in_receiving_chonks(std::vector<chonk>& chonkscape, NodeGraphV2& graph, double dt)
+{
+  // Iterating through the receivers
+  for(size_t i=0; i < this->receivers.size(); i++)
+  {
+    // Adressing the chonk
+    chonk& other_chonk = chonkscape[this->receivers[i]];
+    // Adding the fluxes*modifyer
+    other_chonk.add_to_water_flux( -1 * this->water_flux * this->weigth_water_fluxes[i]);
+    other_chonk.add_to_sediment_flux( -1 * this->sediment_flux * this->weigth_sediment_fluxes[i]);
+    // std::cout << "SEDFLUXDEBUG::" << this->sediment_flux << "||" << this->weigth_sediment_fluxes[i] << "||water::" << this->weigth_water_fluxes[i] << std::endl;
+  }
+
+  // and kill this chonk is memory saving is activated
+  if(memory_saver)
+    this->reset();
+}
+
 void chonk::split_and_merge_in_receiving_chonks_ignore_some(std::vector<chonk>& chonkscape, NodeGraphV2& graph, double dt, std::vector<int>& to_ignore)
 {
   // Iterating through the receivers

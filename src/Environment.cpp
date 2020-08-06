@@ -311,6 +311,27 @@ void ModelRunner::process_node(int& node, std::vector<bool>& is_processed, int& 
         }
       // std::cout << "Bulf4" <<std::endl;
 
+        // Saving the fluxes pre correction in the lakes
+        std::map<int, double > lake_water_corrector, lake_sed_corrector;
+        for(auto lanode:reproc_in_lakes)
+        {
+          lake_water_corrector[lanode] =  this->chonk_network[lanode].get_water_flux();
+          lake_sed_corrector[lanode] = this->chonk_network[lanode].get_sediment_flux();
+        }
+
+        // Cancelling the fluxes from DS to US
+        for(int i = max_stack_id; i >= min_stackID; i--)
+        {
+          int inode = this->graph.get_MF_stack_at_i(i);
+          // std::cout << i << "|" << inode << std::endl;
+          if(checker.find(inode) != checker.end())
+          {
+            underfilled_lake++;
+            this->chonk_network[inode].cancel_split_and_merge_in_receiving_chonks(this->chonk_network,this->graph, this->timestep);
+          }
+        }
+
+        // Reprocessing the fluxes from US to DS
         for(int i = min_stackID; i <= max_stack_id; i++)
         {
           int inode = this->graph.get_MF_stack_at_i(i);
@@ -332,9 +353,9 @@ void ModelRunner::process_node(int& node, std::vector<bool>& is_processed, int& 
           int tlakeid = node_in_lake[lanode];
           if(this->lake_network[tlakeid].get_parent_lake() >= 0)
             tlakeid = this->lake_network[tlakeid].get_parent_lake();
-      
-          lake_water[tlakeid] += this->chonk_network[lanode].get_water_flux();
-          lake_sed[tlakeid] += this->chonk_network[lanode].get_sediment_flux();;
+          // adding to the lake the delta water (the post-lake reprocessing will always ADD more water as it happens when more water overflows)
+          lake_water[tlakeid] += this->chonk_network[lanode].get_water_flux() - lake_water_corrector[lanode];
+          lake_sed[tlakeid] += this->chonk_network[lanode].get_sediment_flux() - lake_sed_corrector[lanode];
           lake_node_entry[tlakeid] = lanode;
         }
 
@@ -345,11 +366,13 @@ void ModelRunner::process_node(int& node, std::vector<bool>& is_processed, int& 
           double water_to_add = toproclake.second;
           double sed_to_add = lake_sed[toproclake.first];
           int node_id = lake_node_entry[toproclake.first];
+          // Simulating the refilling of a lake by reformatting the chonk
           this->chonk_network[node_id].reset();
           this->chonk_network[node_id].set_water_flux(water_to_add);
           this->chonk_network[node_id].set_sediment_flux(sed_to_add);
           this->process_node(node_id, is_processed, lake_incrementor, underfilled_lake, inctive_nodes, cellarea, surface_elevation);
         }
+
         return;
       }
       else
@@ -1043,6 +1066,9 @@ void Lake::pour_water_in_lake(
   )
 {
   
+  // first cancelling the outlet to make sure I eventually find a new one
+  this->outlet_node = -9999;
+
     // no matter if I am filling a new lake or an old one:
   // I am filling a vector of nodes already in teh system (Queue or lake)
   std::vector<bool> is_in_queue(node_in_lake.size(),false);
@@ -1084,6 +1110,8 @@ void Lake::pour_water_in_lake(
     {
       // I therefore save it and break the loop
       this->outlet_node = outlet;
+      // and readding the node to the depression
+      this->depressionfiller.emplace(next_node);
       // std::cout <<"OUTLET FOUND::" << this->outlet_node << std::endl;
       break;
     }
