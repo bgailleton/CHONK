@@ -174,8 +174,6 @@ void ModelRunner::process_node(int& node, std::vector<bool>& is_processed, int& 
     if(this->lake_solver == false && is_processed[node])
       return;
 
-    // if(this->chonk_network[node].get_water_flux() <  -0.1)
-    //   throw std::runtime_error("negative fluxes at start on node " + std::to_string(node) + " W: " + std::to_string(this->chonk_network[node].get_water_flux()) + " and " + std::to_string(is_processed[node]) );
     // if I reach this stage, this node can be labelled as processed
     is_processed[node] = true;
 
@@ -204,9 +202,8 @@ void ModelRunner::process_node(int& node, std::vector<bool>& is_processed, int& 
       }
 
       // I have my existing/new lake
-      // std::cout << "Bulf2" <<std::endl;
 
-      // if my existing lake has a parent (ie a mother lake that had ingested it beforehand) then I consider the new as the one
+      // If my existing lake has a parent (ie a mother lake that had ingested it beforehand) then I consider the new as the one
       if(this->lake_network[lakeid].get_parent_lake() >= 0)
       {
         lakeid = this->lake_network[lakeid].get_parent_lake();
@@ -215,7 +212,7 @@ void ModelRunner::process_node(int& node, std::vector<bool>& is_processed, int& 
       // Calculating volume: the water flux of my CHONK * timestep (to transform into a volume of water)
       double water_volume = this->chonk_network[node].get_water_flux() * timestep;
       // CHONK directly stores the total sediment volume
-      double sedvol  = this->chonk_network[node].get_sediment_flux();
+      double sedvol = this->chonk_network[node].get_sediment_flux();
       
       // pouring water into the lake, it also finds if there is an outlet and reprocess the water fluxes for dat one
       this->lake_network[lakeid].pour_water_in_lake(water_volume,node, node_in_lake, is_processed, inctive_nodes,lake_network, surface_elevation,graph, cellarea, timestep,chonk_network);
@@ -261,7 +258,7 @@ void ModelRunner::process_node(int& node, std::vector<bool>& is_processed, int& 
         }
       // std::cout << "Bulf4" <<std::endl;
 
-        // Saving the fluxes pre correction in the lakes
+        // Saving the fluxes pre correction in the lakes, in order to be able to correct it
         std::map<int, double > lake_water_corrector, lake_sed_corrector;
         for(auto lanode:reproc_in_lakes)
         {
@@ -269,67 +266,75 @@ void ModelRunner::process_node(int& node, std::vector<bool>& is_processed, int& 
           lake_sed_corrector[lanode] = this->chonk_network[lanode].get_sediment_flux();
         }
 
+
         // Cancelling the fluxes from DS to US
         for(int i = max_stack_id; i >= min_stackID; i--)
         {
+          // Going through the stack and gathering node
           int inode = this->graph.get_MF_stack_at_i(i);
 
-
+          // no cancelling of outlet fluxes, already done before
           if(inode == outlet)
             continue;
-          
-
-          // std::cout << i << "|" << inode << std::endl;
+      
+          // only reprocessing the noe if is in the list of course          
           if(checker.find(inode) != checker.end() && inode != outlet )
           {
-            underfilled_lake++;
-            // if(inode == 8271)
-            //   std::cout << "REPROCESSED ONCE GARA::" << this->chonk_network[inode].get_water_flux();
+            // cancelling the fluxes
             this->chonk_network[inode].cancel_split_and_merge_in_receiving_chonks(this->chonk_network,this->graph, this->timestep);
+            // Cancelling the prefluxes (will be readded anyway)
             this->cancel_fluxes_before_moving_prep(this->chonk_network[inode]);
-            // if(inode == 8271)
-            //   std::cout << "::" << this->chonk_network[inode].get_water_flux() << std::endl;;
           }
+
         }
+
 
         // Reprocessing the fluxes from US to DS
         for(int i = min_stackID; i <= max_stack_id; i++)
         {
+          // going through the stack
           int inode = this->graph.get_MF_stack_at_i(i);
-          // std::cout << i << "|" << inode << std::endl;
           if(checker.find(inode) != checker.end())
           {
+            // if nodes are in the ones to reprocess, I proceed
             underfilled_lake++;
-            // std::cout << "1.1::" <<  inode << " is depress?? " << std::to_string(this->graph.is_depression(inode)) << " is in lake?? " << node_in_lake[inode] << std::endl;
-            if(inode == 8271)
-              std::cout << "REPROCESSED ONCE GARBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB" << std::endl;
+            // i know they are not in lakes by definition so I call a lighter function, and avoid too much recusrion which tend to break the code somehows
             this->process_node_nolake_for_sure(inode, is_processed, lake_incrementor, underfilled_lake, inctive_nodes, cellarea, surface_elevation, false);
-            // std::cout << "1.2" << std::endl;
           }
         }
-      // std::cout << "Bulf5" <<std::endl;
 
+        // If no lake to reprocess, well no lake to reprocess
         if(reproc_in_lakes.size() == 0)
           return;
 
+        // Preparing to reprocess lakes: keys of these maps are lakeid (index in the lake_network)
+        // and values are volume of water, of sediments and the entry node (does not matter which one as long as it is in the lake)
         std::map<int, double > lake_water, lake_sed; std::map<int,int> lake_node_entry;
         for(auto& lanode:reproc_in_lakes)
         {
+          //Getting the lake id 
           int tlakeid = node_in_lake[lanode];
+          // if the lake has a parent, I use it has it has ingested the current lake
           if(this->lake_network[tlakeid].get_parent_lake() >= 0)
             tlakeid = this->lake_network[tlakeid].get_parent_lake();
+
           // adding to the lake the delta water (the post-lake reprocessing will always ADD more water as it happens when more water overflows)
-          lake_water[tlakeid] += this->chonk_network[lanode].get_water_flux() - lake_water_corrector[lanode];
-          lake_sed[tlakeid] += this->chonk_network[lanode].get_sediment_flux() - lake_sed_corrector[lanode];
+          lake_water[tlakeid] += (this->chonk_network[lanode].get_water_flux() - lake_water_corrector[lanode]);
+          lake_sed[tlakeid] += (this->chonk_network[lanode].get_sediment_flux() - lake_sed_corrector[lanode]);
           lake_node_entry[tlakeid] = lanode;
         }
 
+        // Finally for each nodes in the system
         for(auto& toproclake:lake_water)
         {
-          // this->chonk_network[newnode].reset();
+
+          // getting the lakeid
           int tlakeid = toproclake.first;
+          // the water flux to add (will be translated to vulume in the next function)
           double water_to_add = toproclake.second;
+          // Sediment flux to add
           double sed_to_add = lake_sed[toproclake.first];
+          // entry node
           int node_id = lake_node_entry[toproclake.first];
           // Simulating the refilling of a lake by reformatting the chonk
           this->chonk_network[node_id].reset();
