@@ -109,6 +109,7 @@ void chonk::split_and_merge_in_receiving_chonks(std::vector<chonk>& chonkscape, 
   {
     // Adressing the chonk
     chonk& other_chonk = chonkscape[this->receivers[i]];
+
     // Adding the fluxes*modifyer
     other_chonk.add_to_water_flux(this->water_flux * this->weigth_water_fluxes[i]);
     other_chonk.add_to_sediment_flux(this->sediment_flux * this->weigth_sediment_fluxes[i]);
@@ -129,11 +130,12 @@ void chonk::cancel_split_and_merge_in_receiving_chonks(std::vector<chonk>& chonk
     // Adressing the chonk
     chonk& other_chonk = chonkscape[this->receivers[i]];
 
-    // if(this->receivers[i] == 7745)
-    //   std::cout << "BURFULBULKU::" << -1 * this->water_flux * this->weigth_water_fluxes[i] << std::endl;
-
-    // Adding the fluxes*modifyer
+    // Adding the fluxes*modifye
     other_chonk.add_to_water_flux( -1 * this->water_flux * this->weigth_water_fluxes[i]);
+
+    if(other_chonk.get_water_flux()<0)
+      other_chonk.set_water_flux(0.);
+
     other_chonk.add_to_sediment_flux( -1 * this->sediment_flux * this->weigth_sediment_fluxes[i]);
     // std::cout << "SEDFLUXDEBUG::" << this->sediment_flux << "||" << this->weigth_sediment_fluxes[i] << "||water::" << this->weigth_water_fluxes[i] << std::endl;
   }
@@ -600,6 +602,14 @@ void chonk::inplace_precipitation_discharge(double Xres, double Yres, xt::pytens
 // Reduce the waterflux by infiltrating some water
 void chonk::inplace_infiltration(double Xres, double Yres, xt::pytensor<double,1>& infiltration){this->water_flux -= Xres * Yres * infiltration[this->current_node];};
 
+
+void chonk::cancel_inplace_only_drainage_area(double Xres, double Yres){this->water_flux += -1 *(Xres * Yres); }//; std::cout << this->water_flux << "||";};
+
+// Calculate discharge by adding simple precipitation modulator 
+void chonk::cancel_inplace_precipitation_discharge(double Xres, double Yres, xt::pytensor<double,1>& precipitation){this->water_flux += -1 *(Xres * Yres * precipitation[current_node]);};
+
+// Reduce the waterflux by infiltrating some water
+void chonk::cancel_inplace_infiltration(double Xres, double Yres, xt::pytensor<double,1>& infiltration){this->water_flux -= -1 *(Xres * Yres * infiltration[this->current_node]);};
 
 
 //########################################################################################

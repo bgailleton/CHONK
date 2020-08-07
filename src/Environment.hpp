@@ -193,6 +193,7 @@ class ModelRunner
     void run();
 
     void manage_fluxes_before_moving_prep(chonk& this_chonk);
+    void cancel_fluxes_before_moving_prep(chonk& this_chonk);
 
     void manage_move_prep(chonk& this_chonk);
 
