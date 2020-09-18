@@ -192,7 +192,6 @@ void ModelRunner::process_node(int& node, std::vector<bool>& is_processed, int& 
         goto nolake;
       }
 
-      // std::cout << "Bulf1" <<std::endl;
       // if It has no preexisting lake AND is the bottom of the depression, I initiate a new lake in the lake network
       if(this->graph.is_depression(node) && lakeid == -1)
       { 
@@ -200,22 +199,21 @@ void ModelRunner::process_node(int& node, std::vector<bool>& is_processed, int& 
         lakeid = lake_incrementor;
         lake_incrementor++;
       }
-
-      // I have my existing/new lake
-
-      // If my existing lake has a parent (ie a mother lake that had ingested it beforehand) then I consider the new as the one
-      if(this->lake_network[lakeid].get_parent_lake() >= 0)
+       // If my existing lake has a parent (ie a mother lake that had ingested it beforehand) then I consider the new as the one
+      else if(this->lake_network[lakeid].get_parent_lake() >= 0)
       {
         lakeid = this->lake_network[lakeid].get_parent_lake();
       }
 
+      // I have my existing/new lake in the (hopefuly) correct form, I need now to pour water in it
       // Calculating volume: the water flux of my CHONK * timestep (to transform into a volume of water)
       double water_volume = this->chonk_network[node].get_water_flux() * timestep;
-      // CHONK directly stores the total sediment volume
+      // CHONK directly stores the total sediment volume (already a Volume there)
       double sedvol = this->chonk_network[node].get_sediment_flux();
       
-      // pouring water into the lake, it also finds if there is an outlet and reprocess the water fluxes for dat one
+      // Pouring water into the lake, it also finds if there is an outlet and reprocess the water fluxes for dat one
       this->lake_network[lakeid].pour_water_in_lake(water_volume,node, node_in_lake, is_processed, inctive_nodes,lake_network, surface_elevation,graph, cellarea, timestep,chonk_network);
+      
       // pouring sediment into the lake
       this->lake_network[lakeid].pour_sediment_into_lake(sedvol);
       // std::cout << "Bulf3::" << lakeid << "||" << this->lake_network.size() <<std::endl;
@@ -969,12 +967,14 @@ void Lake::pour_water_in_lake(
   std::vector<chonk>& chonk_network
   )
 {
-  if(originode == 8371)
-    std::cout << "processing the problem node W:" << chonk_network[originode].get_water_flux() << std::endl;
-  // first cancelling the outlet to make sure I eventually find a new one
+  // Some ongoing debugging
+  // if(originode == 8371)
+  //   std::cout << "processing the problem node W:" << chonk_network[originode].get_water_flux() << std::endl;
+
+  // first cancelling the outlet to make sure I eventually find a new one, If I pour water into the lake I might merge with another one, etc
   this->outlet_node = -9999;
 
-    // no matter if I am filling a new lake or an old one:
+  // no matter if I am filling a new lake or an old one:
   // I am filling a vector of nodes already in teh system (Queue or lake)
   std::vector<bool> is_in_queue(node_in_lake.size(),false);
   for(auto nq:this->node_in_queue)
@@ -982,32 +982,36 @@ void Lake::pour_water_in_lake(
 
   // First checking if this node is in a lake, if yes it means the lake has already been initialised and 
   // We are pouring water from another lake 
-
   if(node_in_lake[originode] == -1)
   {
-
+    // NEW LAKE
     // Emplacing the node in the queue, It will be the first to be processed
-    depressionfiller.emplace( nodium( originode,surface_elevation[originode] ) );
-
-    // this function fills an original lake, hence there is no lake depth yet:
+    depressionfiller.emplace( nodium( originode, surface_elevation[originode] ) );
+    // This function fills an original lake, hence there is no lake depth yet:
     this->water_elevation = surface_elevation[originode];
     is_in_queue[originode] = true;
     this->nodes.push_back(originode);
     this->n_nodes ++;
-
   }
 
-
-
-  // I am processing new nodes while I still have water OR still nodes upstream (if an outlet in encountered, the loop is breaked anually)
+  // I am processing new nodes while I still have water OR still nodes upstream 
+  // (if an outlet in encountered, the loop is breaked anually)
+  // UPDATE_09_2020:: No idea what I meant by anually.
   while(depressionfiller.empty() == false && water_volume > 0 )
   {
     // Getting the next node and ...
+    // (If this is the first time I fill a lake -> the first node is returned)
+    // (If this is another node, it is jsut the next one the closest elevation to the water level)
     nodium next_node = this->depressionfiller.top();
-    this->water_elevation = next_node.elevation;
     // ... removing it from the priority queue 
     this->depressionfiller.pop();
-    // Initialising a dummy outlet
+
+    // The water elevation is the elevation of that Nodium object
+    // (if 1st node -> elevation of the bottom of the depression)
+    // (if other node -> lake water elevation)
+    this->water_elevation = next_node.elevation;
+
+    // Initialising a dummy outlet, if this outlet becomes something I shall break the loop
     int outlet = -9999;
 
     // Adding the upstream neighbors to the queue and checking if there is an outlet node
@@ -1139,65 +1143,66 @@ int Lake::check_neighbors_for_outlet_or_existing_lakes(
 {
 
   // Getting all neighbors: receivers AND donors
-  // std::vector<int>& recs = graph.get_MF_receivers_at_node_no_rerouting(next_node.node);
-  // std::vector<int>& dons = graph.get_MF_donors_at_node(next_node.node);
+  // Ignore dummy, is just cause I is too lazy to overlaod my functions correctly
+  // TODO::Overload your function correctly
   std::vector<int> neightbors; std::vector<double> dummy ; graph.get_D8_neighbors(next_node.node, active_nodes, neightbors, dummy);
-  // neightbors.reserve(neightbors.size() + dons.size());
 
-  // for (auto r:recs)
-  //   neightbors.emplace_back(r);
-  // for (auto d:dons)
-  //   neightbors.emplace_back(d);
-
+  // No outlet so far
   int outlet = -9999;
-  // checking all neighbors
+  // Checking all neighbours
   for(auto node : neightbors)
   {
+    // First checking if the node is already in the queue
+    // If it is, well I do not need it right?
+    // Right.
+    if(is_in_queue[node] )
+      continue;
+
     // Check if the neighbour is a lake, if it is, I am gathering the ID and the depths
     int lake_index = -1;
     if(node_in_lake[node] > -1)
     {
       lake_index = node_in_lake[node];
-
-
+      // If my node is not in the queue but in the same lake (this happens when refilling the lake with more water)
       if(lake_index == this->lake_id || lake_network[lake_index].get_parent_lake() == this->lake_id )
         continue;
     }
-
-    if(is_in_queue[node] )
-      continue;
-
-    double this_depth = 0.;
     
-
+    // lake depth
+    double this_depth = 0.;
+    // getting potentially inherited lake depth
     if(lake_index >= 0)
       this_depth = lake_network[lake_index].get_lake_depth_at_node(node, node_in_lake);
 
-
-    // it gives me the elevation to be considered
+    // It gives me the elevation to be considered
     double tested_elevation = surface_elevation[node] + this_depth;
 
-    // however if there is another lake, I am ingesting it
-    if(lake_index> -1 )
+    // However if there is another lake, I am ingesting it
+    if(lake_index > -1)
     {
+      // Well, before drinking it I need to make sure that I did not already ddid it
+      if(lake_network[lake_index].get_parent_lake() == this->lake_id)
+        continue;
+      // OK let's drink
       this->ingest_other_lake(lake_network[lake_index], node_in_lake, is_in_queue,lake_network);
       continue;
     }
 
-
-
-    // If my neighbor is not in queue and at a higher elevation: I ingest it in the system
-    if(tested_elevation >= this->water_elevation && is_in_queue[node] == false)
+    // If the node is at higher (or same) elevation than me water surface, I set it in the queue
+    if(tested_elevation >= this->water_elevation)
     {
       this->depressionfiller.emplace(nodium(node,tested_elevation));
+      // Making sure I mark it as queued
       is_in_queue[node] = true;
+      // Adding the node to the list of nodes in me queue
       this->node_in_queue.push_back(node);
     }
+
     // Else, if not in queue and has lower elevation, then the current mother node IS an outlet
-    else if(is_in_queue[node] == false)
+    else
     {
       this->outlet_node = next_node.node;
-      // break; // not breaking the loop: I want to get all myneighbors in the queue for potential repouring water in the thingy
+      // not breaking the loop: I want to get all myneighbors in the queue for potential repouring water in the thingy
     }
 
     // Moving to the next neighbour
