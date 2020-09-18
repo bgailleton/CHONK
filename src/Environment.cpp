@@ -967,6 +967,7 @@ void Lake::pour_water_in_lake(
   std::vector<chonk>& chonk_network
   )
 {
+  std::cout << "Entering water volume is " << water_volume << " hence water flux is " <<  water_volume/dt << std::endl;
   // Some ongoing debugging
   // if(originode == 8371)
   //   std::cout << "processing the problem node W:" << chonk_network[originode].get_water_flux() << std::endl;
@@ -999,6 +1000,7 @@ void Lake::pour_water_in_lake(
   // UPDATE_09_2020:: No idea what I meant by anually.
   while(depressionfiller.empty() == false && water_volume > 0 )
   {
+    // std::cout << this->water_elevation << "||" << water_volume << std::endl;
     // Getting the next node and ...
     // (If this is the first time I fill a lake -> the first node is returned)
     // (If this is another node, it is jsut the next one the closest elevation to the water level)
@@ -1006,10 +1008,6 @@ void Lake::pour_water_in_lake(
     // ... removing it from the priority queue 
     this->depressionfiller.pop();
 
-    // The water elevation is the elevation of that Nodium object
-    // (if 1st node -> elevation of the bottom of the depression)
-    // (if other node -> lake water elevation)
-    this->water_elevation = next_node.elevation;
 
     // Initialising a dummy outlet, if this outlet becomes something I shall break the loop
     int outlet = -9999;
@@ -1020,6 +1018,7 @@ void Lake::pour_water_in_lake(
     // If I have an outlet, then the outlet node is positive
     if(outlet >= 0)
     {
+      this->water_elevation = next_node.elevation;
 
       // I therefore save it and break the loop
       this->outlet_node = outlet;
@@ -1034,11 +1033,28 @@ void Lake::pour_water_in_lake(
     this->n_nodes ++;
 
     //Decreasing water volume by filling teh lake
-    double dV = this->n_nodes * cellarea * (this->water_elevation - next_node.elevation );
+    double dV = this->n_nodes * cellarea * ( next_node.elevation - this->water_elevation );
+    if(dV<0)
+    {
+      std::string ljsdfld;
+      if(is_processed[next_node.node] == true)
+        ljsdfld = "true";
+      else
+        ljsdfld = "false";
+      std::cout << "DV::" << dV << " :: " << node_in_lake[next_node.node]  << " :: " << this->n_nodes << "::" << this->water_elevation << " :: " << next_node.elevation << " :: " << ljsdfld << "::" << outlet << std::endl;
+      throw std::runtime_error("negative dV lake filling");
+    }
     water_volume -= dV;
     this->volume += dV;
+
+    // The water elevation is the elevation of that Nodium object
+    // (if 1st node -> elevation of the bottom of the depression)
+    // (if other node -> lake water elevation)
+    this->water_elevation = next_node.elevation;
     // At this point I either have enough water to carry on or I stop the process
   }
+  std::cout << "After raw filling lake water volume is " << water_volume << " hence water flux is " <<  water_volume/dt << std::endl;
+
 
   // checking that I did not overfilled my lake:
   if(water_volume <0)
@@ -1046,6 +1062,7 @@ void Lake::pour_water_in_lake(
     double extra = abs(water_volume);
     double dZ = extra / this->n_nodes / cellarea;
     this->water_elevation -= dZ;
+    water_volume = 0;
   }
 
   // Labelling the node in depression as belonging to this lake and saving their depth
@@ -1064,6 +1081,8 @@ void Lake::pour_water_in_lake(
     {
       // Otherwise: calculating the outflux: water_volume_remaining divided by the time step
       double out_water_rate = water_volume/(dt);
+      std::cout << "out water volume is " << out_water_rate << std::endl;
+
       // Getting all the receivers and the length to the oulet
       std::vector<int>& receivers = graph.get_MF_receivers_at_node(this->outlet_node);
       std::vector<double>& length = graph.get_MF_lengths_at_node(this->outlet_node);
@@ -1189,7 +1208,7 @@ int Lake::check_neighbors_for_outlet_or_existing_lakes(
     // However if there is another lake, and that his elevation is mine I am ingesting it
     // if the lake has a lower elevation, I am outletting in it
     // if the lake has greater elevation, I am considering this node as a potential donor
-    if(lake_index > -1 && tested_elevation == this->water_elevation)
+    if(lake_index > -1 && tested_elevation == next_node.elevation)
     {
       // Well, before drinking it I need to make sure that I did not already ddid it
       if(lake_network[lake_index].get_parent_lake() == this->lake_id)
@@ -1200,7 +1219,7 @@ int Lake::check_neighbors_for_outlet_or_existing_lakes(
     }
 
     // If the node is at higher (or same) elevation than me water surface, I set it in the queue
-    if(tested_elevation >= this->water_elevation)
+    if(tested_elevation >= next_node.elevation)
     {
       this->depressionfiller.emplace(nodium(node,tested_elevation));
       // Making sure I mark it as queued
