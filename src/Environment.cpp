@@ -1018,8 +1018,9 @@ void Lake::pour_water_in_lake(
     outlet = this->check_neighbors_for_outlet_or_existing_lakes(next_node, graph, node_in_lake, lake_network, surface_elevation, is_in_queue, active_nodes);
 
     // If I have an outlet, then the outlet node is positive
-    if(outlet>=0)
+    if(outlet >= 0)
     {
+
       // I therefore save it and break the loop
       this->outlet_node = outlet;
       // and readding the node to the depression
@@ -1037,6 +1038,14 @@ void Lake::pour_water_in_lake(
     water_volume -= dV;
     this->volume += dV;
     // At this point I either have enough water to carry on or I stop the process
+  }
+
+  // checking that I did not overfilled my lake:
+  if(water_volume <0)
+  {
+    double extra = abs(water_volume);
+    double dZ = extra / this->n_nodes / cellarea;
+    this->water_elevation -= dZ;
   }
 
   // Labelling the node in depression as belonging to this lake and saving their depth
@@ -1177,13 +1186,15 @@ int Lake::check_neighbors_for_outlet_or_existing_lakes(
     // It gives me the elevation to be considered
     double tested_elevation = surface_elevation[node] + this_depth;
 
-    // However if there is another lake, I am ingesting it
-    if(lake_index > -1)
+    // However if there is another lake, and that his elevation is mine I am ingesting it
+    // if the lake has a lower elevation, I am outletting in it
+    // if the lake has greater elevation, I am considering this node as a potential donor
+    if(lake_index > -1 && tested_elevation == this->water_elevation)
     {
       // Well, before drinking it I need to make sure that I did not already ddid it
       if(lake_network[lake_index].get_parent_lake() == this->lake_id)
         continue;
-      // OK let's drink
+      // OK let's try to drink it 
       this->ingest_other_lake(lake_network[lake_index], node_in_lake, is_in_queue,lake_network);
       continue;
     }
@@ -1202,7 +1213,7 @@ int Lake::check_neighbors_for_outlet_or_existing_lakes(
     else
     {
       this->outlet_node = next_node.node;
-      // not breaking the loop: I want to get all myneighbors in the queue for potential repouring water in the thingy
+      // IMPORTANT::not breaking the loop: I want to get all myneighbors in the queue for potential repouring water in the thingy
     }
 
     // Moving to the next neighbour
