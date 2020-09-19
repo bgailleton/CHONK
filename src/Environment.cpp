@@ -212,7 +212,7 @@ void ModelRunner::process_node(int& node, std::vector<bool>& is_processed, int& 
       double sedvol = this->chonk_network[node].get_sediment_flux();
       
       // Pouring water into the lake, it also finds if there is an outlet and reprocess the water fluxes for dat one
-      this->lake_network[lakeid].pour_water_in_lake(water_volume,node, node_in_lake, is_processed, inctive_nodes,lake_network, surface_elevation,graph, cellarea, timestep,chonk_network);
+      this->lake_network[lakeid].pour_water_in_lake(water_volume, node, node_in_lake, is_processed, inctive_nodes,lake_network, surface_elevation,graph, cellarea, timestep,chonk_network);
       
       // pouring sediment into the lake
       this->lake_network[lakeid].pour_sediment_into_lake(sedvol);
@@ -282,9 +282,15 @@ void ModelRunner::process_node(int& node, std::vector<bool>& is_processed, int& 
             this->chonk_network[inode].cancel_split_and_merge_in_receiving_chonks(this->chonk_network,this->graph, this->timestep);
             // Cancelling the prefluxes (will be readded anyway)
             this->cancel_fluxes_before_moving_prep(this->chonk_network[inode]);
+            // std::cout << "cancelled fluxes on " << inode << " outlet was " << outlet << std::endl;
           }
 
         }
+        
+        this->cancel_fluxes_before_moving_prep(this->chonk_network[outlet]);
+
+        
+        this->process_node_nolake_for_sure(outlet, is_processed, lake_incrementor, underfilled_lake, inctive_nodes, cellarea, surface_elevation, false, false);
 
 
         // Reprocessing the fluxes from US to DS
@@ -297,7 +303,7 @@ void ModelRunner::process_node(int& node, std::vector<bool>& is_processed, int& 
             // if nodes are in the ones to reprocess, I proceed
             underfilled_lake++;
             // i know they are not in lakes by definition so I call a lighter function, and avoid too much recusrion which tend to break the code somehows
-            this->process_node_nolake_for_sure(inode, is_processed, lake_incrementor, underfilled_lake, inctive_nodes, cellarea, surface_elevation, false);
+            this->process_node_nolake_for_sure(inode, is_processed, lake_incrementor, underfilled_lake, inctive_nodes, cellarea, surface_elevation, false, true);
           }
         }
 
@@ -385,12 +391,12 @@ void ModelRunner::process_node(int& node, std::vector<bool>& is_processed, int& 
 }
 
 void ModelRunner::process_node_nolake_for_sure(int& node, std::vector<bool>& is_processed, int& lake_incrementor, int& underfilled_lake,
-  xt::pytensor<int,1>& inctive_nodes, double& cellarea, xt::pytensor<double,1>& surface_elevation, bool need_move_prep)
+  xt::pytensor<int,1>& inctive_nodes, double& cellarea, xt::pytensor<double,1>& surface_elevation, bool need_move_prep, bool need_flux_before_move)
 {
     is_processed[node] = true;
 
-
-    this->manage_fluxes_before_moving_prep(this->chonk_network[node]);
+    if(need_flux_before_move)
+      this->manage_fluxes_before_moving_prep(this->chonk_network[node]);
     // first step is to apply the right move method, to prepare the chonk to move
     if(need_move_prep)
       this->manage_move_prep(this->chonk_network[node]);
@@ -468,13 +474,17 @@ void ModelRunner::find_nodes_to_reprocess(int start, std::vector<bool>& is_proce
       break;
 
     int this_node = tQ[reading_id];
-    if(insert_id_trav < tsize)
-    {
-      traversal.emplace_back(this_node);
-      insert_id_trav++;
+    if(this_node != start)
+    {  
+      if(insert_id_trav < tsize)
+      {
+        traversal.emplace_back(this_node);
+        insert_id_trav++;
+      }
+      else
+        traversal.push_back(this_node);
     }
-    else
-      traversal.push_back(this_node);
+
 
     for(auto node:this->graph.get_MF_receivers_at_node(this_node))
     {
@@ -484,6 +494,7 @@ void ModelRunner::find_nodes_to_reprocess(int start, std::vector<bool>& is_proce
 
       if(is_in_Q.find(node) != is_in_Q.end())
         continue;
+
       int this_lake_id = node_in_lake[node];
       if(this_lake_id >= 0 && is_in_lake.find(node) == is_in_lake.end())
       {
@@ -967,7 +978,10 @@ void Lake::pour_water_in_lake(
   std::vector<chonk>& chonk_network
   )
 {
-  std::cout << "Entering water volume is " << water_volume << " hence water flux is " <<  water_volume/dt << std::endl;
+  // std::cout << "Entering water volume is " << water_volume << " hence water flux is " <<  water_volume/dt << std::endl;
+  double save_entering_water = water_volume;
+  double save_preexistingwater = this->volume;
+
   // Some ongoing debugging
   // if(originode == 8371)
   //   std::cout << "processing the problem node W:" << chonk_network[originode].get_water_flux() << std::endl;
@@ -991,8 +1005,8 @@ void Lake::pour_water_in_lake(
     // This function fills an original lake, hence there is no lake depth yet:
     this->water_elevation = surface_elevation[originode];
     is_in_queue[originode] = true;
-    this->nodes.push_back(originode);
-    this->n_nodes ++;
+    // this->nodes.push_back(originode);
+    // this->n_nodes ++;
   }
 
   // I am processing new nodes while I still have water OR still nodes upstream 
@@ -1028,9 +1042,7 @@ void Lake::pour_water_in_lake(
       break;
     }
 
-    // Otehr wise, I do not have an outlet and I can save this node as in depression
-    this->nodes.push_back(next_node.node);
-    this->n_nodes ++;
+
 
     //Decreasing water volume by filling teh lake
     double dV = this->n_nodes * cellarea * ( next_node.elevation - this->water_elevation );
@@ -1051,19 +1063,31 @@ void Lake::pour_water_in_lake(
     // (if 1st node -> elevation of the bottom of the depression)
     // (if other node -> lake water elevation)
     this->water_elevation = next_node.elevation;
+        // Otehr wise, I do not have an outlet and I can save this node as in depression
+    this->nodes.push_back(next_node.node);
+    this->n_nodes ++;
     // At this point I either have enough water to carry on or I stop the process
   }
-  std::cout << "After raw filling lake water volume is " << water_volume << " hence water flux is " <<  water_volume/dt << std::endl;
+  // std::cout << "After raw filling lake water volume is " << water_volume << " hence water flux is " <<  water_volume/dt << std::endl;
 
 
   // checking that I did not overfilled my lake:
   if(water_volume <0)
   {
     double extra = abs(water_volume);
+    this->n_nodes -= 1;
+    int extra_node = this->nodes[this->nodes.size() - 1];
+    this->depressionfiller.emplace(nodium(extra_node,surface_elevation[extra_node]));
+    this->nodes.erase(this->nodes.begin() + this->nodes.size() - 1);
+
     double dZ = extra / this->n_nodes / cellarea;
     this->water_elevation -= dZ;
     water_volume = 0;
+    this->volume -= extra;
   }
+
+  // std::cout << "Water balance: " << this->volume - save_preexistingwater + water_volume << "should be equal to " << save_entering_water << std::endl;
+
 
   // Labelling the node in depression as belonging to this lake and saving their depth
   for(auto Unot:this->nodes)
@@ -1081,7 +1105,7 @@ void Lake::pour_water_in_lake(
     {
       // Otherwise: calculating the outflux: water_volume_remaining divided by the time step
       double out_water_rate = water_volume/(dt);
-      std::cout << "out water volume is " << out_water_rate << std::endl;
+      // std::cout << "out water volume is " << out_water_rate << std::endl;
 
       // Getting all the receivers and the length to the oulet
       std::vector<int>& receivers = graph.get_MF_receivers_at_node(this->outlet_node);
@@ -1120,10 +1144,10 @@ void Lake::pour_water_in_lake(
       }
 
       // resetting the outlet CHONK
-      if(is_processed[this->outlet_node])
-      {
-        chonk_network[this->outlet_node].cancel_split_and_merge_in_receiving_chonks(chonk_network,graph,dt);
-      }
+      // if(is_processed[this->outlet_node])
+      // {
+      //   chonk_network[this->outlet_node].cancel_split_and_merge_in_receiving_chonks(chonk_network,graph,dt);
+      // }
 
       chonk_network[this->outlet_node].reinitialise_moving_prep();
       // forcing the new water flux
@@ -1131,6 +1155,7 @@ void Lake::pour_water_in_lake(
       chonk_network[this->outlet_node].set_water_flux(out_water_rate);
 
       // Forcing receivers
+      std::cout << "SS ID for routletting is " << SS_ID << std::endl;
       std::vector<int> rec = {SS_ID};
       std::vector<double> wwf = {1.};
       std::vector<double> wws = {1.};
@@ -1146,8 +1171,6 @@ void Lake::pour_water_in_lake(
         chonk_network[this->outlet_node].set_sediment_flux(0.);
 
       // ready for re calculation, but it needs to be in the env object
-
-
     }
 
   }
