@@ -282,14 +282,22 @@ void ModelRunner::process_node(int& node, std::vector<bool>& is_processed, int& 
             this->chonk_network[inode].cancel_split_and_merge_in_receiving_chonks(this->chonk_network,this->graph, this->timestep);
             // Cancelling the prefluxes (will be readded anyway)
             this->cancel_fluxes_before_moving_prep(this->chonk_network[inode]);
-            // std::cout << "cancelled fluxes on " << inode << " outlet was " << outlet << std::endl;
           }
 
         }
         
         this->cancel_fluxes_before_moving_prep(this->chonk_network[outlet]);
 
-        
+        chonk& this_chonk = this->lake_network[lakeid].get_outletting_chonk();
+        std::vector<int> rec = this_chonk.get_chonk_receivers_copy();
+        std::vector<double> slope2rec =  this_chonk.get_chonk_slope_to_recs_copy();
+        // water weights
+        std::vector<double> wwf = this_chonk.get_chonk_water_weight_copy();
+        std::vector<double> wsf = this_chonk.get_chonk_sediment_weight_copy();
+        this->chonk_network[outlet].reinitialise_moving_prep();
+        this->chonk_network[outlet].external_moving_prep(rec,wwf,wsf,slope2rec);
+        this->chonk_network[outlet].set_water_flux(this_chonk.get_water_flux());
+
         this->process_node_nolake_for_sure(outlet, is_processed, lake_incrementor, underfilled_lake, inctive_nodes, cellarea, surface_elevation, false, false);
 
 
@@ -496,7 +504,7 @@ void ModelRunner::find_nodes_to_reprocess(int start, std::vector<bool>& is_proce
         continue;
 
       int this_lake_id = node_in_lake[node];
-      if(this_lake_id >= 0 && is_in_lake.find(node) == is_in_lake.end())
+      if(this_lake_id >= 0 && is_in_lake.find(node) == is_in_lake.end() && this_node != start)
       {
         // Checking and avoiding dedundancy
         if(this_lake_id == lake_to_avoid || this->lake_network[this_lake_id].get_parent_lake() == lake_to_avoid)
@@ -507,6 +515,7 @@ void ModelRunner::find_nodes_to_reprocess(int start, std::vector<bool>& is_proce
             if(recnode != node)
               new_rec.push_back(recnode);
           }
+          std::cout << "IT HAPPENS" << std::endl;
           this->graph.update_receivers_at_node(this_node, new_rec);
           continue;
         }
@@ -522,6 +531,9 @@ void ModelRunner::find_nodes_to_reprocess(int start, std::vector<bool>& is_proce
         is_in_Q.insert(node);
         continue;
       }
+
+      if(this_node == start && (this_lake_id == lake_to_avoid || this->lake_network[this_lake_id].get_parent_lake() == lake_to_avoid))
+        continue;
 
       is_in_Q.insert(node);
       if(insert_id_proc < tsize )
@@ -1149,10 +1161,11 @@ void Lake::pour_water_in_lake(
       //   chonk_network[this->outlet_node].cancel_split_and_merge_in_receiving_chonks(chonk_network,graph,dt);
       // }
 
-      chonk_network[this->outlet_node].reinitialise_moving_prep();
+      this->outlet_chonk = chonk(-1, -1, false); //  this is creating a "fake" chonk so its id is -1
+      this->outlet_chonk.reinitialise_moving_prep();
       // forcing the new water flux
-      // std::cout << "lake::" << chonk_network[this->outlet_node].get_water_flux() << std::endl;;
-      chonk_network[this->outlet_node].set_water_flux(out_water_rate);
+      // std::cout << "lake::" << this->outlet_chonk.get_water_flux() << std::endl;;
+      this->outlet_chonk.set_water_flux(out_water_rate);
 
       // Forcing receivers
       std::cout << "SS ID for routletting is " << SS_ID << std::endl;
@@ -1160,15 +1173,15 @@ void Lake::pour_water_in_lake(
       std::vector<double> wwf = {1.};
       std::vector<double> wws = {1.};
       std::vector<double> Strec = {SS};
-      chonk_network[this->outlet_node].external_moving_prep(rec,wwf,wws,Strec);
+      this->outlet_chonk.external_moving_prep(rec,wwf,wws,Strec);
       if(this->volume_of_sediment > this->volume)
       {
         double outsed = this->volume_of_sediment - this->volume;
         this->volume_of_sediment -= outsed;
-        chonk_network[this->outlet_node].set_sediment_flux(outsed);
+        this->outlet_chonk.set_sediment_flux(outsed);
       }
       else
-        chonk_network[this->outlet_node].set_sediment_flux(0.);
+        this->outlet_chonk.set_sediment_flux(0.);
 
       // ready for re calculation, but it needs to be in the env object
     }

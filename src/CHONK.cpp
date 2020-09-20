@@ -132,9 +132,12 @@ void chonk::cancel_split_and_merge_in_receiving_chonks(std::vector<chonk>& chonk
 
     // Adding the fluxes*modifye
     other_chonk.add_to_water_flux( -1 * this->water_flux * this->weigth_water_fluxes[i]);
-
-    if(other_chonk.get_water_flux()<0)
-      other_chonk.set_water_flux(0.);
+    std::cout << "Node " << this->chonkID << " removes " << -1 * this->water_flux * this->weigth_water_fluxes[i] << " from " << this->receivers[i] << " leaving " << other_chonk.get_water_flux() << std::endl;;
+    // if(other_chonk.get_water_flux()<0)
+    // {
+    //   std::cout << "warning test:: watf<0" << std::endl;
+    //   other_chonk.set_water_flux(0.);
+    // }
 
     other_chonk.add_to_sediment_flux( -1 * this->sediment_flux * this->weigth_sediment_fluxes[i]);
     // std::cout << "SEDFLUXDEBUG::" << this->sediment_flux << "||" << this->weigth_sediment_fluxes[i] << "||water::" << this->weigth_water_fluxes[i] << std::endl;

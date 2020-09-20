@@ -127,6 +127,7 @@ class Lake
     int set_parent_lake(int value){has_been_ingeted = value;}
     int get_lake_outlet(){return this->outlet_node;}
     std::vector<int> get_ingested_lakes(){return ingested_lakes;}
+    chonk& get_outletting_chonk(){return outlet_chonk;};
 
 
   protected:
@@ -144,6 +145,10 @@ class Lake
     double volume_of_sediment;
     // The node outletting the lake
     int outlet_node;
+
+    // outlet fluxes
+    chonk outlet_chonk;
+
     // the index of the lake which ate this one
     int has_been_ingeted;
     std::vector<int> ingested_lakes; 

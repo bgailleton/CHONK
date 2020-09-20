@@ -97,9 +97,16 @@ class chonk
     double get_other_attribute(std::string key){return other_attributes[key];}
     // receivers
     std::vector<int>& get_chonk_receivers(){return receivers;}
+    std::vector<double>& get_chonk_slope_to_recs(){return slope_to_rec;}
     // water weights
     std::vector<double>& get_chonk_water_weight(){return weigth_water_fluxes;}
     std::vector<double>& get_chonk_sediment_weight(){return weigth_sediment_fluxes;}
+    // receivers
+    std::vector<int> get_chonk_receivers_copy(){return receivers;}
+    // water weights
+    std::vector<double> get_chonk_water_weight_copy(){return weigth_water_fluxes;}
+    std::vector<double> get_chonk_sediment_weight_copy(){return weigth_sediment_fluxes;}
+    std::vector<double> get_chonk_slope_to_recs_copy(){return slope_to_rec;}
 
 
     // Depression solver!
