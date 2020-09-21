@@ -642,8 +642,11 @@ void chonk::active_simple_SPL(double n, double m, xt::pytensor<double,1>& K, dou
     // calculating the flux E = K s^n A^m
     double this_eflux = std::pow(this->water_flux * this->weigth_water_fluxes[i],m) * std::pow(this->slope_to_rec[i],n) * K[this->current_node];
 
-    // if(isinf(this_eflux))
-    //   std::cout << this->water_flux << "||" << this->weigth_water_fluxes[i] << "||" << this->slope_to_rec[i] << std::endl;
+    if(this_eflux < -1)
+    {
+      std::cout << this_eflux << "||" << this->water_flux << "||" << this->weigth_water_fluxes[i] << "||" << this->slope_to_rec[i] << std::endl;
+      throw std::runtime_error("NEGATIVE EROSION");
+    }
 
     // stacking the erosion flux
     this->erosion_flux += this_eflux;

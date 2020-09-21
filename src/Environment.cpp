@@ -74,14 +74,11 @@ void ModelRunner::create(double ttimestep,double tstart_time,std::vector<std::st
 // initialising the node graph and the chonk network
 void ModelRunner::initiate_nodegraph()
 {
+
   std::cout << "initiating nodegraph..." <<std::endl;
   // creating the nodegraph and preprocessing the depression nodes
-  // this->graph = NodeGraph(this->io_int_array["pre_stack"],this->io_int_array["pre_rec"],this->io_int_array["post_rec"],this->io_int_array["post_stack"] , this->io_int_array["m_stack"], this->io_int_array2d["m_rec"],this->io_int_array2d["m_don"], 
-  //   this->io_double_array["surface_elevation"], this->io_double_array2d["length"], this->io_double["x_min"], this->io_double["x_max"], this->io_double["y_min"], 
-  //   this->io_double["y_max"], this->io_double["dx"], this->io_double["dy"], this->io_int["n_rows"], this->io_int["n_cols"], this->io_int["no_data"]);
   xt::pytensor<bool,1> active_nodes = xt::zeros<bool>({this->io_int_array["active_nodes"].size()});
   xt::pytensor<int,1>& inctive_nodes = this->io_int_array["active_nodes"];
-
   for(size_t i =0; i<inctive_nodes.size(); i++)
   {
     int B = inctive_nodes[i];
@@ -90,26 +87,20 @@ void ModelRunner::initiate_nodegraph()
     else
       active_nodes[i] = false;
   }
+
+  // Initialising the graph
   this->graph = NodeGraphV2(this->io_double_array["surface_elevation"], active_nodes,this->io_double["dx"], this->io_double["dy"],
 this->io_int["n_rows"], this->io_int["n_cols"]);
 
   std::cout << "done, sorting few stuff around ..." << std::endl;
-   // if(node == 2074)
-    // {
-      // std::vector<int> receivers = graph.get_MF_receivers_at_node(2074);
-      // std::cout << "FLUBR::" << receivers.size() << std::endl;
-
-      // for(auto trec:receivers)
-      // {
-      //   std::cout << "2074REC is " << trec << std::endl;
-       // }
-    // }
-
-  // Chonkification
+  
+  // Chonkification: initialising chonk network
+  //# clearing the chonk network
   if(this->chonk_network.size()>0)
   {
     this->chonk_network.clear();
   }
+  //# Creating noew empty chonks
   this->chonk_network = std::vector<chonk>();
   this->chonk_network.reserve(size_t(this->io_int["n_elements"]));
 
@@ -119,6 +110,7 @@ this->io_int["n_rows"], this->io_int["n_cols"]);
     this->chonk_network.emplace_back(chonk(int(i), int(i), false));
   }
 
+  // I NEED TO WORK ON THAT PART YO
   // This add previous inherited water from previous lakes
   // Note that it "empties" the lake and reinitialise the depth. If there is still a reason to for the lake, it will form it
   // std::cout << "wat" << std::endl;
@@ -133,44 +125,48 @@ this->io_int["n_rows"], this->io_int["n_cols"]);
   //# no nodes in lakes
   node_in_lake = std::vector<int>(this->io_int["n_elements"], -1);
 
-
   std::cout << "done with setting up graph stuff" <<  std::endl;
 }
 
 void ModelRunner::run()
 {
-
   // Alright now I need to loop from top to bottom
   std::cout << "Starting the run" << std::endl;
+  
   // Keeping track of which node is processed, for debugging and lake management
   std::vector<bool> is_processed(io_int["n_elements"],false);
 
-  // Aliases
+  // Aliases for efficiency
   xt::pytensor<int,1>& inctive_nodes = this->io_int_array["active_nodes"];
   xt::pytensor<double,1>&surface_elevation =  this->io_double_array["surface_elevation"];
+  // well area of a cell to gain time
   double cellarea = this->io_double["dx"] * this->io_double["dy"];
+  // Debug checker
   int underfilled_lake = 0;
+  // Iterating though all the nodes
   for(int i=0; i<io_int["n_elements"]; i++)
   {
+    // Getting the current node in the Us->DS stack order
     int node = this->graph.get_MF_stack_at_i(i);
+    // Processing that node
     this->process_node(node, is_processed, lake_incrementor, underfilled_lake, inctive_nodes, cellarea, surface_elevation, true);    
+    // Switching to the next node in line
   }
+
   std::cout << "Ending the run" << std::endl;
+  // temp debug thingy 
   if(underfilled_lake>0)
     std::cout << "DEBUGINFO::I called the underfilled function " << underfilled_lake << "times" << std::endl;
 
-  this->finalise(); //TODO
-
-  
-
-
+  // Calling the finalising function: it applies the changes in topography and I think will apply the lake sedimentation
+  this->finalise();
+  // Done
 }
 
 void ModelRunner::process_node(int& node, std::vector<bool>& is_processed, int& lake_incrementor, int& underfilled_lake,
   xt::pytensor<int,1>& inctive_nodes, double& cellarea, xt::pytensor<double,1>& surface_elevation, bool need_move_prep)
 {
-
-    // just a check: if the lake solver is not activated, I have no reason to reprocess node
+    // Just a check: if the lake solver is not activated, I have no reason to reprocess node
     if(this->lake_solver == false && is_processed[node])
       return;
 
@@ -282,6 +278,8 @@ void ModelRunner::process_node(int& node, std::vector<bool>& is_processed, int& 
             this->chonk_network[inode].cancel_split_and_merge_in_receiving_chonks(this->chonk_network,this->graph, this->timestep);
             // Cancelling the prefluxes (will be readded anyway)
             this->cancel_fluxes_before_moving_prep(this->chonk_network[inode]);
+            this->chonk_network[inode].set_erosion_flux(0.);
+            this->chonk_network[inode].set_deposition_flux(0.);
           }
 
         }
@@ -297,6 +295,7 @@ void ModelRunner::process_node(int& node, std::vector<bool>& is_processed, int& 
         this->chonk_network[outlet].reinitialise_moving_prep();
         this->chonk_network[outlet].external_moving_prep(rec,wwf,wsf,slope2rec);
         this->chonk_network[outlet].set_water_flux(this_chonk.get_water_flux());
+        this->chonk_network[outlet].set_sediment_flux(this_chonk.get_sediment_flux());
 
         this->process_node_nolake_for_sure(outlet, is_processed, lake_incrementor, underfilled_lake, inctive_nodes, cellarea, surface_elevation, false, false);
 
@@ -419,6 +418,7 @@ void ModelRunner::process_node_nolake_for_sure(int& node, std::vector<bool>& is_
 void ModelRunner::finalise()
 {
   xt::pytensor<double,1>& surface_elevation_tp1 = this->io_double_array["surface_elevation_tp1"];
+  xt::pytensor<double,1>& surface_elevation = this->io_double_array["surface_elevation"];
   xt::pytensor<double,1>& sed_height_tp1 = this->io_double_array["sed_height_tp1"];
   xt::pytensor<double,1> tlake_depth = xt::zeros<double>({size_t(this->io_int["n_elements"])});
 
@@ -429,15 +429,17 @@ void ModelRunner::finalise()
     surface_elevation_tp1[i] += tchonk.get_deposition_flux() * timestep;
     sed_height_tp1[i] -= tchonk.get_erosion_flux() * timestep;
 
+    // if()
+
     // if(isnan(tchonk.get_water_flux()) ||tchonk.get_water_flux() < 0 )
     // {
     //   std::cout << i << "::isdep->" << this->graph.is_depression(i) << "::lake->" << node_in_lake[i] << std::endl;;
     //   throw std::runtime_error("SafeWaterError::NAN or negative detected in the water fluxes W:" + std::to_string( tchonk.get_water_flux() ) );
     // }
     
-    if(isnan(surface_elevation_tp1[i]))
-      throw std::runtime_error("NAN detected in elevation node:" + std::to_string(i) + " E:" + std::to_string(tchonk.get_erosion_flux() * timestep) + " D:" + std::to_string(tchonk.get_deposition_flux() * timestep)
-        + " W:" + std::to_string(tchonk.get_water_flux()));
+    // if(isnan(surface_elevation_tp1[i]) || surface_elevation_tp1[i]>500)
+    //   throw std::runtime_error("NAN detected in elevation node:" + std::to_string(i) + " E:" + std::to_string(tchonk.get_erosion_flux() * timestep) + " D:" + std::to_string(tchonk.get_deposition_flux() * timestep)
+    //     + " W:" + std::to_string(tchonk.get_water_flux()) + "|| etp1:" + std::to_string(surface_elevation_tp1[i]) + " || et: "  + std::to_string(surface_elevation[i]) );
 
 
     // if(std::isnan(sed_height_tp1[i]))
@@ -1152,6 +1154,7 @@ void Lake::pour_water_in_lake(
         // std::cout << "Warning::lake outlet is itself a lake bottom? is it normal?" << std::endl;
         // yes it can be
         SS_ID = this->outlet_node;
+        SS = 0.;
         // throw std::runtime_error(" The lake has an outlet with no downlslope neighbors ??? This is not possible, check Lake::initial_lake_fill or warn Boris that it happened");
       }
 
