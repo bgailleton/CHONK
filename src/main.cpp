@@ -81,6 +81,8 @@ PYBIND11_MODULE(CHONK_cpp, m)
       .def("get_DEBUG_connode", &ModelRunner::get_DEBUG_connode)
       .def("get_mstree", &ModelRunner::get_mstree)
       .def("get_mstree_translated", &ModelRunner::get_mstree_translated)
+      .def("reinitialise_label_list",&ModelRunner::reinitialise_label_list)
+      .def("initialise_label_list",&ModelRunner::initialise_label_list)
     ;
     m.def("set_DEBUG_switch_nodegraph",set_DEBUG_switch_nodegraph);
     m.def("pop_elevation_to_SS_SF_SPIL", pop_elevation_to_SS_SF_SPIL);
@@ -90,6 +92,16 @@ PYBIND11_MODULE(CHONK_cpp, m)
       .def(py::init([]( xt::pytensor<double,1>& elevation,xt::pytensor<bool,1>& active_nodes, 
         double dx, double dy, int nrows, int ncols){return std::unique_ptr<NodeGraphV2>(new NodeGraphV2( elevation,active_nodes,  dx,  dy, nrows, ncols)); }))
       .def("get_MF_stack_full", &NodeGraphV2::get_MF_stack_full)
+      ;
+
+    py::class_<labelz>(m, "label",py::dynamic_attr())
+      .def(py::init<>())
+      .def(py::init([](int label_id){return std::unique_ptr<labelz>(new labelz( label_id)); }))
+      .def("set_int_attribute", &labelz::set_int_attribute)
+      .def("set_double_attribute", &labelz::set_double_attribute)
+      .def("set_int_array_attribute", &labelz::set_int_array_attribute)
+      .def("set_double_array_attribute", &labelz::set_double_array_attribute)
+      // .def("get_MF_stack_full", &NodeGraphV2::get_MF_stack_full)
       ;
 
 

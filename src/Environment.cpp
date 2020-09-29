@@ -63,11 +63,12 @@ bool operator<( const nodium& lhs, const nodium& rhs )
 // Initialises the model object, actually Does not do much but is required.
 void ModelRunner::create(double ttimestep,double tstart_time,std::vector<std::string> tordered_flux_methods, std::string tmove_method)
 {
-  // Getting all the attributes
+  // Saving all the attributes
   this->timestep = ttimestep;
   this->start_time = tstart_time;
   this->ordered_flux_methods = tordered_flux_methods;
   this->move_method = tmove_method;
+  // By default the lake solver is activated
   this->lake_solver = true;
 }
 
@@ -76,9 +77,13 @@ void ModelRunner::initiate_nodegraph()
 {
 
   std::cout << "initiating nodegraph..." <<std::endl;
-  // creating the nodegraph and preprocessing the depression nodes
+  // Creating the nodegraph and preprocessing the depression nodes
+
+  // First jsut sorting out the active node array.
+  // Needs cleaning and optimisation cause some routines with bool where somehow buggy
   xt::pytensor<bool,1> active_nodes = xt::zeros<bool>({this->io_int_array["active_nodes"].size()});
   xt::pytensor<int,1>& inctive_nodes = this->io_int_array["active_nodes"];
+  // Converting int to bool
   for(size_t i =0; i<inctive_nodes.size(); i++)
   {
     int B = inctive_nodes[i];
@@ -88,6 +93,7 @@ void ModelRunner::initiate_nodegraph()
       active_nodes[i] = false;
   }
 
+  //Dat is the real stuff:
   // Initialising the graph
   this->graph = NodeGraphV2(this->io_double_array["surface_elevation"], active_nodes,this->io_double["dx"], this->io_double["dy"],
 this->io_int["n_rows"], this->io_int["n_cols"]);
@@ -114,7 +120,7 @@ this->io_int["n_rows"], this->io_int["n_cols"]);
   // This add previous inherited water from previous lakes
   // Note that it "empties" the lake and reinitialise the depth. If there is still a reason to for the lake, it will form it
   // std::cout << "wat" << std::endl;
-  // this->process_inherited_water();
+  this->process_inherited_water();
   // std::cout << "er" << std::endl;
 
   // Also initialising the Lake graph
@@ -149,7 +155,8 @@ void ModelRunner::run()
     // Getting the current node in the Us->DS stack order
     int node = this->graph.get_MF_stack_at_i(i);
     // Processing that node
-    this->process_node(node, is_processed, lake_incrementor, underfilled_lake, inctive_nodes, cellarea, surface_elevation, true);    
+    this->process_node(node, is_processed, lake_incrementor, underfilled_lake, inctive_nodes, cellarea, surface_elevation, true);   
+    // std::cout << this->chonk_network[node].get_water_flux() << std::endl; 
     // Switching to the next node in line
   }
 
@@ -250,7 +257,6 @@ void ModelRunner::process_node(int& node, std::vector<bool>& is_processed, int& 
           // the checker set helps me keeping track of which nodes to process
           checker.insert(newnode);
         }
-      // std::cout << "Bulf4" <<std::endl;
 
         // Saving the fluxes pre correction in the lakes, in order to be able to correct it
         std::map<int, double > lake_water_corrector, lake_sed_corrector;
@@ -278,6 +284,7 @@ void ModelRunner::process_node(int& node, std::vector<bool>& is_processed, int& 
             this->chonk_network[inode].cancel_split_and_merge_in_receiving_chonks(this->chonk_network,this->graph, this->timestep);
             // Cancelling the prefluxes (will be readded anyway)
             this->cancel_fluxes_before_moving_prep(this->chonk_network[inode]);
+            // because I am reprocessing these nodes, I need to reinitialise their deposition fluxes and erosion fluxes too
             this->chonk_network[inode].set_erosion_flux(0.);
             this->chonk_network[inode].set_deposition_flux(0.);
           }
@@ -428,6 +435,8 @@ void ModelRunner::finalise()
     surface_elevation_tp1[i] -= tchonk.get_erosion_flux() * timestep;
     surface_elevation_tp1[i] += tchonk.get_deposition_flux() * timestep;
     sed_height_tp1[i] -= tchonk.get_erosion_flux() * timestep;
+    // std::cout << this->chonk_network[i].get_water_flux() << std::endl; 
+
 
     // if()
 
@@ -717,7 +726,7 @@ void ModelRunner::process_inherited_water()
   {
     // getting node underwater
     std::vector<int>& unodes = tlake.get_lake_nodes();
-    if(unodes.size() == 0)
+    if(unodes.size() == 0 || tlake.get_parent_lake() != tlake.get_lake_id())
       continue;
 
     // going through all the nodes and gathering the potenial outlets
@@ -1171,7 +1180,7 @@ void Lake::pour_water_in_lake(
       this->outlet_chonk.set_water_flux(out_water_rate);
 
       // Forcing receivers
-      std::cout << "SS ID for routletting is " << SS_ID << std::endl;
+      // std::cout << "SS ID for routletting is " << SS_ID << std::endl;
       std::vector<int> rec = {SS_ID};
       std::vector<double> wwf = {1.};
       std::vector<double> wws = {1.};
@@ -1516,6 +1525,9 @@ int ModelRunner::solve_depressionv2(int node)
       break;
     }
 
+    //Adding a comment to recompile
+    // And another one (working on header files and python only recompiles if ne of the cpp file has changed)
+
     // for(auto don:donodes)
     // {
       
@@ -1549,6 +1561,13 @@ int ModelRunner::solve_depressionv2(int node)
   return potential_outlet;
 
 }
+
+
+
+
+//////////////////////////////////////////
+/////////////////////////////////////////
+
 
 
 

@@ -38,6 +38,46 @@
 
 
 
+
+
+// #####################################################
+// ############# Labelling class #######################
+// #####################################################
+
+// the label class is a way to group every pixels having the same info and save memory.
+// this is also the core concept of the tracking engine, which track and uses the label info to track the prop of each provenances area into the lagrangian particules
+class labelz
+{
+public:
+    // Default, empty constructor
+    labelz(){};
+    // Initialise a label class with an id corresponding to its place in the labelz vector
+    labelz(int id){this->label_id = label_id;};
+    // ID and place in the labelz vector
+    int label_id;
+    // integers attributes
+    std::unordered_map<std::string, int> int_attributes;
+    // floating points attributes
+    std::unordered_map<std::string, double> double_attributes;
+    // arrays of integers attributes
+    std::unordered_map<std::string, xt::pytensor<int,1> > int_array_attributes;
+    // arrays of floating points attributes
+    std::unordered_map<std::string, xt::pytensor<double,1> > double_array_attributes;
+
+    // Sets an integer attribute (update an old one or add a new one)
+    void set_int_attribute(std::string key, int val){this->int_attributes[key] = val;};
+    // Sets an floating attribute (update an old one or add a new one)
+    void set_double_attribute(std::string key, double val){this->double_attributes[key] = val;};
+    // Sets an integer array attribute (update an old one or add a new one)
+    void set_int_array_attribute(std::string key, xt::pytensor<int,1> val){this->int_array_attributes[key] = val;};
+    // Sets an floating array attribute (update an old one or add a new one)
+    void set_double_array_attribute(std::string key, xt::pytensor<double,1> val){this->double_array_attributes[key] = val;}
+};
+
+
+
+
+
 // #####################################################
 // ############# Node structure ########################
 // #####################################################
@@ -185,6 +225,7 @@ class ModelRunner
     // # timestep
     void update_timestep(double dt){timestep = dt;};
 
+
     // Get parameters
     int get_int_param(std::string name){ return io_int[name];};
     double get_double_param(std::string name){return io_double[name];};
@@ -251,6 +292,20 @@ void process_node_nolake_for_sure(int& node, std::vector<bool>& is_processed, in
     void set_lake_switch(bool value){lake_solver = value;}
     std::vector<int> get_broken_nodes(){return graph.get_broken_nodes();}
 
+    // This function reinitialise the list of label to empty
+    void reinitialise_label_list(){labelz_list.clear();};
+    // Initialises a label list to n empty labels
+    // void initialise_label_list(int n_labels){this->labelz_list.clear();this->labelz_list.reserve(n_labels);for(int i=0; i<n_labels; i++){this->labelz_list.emplace_back(labelz(i));}};
+    void initialise_label_list(std::vector<labelz>& these_labelz){this->labelz_list = std::move(these_labelz); n_labels = int(these_labelz.size());};
+    // returns the number of labels in the label list
+    int get_n_labels(){return n_labels;}
+    // get a list of a given attribute for each labels, this aims to minimise the calls to maps which is lower than looking in a vector. Especially when it would ned to be done for each nodes
+    std::vector<int> get_list_of_int_labels_attribute(std::string key){std::vector<int> output;output.reserve(n_labels);for(int i=0;i<n_labels;i++){output.emplace_back(labelz_list[i].int_attributes[key]);} return output;}
+    std::vector<double> get_list_of_double_labels_attribute(std::string key){std::vector<double> output;output.reserve(n_labels);for(int i=0;i<n_labels;i++){output.emplace_back(labelz_list[i].double_attributes[key]);} return output;}
+    std::vector<xt::pytensor<double,1> > get_list_of_double_array_labels_attribute(std::string key){std::vector<xt::pytensor<double,1> > output;output.reserve(n_labels);for(int i=0;i<n_labels;i++){output.emplace_back(labelz_list[i].double_array_attributes[key]);} return output;}
+    std::vector<xt::pytensor<int,1> > get_list_of_int_array_labels_attribute(std::string key){std::vector<xt::pytensor<int,1> > output;output.reserve(n_labels);for(int i=0;i<n_labels;i++){output.emplace_back(labelz_list[i].int_array_attributes[key]);} return output;}
+
+
   protected:
 
     // timestep of the model
@@ -285,13 +340,17 @@ void process_node_nolake_for_sure(int& node, std::vector<bool>& is_processed, in
     //# Vetor containing the lake ID for each nodes of the landscape. -1 -> NAL node: Not A Lake
     std::vector<int> node_in_lake;
 
-    // parameters
+    // parameters, stored un maps of thingies by type
     std::map<std::string, int> io_int;
     std::map<std::string, double> io_double;
     std::map<std::string, xt::pytensor<int,1> > io_int_array;
     std::map<std::string, xt::pytensor<int,2> > io_int_array2d;
-    std::map<std::string, xt::pytensor<double,1> > io_double_array;
+    std::map<std::string, xt::pytensor<double,1> > io_double_array ;
     std::map<std::string, xt::pytensor<double,2> > io_double_array2d;
+
+    //Labellisation:
+    int n_labels;
+    std::vector<labelz> labelz_list;
 
   private:
     void create() {return;};

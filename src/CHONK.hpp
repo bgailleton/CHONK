@@ -119,6 +119,9 @@ class chonk
     void external_moving_prep(std::vector<int>& rec,std::vector<double>& wwf,std::vector<double>& wws, std::vector<double>& strec)
          {receivers = rec;weigth_water_fluxes = wwf; weigth_sediment_fluxes = wws; slope_to_rec = strec;return;}
 
+    // Tracking and labelling functions
+    void initialise_local_label_tracker_in_sediment_flux(int n_labels){other_attributes_arrays["label_tracker"] = std::vector<int>();other_attributes_arrays["label_tracker"].reserve(n_labels);for(int i=0;i<n_labels;i++){other_attributes_arrays["label_tracker"].emplace_back(0);};}
+
 
   protected:
     // Administration attributes
@@ -156,6 +159,7 @@ class chonk
     // I think that if I systematically add them as attributes, I will loose some performance
     // Instead I well assign a map of attribute so that I can add as many as I need, even if less explicit
     std::map<std::string,double> other_attributes;
+    std::map<std::string,std::vector<double> > other_attributes_arrays;
 
 
   private:
