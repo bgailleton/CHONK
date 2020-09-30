@@ -292,6 +292,8 @@ void process_node_nolake_for_sure(int& node, std::vector<bool>& is_processed, in
     void set_lake_switch(bool value){lake_solver = value;}
     std::vector<int> get_broken_nodes(){return graph.get_broken_nodes();}
 
+
+    // Functions managing the interactions with the label array: extracting the parameters and other related characteristics
     // This function reinitialise the list of label to empty
     void reinitialise_label_list(){labelz_list.clear();};
     // Initialises a label list to n empty labels
@@ -299,12 +301,14 @@ void process_node_nolake_for_sure(int& node, std::vector<bool>& is_processed, in
     void initialise_label_list(std::vector<labelz>& these_labelz){this->labelz_list = std::move(these_labelz); n_labels = int(these_labelz.size());};
     // returns the number of labels in the label list
     int get_n_labels(){return n_labels;}
-    // get a list of a given attribute for each labels, this aims to minimise the calls to maps which is lower than looking in a vector. Especially when it would ned to be done for each nodes
+    // Get a list of a given attribute for each labels, this aims to minimise the calls to maps which is lower than looking in a vector. Especially when it would ned to be done for each nodes
+    // For example, you are processing the SPL, so you want a list of K for each label. Then you don't have to retrieve it from the maps at each iterations (accessing map elements is much slower than accessing vector elements)
     std::vector<int> get_list_of_int_labels_attribute(std::string key){std::vector<int> output;output.reserve(n_labels);for(int i=0;i<n_labels;i++){output.emplace_back(labelz_list[i].int_attributes[key]);} return output;}
     std::vector<double> get_list_of_double_labels_attribute(std::string key){std::vector<double> output;output.reserve(n_labels);for(int i=0;i<n_labels;i++){output.emplace_back(labelz_list[i].double_attributes[key]);} return output;}
     std::vector<xt::pytensor<double,1> > get_list_of_double_array_labels_attribute(std::string key){std::vector<xt::pytensor<double,1> > output;output.reserve(n_labels);for(int i=0;i<n_labels;i++){output.emplace_back(labelz_list[i].double_array_attributes[key]);} return output;}
     std::vector<xt::pytensor<int,1> > get_list_of_int_array_labels_attribute(std::string key){std::vector<xt::pytensor<int,1> > output;output.reserve(n_labels);for(int i=0;i<n_labels;i++){output.emplace_back(labelz_list[i].int_array_attributes[key]);} return output;}
 
+    
 
   protected:
 

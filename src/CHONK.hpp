@@ -120,7 +120,7 @@ class chonk
          {receivers = rec;weigth_water_fluxes = wwf; weigth_sediment_fluxes = wws; slope_to_rec = strec;return;}
 
     // Tracking and labelling functions
-    void initialise_local_label_tracker_in_sediment_flux(int n_labels){other_attributes_arrays["label_tracker"] = std::vector<int>();other_attributes_arrays["label_tracker"].reserve(n_labels);for(int i=0;i<n_labels;i++){other_attributes_arrays["label_tracker"].emplace_back(0);};}
+    void initialise_local_label_tracker_in_sediment_flux(int n_labels){other_attributes_arrays["label_tracker"] = std::vector<double>();other_attributes_arrays["label_tracker"].reserve(n_labels);for(int i=0;i<n_labels;i++){other_attributes_arrays["label_tracker"].emplace_back(0);};}
 
 
   protected:
