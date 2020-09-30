@@ -623,7 +623,7 @@ void chonk::cancel_inplace_infiltration(double Xres, double Yres, xt::pytensor<d
 // they need to take care of the motion
 
 // Simplest Stream power incision formulation, Howard and Kerby 1984
-void chonk::active_simple_SPL(double n, double m, xt::pytensor<double,1>& K, double dt, double Xres, double Yres)
+void chonk::active_simple_SPL(double n, double m, double K, double dt, double Xres, double Yres)
 {
 
   // I am recording the current sediment fluxes in the model distributed for each receivers
@@ -638,7 +638,7 @@ void chonk::active_simple_SPL(double n, double m, xt::pytensor<double,1>& K, dou
   {
 
     // calculating the flux E = K s^n A^m
-    double this_eflux = std::pow(this->water_flux * this->weigth_water_fluxes[i],m) * std::pow(this->slope_to_rec[i],n) * K[this->current_node];
+    double this_eflux = std::pow(this->water_flux * this->weigth_water_fluxes[i],m) * std::pow(this->slope_to_rec[i],n) * K;
 
     if(this_eflux < -1)
     {

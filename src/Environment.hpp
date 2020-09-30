@@ -243,7 +243,7 @@ class ModelRunner
 
     void manage_move_prep(chonk& this_chonk);
 
-    void manage_fluxes_after_moving_prep(chonk& this_chonk);
+    void manage_fluxes_after_moving_prep(chonk& this_chonk, int label_id);
 
     // int solve_depression(int node);
     int solve_depressionv2(int node);
@@ -307,8 +307,16 @@ void process_node_nolake_for_sure(int& node, std::vector<bool>& is_processed, in
     std::vector<double> get_list_of_double_labels_attribute(std::string key){std::vector<double> output;output.reserve(n_labels);for(int i=0;i<n_labels;i++){output.emplace_back(labelz_list[i].double_attributes[key]);} return output;}
     std::vector<xt::pytensor<double,1> > get_list_of_double_array_labels_attribute(std::string key){std::vector<xt::pytensor<double,1> > output;output.reserve(n_labels);for(int i=0;i<n_labels;i++){output.emplace_back(labelz_list[i].double_array_attributes[key]);} return output;}
     std::vector<xt::pytensor<int,1> > get_list_of_int_array_labels_attribute(std::string key){std::vector<xt::pytensor<int,1> > output;output.reserve(n_labels);for(int i=0;i<n_labels;i++){output.emplace_back(labelz_list[i].int_array_attributes[key]);} return output;}
+    // Preprocess the lsit of elements from labels
+    void prepare_label_to_list_for_processes();
 
-    
+
+    // initialise the map of correspondances between model processes and integers for the switch engines
+    void initialise_intcorrespondance();
+
+    //update the label array
+    void update_label_array(xt::pytensor<int,1>& arr){label_array = arr;};
+
 
   protected:
 
@@ -353,8 +361,23 @@ void process_node_nolake_for_sure(int& node, std::vector<bool>& is_processed, in
     std::map<std::string, xt::pytensor<double,2> > io_double_array2d;
 
     //Labellisation:
+    // Number of labels 
     int n_labels;
+    // Vector containing all the different labels
     std::vector<labelz> labelz_list;
+    // Maps of labels per_law utilise (not the most logical thing but it avoid a looooot of map access)
+    std::unordered_map<std::string, std::vector<int> > labelz_list_int; 
+    std::unordered_map<std::string, std::vector<double> > labelz_list_double; 
+    std::unordered_map<std::string, std::vector<std::vector<int> > > labelz_list_int_array; 
+    std::unordered_map<std::string, std::vector<std::vector<double> > > labelz_list_double_array; 
+    // std::unordered_map<std::string, std::vector<int> > labelz_list_int; 
+
+    // Correspondance between int and laws for speeding up with switched
+    std::map<std::string,int> intcorrespondance;
+
+    // Label array: because it is a systematic requirements, I need this aray to always be there
+    xt::pytensor<int,1> label_array;
+
 
   private:
     void create() {return;};

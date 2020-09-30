@@ -83,6 +83,7 @@ PYBIND11_MODULE(CHONK_cpp, m)
       .def("get_mstree_translated", &ModelRunner::get_mstree_translated)
       .def("reinitialise_label_list",&ModelRunner::reinitialise_label_list)
       .def("initialise_label_list",&ModelRunner::initialise_label_list)
+      .def("update_label_array", &ModelRunner::update_label_array)
     ;
     m.def("set_DEBUG_switch_nodegraph",set_DEBUG_switch_nodegraph);
     m.def("pop_elevation_to_SS_SF_SPIL", pop_elevation_to_SS_SF_SPIL);

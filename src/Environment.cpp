@@ -70,6 +70,7 @@ void ModelRunner::create(double ttimestep,double tstart_time,std::vector<std::st
   this->move_method = tmove_method;
   // By default the lake solver is activated
   this->lake_solver = true;
+  this->initialise_intcorrespondance();
 }
 
 // initialising the node graph and the chonk network
@@ -398,7 +399,7 @@ void ModelRunner::process_node(int& node, std::vector<bool>& is_processed, int& 
     if(need_move_prep)
       this->manage_move_prep(this->chonk_network[node]);
     // Fluxes after moving prep are active fluxes such as erosion or other thingies
-    this->manage_fluxes_after_moving_prep(this->chonk_network[node]);
+    this->manage_fluxes_after_moving_prep(this->chonk_network[node],this->label_array[node]);
     // Apply the changes and propagate the fluxes downstream
     this->chonk_network[node].split_and_merge_in_receiving_chonks(this->chonk_network, this->graph, this->io_double_array["surface_elevation_tp1"], io_double_array["sed_height_tp1"], this->timestep);
 }
@@ -415,7 +416,7 @@ void ModelRunner::process_node_nolake_for_sure(int& node, std::vector<bool>& is_
       this->manage_move_prep(this->chonk_network[node]);
   
 
-    this->manage_fluxes_after_moving_prep(this->chonk_network[node]);
+    this->manage_fluxes_after_moving_prep(this->chonk_network[node],this->label_array[node]);
     // std::cout << "bite" << std::endl;
     this->chonk_network[node].split_and_merge_in_receiving_chonks(this->chonk_network, this->graph, this->io_double_array["surface_elevation_tp1"], io_double_array["sed_height_tp1"], this->timestep);
 }
@@ -609,12 +610,6 @@ void ModelRunner::manage_fluxes_before_moving_prep(chonk& this_chonk)
 
 void ModelRunner::cancel_fluxes_before_moving_prep(chonk& this_chonk)
 {
-
-  std::map<std::string,int> intcorrespondance;
-  intcorrespondance["drainage_area"] = 1;
-  intcorrespondance["precipitation_discharge"] = 2;
-  intcorrespondance["infiltration_discharge"] = 3;
-
   for(auto method:this->ordered_flux_methods)
   {
     if(method == "move")
@@ -623,13 +618,13 @@ void ModelRunner::cancel_fluxes_before_moving_prep(chonk& this_chonk)
 
     switch(this_case)
     {
-      case 1:
+      case 5:
         this_chonk.cancel_inplace_only_drainage_area(this->io_double["dx"], this->io_double["dy"]);
         break;
-      case 2:
+      case 6:
         this_chonk.cancel_inplace_precipitation_discharge(this->io_double["dx"], this->io_double["dy"],this->io_double_array["precipitation"]);
         break;
-      case 3:
+      case 7:
         this_chonk.cancel_inplace_infiltration(this->io_double["dx"], this->io_double["dy"], this->io_double_array["infiltration"]);
         break;
     }
@@ -651,15 +646,10 @@ void ModelRunner::manage_move_prep(chonk& this_chonk)
 
   switch(this_case)
   {
-    case 1:
+    case 2:
       this_chonk.move_to_steepest_descent(this->graph, this->timestep, this->io_double_array["sed_height"], this->io_double_array["sed_height_tp1"], 
    this->io_double_array["surface_elevation"],  this->io_double_array["surface_elevation_tp1"], this->io_double["dx"], this->io_double["dy"], chonk_network);
       break;
-    case 2:
-      this_chonk.move_to_steepest_descent_nodepression(this->graph, this->timestep, this->io_double_array["sed_height"], this->io_double_array["sed_height_tp1"], 
-   this->io_double_array["surface_elevation"],  this->io_double_array["surface_elevation_tp1"], this->io_double["dx"], this->io_double["dy"], chonk_network);
-      break;
-
     case 3:
       this_chonk.move_MF_from_fastscapelib(this->graph, this->io_double_array2d["external_weigths_water"], this->timestep, this->io_double_array["sed_height"], this->io_double_array["sed_height_tp1"], 
    this->io_double_array["surface_elevation"],  this->io_double_array["surface_elevation_tp1"], this->io_double["dx"], this->io_double["dy"], chonk_network);
@@ -674,11 +664,9 @@ void ModelRunner::manage_move_prep(chonk& this_chonk)
   }
 }
 
-void ModelRunner::manage_fluxes_after_moving_prep(chonk& this_chonk)
+void ModelRunner::manage_fluxes_after_moving_prep(chonk& this_chonk, int label_id)
 {
   bool has_moved = false;
-  std::map<std::string,int> intcorrespondance;
-  intcorrespondance["basic_SPIL"] = 1;
   for(auto method:this->ordered_flux_methods)
   {
     
@@ -695,11 +683,50 @@ void ModelRunner::manage_fluxes_after_moving_prep(chonk& this_chonk)
     switch(this_case)
     {
       case 1:
-        this_chonk.active_simple_SPL(this->io_double["SPIL_n"], this->io_double["SPIL_m"], this->io_double_array["erodibility_K"], this->timestep, this->io_double["dx"], this->io_double["dy"]);
+        this_chonk.active_simple_SPL(this->labelz_list_int["SPIL_n"][label_id], this->labelz_list_int["SPIL_m"][label_id], this->labelz_list_double["SPIL_K"][label_id], this->timestep, this->io_double["dx"], this->io_double["dy"]);
         break;
     }
   }
   return;
+}
+
+// Initialise ad-hoc set of internal correspondance between process names and integer
+// Again this is a small otpimisation that reduce the need to initialise and call maps for each nodes as maps are slower to access
+void ModelRunner::initialise_intcorrespondance()
+{
+  intcorrespondance = std::map<std::string,int>();
+  intcorrespondance["SPIL_Howard_Kerby_1984"] = 1;
+  intcorrespondance["D8"] = 2;
+  intcorrespondance["MF_fastscapelib"] = 3;
+  intcorrespondance["MF_fastscapelib_threshold_SF"] = 4;
+  intcorrespondance["drainage_area"] = 5;
+  intcorrespondance["precipitation_discharge"] = 6;
+  intcorrespondance["infiltration_discharge"] = 7;
+
+}
+
+void ModelRunner::prepare_label_to_list_for_processes()
+{
+  for(auto method:this->ordered_flux_methods)
+  {
+    int this_case = intcorrespondance[method];
+    switch(this_case)
+    {
+
+      case 1:
+        for(auto& tlab:labelz_list)
+        {
+          labelz_list_int["SPIL_m"].push_back(tlab.int_attributes["SPIL_m"]);
+          labelz_list_int["SPIL_n"].push_back(tlab.int_attributes["SPIL_n"]);
+          labelz_list_double["SPIL_K"].push_back(tlab.double_attributes["SPIL_K"]);
+        }
+          
+      // defaut case means the law has no correspondance so it does not do anyting
+      default: 
+        break;
+    }
+  }
+
 }
 
 
@@ -1355,7 +1382,7 @@ void  ModelRunner::find_underfilled_lakes_already_processed_and_give_water(int S
 
 
     this->manage_move_prep(chonk_network[node]);
-    this->manage_fluxes_after_moving_prep(chonk_network[node]);
+    this->manage_fluxes_after_moving_prep(chonk_network[node], this->label_array[node]);
 
     // need to check if some nodes give in lake
     std::vector<int> to_ignore;

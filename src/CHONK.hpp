@@ -66,7 +66,7 @@ class chonk
 
 
     //#### active flux applyer (AFTER move)
-    void active_simple_SPL(double n, double m, xt::pytensor<double,1>& K, double dt, double Xres, double Yres);
+    void active_simple_SPL(double n, double m, double K, double dt, double Xres, double Yres);
 
 
 
