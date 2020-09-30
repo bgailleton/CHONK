@@ -108,12 +108,6 @@ class chonk
     std::vector<double> get_chonk_sediment_weight_copy(){return weigth_sediment_fluxes;}
     std::vector<double> get_chonk_slope_to_recs_copy(){return slope_to_rec;}
 
-
-    // Depression solver!
-    void solve_depression_simple(NodeGraphV2& graph, double dt, xt::pytensor<double,1>& sed_height, xt::pytensor<double,1>& sed_height_tp1, 
-  xt::pytensor<double,1>& surface_elevation,xt::pytensor<double,1>& surface_elevation_tp1, double Xres, double Yres, std::vector<chonk>& chonk_network);
-    // Sub-depression tree builder
-    void recursion_builder_subdepression_tree(std::set<int>& set_of_depressions, int current_pit_ID, NodeGraphV2& graph);
     // reinitialise moving preparation by clearing all vectors of move
     void reinitialise_moving_prep(){receivers.clear();weigth_water_fluxes.clear();weigth_sediment_fluxes.clear();slope_to_rec.clear();return;}
     void external_moving_prep(std::vector<int>& rec,std::vector<double>& wwf,std::vector<double>& wws, std::vector<double>& strec)

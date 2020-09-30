@@ -397,10 +397,9 @@ void ModelRunner::process_node(int& node, std::vector<bool>& is_processed, int& 
     // first step is to apply the right move method, to prepare the chonk to move
     if(need_move_prep)
       this->manage_move_prep(this->chonk_network[node]);
-  
-
+    // Fluxes after moving prep are active fluxes such as erosion or other thingies
     this->manage_fluxes_after_moving_prep(this->chonk_network[node]);
-    // std::cout << "bite" << std::endl;
+    // Apply the changes and propagate the fluxes downstream
     this->chonk_network[node].split_and_merge_in_receiving_chonks(this->chonk_network, this->graph, this->io_double_array["surface_elevation_tp1"], io_double_array["sed_height_tp1"], this->timestep);
 }
 
