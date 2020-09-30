@@ -245,9 +245,6 @@ class ModelRunner
 
     void manage_fluxes_after_moving_prep(chonk& this_chonk, int label_id);
 
-    // int solve_depression(int node);
-    int solve_depressionv2(int node);
-
 
     void process_inherited_water();
 

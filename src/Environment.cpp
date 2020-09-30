@@ -71,6 +71,7 @@ void ModelRunner::create(double ttimestep,double tstart_time,std::vector<std::st
   // By default the lake solver is activated
   this->lake_solver = true;
   this->initialise_intcorrespondance();
+  this->prepare_label_to_list_for_processes();
 }
 
 // initialising the node graph and the chonk network
@@ -693,7 +694,8 @@ void ModelRunner::manage_fluxes_after_moving_prep(chonk& this_chonk, int label_i
 // Initialise ad-hoc set of internal correspondance between process names and integer
 // Again this is a small otpimisation that reduce the need to initialise and call maps for each nodes as maps are slower to access
 void ModelRunner::initialise_intcorrespondance()
-{
+
+this->prepare_label_to_list_for_processes();{
   intcorrespondance = std::map<std::string,int>();
   intcorrespondance["SPIL_Howard_Kerby_1984"] = 1;
   intcorrespondance["D8"] = 2;
@@ -1477,117 +1479,6 @@ xt::pytensor<double,1> pop_elevation_to_SS_SF_SPIL(xt::pytensor<int,1>& stack, x
   return elevation;
 
 }
-
-
-
-// This function is the main algorithm managing depression solving
-// DEPRECATED
-int ModelRunner::solve_depressionv2(int node)
-{
-  std::cout << "solving depression at node " << node << std::endl;
-  // Gathering the depression rerouter, I'll need it to check when I reach another pit vs true base level
-  // xt::pytensor<int,1>& depressions = this->io_int_array["depression_to_reroute"];
-  xt::pytensor<double,1>& surface_elevation = this->io_double_array["surface_elevation"];
-  xt::pytensor<double,1>& lake_depth = this->io_double_array["lake_depth"];
-  xt::pytensor<int,1>& active_nodes = this->io_int_array["active_nodes"];
-  // I am making these aliases to avoid the cost of accessing the map element each nodes
-
-  // Getting the total volume of water arriving in this depression: Q * dt
-  double water_volume = this->chonk_network[node].get_water_flux() * timestep;
-  // My first node to be processed is the pit
-  nodium working_node( node, surface_elevation[node] + lake_depth[node]);
-
-  // Initialising the priority queue I will be using to processed my nodes
-  std::priority_queue< nodium, std::vector<nodium>, std::greater<nodium> > depressionfiller;
-  // Adding my first node in it
-  depressionfiller.push(working_node);
-  
-  // I'll be keeping track of how many and which nodes are in this depression
-  int n_nodes_underwater = 0;
-  std::vector<int> underwater_nodes;
-  std::vector<bool> is_underwater(this->io_int["n_elements"], false);
-  std::vector<bool> is_in_queue(this->io_int["n_elements"], false);
-  is_in_queue[working_node.node] = true;
-
-  // My current water level is the elevation of this node + eventually preexisting lake water from THIS timestep
-  double current_water_level = surface_elevation[node] + lake_depth[node];
-  // I will track my outlet status
-  int potential_outlet = -9999;
-  // Temp boolean I need to break the loop in some specific cases (e.g. an edge is reach and my water escapes)
-  bool break_main_loop = false;
-  // Now filling the depression, doing it while I have enough water to do so
-  while(water_volume>0 && depressionfiller.empty() == false)
-  {
-    // At the start of this loop, my working node is in the depression
-    n_nodes_underwater++;
-    working_node =  depressionfiller.top();
-    depressionfiller.pop();
-    underwater_nodes.push_back(working_node.node);
-    is_underwater[working_node.node] = true;
-
-    if(active_nodes[working_node.node] == 0)
-      break;
-
-    // HEre, checking if this node outlets the depression
-    // I am getting all the receivers of the current working node, i.e. the downslope neighbors of my current one
-    std::vector<int> recnodes = graph.get_MF_receivers_at_node(working_node.node);
-    std::vector<int> donodes = graph.get_MF_donors_at_node(working_node.node);
-    recnodes.insert(recnodes.end(), donodes.begin(), donodes.end());
-    for(auto nenode:recnodes)
-    {
-      double this_elev = surface_elevation[nenode] + lake_depth[nenode];
-      if(this_elev>= current_water_level || lake_depth[nenode] > 0)
-      {
-        nodium next_node( nenode, this_elev);
-        depressionfiller.push(next_node);
-      }
-
-    }
-    
-    if(break_main_loop)
-    {
-      current_water_level = surface_elevation[potential_outlet] + lake_depth[potential_outlet];
-
-      break;
-    }
-
-    //Adding a comment to recompile
-    // And another one (working on header files and python only recompiles if ne of the cpp file has changed)
-
-    // for(auto don:donodes)
-    // {
-      
-    // }
-
-    if(depressionfiller.empty())
-    {
-      break;
-    }
-
-    nodium next_node = depressionfiller.top();
-
-    water_volume -= n_nodes_underwater * this->io_double["dx"] * this->io_double["dy"] * (next_node.elevation + lake_depth[next_node.node] - current_water_level);
-
-    current_water_level = next_node.elevation + lake_depth[next_node.node];
-
-  }
-
-  // // DEAL WITH EXTRA WATER HERE
-  // if(potential_outlet>=0)
-  // {
-
-  // }
-
-
-  for(auto unode:underwater_nodes)
-  {
-    lake_depth[unode] = current_water_level -  surface_elevation[unode];
-  }
-
-  return potential_outlet;
-
-}
-
 
 
 
