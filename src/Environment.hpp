@@ -429,6 +429,7 @@ class ModelRunner
 
 
   private:
+    // mirror of the constructors
     void create() {return;};
     void create(double ttimestep,double tstart_time, std::vector<std::string> tordered_flux_methods, std::string tmove_method);
      
@@ -436,12 +437,7 @@ class ModelRunner
 };// End of ModelRunner
 
 
-
-
-
-
-
-
+// Ignore that at the moment
 xt::pytensor<double,1> pop_elevation_to_SS_SF_SPIL(xt::pytensor<int,1>& stack, xt::pytensor<int,1>& rec,xt::pytensor<double,1>& length , xt::pytensor<double,1>& erosion, 
       xt::pytensor<double,1>& K, double n, double m, double cellarea);
 

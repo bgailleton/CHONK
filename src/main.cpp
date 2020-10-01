@@ -13,7 +13,6 @@
 #include <pybind11/complex.h>
 #include <pybind11/chrono.h>
 #include <pybind11/functional.h>
-// include "nodegraph.hpp"
 
 #include "nodegraph.hpp"
 #include "CHONK.hpp"
@@ -26,20 +25,14 @@
 #include <vector>
 #include <map>
 
-
-
 namespace py = pybind11;
-
-
-
-
 
 PYBIND11_MODULE(CHONK_cpp, m)
 {
     xt::import_numpy();
 
     m.doc() = R"pbdoc(
-        Testing flow routing system for my post-doc
+        CHONK model runner, a tool to set and run the model CHONK
 
         .. currentmodule:: CHONK_cpp
 

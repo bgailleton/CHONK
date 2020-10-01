@@ -612,6 +612,49 @@ void chonk::cancel_inplace_precipitation_discharge(double Xres, double Yres, xt:
 // Reduce the waterflux by infiltrating some water
 void chonk::cancel_inplace_infiltration(double Xres, double Yres, xt::pytensor<double,1>& infiltration){this->water_flux -= -1 *(Xres * Yres * infiltration[this->current_node]);};
 
+//########################################################################################
+//########################################################################################
+//############ Traking management: clever flux modifyers##################################
+//########################################################################################
+//########################################################################################
+// manages the sediment fluxes
+
+std::vector<double> chonk::get_preexisting_sediment_flux_by_receivers()
+{
+  std::vector<double> pre_sedfluxes;pre_sedfluxes.reserve(this->weigth_sediment_fluxes.size());
+  for(auto& v:this->weigth_sediment_fluxes)
+  {
+    pre_sedfluxes.emplace_back(v*this->sediment_flux);
+  }
+  return pre_sedfluxes;
+}
+
+void chonk::set_sediment_flux(double value,std::vector<double>& label_proportions)
+{
+  this->sediment_flux = value;
+  for(int i=0; i< int(label_proportions.size()); i++)
+    other_attributes_arrays["label_tracker"][i] = label_proportions[i];
+}
+
+void chonk::add_to_sediment_flux(double value, std::vector<double>& label_proportions)
+{
+  this->sediment_flux += value;
+  double total_proportion = 1;
+  for(int i=0; i< int(label_proportions.size()); i++)
+  {
+    total_proportion += label_proportions[i];
+    other_attributes_arrays["label_tracker"][i] += label_proportions[i];
+  }
+
+  for(int i=0; i< int(label_proportions.size()); i++)
+    other_attributes_arrays["label_tracker"][i] = other_attributes_arrays["label_tracker"][i]/total_proportion;
+
+}
+// next step:: propagte proportions to split and merge
+
+
+
+
 
 //########################################################################################
 //########################################################################################
@@ -627,11 +670,7 @@ void chonk::active_simple_SPL(double n, double m, double K, double dt, double Xr
 {
 
   // I am recording the current sediment fluxes in the model distributed for each receivers
-  std::vector<double> pre_sedfluxes;pre_sedfluxes.reserve(this->weigth_sediment_fluxes.size());
-  for(auto& v:this->weigth_sediment_fluxes)
-  {
-    pre_sedfluxes.emplace_back(v*this->sediment_flux);
-  }
+  std::vector<double> pre_sedfluxes = get_preexisting_sediment_flux_by_receivers();
 
   // Calculation current fluxes
   for(size_t i=0; i<this->receivers.size(); i++)
@@ -640,19 +679,8 @@ void chonk::active_simple_SPL(double n, double m, double K, double dt, double Xr
     // calculating the flux E = K s^n A^m
     double this_eflux = std::pow(this->water_flux * this->weigth_water_fluxes[i],m) * std::pow(this->slope_to_rec[i],n) * K;
 
-    if(this_eflux < -1)
-    {
-      std::cout << this_eflux << "||" << this->water_flux << "||" << this->weigth_water_fluxes[i] << "||" << this->slope_to_rec[i] << std::endl;
-      throw std::runtime_error("NEGATIVE EROSION");
-    }
-
     // stacking the erosion flux
     this->erosion_flux += this_eflux;
-    // if(isnan(this->erosion_flux) )
-    // {
-    //   std::cout << "NAN BECAUSE::" << this_eflux << "||" << this->slope_to_rec[i]  << "||";
-    //   std::cout << this->weigth_water_fluxes[i] << "||" << this->water_flux  << std::endl;
-    // }
 
     // What has been eroded moves into the sediment flux (which needs to be converted into a volume)
     this->sediment_flux += this_eflux * Xres * Yres * dt;

@@ -86,8 +86,10 @@ class chonk
     void add_deposition_flux(double value){deposition_flux += value;}
     // # Sediment flux
     double get_sediment_flux(){return sediment_flux;}
-    void set_sediment_flux(double value){sediment_flux = value;}
-    void add_to_sediment_flux(double value){sediment_flux += value;}
+    void set_sediment_flux_no_tacking(double value){sediment_flux = value;}
+    void set_sediment_flux(double value,std::vector<double>& label_proportions);
+    void add_to_sediment_flux_no_tracking(double value){sediment_flux += value;}
+    void add_to_sediment_flux(double value, std::vector<double>& label_proportions);
     //# check emptyness 
     bool check_if_empty(){return is_empty;};
     //# Check if depression solved
