@@ -183,7 +183,7 @@ void ModelRunner::process_node(int& node, std::vector<bool>& is_processed, int& 
     is_processed[node] = true;
 
     // manages the fluxes before moving the particule: accumulating DA, precipitation, infiltration, evaporation, ...
-    this->manage_fluxes_before_moving_prep(this->chonk_network[node]);
+    this->manage_fluxes_before_moving_prep(this->chonk_network[node],this->label_array[node] );
 
     // Uf the lake solving is activated, then I go through the (more than I expected) complex process of filing a lake correctly
     if(this->lake_solver) 
@@ -285,7 +285,7 @@ void ModelRunner::process_node(int& node, std::vector<bool>& is_processed, int& 
             // cancelling the fluxes
             this->chonk_network[inode].cancel_split_and_merge_in_receiving_chonks(this->chonk_network,this->graph, this->timestep);
             // Cancelling the prefluxes (will be readded anyway)
-            this->cancel_fluxes_before_moving_prep(this->chonk_network[inode]);
+            this->cancel_fluxes_before_moving_prep(this->chonk_network[inode], this->label_array[inode]);
             // because I am reprocessing these nodes, I need to reinitialise their deposition fluxes and erosion fluxes too
             this->chonk_network[inode].set_erosion_flux(0.);
             this->chonk_network[inode].set_deposition_flux(0.);
@@ -293,7 +293,7 @@ void ModelRunner::process_node(int& node, std::vector<bool>& is_processed, int& 
 
         }
         
-        this->cancel_fluxes_before_moving_prep(this->chonk_network[outlet]);
+        this->cancel_fluxes_before_moving_prep(this->chonk_network[outlet], this->label_array[outlet]);
 
         chonk& this_chonk = this->lake_network[lakeid].get_outletting_chonk();
         std::vector<int> rec = this_chonk.get_chonk_receivers_copy();
@@ -411,7 +411,7 @@ void ModelRunner::process_node_nolake_for_sure(int& node, std::vector<bool>& is_
     is_processed[node] = true;
 
     if(need_flux_before_move)
-      this->manage_fluxes_before_moving_prep(this->chonk_network[node]);
+      this->manage_fluxes_before_moving_prep(this->chonk_network[node], this->label_array[node]);
     // first step is to apply the right move method, to prepare the chonk to move
     if(need_move_prep)
       this->manage_move_prep(this->chonk_network[node]);
@@ -579,7 +579,7 @@ void ModelRunner::find_nodes_to_reprocess(int start, std::vector<bool>& is_proce
 
 
 
-void ModelRunner::manage_fluxes_before_moving_prep(chonk& this_chonk)
+void ModelRunner::manage_fluxes_before_moving_prep(chonk& this_chonk, int label_id)
 {
 
   std::map<std::string,int> intcorrespondance;
@@ -609,7 +609,7 @@ void ModelRunner::manage_fluxes_before_moving_prep(chonk& this_chonk)
   }
 }
 
-void ModelRunner::cancel_fluxes_before_moving_prep(chonk& this_chonk)
+void ModelRunner::cancel_fluxes_before_moving_prep(chonk& this_chonk, int label_id)
 {
   for(auto method:this->ordered_flux_methods)
   {
@@ -1380,7 +1380,7 @@ void  ModelRunner::find_underfilled_lakes_already_processed_and_give_water(int S
       continue;
 
 
-    this->manage_fluxes_before_moving_prep(chonk_network[node]);
+    this->manage_fluxes_before_moving_prep(chonk_network[node], this->label_array[node] );
 
 
     this->manage_move_prep(chonk_network[node]);
