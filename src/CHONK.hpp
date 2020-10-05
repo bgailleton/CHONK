@@ -66,7 +66,7 @@ class chonk
 
 
     //#### active flux applyer (AFTER move)
-    void active_simple_SPL(double n, double m, double K, double dt, double Xres, double Yres);
+    void active_simple_SPL(double n, double m, double K, double dt, double Xres, double Yres, int label);
 
 
 
@@ -87,9 +87,9 @@ class chonk
     // # Sediment flux
     double get_sediment_flux(){return sediment_flux;}
     void set_sediment_flux_no_tacking(double value){sediment_flux = value;}
-    void set_sediment_flux(double value,std::vector<double>& label_proportions);
+    void set_sediment_flux(double value,std::vector<double> label_proportions);
     void add_to_sediment_flux_no_tracking(double value){sediment_flux += value;}
-    void add_to_sediment_flux(double value, std::vector<double>& label_proportions);
+    void add_to_sediment_flux(double value, std::vector<double> label_proportions);
     //# check emptyness 
     bool check_if_empty(){return is_empty;};
     //# Check if depression solved
@@ -97,12 +97,16 @@ class chonk
     //# other attribute
     void set_other_attribute(std::string key, double val){other_attributes[key] = val;}
     double get_other_attribute(std::string key){return other_attributes[key];}
+    std::vector<double> get_other_attribute_array(std::string key){return other_attributes_arrays[key];}
+
     // receivers
     std::vector<int>& get_chonk_receivers(){return receivers;}
     std::vector<double>& get_chonk_slope_to_recs(){return slope_to_rec;}
     // water weights
     std::vector<double>& get_chonk_water_weight(){return weigth_water_fluxes;}
     std::vector<double>& get_chonk_sediment_weight(){return weigth_sediment_fluxes;}
+    std::vector<double> get_preexisting_sediment_flux_by_receivers();
+    
     // receivers
     std::vector<int> get_chonk_receivers_copy(){return receivers;}
     // water weights
@@ -110,14 +114,14 @@ class chonk
     std::vector<double> get_chonk_sediment_weight_copy(){return weigth_sediment_fluxes;}
     std::vector<double> get_chonk_slope_to_recs_copy(){return slope_to_rec;}
 
+
     // reinitialise moving preparation by clearing all vectors of move
     void reinitialise_moving_prep(){receivers.clear();weigth_water_fluxes.clear();weigth_sediment_fluxes.clear();slope_to_rec.clear();return;}
     void external_moving_prep(std::vector<int>& rec,std::vector<double>& wwf,std::vector<double>& wws, std::vector<double>& strec)
          {receivers = rec;weigth_water_fluxes = wwf; weigth_sediment_fluxes = wws; slope_to_rec = strec;return;}
 
     // Tracking and labelling functions
-    void initialise_local_label_tracker_in_sediment_flux(int n_labels){other_attributes_arrays["label_tracker"] = std::vector<double>();other_attributes_arrays["label_tracker"].reserve(n_labels);for(int i=0;i<n_labels;i++){other_attributes_arrays["label_tracker"].emplace_back(0);};}
-
+    void initialise_local_label_tracker_in_sediment_flux(int n_labels){other_attributes_arrays["label_tracker"] = std::vector<double>(n_labels,0.);}
 
   protected:
     // Administration attributes

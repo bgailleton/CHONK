@@ -343,7 +343,7 @@ class ModelRunner
     void reinitialise_label_list(){labelz_list.clear();};
     // Initialises a label list to n empty labels
     // void initialise_label_list(int n_labels){this->labelz_list.clear();this->labelz_list.reserve(n_labels);for(int i=0; i<n_labels; i++){this->labelz_list.emplace_back(labelz(i));}};
-    void initialise_label_list(std::vector<labelz>& these_labelz){this->labelz_list = std::move(these_labelz); n_labels = int(these_labelz.size());};
+    void initialise_label_list(std::vector<labelz> these_labelz){this->labelz_list = these_labelz; n_labels = int(these_labelz.size());this->prepare_label_to_list_for_processes();};
     // returns the number of labels in the label list
     int get_n_labels(){return n_labels;}
     // Get a list of a given attribute for each labels, this aims to minimise the calls to maps which is lower than looking in a vector. Especially when it would ned to be done for each nodes

@@ -71,7 +71,7 @@ void ModelRunner::create(double ttimestep,double tstart_time,std::vector<std::st
   // By default the lake solver is activated
   this->lake_solver = true;
   this->initialise_intcorrespondance();
-  this->prepare_label_to_list_for_processes();
+  this->prepare_label_to_list_for_processes(); 
 }
 
 // initialising the node graph and the chonk network
@@ -116,8 +116,11 @@ this->io_int["n_rows"], this->io_int["n_cols"]);
   for(size_t i=0; i<size_t(this->io_int["n_elements"]); i++)
   {
     this->chonk_network.emplace_back(chonk(int(i), int(i), false));
+    this->chonk_network[i].initialise_local_label_tracker_in_sediment_flux(this->n_labels);
   }
 
+
+  //Stuff
   // I NEED TO WORK ON THAT PART YO
   // This add previous inherited water from previous lakes
   // Note that it "empties" the lake and reinitialise the depth. If there is still a reason to for the lake, it will form it
@@ -143,6 +146,7 @@ void ModelRunner::run()
   
   // Keeping track of which node is processed, for debugging and lake management
   std::vector<bool> is_processed(io_int["n_elements"],false);
+
 
   // Aliases for efficiency
   xt::pytensor<int,1>& inctive_nodes = this->io_int_array["active_nodes"];
@@ -292,7 +296,9 @@ void ModelRunner::process_node(int& node, std::vector<bool>& is_processed, int& 
           }
 
         }
+
         
+
         this->cancel_fluxes_before_moving_prep(this->chonk_network[outlet], this->label_array[outlet]);
 
         chonk& this_chonk = this->lake_network[lakeid].get_outletting_chonk();
@@ -304,7 +310,8 @@ void ModelRunner::process_node(int& node, std::vector<bool>& is_processed, int& 
         this->chonk_network[outlet].reinitialise_moving_prep();
         this->chonk_network[outlet].external_moving_prep(rec,wwf,wsf,slope2rec);
         this->chonk_network[outlet].set_water_flux(this_chonk.get_water_flux());
-        this->chonk_network[outlet].set_sediment_flux(this_chonk.get_sediment_flux());
+        std::vector<double> oatlab = this_chonk.get_other_attribute_array("label_tracker");
+        this->chonk_network[outlet].set_sediment_flux(this_chonk.get_sediment_flux(), oatlab);
 
         this->process_node_nolake_for_sure(outlet, is_processed, lake_incrementor, underfilled_lake, inctive_nodes, cellarea, surface_elevation, false, false);
 
@@ -330,6 +337,23 @@ void ModelRunner::process_node(int& node, std::vector<bool>& is_processed, int& 
         // Preparing to reprocess lakes: keys of these maps are lakeid (index in the lake_network)
         // and values are volume of water, of sediments and the entry node (does not matter which one as long as it is in the lake)
         std::map<int, double > lake_water, lake_sed; std::map<int,int> lake_node_entry;
+        std::map<int, chonk > lake_chonks;
+        for(auto& lanode:reproc_in_lakes)
+        {
+          //Getting the lake id 
+          int tlakeid = node_in_lake[lanode];
+          // if the lake has a parent, I use it has it has ingested the current lake
+          if(this->lake_network[tlakeid].get_parent_lake() >= 0)
+            tlakeid = this->lake_network[tlakeid].get_parent_lake();
+          lake_water[tlakeid] = 0.;
+          lake_sed[tlakeid] = 0.;
+          chonk tchonk4lake(-1,-1,false);
+          tchonk4lake.initialise_local_label_tracker_in_sediment_flux(this->n_labels);
+          lake_chonks[tlakeid] = tchonk4lake;
+
+        }
+
+
         for(auto& lanode:reproc_in_lakes)
         {
           //Getting the lake id 
@@ -341,7 +365,11 @@ void ModelRunner::process_node(int& node, std::vector<bool>& is_processed, int& 
           // adding to the lake the delta water (the post-lake reprocessing will always ADD more water as it happens when more water overflows)
           lake_water[tlakeid] += (this->chonk_network[lanode].get_water_flux() - lake_water_corrector[lanode]);
           lake_sed[tlakeid] += (this->chonk_network[lanode].get_sediment_flux() - lake_sed_corrector[lanode]);
+
+          std::vector<double> label_prop = this->chonk_network[lanode].get_other_attribute_array("label_tracker");
           lake_node_entry[tlakeid] = lanode;
+          lake_chonks[tlakeid].add_to_sediment_flux(this->chonk_network[lanode].get_sediment_flux(), label_prop);
+
         }
 
         // Finally for each nodes in the system
@@ -359,10 +387,9 @@ void ModelRunner::process_node(int& node, std::vector<bool>& is_processed, int& 
           // Simulating the refilling of a lake by reformatting the chonk
           this->chonk_network[node_id].reset();
           this->chonk_network[node_id].set_water_flux(water_to_add);
-          this->chonk_network[node_id].set_sediment_flux(sed_to_add);
-          // std::cout << "1.3" << std::endl;
+          auto baluf = lake_chonks[toproclake.first].get_other_attribute_array("label_tracker");
+          this->chonk_network[node_id].set_sediment_flux(sed_to_add, baluf);
           this->process_node(node_id, is_processed, lake_incrementor, underfilled_lake, inctive_nodes, cellarea, surface_elevation,false);
-          // std::cout << "1.4" << std::endl;
         }
 
         return;
@@ -684,7 +711,7 @@ void ModelRunner::manage_fluxes_after_moving_prep(chonk& this_chonk, int label_i
     switch(this_case)
     {
       case 1:
-        this_chonk.active_simple_SPL(this->labelz_list_int["SPIL_n"][label_id], this->labelz_list_int["SPIL_m"][label_id], this->labelz_list_double["SPIL_K"][label_id], this->timestep, this->io_double["dx"], this->io_double["dy"]);
+        this_chonk.active_simple_SPL(this->labelz_list_double["SPIL_n"][label_id], this->labelz_list_double["SPIL_m"][label_id], this->labelz_list_double["SPIL_K"][label_id], this->timestep, this->io_double["dx"], this->io_double["dy"], label_id);
         break;
     }
   }
@@ -694,8 +721,7 @@ void ModelRunner::manage_fluxes_after_moving_prep(chonk& this_chonk, int label_i
 // Initialise ad-hoc set of internal correspondance between process names and integer
 // Again this is a small otpimisation that reduce the need to initialise and call maps for each nodes as maps are slower to access
 void ModelRunner::initialise_intcorrespondance()
-
-this->prepare_label_to_list_for_processes();{
+{
   intcorrespondance = std::map<std::string,int>();
   intcorrespondance["SPIL_Howard_Kerby_1984"] = 1;
   intcorrespondance["D8"] = 2;
@@ -716,10 +742,13 @@ void ModelRunner::prepare_label_to_list_for_processes()
     {
 
       case 1:
+        labelz_list_double["SPIL_m"] = std::vector<double>();
+        labelz_list_double["SPIL_n"] = std::vector<double>();
+        labelz_list_double["SPIL_K"] = std::vector<double>();
         for(auto& tlab:labelz_list)
         {
-          labelz_list_int["SPIL_m"].push_back(tlab.int_attributes["SPIL_m"]);
-          labelz_list_int["SPIL_n"].push_back(tlab.int_attributes["SPIL_n"]);
+          labelz_list_double["SPIL_m"].push_back(tlab.double_attributes["SPIL_m"]);
+          labelz_list_double["SPIL_n"].push_back(tlab.double_attributes["SPIL_n"]);
           labelz_list_double["SPIL_K"].push_back(tlab.double_attributes["SPIL_K"]);
         }
           
@@ -1203,8 +1232,9 @@ void Lake::pour_water_in_lake(
 
       this->outlet_chonk = chonk(-1, -1, false); //  this is creating a "fake" chonk so its id is -1
       this->outlet_chonk.reinitialise_moving_prep();
+      this->outlet_chonk.initialise_local_label_tracker_in_sediment_flux( int(chonk_network[originode].get_other_attribute_array("label_tracker").size() ) );
       // forcing the new water flux
-      // std::cout << "lake::" << this->outlet_chonk.get_water_flux() << std::endl;;
+
       this->outlet_chonk.set_water_flux(out_water_rate);
 
       // Forcing receivers
@@ -1218,10 +1248,14 @@ void Lake::pour_water_in_lake(
       {
         double outsed = this->volume_of_sediment - this->volume;
         this->volume_of_sediment -= outsed;
-        this->outlet_chonk.set_sediment_flux(outsed);
+        this->outlet_chonk.set_sediment_flux(0., chonk_network[originode].get_other_attribute_array("label_tracker"));
+        this->outlet_chonk.add_to_sediment_flux(outsed, chonk_network[originode].get_other_attribute_array("label_tracker"));
       }
       else
-        this->outlet_chonk.set_sediment_flux(0.);
+      {
+        std::vector<double> baluf_2 (chonk_network[originode].get_other_attribute_array("label_tracker").size(),0.);
+        this->outlet_chonk.set_sediment_flux(0.,baluf_2);
+      }
 
       // ready for re calculation, but it needs to be in the env object
     }

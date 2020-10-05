@@ -102,7 +102,7 @@ void chonk::split_and_merge_in_receiving_chonks(std::vector<chonk>& chonkscape, 
 void chonk::split_and_merge_in_receiving_chonks(std::vector<chonk>& chonkscape, NodeGraphV2& graph, double dt)
 {
   // Iterating through the receivers
-
+  std::vector<double> oatalab = other_attributes_arrays["label_tracker"];
   for(size_t i=0; i < this->receivers.size(); i++)
   {
     // Adressing the chonk
@@ -110,7 +110,9 @@ void chonk::split_and_merge_in_receiving_chonks(std::vector<chonk>& chonkscape, 
 
     // Adding the fluxes*modifyer
     other_chonk.add_to_water_flux(this->water_flux * this->weigth_water_fluxes[i]);
-    other_chonk.add_to_sediment_flux(this->sediment_flux * this->weigth_sediment_fluxes[i]);
+
+    // So far the tracker gives equal proportion of its tracking downstream
+    other_chonk.add_to_sediment_flux(this->sediment_flux * this->weigth_sediment_fluxes[i], oatalab);
     // std::cout << "SEDFLUXDEBUG::" << this->sediment_flux << "||" << this->weigth_sediment_fluxes[i] << "||water::" << this->weigth_water_fluxes[i] << std::endl;
   }
 
@@ -122,6 +124,9 @@ void chonk::split_and_merge_in_receiving_chonks(std::vector<chonk>& chonkscape, 
 void chonk::cancel_split_and_merge_in_receiving_chonks(std::vector<chonk>& chonkscape, NodeGraphV2& graph, double dt)
 {
   // Iterating through the receivers
+  std::vector<double> oatalab = other_attributes_arrays["label_tracker"];
+  for(auto& oat:oatalab)
+    oat = -1 * oat;
 
   for(size_t i=0; i < this->receivers.size(); i++)
   {
@@ -137,7 +142,7 @@ void chonk::cancel_split_and_merge_in_receiving_chonks(std::vector<chonk>& chonk
     //   other_chonk.set_water_flux(0.);
     // }
 
-    other_chonk.add_to_sediment_flux( -1 * this->sediment_flux * this->weigth_sediment_fluxes[i]);
+    other_chonk.add_to_sediment_flux( -1 * this->sediment_flux * this->weigth_sediment_fluxes[i], oatalab);
     // std::cout << "SEDFLUXDEBUG::" << this->sediment_flux << "||" << this->weigth_sediment_fluxes[i] << "||water::" << this->weigth_water_fluxes[i] << std::endl;
   }
 
@@ -148,6 +153,9 @@ void chonk::cancel_split_and_merge_in_receiving_chonks(std::vector<chonk>& chonk
 
 void chonk::split_and_merge_in_receiving_chonks_ignore_some(std::vector<chonk>& chonkscape, NodeGraphV2& graph, double dt, std::vector<int>& to_ignore)
 {
+  
+  std::vector<double> oatalab = other_attributes_arrays["label_tracker"];
+
   // Iterating through the receivers
   for(size_t i=0; i < this->receivers.size(); i++)
   {
@@ -158,7 +166,7 @@ void chonk::split_and_merge_in_receiving_chonks_ignore_some(std::vector<chonk>& 
     chonk& other_chonk = chonkscape[this->receivers[i]];
     // Adding the fluxes*modifyer
     other_chonk.add_to_water_flux(this->water_flux * this->weigth_water_fluxes[i]);
-    other_chonk.add_to_sediment_flux(this->sediment_flux * this->weigth_sediment_fluxes[i]);
+    other_chonk.add_to_sediment_flux(this->sediment_flux * this->weigth_sediment_fluxes[i], oatalab);
   }
 
   // and kill this chonk is memory saving is activated
@@ -619,6 +627,7 @@ void chonk::cancel_inplace_infiltration(double Xres, double Yres, xt::pytensor<d
 //########################################################################################
 // manages the sediment fluxes
 
+// Returns the proportion of sediment fluxes sent to the receivers
 std::vector<double> chonk::get_preexisting_sediment_flux_by_receivers()
 {
   std::vector<double> pre_sedfluxes;pre_sedfluxes.reserve(this->weigth_sediment_fluxes.size());
@@ -629,25 +638,56 @@ std::vector<double> chonk::get_preexisting_sediment_flux_by_receivers()
   return pre_sedfluxes;
 }
 
-void chonk::set_sediment_flux(double value,std::vector<double>& label_proportions)
+// Set the total sediment flux manually, with given proportions for each labels
+// Index of the label array is the label, and the sum of the proportions should be 1
+void chonk::set_sediment_flux(double value, std::vector<double> label_proportions)
 {
   this->sediment_flux = value;
+  std::vector<double>& oatalab = other_attributes_arrays["label_tracker"];
   for(int i=0; i< int(label_proportions.size()); i++)
-    other_attributes_arrays["label_tracker"][i] = label_proportions[i];
+  {  
+    oatalab[i] = label_proportions[i];
+  }
 }
 
-void chonk::add_to_sediment_flux(double value, std::vector<double>& label_proportions)
+// Add a certain amount to the sediment flux
+void chonk::add_to_sediment_flux(double value, std::vector<double> label_proportions)
 {
-  this->sediment_flux += value;
+
+  // First I am getting the proportions of stuff I wanna add
   double total_proportion = 1;
+  // getting current proportions
+  std::vector<double>& oatalab = other_attributes_arrays["label_tracker"];
+
+  // If I already have sediments, then normalising the new proportions to add to the thingy
+  if(this->sediment_flux>0)
+  {    
+    for(auto& prop:label_proportions)
+    {
+      prop = prop * value / this->sediment_flux;
+    }
+  }
+  else
+  {
+    // Otherwise these proportions shall be the new truth
+    total_proportion=0;
+  }
+
+  // Applying it
   for(int i=0; i< int(label_proportions.size()); i++)
   {
     total_proportion += label_proportions[i];
-    other_attributes_arrays["label_tracker"][i] += label_proportions[i];
+    oatalab[i] += label_proportions[i];
   }
 
   for(int i=0; i< int(label_proportions.size()); i++)
-    other_attributes_arrays["label_tracker"][i] = other_attributes_arrays["label_tracker"][i]/total_proportion;
+  {
+    oatalab[i] = oatalab[i]/total_proportion;
+  }
+
+  // Finally adding the full amount
+  this->sediment_flux += value;
+
 
 }
 // next step:: propagte proportions to split and merge
@@ -666,25 +706,24 @@ void chonk::add_to_sediment_flux(double value, std::vector<double>& label_propor
 // they need to take care of the motion
 
 // Simplest Stream power incision formulation, Howard and Kerby 1984
-void chonk::active_simple_SPL(double n, double m, double K, double dt, double Xres, double Yres)
+void chonk::active_simple_SPL(double n, double m, double K, double dt, double Xres, double Yres, int label)
 {
 
   // I am recording the current sediment fluxes in the model distributed for each receivers
   std::vector<double> pre_sedfluxes = get_preexisting_sediment_flux_by_receivers();
-
   // Calculation current fluxes
   for(size_t i=0; i<this->receivers.size(); i++)
   {
-
     // calculating the flux E = K s^n A^m
     double this_eflux = std::pow(this->water_flux * this->weigth_water_fluxes[i],m) * std::pow(this->slope_to_rec[i],n) * K;
-
+  
     // stacking the erosion flux
     this->erosion_flux += this_eflux;
 
     // What has been eroded moves into the sediment flux (which needs to be converted into a volume)
-    this->sediment_flux += this_eflux * Xres * Yres * dt;
-
+    std::vector<double> buluf(this->other_attributes_arrays["label_tracker"].size(), 0.);
+    buluf[label] = 1.;
+    this->add_to_sediment_flux(this_eflux * Xres * Yres * dt, buluf);
     // recording the current flux 
     pre_sedfluxes[i] += this_eflux * Xres * Yres * dt;
 
