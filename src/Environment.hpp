@@ -314,6 +314,8 @@ class ModelRunner
     xt::pytensor<double,1> get_sediment_flux();
     // # return generic attribute
     xt::pytensor<double,1> get_other_attribute(std::string key);
+    
+    std::vector<xt::pytensor<double,1> > get_label_tracking_results();
 
 
     // DEBUGGING FUNCTIONS

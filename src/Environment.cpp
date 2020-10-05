@@ -927,6 +927,28 @@ xt::pytensor<double,1> ModelRunner::get_other_attribute(std::string key)
   return output;
 }
 
+std::vector<xt::pytensor<double,1> > ModelRunner::get_label_tracking_results()
+{
+  std::vector<xt::pytensor<double,1> > output;
+  for(int i=0; i<this->n_labels; i++)
+  {
+    xt::pytensor<double,1> temp = xt::zeros_like(io_double_array["surface_elevation"]);
+    output.push_back(temp);
+  }
+
+  for( int i=0; i< io_int["n_elements"];i++)
+  {
+    chonk& tchonk =this->chonk_network[i];
+    for(int j=0; j<this->n_labels; j++)
+    {
+      output[j][i] = tchonk.get_other_attribute_array("label_tracker")[j];
+    }
+  }
+
+  return output;
+
+}
+
 
 
 
