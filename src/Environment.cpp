@@ -768,7 +768,13 @@ void ModelRunner::prepare_label_to_list_for_processes()
         {
           labelz_list_double["SPIL_m"].push_back(tlab.double_attributes["SPIL_m"]);
           labelz_list_double["SPIL_n"].push_back(tlab.double_attributes["SPIL_n"]);
-          labelz_list_double["SPIL_K"].push_back(tlab.double_attributes["SPIL_K"]);
+          labelz_list_double["CHARLIE_I_Kr"].push_back(tlab.double_attributes["CHARLIE_I_Kr"]);
+          labelz_list_double["CHARLIE_I_Ks"].push_back(tlab.double_attributes["CHARLIE_I_Ks"]);
+          labelz_list_double["CHARLIE_I_V"].push_back(tlab.double_attributes["CHARLIE_I_V"]);
+          labelz_list_double["CHARLIE_I_dimless_roughness"].push_back(tlab.double_attributes["CHARLIE_I_dimless_roughness"]);
+          labelz_list_double["CHARLIE_I_dstar"].push_back(tlab.double_attributes["CHARLIE_I_dstar"]);
+          labelz_list_double["CHARLIE_I_threshold_incision"].push_back(tlab.double_attributes["CHARLIE_I_threshold_incision"]);
+          labelz_list_double["CHARLIE_I_threshold_entrainment"].push_back(tlab.double_attributes["CHARLIE_I_threshold_entrainment"]);
         }
         break;
   
