@@ -67,6 +67,10 @@ class chonk
 
     //#### active flux applyer (AFTER move)
     void active_simple_SPL(double n, double m, double K, double dt, double Xres, double Yres, int label);
+    void charlie_I(double n, double m, double K_r, double K_s,
+  double dimless_roughness, double this_sed_height, double V_param, 
+  double d_star, double threshold_incision, double threshold_sed_entrainment,
+  int label, std::vector<double> sed_label_prop, double dt, double Xres, double Yres);
 
 
 

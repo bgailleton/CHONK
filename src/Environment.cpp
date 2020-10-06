@@ -730,6 +730,7 @@ void ModelRunner::initialise_intcorrespondance()
   intcorrespondance["drainage_area"] = 5;
   intcorrespondance["precipitation_discharge"] = 6;
   intcorrespondance["infiltration_discharge"] = 7;
+  intcorrespondance["CHARLIE_I"] = 8;
 
 }
 
@@ -740,7 +741,7 @@ void ModelRunner::prepare_label_to_list_for_processes()
     int this_case = intcorrespondance[method];
     switch(this_case)
     {
-
+      // SPIL_full_label
       case 1:
         labelz_list_double["SPIL_m"] = std::vector<double>();
         labelz_list_double["SPIL_n"] = std::vector<double>();
@@ -751,8 +752,27 @@ void ModelRunner::prepare_label_to_list_for_processes()
           labelz_list_double["SPIL_n"].push_back(tlab.double_attributes["SPIL_n"]);
           labelz_list_double["SPIL_K"].push_back(tlab.double_attributes["SPIL_K"]);
         }
-          
-      // defaut case means the law has no correspondance so it does not do anyting
+        break;
+      // Charlie the first
+      case 8:
+        labelz_list_double["SPIL_m"] = std::vector<double>();
+        labelz_list_double["SPIL_n"] = std::vector<double>();
+        labelz_list_double["CHARLIE_I_Kr"] = std::vector<double>();
+        labelz_list_double["CHARLIE_I_Ks"] = std::vector<double>();
+        labelz_list_double["CHARLIE_I_V"] = std::vector<double>();
+        labelz_list_double["CHARLIE_I_dimless_roughness"] = std::vector<double>();
+        labelz_list_double["CHARLIE_I_dstar"] = std::vector<double>();
+        labelz_list_double["CHARLIE_I_threshold_incision"] = std::vector<double>();
+        labelz_list_double["CHARLIE_I_threshold_entrainment"] = std::vector<double>();
+        for(auto& tlab:labelz_list)
+        {
+          labelz_list_double["SPIL_m"].push_back(tlab.double_attributes["SPIL_m"]);
+          labelz_list_double["SPIL_n"].push_back(tlab.double_attributes["SPIL_n"]);
+          labelz_list_double["SPIL_K"].push_back(tlab.double_attributes["SPIL_K"]);
+        }
+        break;
+  
+      // defaut case means the law has no correspondance so it does not do anything
       default: 
         break;
     }

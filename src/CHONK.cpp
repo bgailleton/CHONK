@@ -659,18 +659,23 @@ void chonk::add_to_sediment_flux(double value, std::vector<double> label_proport
   // getting current proportions
   std::vector<double>& oatalab = other_attributes_arrays["label_tracker"];
 
+  double sum_test_pre = 0.;
+  for(auto val:oatalab)
+    sum_test_pre += val;
+
   // If I already have sediments, then normalising the new proportions to add to the thingy
   if(this->sediment_flux>0)
   {    
     for(auto& prop:label_proportions)
     {
-      prop = prop * value / this->sediment_flux;
+      double temp = prop;
+      prop = temp * value / this->sediment_flux;
     }
   }
   else
   {
     // Otherwise these proportions shall be the new truth
-    total_proportion=0;
+    total_proportion = sum_test_pre;
   }
 
   // Applying it
@@ -682,11 +687,29 @@ void chonk::add_to_sediment_flux(double value, std::vector<double> label_proport
 
   for(int i=0; i< int(label_proportions.size()); i++)
   {
-    oatalab[i] = oatalab[i]/total_proportion;
+    if(total_proportion!=0)
+      oatalab[i] = oatalab[i]/total_proportion; 
   }
 
   // Finally adding the full amount
+
+
+  // keeping this debugging here in case
+  // double sum_test = 0.;
+  // for(auto val:oatalab)
+  //   sum_test += val;
+
+  // if(sum_test>1.1)
+  // {
+  //   double sum_acc = 0.;
+  //   for(auto val:label_proportions)
+  //     sum_acc += val;
+
+  //   std::cout << sum_acc << "||" << sum_test << "||" << sum_test_pre << "||" << this->sediment_flux << std::endl;
+  //   throw std::runtime_error("unfitted_proportion");
+  // }
   this->sediment_flux += value;
+
 
 
 }
@@ -736,6 +759,82 @@ void chonk::active_simple_SPL(double n, double m, double K, double dt, double Xr
     if(this->sediment_flux>0)
       this->weigth_sediment_fluxes[i] = pre_sedfluxes[i]/this->sediment_flux;
   }
+
+  // Done
+  return;
+}
+
+
+void chonk::charlie_I(double n, double m, double K_r, double K_s,
+  double dimless_roughness, double this_sed_height, double V_param, 
+  double d_star, double threshold_incision, double threshold_sed_entrainment,
+  int zone_label, std::vector<double> sed_label_prop, double dt, double Xres, double Yres)
+{
+   // I am recording the current sediment fluxes in the model distributed for each receivers
+  std::vector<double> pre_sedfluxes = get_preexisting_sediment_flux_by_receivers();
+
+  double Er_tot = 0;
+  double Es_tot = 0;
+  double Ds_tot = 0;
+
+  double exp_sed_height_roughness =  std::exp(- this_sed_height / dimless_roughness);
+
+  // Calculation current fluxes
+  for(size_t i=0; i<this->receivers.size(); i++)
+  {
+    double this_qw = this->water_flux * this->weigth_water_fluxes[i];
+    double current_stream_power = std::pow(this_qw,m) * std::pow(this->slope_to_rec[i],n);
+    // calculating the flux E = K s^n A^m
+    double Er = (current_stream_power * K_r 
+        * (1 - std::exp(- current_stream_power + threshold_incision) ) )
+        * exp_sed_height_roughness;
+
+    double Es = (current_stream_power * K_s
+        * (1 - std::exp(- current_stream_power + threshold_sed_entrainment) ) )
+        * (1 - exp_sed_height_roughness);
+    
+    double Ds = V_param * d_star * this->sediment_flux * this->weigth_sediment_fluxes[i];
+    
+
+    Er_tot += Er;
+    Es_tot += Es;
+    Ds_tot += Ds;
+
+
+
+    // // stacking the erosion flux
+    // this->erosion_flux += this_eflux;
+
+    // // What has been eroded moves into the sediment flux (which needs to be converted into a volume)
+    // std::vector<double> buluf(this->other_attributes_arrays["label_tracker"].size(), 0.);
+    // buluf[label] = 1.;
+    // this->add_to_sediment_flux(this_eflux * Xres * Yres * dt, buluf);
+    // // recording the current flux 
+    pre_sedfluxes[i] += (Er + Es - Ds) * Xres * Yres * dt;
+
+  }
+
+  // Now I need to recalculate the sediment fluxes weights to each receivers
+  for(size_t i=0; i<this->receivers.size(); i++)
+  {
+    if(this->sediment_flux>0)
+      this->weigth_sediment_fluxes[i] = pre_sedfluxes[i]/this->sediment_flux;
+  }
+
+  // Adding the eroded bedrock to the sediment flux
+  std::vector<double> buluf(this->other_attributes_arrays["label_tracker"].size(), 0.);
+  buluf[zone_label] = 1.;
+  this->add_to_sediment_flux(Er_tot * Xres * Yres * dt, buluf);
+
+  // Adding the sediment entrained into the sedimetn flux
+  this->add_to_sediment_flux(Es_tot * Xres * Yres * dt, sed_label_prop);
+
+  // removing the deposition from sediment flux
+  this->add_to_sediment_flux(-1 * Ds_tot * Xres * Yres * dt, this->other_attributes_arrays["label_tracker"]);
+
+  // Applying to the global fluxes
+  this->erosion_flux += Er_tot + Es_tot;
+  this->deposition_flux += Ds_tot;
 
   // Done
   return;
