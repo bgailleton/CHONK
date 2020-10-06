@@ -54,7 +54,7 @@ void chonk::create(int tchonkID, int tcurrent_node, bool tmemory_saver)
 {
   // Initialising the fluxes to 0 and other admin detail
   this->is_empty = false;
-  this->erosion_flux = 0;
+  this->erosion_flux_undifferentiated = 0;
   this->water_flux = 0;
   this->sediment_flux = 0;
   this->deposition_flux = 0;
@@ -74,7 +74,7 @@ void chonk::reset()
   this->depression_solved_at_this_timestep = false;
   this->memory_saver = 0;
   this->water_flux = 0;
-  this->erosion_flux = 0;
+  this->erosion_flux_undifferentiated = 0;
   this->sediment_flux = 0;
   this->other_attributes["height_lake_sediments_tp1"] = 0;
 
@@ -741,7 +741,7 @@ void chonk::active_simple_SPL(double n, double m, double K, double dt, double Xr
     double this_eflux = std::pow(this->water_flux * this->weigth_water_fluxes[i],m) * std::pow(this->slope_to_rec[i],n) * K;
   
     // stacking the erosion flux
-    this->erosion_flux += this_eflux;
+    this->erosion_flux_undifferentiated += this_eflux;
 
     // What has been eroded moves into the sediment flux (which needs to be converted into a volume)
     std::vector<double> buluf(this->other_attributes_arrays["label_tracker"].size(), 0.);
@@ -803,7 +803,7 @@ void chonk::charlie_I(double n, double m, double K_r, double K_s,
 
 
     // // stacking the erosion flux
-    // this->erosion_flux += this_eflux;
+    // this->erosion_flux_undifferentiated += this_eflux;
 
     // // What has been eroded moves into the sediment flux (which needs to be converted into a volume)
     // std::vector<double> buluf(this->other_attributes_arrays["label_tracker"].size(), 0.);
@@ -833,7 +833,7 @@ void chonk::charlie_I(double n, double m, double K_r, double K_s,
   this->add_to_sediment_flux(-1 * Ds_tot * Xres * Yres * dt, this->other_attributes_arrays["label_tracker"]);
 
   // Applying to the global fluxes
-  this->erosion_flux += Er_tot + Es_tot;
+  this->erosion_flux_undifferentiated += Er_tot + Es_tot;
   this->deposition_flux += Ds_tot;
 
   // Done

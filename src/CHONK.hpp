@@ -82,8 +82,12 @@ class chonk
     void set_water_flux(double value){water_flux = value;}
     void add_to_water_flux(double value){water_flux += value;}
     // # Erosion flux
-    double get_erosion_flux(){return erosion_flux;}
-    void set_erosion_flux(double value){erosion_flux = value;}
+    double get_erosion_flux_undifferentiated(){return erosion_flux_undifferentiated;}
+    void set_erosion_flux_undifferentiated(double value){erosion_flux_undifferentiated = value;}
+    double get_erosion_flux_only_sediments(){return erosion_flux_only_sediments;}
+    void set_erosion_flux_only_sediments(double value){erosion_flux_only_sediments = value;}
+    double get_erosion_flux_only_bedrock(){return erosion_flux_only_bedrock;}
+    void set_erosion_flux_only_bedrock(double value){erosion_flux_only_bedrock = value;}
     // # Deposition flux
     double get_deposition_flux(){return deposition_flux;}
     void set_deposition_flux(double value){deposition_flux = value;}
@@ -144,7 +148,9 @@ class chonk
     // Current flux of water in the CHONK (in L^3/T)
     double water_flux;
     // Current erosion flux in H/T
-    double erosion_flux;
+    double erosion_flux_undifferentiated;
+    double erosion_flux_only_sediments;
+    double erosion_flux_only_bedrock;
     // Current deposition flux in H/T
     double deposition_flux;
     // Current Sediment flux in L^3
