@@ -463,27 +463,10 @@ void ModelRunner::finalise()
     surface_elevation_tp1[i] -= tchonk.get_erosion_flux() * timestep;
     surface_elevation_tp1[i] += tchonk.get_deposition_flux() * timestep;
     sed_height_tp1[i] -= tchonk.get_erosion_flux() * timestep;
-    // std::cout << this->chonk_network[i].get_water_flux() << std::endl; 
-
-
-    // if()
-
-    // if(isnan(tchonk.get_water_flux()) ||tchonk.get_water_flux() < 0 )
-    // {
-    //   std::cout << i << "::isdep->" << this->graph.is_depression(i) << "::lake->" << node_in_lake[i] << std::endl;;
-    //   throw std::runtime_error("SafeWaterError::NAN or negative detected in the water fluxes W:" + std::to_string( tchonk.get_water_flux() ) );
-    // }
-    
-    // if(isnan(surface_elevation_tp1[i]) || surface_elevation_tp1[i]>500)
-    //   throw std::runtime_error("NAN detected in elevation node:" + std::to_string(i) + " E:" + std::to_string(tchonk.get_erosion_flux() * timestep) + " D:" + std::to_string(tchonk.get_deposition_flux() * timestep)
-    //     + " W:" + std::to_string(tchonk.get_water_flux()) + "|| etp1:" + std::to_string(surface_elevation_tp1[i]) + " || et: "  + std::to_string(surface_elevation[i]) );
-
-
-    // if(std::isnan(sed_height_tp1[i]))
-    //   std::cout << "NAN:" << tchonk.get_water_flux() << std::endl;;
 
     if(sed_height_tp1[i]<0)
       sed_height_tp1[i] = 0;
+    
     sed_height_tp1[i] += tchonk.get_deposition_flux() * timestep;
 
     if(node_in_lake[i]>=0)
@@ -496,6 +479,8 @@ void ModelRunner::finalise()
     {
       tlake_depth[i] = 0;
     }
+
+
   }
 
   this->io_double_array["lake_depth"] = tlake_depth;
