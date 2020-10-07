@@ -812,6 +812,18 @@ void ModelRunner::manage_fluxes_after_moving_prep(chonk& this_chonk, int label_i
       case 1:
         this_chonk.active_simple_SPL(this->labelz_list_double["SPIL_n"][label_id], this->labelz_list_double["SPIL_m"][label_id], this->labelz_list_double["SPIL_K"][label_id], this->timestep, this->io_double["dx"], this->io_double["dy"], label_id);
         break;
+      case 8:
+        std::vector<double> these_sed_props(this->n_labels,0.);
+        if(is_there_sed_here[this_chonk.get_current_location()])
+          these_sed_props = this->sed_prop_by_label[this_chonk.get_current_location()][this->sed_prop_by_label[this_chonk.get_current_location()].size() - 1];
+
+        this_chonk.charlie_I(this->labelz_list_double["SPIL_n"][label_id], this->labelz_list_double["SPIL_m"][label_id], this->labelz_list_double["CHARLIE_I_Kr"][label_id], 
+  this->labelz_list_double["CHARLIE_I_Ks"][label_id],
+  this->labelz_list_double["CHARLIE_I_dimless_roughness"][label_id], this->io_double_array["sed_height"][this_chonk.get_current_location()], 
+  this->labelz_list_double["CHARLIE_I_V"][label_id], 
+  this->labelz_list_double["CHARLIE_I_dstar"][label_id], this->labelz_list_double["CHARLIE_I_threshold_incision"][label_id], 
+  this->labelz_list_double["CHARLIE_I_threshold_entrainment"][label_id],
+  label_id, these_sed_props, this->timestep,  this->io_double["dx"], this->io_double["dy"]);
     }
   }
   return;
