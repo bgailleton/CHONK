@@ -789,6 +789,15 @@ void ModelRunner::prepare_label_to_list_for_processes()
 
 }
 
+void ModelRunner::initialise_label_list(std::vector<labelz> these_labelz)
+{
+  this->labelz_list = these_labelz;
+  this->n_labels = int(these_labelz.size());
+  this->prepare_label_to_list_for_processes();
+
+  this->io_double_array2d["sediment_label_proportions"] = xt::zeros<double>({this->n_labels, this->io_int["n_elements"]});
+}
+
 
 //#################################################
 //#################################################
