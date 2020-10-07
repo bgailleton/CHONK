@@ -460,12 +460,15 @@ void ModelRunner::finalise()
   xt::pytensor<double,1>& surface_elevation = this->io_double_array["surface_elevation"];
   xt::pytensor<double,1>& sed_height_tp1 = this->io_double_array["sed_height_tp1"];
   xt::pytensor<double,1> tlake_depth = xt::zeros<double>({size_t(this->io_int["n_elements"])});
+//   is_there_sed_here
+// sed_prop_by_label
 
   // Iterating through all nodes
   for(int i=0; i< this->io_int["n_elements"]; i++)
   {
     // Getting the current chonk
     chonk& tchonk = this->chonk_network[i];
+    auto this_lab = tchonk.get_other_attribute_array("label_tracker");
 
     // getting the lake stuffs
     if(node_in_lake[i]>=0)
@@ -479,18 +482,31 @@ void ModelRunner::finalise()
       tlake_depth[i] = 0;
     }
 
+
+
     // First applying the specific erosion flux
-    surface_elevation_tp1[i] -= tchonk.get_erosion_flux_only_sediments() * timestep;
-    sed_height_tp1[i] -= tchonk.get_erosion_flux_only_sediments() * timestep;
-    surface_elevation_tp1[i] += tchonk.get_deposition_flux() * timestep;
-    sed_height_tp1[i] += tchonk.get_deposition_flux() * timestep;
+    double tadd = tchonk.get_erosion_flux_only_sediments() * timestep;
+    surface_elevation_tp1[i] -= tadd;
+    sed_height_tp1[i] -= tadd;
+    this->add_to_sediment_tracking(i, -1 * tadd, this_lab, sed_height_tp1[i]);
+    
+    tadd = tchonk.get_deposition_flux() * timestep;
+    surface_elevation_tp1[i] += tadd;
+    sed_height_tp1[i] += tadd;
+    this->add_to_sediment_tracking(i, tadd, this_lab, sed_height_tp1[i]);
 
     surface_elevation_tp1[i] -= tchonk.get_erosion_flux_only_bedrock() * timestep;
 
     // double to_remove = tchonk.get_erosion_flux_undifferentiated();
+    tadd = tchonk.get_erosion_flux_undifferentiated() * timestep;
+    surface_elevation_tp1[i] -= tadd;
+    sed_height_tp1[i] -= tadd;
 
-    surface_elevation_tp1[i] -= tchonk.get_erosion_flux_undifferentiated() * timestep;
-    sed_height_tp1[i] -= tchonk.get_erosion_flux_undifferentiated() * timestep;
+    if(sed_height_tp1[i] < 0)
+      tadd = tadd + sed_height_tp1[i];
+
+    this->add_to_sediment_tracking(i, -1*tadd, this_lab, sed_height_tp1[i]);
+
     if(sed_height_tp1[i]<0)
     {
       // to_remove = std::abs(sed_height_tp1[i]);
@@ -504,11 +520,91 @@ void ModelRunner::finalise()
   this->io_double_array["lake_depth"] = tlake_depth;
 }
 
+void ModelRunner::add_to_sediment_tracking(int index, double height, std::vector<double> label_prop, double sed_depth_here)
+{
+  // trying to remove sediments but no sediments are here
+  // Nothing happens then
+  if(height<0 && is_there_sed_here[index] == false)
+  {
+    return;
+  }
+
+  // No sediments previously there -> creating boxes of sediment here
+  if(is_there_sed_here[index] == false)
+  {
+    int n_strata = std::ceil(height / this->io_double["depths_res_sed_proportions"]);
+    for(int i = 0; i<n_strata; i++)
+      sed_prop_by_label[index].push_back(label_prop);
+    return;
+  }
+
+  // Sediments already in there, getting more complex
+  // Getting the proportion of the last box filled and the number of boxes
+  double n_boxes = sed_depth_here/this->io_double["depths_res_sed_proportions"];
+  double n_strata_already_there;
+  double prop_box_filled = std::modf(n_boxes, &n_strata_already_there);
+  double n_boxes_to_fill = std::abs(height/this->io_double["depths_res_sed_proportions"]);
+  size_t current_box = sed_prop_by_label[index].size() - 1;
+
+  if(n_strata_already_there != int( sed_prop_by_label[index].size() ) )
+  {
+    throw std::runtime_error("Unconsistent strata in sediment tracking, needs investigation");
+  }
+  // n_boxes to add or remove
+  int delta_boxes = 0;
+  // Sediment addition case
+  if(height > 0)
+  {
+    // Calculating the number of boxes to add
+    delta_boxes = std::floor(n_boxes_to_fill);
+    double comparator = n_boxes_to_fill;
+    if(n_boxes_to_fill>1)
+      comparator = 1;
+    // filling the current box with the mixed proportions of labels
+    sed_prop_by_label[index][current_box] = this->mix_two_proportions(prop_box_filled, sed_prop_by_label[index][current_box], (comparator - prop_box_filled), label_prop);
+
+    // adding the boxes
+    if(delta_boxes> 0)
+    {
+      for(size_t i=0; i<delta_boxes; i++)
+        sed_prop_by_label[index].push_back(label_prop);
+    }
+  }
+  else
+  {
+    // sediments to remove, easier
+    delta_boxes = std::floor(n_boxes_to_fill);
+    if(delta_boxes > 0)
+    {
+      for(size_t i=0; i<delta_boxes; i++)
+        sed_prop_by_label[index].pop_back();
+    }
+  }
+  //Done??
+}
+
+std::vector<double> ModelRunner::mix_two_proportions(double prop1, std::vector<double> labprop1, double prop2, std::vector<double> labprop2)
+{
+  double prop_tot = prop1 + prop2;
+  for(auto& val : labprop1)
+    val = val / prop_tot;
+  for(auto& val : labprop2)
+    val = val / prop_tot;
+
+  std::vector<double> output(labprop1.size());
+  for(size_t i=0; i<labprop1.size(); i++)
+    output[i] = labprop1[i] + labprop2[i];
+
+  return output;
+}
+
+
+
 void ModelRunner::find_nodes_to_reprocess(int start, std::vector<bool>& is_processed, std::vector<int>& nodes_to_reprocess, std::vector<int>& nodes_to_relake, int lake_to_avoid)
 {
   // std::cout << "start" << std::endl;
   int tsize = int(round(this->io_int["n_elements"]/4));
-  int insert_id_trav = 0,insert_id_lake = 0,reading_id = -1, insert_id_proc = 1;;
+  int insert_id_trav = 0,insert_id_lake = 0,reading_id = -1, insert_id_proc = 1;
 
   std::vector<int> traversal;traversal.reserve(tsize);
   std::vector<int> tQ;tQ.reserve(tsize);
@@ -794,8 +890,9 @@ void ModelRunner::initialise_label_list(std::vector<labelz> these_labelz)
   this->labelz_list = these_labelz;
   this->n_labels = int(these_labelz.size());
   this->prepare_label_to_list_for_processes();
-
-  this->io_double_array2d["sediment_label_proportions"] = xt::zeros<double>({this->n_labels, this->io_int["n_elements"]});
+  // initialising the sediment tracking device
+  is_there_sed_here = std::vector<bool>(this->n_labels, false);
+  sed_prop_by_label = std::map<int, std::vector<std::vector<double> > >() ;
 }
 
 

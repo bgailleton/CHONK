@@ -363,6 +363,11 @@ class ModelRunner
 
     //update the label array
     void update_label_array(xt::pytensor<int,1>& arr){label_array = arr;};
+    
+    void add_to_sediment_tracking(int index, double height, std::vector<double> label_prop, double sed_depth_here);
+
+    std::vector<double> mix_two_proportions(double prop1, std::vector<double> labprop1, double prop2, std::vector<double> labprop2);
+
 
 
   protected:
@@ -428,6 +433,10 @@ class ModelRunner
 
     // Label array: because it is a systematic requirements, I need this aray to always be there
     xt::pytensor<int,1> label_array;
+
+    // Discretisation of sediment height
+    std::vector<bool> is_there_sed_here;
+    std::map<int, std::vector<std::vector<double> > > sed_prop_by_label;
 
 
   private:
