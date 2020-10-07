@@ -488,17 +488,16 @@ void ModelRunner::finalise()
     surface_elevation_tp1[i] -= tchonk.get_erosion_flux_only_bedrock() * timestep;
 
     // double to_remove = tchonk.get_erosion_flux_undifferentiated();
-    if(sed_height_tp1[i] > 0)
+
+    surface_elevation_tp1[i] -= tchonk.get_erosion_flux_undifferentiated() * timestep;
+    sed_height_tp1[i] -= tchonk.get_erosion_flux_undifferentiated() * timestep;
+    if(sed_height_tp1[i]<0)
     {
-      surface_elevation_tp1[i] -= tchonk.get_erosion_flux_undifferentiated() * timestep;
-      sed_height_tp1[i] -= tchonk.get_erosion_flux_undifferentiated() * timestep;
-      if(sed_height_tp1[i]<0)
-      {
-        // to_remove = std::abs(sed_height_tp1[i]);
-        sed_height_tp1[i] = 0;
-        // surface_elevation_tp1[i] += to_remove;
-      }
+      // to_remove = std::abs(sed_height_tp1[i]);
+      sed_height_tp1[i] = 0;
+      // surface_elevation_tp1[i] += to_remove;
     }
+
 
   }
 
