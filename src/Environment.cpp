@@ -486,26 +486,36 @@ void ModelRunner::finalise()
 
     // First applying the specific erosion flux
     double tadd = tchonk.get_erosion_flux_only_sediments() * timestep;
+    // std::cout << "A::" << i << "||" << tadd << "||" << sed_height_tp1[i] << std::endl;
+    this->add_to_sediment_tracking(i, -1 * tadd, this_lab, sed_height_tp1[i]);
     surface_elevation_tp1[i] -= tadd;
     sed_height_tp1[i] -= tadd;
-    this->add_to_sediment_tracking(i, -1 * tadd, this_lab, sed_height_tp1[i]);
+
     
     tadd = tchonk.get_deposition_flux() * timestep;
+    // std::cout << "B::" << i << "||" << tadd << "||" << sed_height_tp1[i] << std::endl;
+
+    this->add_to_sediment_tracking(i, tadd, this_lab, sed_height_tp1[i]);
+    
+    // std::cout << "B2::" << i << "||" << tadd << "||" << sed_height_tp1[i] << "||" << node_in_lake[i] << std::endl;
+ 
     surface_elevation_tp1[i] += tadd;
     sed_height_tp1[i] += tadd;
-    this->add_to_sediment_tracking(i, tadd, this_lab, sed_height_tp1[i]);
 
     surface_elevation_tp1[i] -= tchonk.get_erosion_flux_only_bedrock() * timestep;
 
     // double to_remove = tchonk.get_erosion_flux_undifferentiated();
     tadd = tchonk.get_erosion_flux_undifferentiated() * timestep;
+    if(sed_height_tp1[i] < 0)
+      tadd = tadd + sed_height_tp1[i];
+    // std::cout << "C::" << i << "||" << tadd << "||" << sed_height_tp1[i] << std::endl;
+
+    this->add_to_sediment_tracking(i, -1*tadd, this_lab, sed_height_tp1[i]);
+    // std::cout << "D::" << i << "||" << tadd << "||" << sed_height_tp1[i] << std::endl;
+
     surface_elevation_tp1[i] -= tadd;
     sed_height_tp1[i] -= tadd;
 
-    if(sed_height_tp1[i] < 0)
-      tadd = tadd + sed_height_tp1[i];
-
-    this->add_to_sediment_tracking(i, -1*tadd, this_lab, sed_height_tp1[i]);
 
     if(sed_height_tp1[i]<0)
     {
@@ -524,19 +534,30 @@ void ModelRunner::add_to_sediment_tracking(int index, double height, std::vector
 {
   // trying to remove sediments but no sediments are here
   // Nothing happens then
+  if(height == 0)
+    return;
+
+  // std::cout << "BA" << std::endl;
   if(height<0 && is_there_sed_here[index] == false)
   {
     return;
   }
+  // std::cout << "BB" << std::endl;
 
   // No sediments previously there -> creating boxes of sediment here
   if(is_there_sed_here[index] == false)
   {
-    int n_strata = std::ceil(height / this->io_double["depths_res_sed_proportions"]);
+    int n_strata = std::ceil(std::abs(height / this->io_double["depths_res_sed_proportions"]));
     for(int i = 0; i<n_strata; i++)
+    {
       sed_prop_by_label[index].push_back(label_prop);
+    }
+  // std::cout << "BD" << std::endl;
+
+    is_there_sed_here[index] = true;
     return;
   }
+  // std::cout << "BE" << std::endl;
 
   // Sediments already in there, getting more complex
   // Getting the proportion of the last box filled and the number of boxes
@@ -546,10 +567,10 @@ void ModelRunner::add_to_sediment_tracking(int index, double height, std::vector
   double n_boxes_to_fill = std::abs(height/this->io_double["depths_res_sed_proportions"]);
   size_t current_box = sed_prop_by_label[index].size() - 1;
 
-  if(n_strata_already_there != int( sed_prop_by_label[index].size() ) )
-  {
-    throw std::runtime_error("Unconsistent strata in sediment tracking, needs investigation");
-  }
+  // if(n_strata_already_there != int( sed_prop_by_label[index].size() ) )
+  // {
+  //   throw std::runtime_error("Unconsistent strata in sediment tracking, needs investigation");
+  // }
   // n_boxes to add or remove
   int delta_boxes = 0;
   // Sediment addition case
@@ -577,10 +598,15 @@ void ModelRunner::add_to_sediment_tracking(int index, double height, std::vector
     if(delta_boxes > 0)
     {
       for(size_t i=0; i<delta_boxes; i++)
+      {
         sed_prop_by_label[index].pop_back();
+      }
     }
+    
   }
   //Done??
+  if(sed_prop_by_label[index].size() == 0)
+      is_there_sed_here[index] = false;
 }
 
 std::vector<double> ModelRunner::mix_two_proportions(double prop1, std::vector<double> labprop1, double prop2, std::vector<double> labprop2)
@@ -653,7 +679,7 @@ void ModelRunner::find_nodes_to_reprocess(int start, std::vector<bool>& is_proce
             if(recnode != node)
               new_rec.push_back(recnode);
           }
-          std::cout << "IT HAPPENS" << std::endl;
+          // std::cout << "IT HAPPENS" << std::endl;
           this->graph.update_receivers_at_node(this_node, new_rec);
           continue;
         }
@@ -796,6 +822,7 @@ void ModelRunner::manage_fluxes_after_moving_prep(chonk& this_chonk, int label_i
   bool has_moved = false;
   for(auto method:this->ordered_flux_methods)
   {
+    int index = this_chonk.get_current_location();
     
     if(method == "move")
     {
@@ -813,17 +840,22 @@ void ModelRunner::manage_fluxes_after_moving_prep(chonk& this_chonk, int label_i
         this_chonk.active_simple_SPL(this->labelz_list_double["SPIL_n"][label_id], this->labelz_list_double["SPIL_m"][label_id], this->labelz_list_double["SPIL_K"][label_id], this->timestep, this->io_double["dx"], this->io_double["dy"], label_id);
         break;
       case 8:
+      // std::cout << "A::" <<this->sed_prop_by_label[index].size() << "||" << is_there_sed_here[index]  << std::endl;
         std::vector<double> these_sed_props(this->n_labels,0.);
-        if(is_there_sed_here[this_chonk.get_current_location()])
-          these_sed_props = this->sed_prop_by_label[this_chonk.get_current_location()][this->sed_prop_by_label[this_chonk.get_current_location()].size() - 1];
+        if(is_there_sed_here[index] && this->sed_prop_by_label[index].size()>0) // I SHOULD NOT NEED THE SECOND THING, WHY DO I FUTURE BORIS????
+          these_sed_props = this->sed_prop_by_label[index][this->sed_prop_by_label[index].size() - 1];
+      // std::cout << "B" << std::endl;
 
         this_chonk.charlie_I(this->labelz_list_double["SPIL_n"][label_id], this->labelz_list_double["SPIL_m"][label_id], this->labelz_list_double["CHARLIE_I_Kr"][label_id], 
   this->labelz_list_double["CHARLIE_I_Ks"][label_id],
-  this->labelz_list_double["CHARLIE_I_dimless_roughness"][label_id], this->io_double_array["sed_height"][this_chonk.get_current_location()], 
+  this->labelz_list_double["CHARLIE_I_dimless_roughness"][label_id], this->io_double_array["sed_height"][index], 
   this->labelz_list_double["CHARLIE_I_V"][label_id], 
   this->labelz_list_double["CHARLIE_I_dstar"][label_id], this->labelz_list_double["CHARLIE_I_threshold_incision"][label_id], 
   this->labelz_list_double["CHARLIE_I_threshold_entrainment"][label_id],
   label_id, these_sed_props, this->timestep,  this->io_double["dx"], this->io_double["dy"]);
+      // std::cout << "C" << std::endl;
+        
+        break;
     }
   }
   return;
@@ -903,7 +935,7 @@ void ModelRunner::initialise_label_list(std::vector<labelz> these_labelz)
   this->n_labels = int(these_labelz.size());
   this->prepare_label_to_list_for_processes();
   // initialising the sediment tracking device
-  is_there_sed_here = std::vector<bool>(this->n_labels, false);
+  is_there_sed_here = std::vector<bool>(this->io_int["n_elements"], false);
   sed_prop_by_label = std::map<int, std::vector<std::vector<double> > >() ;
 }
 
@@ -1295,6 +1327,11 @@ void Lake::pour_water_in_lake(
 
     //Decreasing water volume by filling teh lake
     double dV = this->n_nodes * cellarea * ( next_node.elevation - this->water_elevation );
+
+    // I SHOULD NOT HAVE TO DO THAT!!!! PROBABLY LINKED TO NUMERICAL UNSTABILITIES BUT STILL
+    if(dV > - 1e-3 && dV < 0)
+      dV = 0;
+
     if(dV<0)
     {
       std::string ljsdfld;

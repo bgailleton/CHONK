@@ -797,7 +797,10 @@ void chonk::charlie_I(double n, double m, double K_r, double K_s,
         * (1 - std::exp(- current_stream_power + threshold_sed_entrainment) ) )
         * (1 - exp_sed_height_roughness);
     
-    double Ds = V_param * d_star * this->sediment_flux * this->weigth_sediment_fluxes[i];
+    double stuff = this->water_flux * this->weigth_water_fluxes[i];
+    double Ds = 0.;
+    if(stuff > 0)
+      Ds = V_param * d_star * this->sediment_flux/(Xres*Yres * stuff) * this->weigth_sediment_fluxes[i];
     
 
     Er_tot += Er;
@@ -818,13 +821,6 @@ void chonk::charlie_I(double n, double m, double K_r, double K_s,
 
   }
 
-  // Now I need to recalculate the sediment fluxes weights to each receivers
-  for(size_t i=0; i<this->receivers.size(); i++)
-  {
-    if(this->sediment_flux>0)
-      this->weigth_sediment_fluxes[i] = pre_sedfluxes[i]/this->sediment_flux;
-  }
-
   // Adding the eroded bedrock to the sediment flux
   std::vector<double> buluf(this->other_attributes_arrays["label_tracker"].size(), 0.);
   buluf[zone_label] = 1.;
@@ -840,6 +836,18 @@ void chonk::charlie_I(double n, double m, double K_r, double K_s,
   this->erosion_flux_only_bedrock += Er_tot;
   this->erosion_flux_only_sediments += Es_tot;
   this->deposition_flux += Ds_tot;
+
+  if(this->deposition_flux>1e3)
+  {
+    std::cout << Er_tot << "|" << Es_tot << "|" << std::endl;
+    throw std::runtime_error("SHIT::" + std::to_string(Ds_tot));
+  }
+    // Now I need to recalculate the sediment fluxes weights to each receivers
+  for(size_t i=0; i<this->receivers.size(); i++)
+  {
+    if(this->sediment_flux>0)
+      this->weigth_sediment_fluxes[i] = pre_sedfluxes[i]/this->sediment_flux;
+  }
 
   // Done
   return;
