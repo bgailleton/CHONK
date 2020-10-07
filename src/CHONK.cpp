@@ -55,6 +55,8 @@ void chonk::create(int tchonkID, int tcurrent_node, bool tmemory_saver)
   // Initialising the fluxes to 0 and other admin detail
   this->is_empty = false;
   this->erosion_flux_undifferentiated = 0;
+  this->erosion_flux_only_bedrock = 0;
+  this->erosion_flux_only_sediments = 0;
   this->water_flux = 0;
   this->sediment_flux = 0;
   this->deposition_flux = 0;
@@ -75,6 +77,8 @@ void chonk::reset()
   this->memory_saver = 0;
   this->water_flux = 0;
   this->erosion_flux_undifferentiated = 0;
+  this->erosion_flux_only_bedrock = 0;
+  this->erosion_flux_only_sediments = 0;
   this->sediment_flux = 0;
   this->other_attributes["height_lake_sediments_tp1"] = 0;
 
@@ -833,7 +837,8 @@ void chonk::charlie_I(double n, double m, double K_r, double K_s,
   this->add_to_sediment_flux(-1 * Ds_tot * Xres * Yres * dt, this->other_attributes_arrays["label_tracker"]);
 
   // Applying to the global fluxes
-  this->erosion_flux_undifferentiated += Er_tot + Es_tot;
+  this->erosion_flux_only_bedrock += Er_tot;
+  this->erosion_flux_only_sediments += Es_tot;
   this->deposition_flux += Ds_tot;
 
   // Done

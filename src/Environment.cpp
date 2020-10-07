@@ -292,8 +292,8 @@ void ModelRunner::process_node(int& node, std::vector<bool>& is_processed, int& 
             this->cancel_fluxes_before_moving_prep(this->chonk_network[inode], this->label_array[inode]);
             // because I am reprocessing these nodes, I need to reinitialise their deposition fluxes and erosion fluxes too
             this->chonk_network[inode].set_erosion_flux_undifferentiated(0.);
-            this->chonk_network[inode].set_erosion_only_sediments(0.);
-            this->chonk_network[inode].set_erosion_only_bedrock(0.);
+            this->chonk_network[inode].set_erosion_flux_only_sediments(0.);
+            this->chonk_network[inode].set_erosion_flux_only_bedrock(0.);
             this->chonk_network[inode].set_deposition_flux(0.);
           }
 
@@ -454,23 +454,20 @@ void ModelRunner::process_node_nolake_for_sure(int& node, std::vector<bool>& is_
 
 void ModelRunner::finalise()
 {
+  // Finilising the timestep by applying the changes to the thingy
+  // First gathering all the aliases 
   xt::pytensor<double,1>& surface_elevation_tp1 = this->io_double_array["surface_elevation_tp1"];
   xt::pytensor<double,1>& surface_elevation = this->io_double_array["surface_elevation"];
   xt::pytensor<double,1>& sed_height_tp1 = this->io_double_array["sed_height_tp1"];
   xt::pytensor<double,1> tlake_depth = xt::zeros<double>({size_t(this->io_int["n_elements"])});
 
+  // Iterating through all nodes
   for(int i=0; i< this->io_int["n_elements"]; i++)
   {
+    // Getting the current chonk
     chonk& tchonk = this->chonk_network[i];
-    surface_elevation_tp1[i] -= tchonk.get_erosion_flux_undifferentiated() * timestep;
-    surface_elevation_tp1[i] += tchonk.get_deposition_flux() * timestep;
-    sed_height_tp1[i] -= tchonk.get_erosion_flux_undifferentiated() * timestep;
 
-    if(sed_height_tp1[i]<0)
-      sed_height_tp1[i] = 0;
-
-    sed_height_tp1[i] += tchonk.get_deposition_flux() * timestep;
-
+    // getting the lake stuffs
     if(node_in_lake[i]>=0)
     {
       int lakeid = node_in_lake[i];
@@ -482,6 +479,26 @@ void ModelRunner::finalise()
       tlake_depth[i] = 0;
     }
 
+    // First applying the specific erosion flux
+    surface_elevation_tp1[i] -= tchonk.get_erosion_flux_only_sediments() * timestep;
+    sed_height_tp1[i] -= tchonk.get_erosion_flux_only_sediments() * timestep;
+    surface_elevation_tp1[i] += tchonk.get_deposition_flux() * timestep;
+    sed_height_tp1[i] += tchonk.get_deposition_flux() * timestep;
+
+    surface_elevation_tp1[i] -= tchonk.get_erosion_flux_only_bedrock() * timestep;
+
+    // double to_remove = tchonk.get_erosion_flux_undifferentiated();
+    if(sed_height_tp1[i] > 0)
+    {
+      surface_elevation_tp1[i] -= tchonk.get_erosion_flux_undifferentiated() * timestep;
+      sed_height_tp1[i] -= tchonk.get_erosion_flux_undifferentiated() * timestep;
+      if(sed_height_tp1[i]<0)
+      {
+        // to_remove = std::abs(sed_height_tp1[i]);
+        sed_height_tp1[i] = 0;
+        // surface_elevation_tp1[i] += to_remove;
+      }
+    }
 
   }
 
@@ -912,7 +929,7 @@ xt::pytensor<double,1> ModelRunner::get_erosion_flux()
   xt::pytensor<double,1> output = xt::zeros<double>({size_t(this->io_int["n_elements"])});
   for(auto& tchonk:chonk_network)
   {
-    output[tchonk.get_current_location()] = tchonk.get_erosion_flux() + tchonk.get_erosion_flux_only_sediments() + tchonk.get_erosion_flux_only_bedrock() ;
+    output[tchonk.get_current_location()] = tchonk.get_erosion_flux_undifferentiated() + tchonk.get_erosion_flux_only_sediments() + tchonk.get_erosion_flux_only_bedrock() ;
   }
   return output;
 
