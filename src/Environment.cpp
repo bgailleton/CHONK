@@ -495,6 +495,7 @@ void ModelRunner::finalise()
 
     // First applying the specific erosion flux
     double tadd = tchonk.get_erosion_flux_only_sediments() * timestep;
+    // std::cout << "Es is " << tadd;
     // std::cout << "A::" << i << "||" << tadd << "||" << sed_height_tp1[i] << std::endl;
     this->add_to_sediment_tracking(i, -1 * tadd, this_lab, sed_height_tp1[i]);
     surface_elevation_tp1[i] -= tadd;
@@ -503,6 +504,7 @@ void ModelRunner::finalise()
     
     tadd = tchonk.get_deposition_flux() * timestep;
     // std::cout << "B::" << i << "||" << tadd << "||" << sed_height_tp1[i] << std::endl;
+    // std::cout << " Ds is " << tadd;
 
     this->add_to_sediment_tracking(i, tadd, this_lab, sed_height_tp1[i]);
     
@@ -512,9 +514,11 @@ void ModelRunner::finalise()
     sed_height_tp1[i] += tadd;
 
     surface_elevation_tp1[i] -= tchonk.get_erosion_flux_only_bedrock() * timestep;
+    // std::cout << " Er is " << tchonk.get_erosion_flux_only_bedrock() * timestep;
 
     // double to_remove = tchonk.get_erosion_flux_undifferentiated();
     tadd = tchonk.get_erosion_flux_undifferentiated() * timestep;
+    // std::cout << " Eund is " << tadd << std::endl;
     if(sed_height_tp1[i] < 0)
       tadd = tadd + sed_height_tp1[i];
     // std::cout << "C::" << i << "||" << tadd << "||" << sed_height_tp1[i] << std::endl;

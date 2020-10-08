@@ -788,18 +788,26 @@ void chonk::charlie_I(double n, double m, double K_r, double K_s,
     double this_qw = this->water_flux * this->weigth_water_fluxes[i];
     double current_stream_power = std::pow(this_qw,m) * std::pow(this->slope_to_rec[i],n);
     // calculating the flux E = K s^n A^m
+    double threshholder_bedrock = 0.;
+    if(threshold_incision >0)
+      threshholder_bedrock = current_stream_power * (1 - std::exp(- current_stream_power/threshold_incision) );
+
+    double threshholder_sed = 0.;
+    if(threshold_sed_entrainment > 0)
+      threshholder_sed = current_stream_power * (1 - std::exp(- current_stream_power/threshold_sed_entrainment) );
+
     double Er = (current_stream_power * K_r 
-        * (1 - std::exp(- current_stream_power + threshold_incision) ) )
+        - threshholder_bedrock )
         * exp_sed_height_roughness;
 
     double Es = (current_stream_power * K_s
-        * (1 - std::exp(- current_stream_power + threshold_sed_entrainment) ) )
+        - threshholder_sed)
         * (1 - exp_sed_height_roughness);
     
-    double stuff = this->water_flux * this->weigth_water_fluxes[i];
+
     double Ds = 0.;
-    if(stuff > 0)
-      Ds = V_param * d_star * this->sediment_flux/(Xres*Yres * stuff) * this->weigth_sediment_fluxes[i];
+    if(this_qw > 0)
+      Ds = V_param * d_star * (this->sediment_flux/(Xres*Yres * this_qw * dt)) * this->weigth_sediment_fluxes[i];
     
 
     Er_tot += Er;
