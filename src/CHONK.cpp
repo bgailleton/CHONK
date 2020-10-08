@@ -782,7 +782,6 @@ void chonk::charlie_I(double n, double m, double K_r, double K_s,
   double Ds_tot = 0;
 
   double exp_sed_height_roughness =  std::exp(- this_sed_height / dimless_roughness);
-
   // Calculation current fluxes
   for(size_t i=0; i<this->receivers.size(); i++)
   {
@@ -837,9 +836,9 @@ void chonk::charlie_I(double n, double m, double K_r, double K_s,
   this->erosion_flux_only_sediments += Es_tot;
   this->deposition_flux += Ds_tot;
 
-  if(this->deposition_flux>1e3)
+  if(this->deposition_flux>1e2)
   {
-    std::cout << Er_tot << "|" << Es_tot << "|" << std::endl;
+    std::cout << Er_tot << "|" << Es_tot << "|" <<  this->sediment_flux  << std::endl;
     throw std::runtime_error("SHIT::" + std::to_string(Ds_tot));
   }
     // Now I need to recalculate the sediment fluxes weights to each receivers

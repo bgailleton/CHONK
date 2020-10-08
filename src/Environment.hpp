@@ -184,6 +184,9 @@ class Lake
     // Return the representative chonk of the lake, bearing its water flux and its sediment flux
     chonk& get_outletting_chonk(){return outlet_chonk;};
 
+    void drape_deposition_flux_to_chonks(std::vector<chonk>& chonk_network, xt::pytensor<double,1>& surface_elevation, double timestep);
+
+
 
   protected:
     // Lake ID, i.e. the lake place in the parent environment vector of lakes

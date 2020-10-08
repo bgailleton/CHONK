@@ -461,7 +461,16 @@ void ModelRunner::finalise()
   xt::pytensor<double,1>& sed_height_tp1 = this->io_double_array["sed_height_tp1"];
   xt::pytensor<double,1> tlake_depth = xt::zeros<double>({size_t(this->io_int["n_elements"])});
 //   is_there_sed_here
-// sed_prop_by_label
+// sed_prop_by_label  
+
+  // First dealing with lake deposition:
+
+  for(auto& loch:this->lake_network)
+  {
+    if(loch.get_parent_lake()>=0)
+      continue;
+    loch.drape_deposition_flux_to_chonks(this->chonk_network, surface_elevation, this->timestep);
+  }
 
   // Iterating through all nodes
   for(int i=0; i< this->io_int["n_elements"]; i++)
@@ -526,7 +535,6 @@ void ModelRunner::finalise()
 
 
   }
-
   this->io_double_array["lake_depth"] = tlake_depth;
 }
 
@@ -572,12 +580,12 @@ void ModelRunner::add_to_sediment_tracking(int index, double height, std::vector
   //   throw std::runtime_error("Unconsistent strata in sediment tracking, needs investigation");
   // }
   // n_boxes to add or remove
-  int delta_boxes = 0;
+  int delta_boxes = std::floor(n_boxes_to_fill);
+  // std::cout << "DB::" << delta_boxes << std::endl;
   // Sediment addition case
   if(height > 0)
   {
     // Calculating the number of boxes to add
-    delta_boxes = std::floor(n_boxes_to_fill);
     double comparator = n_boxes_to_fill;
     if(n_boxes_to_fill>1)
       comparator = 1;
@@ -587,19 +595,21 @@ void ModelRunner::add_to_sediment_tracking(int index, double height, std::vector
     // adding the boxes
     if(delta_boxes> 0)
     {
-      for(size_t i=0; i<delta_boxes; i++)
+      for(int i=0; i<delta_boxes; i++)
         sed_prop_by_label[index].push_back(label_prop);
     }
   }
   else
   {
     // sediments to remove, easier
-    delta_boxes = std::floor(n_boxes_to_fill);
     if(delta_boxes > 0)
     {
-      for(size_t i=0; i<delta_boxes; i++)
+
+      for(int i=0; i<delta_boxes; i++)
       {
-        sed_prop_by_label[index].pop_back();
+        // NEED TO CHECK WHY IS THIS HAPPENING HERE!!!! IT SHOULD NOT TRY TO POP BACK IF THERE IS NOTHING TO POP BACK 
+        if(sed_prop_by_label[index].size() > 0)
+          sed_prop_by_label[index].pop_back();
       }
     }
     
@@ -607,6 +617,7 @@ void ModelRunner::add_to_sediment_tracking(int index, double height, std::vector
   //Done??
   if(sed_prop_by_label[index].size() == 0)
       is_there_sed_here[index] = false;
+
 }
 
 std::vector<double> ModelRunner::mix_two_proportions(double prop1, std::vector<double> labprop1, double prop2, std::vector<double> labprop2)
@@ -1223,7 +1234,7 @@ void Lake::ingest_other_lake(
     this_PQ.pop();
   }
 
-  this->volume_of_sediment = other_lake.get_volume_of_sediment();
+  this->pour_sediment_into_lake(other_lake.get_volume_of_sediment());
 
   // Deleting this lake and setting its parent lake
   int save_ID = other_lake.get_lake_id();
@@ -1242,6 +1253,26 @@ void Lake::ingest_other_lake(
 void Lake::pour_sediment_into_lake(double sediment_volume)
 {
   this->volume_of_sediment += sediment_volume;
+}
+
+// Give the deposition fluxe from lakes to the 
+void Lake::drape_deposition_flux_to_chonks(std::vector<chonk>& chonk_network, xt::pytensor<double,1>& surface_elevation, double timestep)
+{
+
+  if(this->volume == 0)
+    return;
+
+  double ratio_of_dep = this->volume_of_sediment/this->volume;
+
+  // NEED TO DEAL WITH THAT BOBO
+  if(ratio_of_dep>1)
+    ratio_of_dep = 1;
+  //   throw std::runtime_error("MORE_SEDIMENT_THAN_WATER_IN_LAKE_FINALISATION::" + std::to_string(ratio_of_dep) + "||" + std::to_string(this->volume));
+
+  for(auto& no:this->nodes)
+  {
+    chonk_network[no].add_deposition_flux(ratio_of_dep * (this->water_elevation - surface_elevation[no]) / timestep);
+  }
 }
 
 // Fill a lake with a certain amount of water for the first time of the run
@@ -1450,6 +1481,7 @@ void Lake::pour_water_in_lake(
       std::vector<double> wws = {1.};
       std::vector<double> Strec = {SS};
       this->outlet_chonk.external_moving_prep(rec,wwf,wws,Strec);
+
       if(this->volume_of_sediment > this->volume)
       {
         double outsed = this->volume_of_sediment - this->volume;
