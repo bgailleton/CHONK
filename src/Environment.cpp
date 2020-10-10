@@ -494,30 +494,32 @@ void ModelRunner::finalise()
 
 
     // First applying the specific erosion flux
-    double tadd = tchonk.get_erosion_flux_only_sediments() * timestep;
-    // std::cout << "Es is " << tadd;
-    // std::cout << "A::" << i << "||" << tadd << "||" << sed_height_tp1[i] << std::endl;
-    this->add_to_sediment_tracking(i, -1 * tadd, this_lab, sed_height_tp1[i]);
-    surface_elevation_tp1[i] -= tadd;
-    sed_height_tp1[i] -= tadd;
-
-    
-    tadd = tchonk.get_deposition_flux() * timestep;
-    // std::cout << "B::" << i << "||" << tadd << "||" << sed_height_tp1[i] << std::endl;
-    // std::cout << " Ds is " << tadd;
-
-    this->add_to_sediment_tracking(i, tadd, this_lab, sed_height_tp1[i]);
-    
-    // std::cout << "B2::" << i << "||" << tadd << "||" << sed_height_tp1[i] << "||" << node_in_lake[i] << std::endl;
- 
-    surface_elevation_tp1[i] += tadd;
-    sed_height_tp1[i] += tadd;
-
+    // std::cout << surface_elevation_tp1[i] << "||";
     surface_elevation_tp1[i] -= tchonk.get_erosion_flux_only_bedrock() * timestep;
-    // std::cout << " Er is " << tchonk.get_erosion_flux_only_bedrock() * timestep;
+    // std::cout << surface_elevation_tp1[i] << "||";
+
+    // Applying elevation changes from the sediments
+    double sedcrea = tchonk.get_sediment_creation_flux() * timestep;
+
+    // std::cout << sedcrea << "|" << tchonk.get_erosion_flux_only_sediments() * timestep  << "||";
+    if(sedcrea + sed_height_tp1[i] < 0)
+    {
+      std::cout << "happens??" << std::endl;
+      surface_elevation_tp1[i] -= sed_height_tp1[i];
+      sed_height_tp1[i] = 0.;
+      sed_prop_by_label[i] = std::vector<std::vector<double> >();
+    } 
+    else
+    {
+     this->add_to_sediment_tracking(i, sedcrea, this_lab, sed_height_tp1[i]);
+     surface_elevation_tp1[i] += sedcrea;
+     sed_height_tp1[i] += sedcrea;
+    }
+    // std::cout << surface_elevation_tp1[i] << std::endl;;
 
     // double to_remove = tchonk.get_erosion_flux_undifferentiated();
-    tadd = tchonk.get_erosion_flux_undifferentiated() * timestep;
+    double tadd = tchonk.get_erosion_flux_undifferentiated() * timestep;
+    // std::cout << tadd << "|";
     // std::cout << " Eund is " << tadd << std::endl;
     if(sed_height_tp1[i] < 0)
       tadd = tadd + sed_height_tp1[i];
@@ -534,6 +536,7 @@ void ModelRunner::finalise()
     {
       // to_remove = std::abs(sed_height_tp1[i]);
       sed_height_tp1[i] = 0;
+      sed_prop_by_label[i] = std::vector<std::vector<double> >();
       // surface_elevation_tp1[i] += to_remove;
     }
 
@@ -749,11 +752,6 @@ void ModelRunner::find_nodes_to_reprocess(int start, std::vector<bool>& is_proce
 void ModelRunner::manage_fluxes_before_moving_prep(chonk& this_chonk, int label_id)
 {
 
-  std::map<std::string,int> intcorrespondance;
-  intcorrespondance["drainage_area"] = 1;
-  intcorrespondance["precipitation_discharge"] = 2;
-  intcorrespondance["infiltration_discharge"] = 3;
-
   for(auto method:this->ordered_flux_methods)
   {
     if(method == "move")
@@ -762,13 +760,13 @@ void ModelRunner::manage_fluxes_before_moving_prep(chonk& this_chonk, int label_
 
     switch(this_case)
     {
-      case 1:
+      case 5:
         this_chonk.inplace_only_drainage_area(this->io_double["dx"], this->io_double["dy"]);
         break;
-      case 2:
+      case 6:
         this_chonk.inplace_precipitation_discharge(this->io_double["dx"], this->io_double["dy"],this->io_double_array["precipitation"]);
         break;
-      case 3:
+      case 7:
         this_chonk.inplace_infiltration(this->io_double["dx"], this->io_double["dy"], this->io_double_array["infiltration"]);
         break;
     }
@@ -804,12 +802,6 @@ void ModelRunner::cancel_fluxes_before_moving_prep(chonk& this_chonk, int label_
 
 void ModelRunner::manage_move_prep(chonk& this_chonk)
 {
-
-  std::map<std::string,int> intcorrespondance;
-  intcorrespondance["D8"] = 1;
-  intcorrespondance["D8_nodeps"] = 2;
-  intcorrespondance["MF_fastscapelib"] = 3;
-  intcorrespondance["MF_fastscapelib_threshold_SF"] = 4;
   int this_case = intcorrespondance[this->move_method];
 
   switch(this_case)
@@ -1275,7 +1267,7 @@ void Lake::drape_deposition_flux_to_chonks(std::vector<chonk>& chonk_network, xt
 
   for(auto& no:this->nodes)
   {
-    chonk_network[no].add_deposition_flux(ratio_of_dep * (this->water_elevation - surface_elevation[no]) / timestep);
+    chonk_network[no].add_sediment_creation_flux(ratio_of_dep * (this->water_elevation - surface_elevation[no]) / timestep);
   }
 }
 

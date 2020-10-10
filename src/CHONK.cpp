@@ -60,6 +60,7 @@ void chonk::create(int tchonkID, int tcurrent_node, bool tmemory_saver)
   this->water_flux = 0;
   this->sediment_flux = 0;
   this->deposition_flux = 0;
+  this->sediment_creation_flux = 0;
   this->other_attributes["height_lake_sediments_tp1"] = 0;
 
   // required params
@@ -79,6 +80,7 @@ void chonk::reset()
   this->erosion_flux_undifferentiated = 0;
   this->erosion_flux_only_bedrock = 0;
   this->erosion_flux_only_sediments = 0;
+  this->sediment_creation_flux = 0;
   this->sediment_flux = 0;
   this->other_attributes["height_lake_sediments_tp1"] = 0;
 
@@ -107,6 +109,7 @@ void chonk::split_and_merge_in_receiving_chonks(std::vector<chonk>& chonkscape, 
 {
   // Iterating through the receivers
   std::vector<double> oatalab = other_attributes_arrays["label_tracker"];
+  double sum_weight_sed = 0;
   for(size_t i=0; i < this->receivers.size(); i++)
   {
     // Adressing the chonk
@@ -117,8 +120,10 @@ void chonk::split_and_merge_in_receiving_chonks(std::vector<chonk>& chonkscape, 
 
     // So far the tracker gives equal proportion of its tracking downstream
     other_chonk.add_to_sediment_flux(this->sediment_flux * this->weigth_sediment_fluxes[i], oatalab);
+    sum_weight_sed += this->weigth_sediment_fluxes[i];
     // std::cout << "SEDFLUXDEBUG::" << this->sediment_flux << "||" << this->weigth_sediment_fluxes[i] << "||water::" << this->weigth_water_fluxes[i] << std::endl;
   }
+  // std::cout << sum_weight_sed << "||";
 
   // and kill this chonk is memory saving is activated
   if(memory_saver)
@@ -518,6 +523,11 @@ void chonk::move_MF_from_fastscapelib_threshold_SF(NodeGraphV2& graph, double th
 
     // There is a non-pit neighbor, let's save it with its attributes
     double weight = waterweigths[i];
+    if(std::isnan(weight))
+    {
+      std::cout << "weight is " << weight << " slope is " << this_slope << " water flux is " << this->water_flux << std::endl;
+      throw std::runtime_error("NANWATERERROR");
+    }
     // std::cout << "WATER WEIGHT " << weight << std::endl;
     this->receivers.push_back(this_neightbor);
     this->weigth_water_fluxes.push_back(weight);
@@ -777,19 +787,29 @@ void chonk::charlie_I(double n, double m, double K_r, double K_s,
    // I am recording the current sediment fluxes in the model distributed for each receivers
   std::vector<double> pre_sedfluxes = get_preexisting_sediment_flux_by_receivers();
 
+
   double Er_tot = 0;
   double Es_tot = 0;
   double Ds_tot = 0;
+
+  double E_cap_s = 0;
+
+
+
+  double depodivider = 1 + (V_param * d_star * Xres * Yres / this->water_flux);
+
+  for(auto& flub:pre_sedfluxes)
+    flub = flub/depodivider;
 
   double exp_sed_height_roughness =  std::exp(- this_sed_height / dimless_roughness);
   // Calculation current fluxes
   for(size_t i=0; i<this->receivers.size(); i++)
   {
-    double this_qw = this->water_flux * this->weigth_water_fluxes[i];
-    double current_stream_power = std::pow(this_qw,m) * std::pow(this->slope_to_rec[i],n);
+    double this_Qw = this->water_flux * this->weigth_water_fluxes[i];
+    double current_stream_power = std::pow(this_Qw,m) * std::pow(this->slope_to_rec[i],n);
     // calculating the flux E = K s^n A^m
     double threshholder_bedrock = 0.;
-    if(threshold_incision >0)
+    if(threshold_incision > 0)
       threshholder_bedrock = current_stream_power * (1 - std::exp(- current_stream_power/threshold_incision) );
 
     double threshholder_sed = 0.;
@@ -803,16 +823,18 @@ void chonk::charlie_I(double n, double m, double K_r, double K_s,
     double Es = (current_stream_power * K_s
         - threshholder_sed)
         * (1 - exp_sed_height_roughness);
+
+    E_cap_s += (current_stream_power * K_s - threshholder_sed);
     
 
-    double Ds = 0.;
-    if(this_qw > 0)
-      Ds = V_param * d_star * (this->sediment_flux/(Xres*Yres * this_qw * dt)) * this->weigth_sediment_fluxes[i];
+    // double Ds = 0.;
+    // if(this_Qw > 0)
+    //   Ds = V_param * d_star * (this->sediment_flux/ (this_Qw * dt)) * this->weigth_sediment_fluxes[i];
     
 
     Er_tot += Er;
     Es_tot += Es;
-    Ds_tot += Ds;
+    // Ds_tot += Ds;
 
 
 
@@ -824,7 +846,7 @@ void chonk::charlie_I(double n, double m, double K_r, double K_s,
     // buluf[label] = 1.;
     // this->add_to_sediment_flux(this_eflux * Xres * Yres * dt, buluf);
     // // recording the current flux 
-    pre_sedfluxes[i] += (Er + Es - Ds) * Xres * Yres * dt;
+    pre_sedfluxes[i] += (Er + Es) * Xres * Yres * dt / depodivider;
 
   }
 
@@ -836,25 +858,86 @@ void chonk::charlie_I(double n, double m, double K_r, double K_s,
   // Adding the sediment entrained into the sedimetn flux
   this->add_to_sediment_flux(Es_tot * Xres * Yres * dt, sed_label_prop);
 
+  this->sediment_flux = this->sediment_flux/depodivider;
+
+  if(this->receivers.size()>0)
+  {
+    // std::cout << "|b|" << weigth_sediment_fluxes[0];
+    for(size_t i=0; i<this->receivers.size(); i++)
+    {
+      if(this->sediment_flux>0)
+        this->weigth_sediment_fluxes[i] = pre_sedfluxes[i]/this->sediment_flux;
+    }
+    // std::cout << "|a|" << weigth_sediment_fluxes[0];
+  }
+  
+  // Calculation current fluxes
+  // for(size_t i=0; i<this->receivers.size(); i++)
+  // {
+  //   double this_Qw = this->water_flux * this->weigth_water_fluxes[i];
+  //   if(this_Qw > 0)
+  //     Ds_tot += V_param * d_star * (this->sediment_flux/ (this_Qw * dt)) * this->weigth_sediment_fluxes[i];
+  // }
+  Ds_tot += V_param * d_star * (this->sediment_flux/ (this->water_flux * dt));
+
   // removing the deposition from sediment flux
-  this->add_to_sediment_flux(-1 * Ds_tot * Xres * Yres * dt, this->other_attributes_arrays["label_tracker"]);
+  // this->add_to_sediment_flux(-1 * Ds_tot * Xres * Yres * dt, this->other_attributes_arrays["label_tracker"]);
 
   // Applying to the global fluxes
   this->erosion_flux_only_bedrock += Er_tot;
   this->erosion_flux_only_sediments += Es_tot;
   this->deposition_flux += Ds_tot;
 
-  if(this->deposition_flux>1e2)
+  double phi = 0; // TEMPORARY MEASURE, PHI WILL BE TO BE ADDED AFTER
+  
+  double new_sed_height = 0.;
+  double Dsphi = Ds_tot / (1 - phi);
+
+  if(E_cap_s <= 0)
   {
-    std::cout << Er_tot << "|" << Es_tot << "|" <<  this->sediment_flux  << std::endl;
-    throw std::runtime_error("SHIT::" + std::to_string(Ds_tot));
+    new_sed_height = this_sed_height + Dsphi * dt;
+
   }
+  else if( (Ds_tot/(1-phi))/E_cap_s == 1 )
+  {
+    new_sed_height = dimless_roughness * std::log( E_cap_s/ dimless_roughness * dt + std::exp(this_sed_height/dimless_roughness) );
+  }
+  else
+  {
+    double A = 1 / ((Dsphi / E_cap_s) - 1);    
+    double B = Dsphi - E_cap_s;
+    B = B * dt / dimless_roughness;
+    B = std::exp(B);
+    double C = ( ( Dsphi / E_cap_s ) - 1 ) * std::exp(this_sed_height/dimless_roughness);
+    new_sed_height = dimless_roughness * std::log( A * (B * (C + 1) - 1));
+  }
+
+  // if(std::isnan(new_sed_height))
+  //   throw std::runtime_error("nan H:" + std::to_string((Ds_tot/(1-phi))/E_cap_s) + ":" + std::to_string(E_cap_s) );
+
+  this->add_sediment_creation_flux((new_sed_height - this_sed_height) / dt);
+
+  // double sum_weight = 0.;
+  // for(auto v:this->weigth_water_fluxes)
+  //   sum_weight += v;
+  // sum_weight = std::round(sum_weight * 100)/100;
+  // if(sum_weight != 0 && sum_weight != 1)
+  //   throw std::runtime_error("WATERWEIGHTERROR::" + std::to_string(sum_weight));
+  // sum_weight = 0.;
+  // for(auto v:this->weigth_sediment_fluxes)
+  //   sum_weight += v;
+  // sum_weight = std::round(sum_weight * 100)/100;
+
+  // if(sum_weight != 0 && sum_weight != 1)
+  //   throw std::runtime_error("SEDWEIGHTERROR::" + std::to_string(sum_weight));
+
+  // if(this->deposition_flux>1e2)
+  // {
+  //   std::cout << Er_tot << "|" << Es_tot << "|" <<  this->sediment_flux  << std::endl;
+  //   // throw std::runtime_error("SHIT::" + std::to_string(Ds_tot));
+  // }
     // Now I need to recalculate the sediment fluxes weights to each receivers
-  for(size_t i=0; i<this->receivers.size(); i++)
-  {
-    if(this->sediment_flux>0)
-      this->weigth_sediment_fluxes[i] = pre_sedfluxes[i]/this->sediment_flux;
-  }
+  // std::cout << Er_tot * dt << "|";
 
   // Done
   return;

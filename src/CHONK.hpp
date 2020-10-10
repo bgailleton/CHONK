@@ -92,6 +92,10 @@ class chonk
     double get_deposition_flux(){return deposition_flux;}
     void set_deposition_flux(double value){deposition_flux = value;}
     void add_deposition_flux(double value){deposition_flux += value;}
+    // # sediment_creation flux
+    double get_sediment_creation_flux(){return sediment_creation_flux;}
+    void set_sediment_creation_flux(double value){sediment_creation_flux = value;}
+    void add_sediment_creation_flux(double value){sediment_creation_flux += value;}
     // # Sediment flux
     double get_sediment_flux(){return sediment_flux;}
     void set_sediment_flux_no_tacking(double value){sediment_flux = value;}
@@ -155,6 +159,8 @@ class chonk
     double deposition_flux;
     // Current Sediment flux in L^3
     double sediment_flux;
+    // sediment creation flux
+    double sediment_creation_flux;
 
 
     // Movers

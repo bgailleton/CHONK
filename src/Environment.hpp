@@ -333,8 +333,11 @@ class ModelRunner
     std::vector<std::vector<int> > get_mstree_translated(){return this->graph.get_mstree_translated();}
     void DEBUG_check_weird_val_stacks();
     
+
     // returns the ordered string of method to compute the fluxes
     std::vector<std::string>& get_ordered_flux_method(){return ordered_flux_methods;}; 
+    void update_flux_methods(std::vector<std::string> methods){ordered_flux_methods = methods;}
+    void update_move_method(std::vector<std::string> methods){ordered_flux_methods = methods;}
 
     // Activate or deactivate lake management in the model
     // Lake management = dynamic lake filling with water, sediments and lake sedimentation
