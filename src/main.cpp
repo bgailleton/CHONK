@@ -44,7 +44,7 @@ PYBIND11_MODULE(CHONK_cpp, m)
 // (double ttimestep, double tstart_time, std::vector<std::string> tordered_flux_methods, std::string tmove_method)
     py::class_<ModelRunner>(m, "ModelRunner",py::dynamic_attr())
       .def(py::init<>())
-      .def(py::init([](double ttimestep, double tstart_time, std::vector<std::string> tordered_flux_methods, std::string tmove_method){return std::unique_ptr<ModelRunner>(new ModelRunner( ttimestep, tstart_time, tordered_flux_methods, tmove_method)); }))
+      .def(py::init([](double ttimestep, std::vector<std::string> tordered_flux_methods, std::string tmove_method){return std::unique_ptr<ModelRunner>(new ModelRunner( ttimestep, tordered_flux_methods, tmove_method)); }))
       .def("initiate_nodegraph", &ModelRunner::initiate_nodegraph)
       .def("run", &ModelRunner::run)
       .def("update_int_param",&ModelRunner::update_int_param)
@@ -78,6 +78,9 @@ PYBIND11_MODULE(CHONK_cpp, m)
       .def("initialise_label_list",&ModelRunner::initialise_label_list)
       .def("update_label_array", &ModelRunner::update_label_array)
       .def("get_label_tracking_results", &ModelRunner::get_label_tracking_results)
+      .def("get_ordered_flux_method", &ModelRunner::get_ordered_flux_method)
+      .def("update_flux_methods", &ModelRunner::update_flux_methods)
+      .def("update_move_method", &ModelRunner::update_move_method)
     ;
     m.def("set_DEBUG_switch_nodegraph",set_DEBUG_switch_nodegraph);
     m.def("pop_elevation_to_SS_SF_SPIL", pop_elevation_to_SS_SF_SPIL);

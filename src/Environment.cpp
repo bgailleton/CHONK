@@ -61,11 +61,10 @@ bool operator<( const nodium& lhs, const nodium& rhs )
 // ######################################################################
 
 // Initialises the model object, actually Does not do much but is required.
-void ModelRunner::create(double ttimestep,double tstart_time,std::vector<std::string> tordered_flux_methods, std::string tmove_method)
+void ModelRunner::create(double ttimestep, std::vector<std::string> tordered_flux_methods, std::string tmove_method)
 {
   // Saving all the attributes
   this->timestep = ttimestep;
-  this->start_time = tstart_time;
   this->ordered_flux_methods = tordered_flux_methods;
   this->move_method = tmove_method;
   // By default the lake solver is activated

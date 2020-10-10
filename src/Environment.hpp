@@ -232,7 +232,7 @@ class ModelRunner
     ModelRunner() { create(); }
 
     // Full constructor
-    ModelRunner(double ttimestep, double tstart_time, std::vector<std::string> tordered_flux_methods, std::string tmove_method) { create( ttimestep, tstart_time, tordered_flux_methods, tmove_method); }
+    ModelRunner(double ttimestep, std::vector<std::string> tordered_flux_methods, std::string tmove_method) { create( ttimestep, tstart_time, tordered_flux_methods, tmove_method); }
 
     // update parameters, each of thes function are used to provide external parameters of each types to the model
     // int -> integer number,e.g. 1,34,654,3333
@@ -337,7 +337,7 @@ class ModelRunner
     // returns the ordered string of method to compute the fluxes
     std::vector<std::string>& get_ordered_flux_method(){return ordered_flux_methods;}; 
     void update_flux_methods(std::vector<std::string> methods){ordered_flux_methods = methods;}
-    void update_move_method(std::vector<std::string> methods){ordered_flux_methods = methods;}
+    void update_move_method(std::string mots){move_method = mots;}
 
     // Activate or deactivate lake management in the model
     // Lake management = dynamic lake filling with water, sediments and lake sedimentation
