@@ -1,4 +1,4 @@
-from setuptools import setup, Extension
+from setuptools import setup, Extension, find_packages
 from setuptools.command.build_ext import build_ext
 import sys
 import os
@@ -116,5 +116,6 @@ setup(
     ext_modules=ext_modules,
     install_requires=['pybind11>=2.0.1', 'numpy'],
     cmdclass={'build_ext': BuildExt},
+    packages=find_packages(include=['CHONK_XL']),
     zip_safe=False,
 )

@@ -232,7 +232,7 @@ class ModelRunner
     ModelRunner() { create(); }
 
     // Full constructor
-    ModelRunner(double ttimestep, std::vector<std::string> tordered_flux_methods, std::string tmove_method) { create( ttimestep, tstart_time, tordered_flux_methods, tmove_method); }
+    ModelRunner(double ttimestep, std::vector<std::string> tordered_flux_methods, std::string tmove_method) { create( ttimestep, tordered_flux_methods, tmove_method); }
 
     // update parameters, each of thes function are used to provide external parameters of each types to the model
     // int -> integer number,e.g. 1,34,654,3333
@@ -448,7 +448,7 @@ class ModelRunner
   private:
     // mirror of the constructors
     void create() {return;};
-    void create(double ttimestep,double tstart_time, std::vector<std::string> tordered_flux_methods, std::string tmove_method);
+    void create(double ttimestep, std::vector<std::string> tordered_flux_methods, std::string tmove_method);
      
 
 };// End of ModelRunner
