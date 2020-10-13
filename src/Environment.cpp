@@ -69,6 +69,7 @@ void ModelRunner::create(double ttimestep, std::vector<std::string> tordered_flu
   this->move_method = tmove_method;
   // By default the lake solver is activated
   this->lake_solver = true;
+  // Initialising the labelling stuff
   this->initialise_intcorrespondance();
   this->prepare_label_to_list_for_processes(); 
 }

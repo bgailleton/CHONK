@@ -374,6 +374,8 @@ class ModelRunner
 
     std::vector<double> mix_two_proportions(double prop1, std::vector<double> labprop1, double prop2, std::vector<double> labprop2);
 
+    void add_external_to_double_array(std::string key,xt::pytensor<double,1>& adder){this->io_double_array[key] += adder;}
+
 
 
   protected:
