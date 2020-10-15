@@ -82,6 +82,11 @@ PYBIND11_MODULE(CHONK_cpp, m)
       .def("update_flux_methods", &ModelRunner::update_flux_methods)
       .def("update_move_method", &ModelRunner::update_move_method)
       .def("add_external_to_double_array", &ModelRunner::add_external_to_double_array)
+      .def("get_superficial_layer_sediment_prop", &ModelRunner::get_superficial_layer_sediment_prop)
+      .def("get_erosion_bedrock_only_flux", &ModelRunner::get_erosion_bedrock_only_flux)
+      .def("get_erosion_sed_only_flux", &ModelRunner::get_erosion_sed_only_flux)
+      .def("get_sediment_creation_flux", &ModelRunner::get_sediment_creation_flux)
+
     ;
     m.def("set_DEBUG_switch_nodegraph",set_DEBUG_switch_nodegraph);
     m.def("pop_elevation_to_SS_SF_SPIL", pop_elevation_to_SS_SF_SPIL);

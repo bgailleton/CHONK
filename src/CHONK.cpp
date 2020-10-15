@@ -673,6 +673,8 @@ void chonk::add_to_sediment_flux(double value, std::vector<double> label_proport
   // getting current proportions
   std::vector<double>& oatalab = other_attributes_arrays["label_tracker"];
 
+
+
   double sum_test_pre = 0.;
   for(auto val:oatalab)
     sum_test_pre += val;
@@ -683,7 +685,10 @@ void chonk::add_to_sediment_flux(double value, std::vector<double> label_proport
     for(auto& prop:label_proportions)
     {
       double temp = prop;
+      double temp3 = prop;
       prop = temp * value / this->sediment_flux;
+      // if(std::isfinite(temp3) == false)
+      //   std::cout << "NANPROP::" << temp << "||" << value << "||" << this->sediment_flux << "||" << temp3 << std::endl;
     }
   }
   else
@@ -692,6 +697,17 @@ void chonk::add_to_sediment_flux(double value, std::vector<double> label_proport
     total_proportion = sum_test_pre;
   }
 
+  // for(auto ugh:oatalab)
+  // if(std::isfinite(ugh) == false)
+  // {
+  //   std::cout << "nan before here" << std::endl;
+  // }
+  // for(auto ugh:label_proportions)
+  // if(std::isfinite(ugh) == false)
+  // {
+  //   std::cout << "nan before label_proportions" << std::endl;
+  // }
+
   // Applying it
   for(int i=0; i< int(label_proportions.size()); i++)
   {
@@ -699,11 +715,20 @@ void chonk::add_to_sediment_flux(double value, std::vector<double> label_proport
     oatalab[i] += label_proportions[i];
   }
 
+  // if(total_proportion == 0)
+  //   return;
+
   for(int i=0; i< int(label_proportions.size()); i++)
   {
     if(total_proportion!=0)
       oatalab[i] = oatalab[i]/total_proportion; 
   }
+
+  // for(auto ugh:oatalab)
+  // if(std::isfinite(ugh) == false)
+  // {
+  //   throw std::runtime_error("nan after");
+  // }
 
   // Finally adding the full amount
 
@@ -824,6 +849,7 @@ void chonk::charlie_I(double n, double m, double K_r, double K_s,
         - threshholder_sed)
         * (1 - exp_sed_height_roughness);
 
+
     E_cap_s += (current_stream_power * K_s - threshholder_sed);
     
 
@@ -831,6 +857,7 @@ void chonk::charlie_I(double n, double m, double K_r, double K_s,
     // if(this_Qw > 0)
     //   Ds = V_param * d_star * (this->sediment_flux/ (this_Qw * dt)) * this->weigth_sediment_fluxes[i];
     
+    // std::cout << Es << "|" <<K_s << "|" << threshholder_sed << "|" << exp_sed_height_roughness << "|" <<  current_stream_power << std::endl;;
 
     Er_tot += Er;
     Es_tot += Es;
@@ -853,10 +880,13 @@ void chonk::charlie_I(double n, double m, double K_r, double K_s,
   // Adding the eroded bedrock to the sediment flux
   std::vector<double> buluf(this->other_attributes_arrays["label_tracker"].size(), 0.);
   buluf[zone_label] = 1.;
+  // std::cout << "a" << std::endl;
   this->add_to_sediment_flux(Er_tot * Xres * Yres * dt, buluf);
+  // std::cout << "b" << std::endl;
 
   // Adding the sediment entrained into the sedimetn flux
   this->add_to_sediment_flux(Es_tot * Xres * Yres * dt, sed_label_prop);
+  // std::cout << "c" << std::endl;
 
   this->sediment_flux = this->sediment_flux/depodivider;
 
@@ -914,9 +944,10 @@ void chonk::charlie_I(double n, double m, double K_r, double K_s,
 
   // if(std::isnan(new_sed_height))
   //   throw std::runtime_error("nan H:" + std::to_string((Ds_tot/(1-phi))/E_cap_s) + ":" + std::to_string(E_cap_s) );
-
-  this->add_sediment_creation_flux((new_sed_height - this_sed_height) / dt);
-
+  double new_sedcrea = (new_sed_height - this_sed_height) / dt;
+  this->add_sediment_creation_flux(new_sedcrea);
+  if(abs(new_sedcrea)>100)
+    std::cout << new_sed_height << "||" << this_sed_height << "||" << Es_tot << "||" << Ds_tot << std::endl;
   // double sum_weight = 0.;
   // for(auto v:this->weigth_water_fluxes)
   //   sum_weight += v;

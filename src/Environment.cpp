@@ -12,6 +12,7 @@
 #include <queue>
 #include <limits>
 #include <chrono>
+#include <thread>
 
 #include "xtensor-python/pyarray.hpp"
 #include "xtensor-python/pytensor.hpp"
@@ -38,7 +39,6 @@
 #include "nodegraph.hpp"
 
 #include <boost/timer/timer.hpp>
-
 
 
 // Managing the comparison operators for the fill node, to let the queue know I wanna compare it by elevation values
@@ -100,7 +100,7 @@ void ModelRunner::initiate_nodegraph()
   this->graph = NodeGraphV2(this->io_double_array["surface_elevation"], active_nodes,this->io_double["dx"], this->io_double["dy"],
 this->io_int["n_rows"], this->io_int["n_cols"]);
 
-  std::cout << "done, sorting few stuff around ..." << std::endl;
+  // std::cout << "done, sorting few stuff around ..." << std::endl;
   
   // Chonkification: initialising chonk network
   //# clearing the chonk network
@@ -155,6 +155,7 @@ void ModelRunner::run()
   double cellarea = this->io_double["dx"] * this->io_double["dy"];
   // Debug checker
   int underfilled_lake = 0;
+  std::cout << "starting iteration" << std::endl;
   // Iterating though all the nodes
   for(int i=0; i<io_int["n_elements"]; i++)
   {
@@ -168,12 +169,14 @@ void ModelRunner::run()
 
   std::cout << "Ending the run" << std::endl;
   // temp debug thingy 
-  if(underfilled_lake>0)
-    std::cout << "DEBUGINFO::I called the underfilled function " << underfilled_lake << "times" << std::endl;
+  // if(underfilled_lake>0)
+  //   std::cout << "DEBUGINFO::I called the underfilled function " << underfilled_lake << "times" << std::endl;
 
   // Calling the finalising function: it applies the changes in topography and I think will apply the lake sedimentation
   this->finalise();
   // Done
+  // std::this_thread::sleep_for(std::chrono::milliseconds(2000));
+  std::cout << "done" << std::endl;
 }
 
 void ModelRunner::process_node(int& node, std::vector<bool>& is_processed, int& lake_incrementor, int& underfilled_lake,
@@ -388,6 +391,7 @@ void ModelRunner::process_node(int& node, std::vector<bool>& is_processed, int& 
           int node_id = lake_node_entry[toproclake.first];
           // Simulating the refilling of a lake by reformatting the chonk
           this->chonk_network[node_id].reset();
+          this->chonk_network[node_id].initialise_local_label_tracker_in_sediment_flux(this->n_labels);
           this->chonk_network[node_id].set_water_flux(water_to_add);
           auto baluf = lake_chonks[toproclake.first].get_other_attribute_array("label_tracker");
           this->chonk_network[node_id].set_sediment_flux(sed_to_add, baluf);
@@ -464,6 +468,7 @@ void ModelRunner::finalise()
 // sed_prop_by_label  
 
   // First dealing with lake deposition:
+   // std::cout <<"1" << std::endl;
 
   for(auto& loch:this->lake_network)
   {
@@ -471,13 +476,17 @@ void ModelRunner::finalise()
       continue;
     loch.drape_deposition_flux_to_chonks(this->chonk_network, surface_elevation, this->timestep);
   }
-
+   // std::cout <<"2" << std::endl;
   // Iterating through all nodes
   for(int i=0; i< this->io_int["n_elements"]; i++)
   {
+   // std::cout <<"3.1" << std::endl;
     // Getting the current chonk
     chonk& tchonk = this->chonk_network[i];
     auto this_lab = tchonk.get_other_attribute_array("label_tracker");
+    for(auto LAB:this_lab)
+      if(std::isfinite(LAB) ==false)
+        std::cout << LAB << " << naninf for sedflux" << std::endl;
 
     // getting the lake stuffs
     if(node_in_lake[i]>=0)
@@ -500,21 +509,29 @@ void ModelRunner::finalise()
 
     // Applying elevation changes from the sediments
     double sedcrea = tchonk.get_sediment_creation_flux() * timestep;
+   // std::cout <<"3.2" << std::endl;
 
+    // std::cout << "a" << std::endl;
     // std::cout << sedcrea << "|" << tchonk.get_erosion_flux_only_sediments() * timestep  << "||";
     if(sedcrea + sed_height_tp1[i] < 0)
     {
-      std::cout << "happens??" << std::endl;
+      std::cout << "happens??" <<sedcrea << "||" << sed_height_tp1[i] << "||" << this->node_in_lake[i] << std::endl;
       surface_elevation_tp1[i] -= sed_height_tp1[i];
       sed_height_tp1[i] = 0.;
       sed_prop_by_label[i] = std::vector<std::vector<double> >();
     } 
     else
     {
+    // std::cout << "b" << std::endl;
      this->add_to_sediment_tracking(i, sedcrea, this_lab, sed_height_tp1[i]);
+    // std::cout << "c" << std::endl;
+
      surface_elevation_tp1[i] += sedcrea;
      sed_height_tp1[i] += sedcrea;
     }
+
+   // std::cout <<"3.3" << std::endl;
+
     // std::cout << surface_elevation_tp1[i] << std::endl;;
 
     // double to_remove = tchonk.get_erosion_flux_undifferentiated();
@@ -524,9 +541,11 @@ void ModelRunner::finalise()
     if(sed_height_tp1[i] < 0)
       tadd = tadd + sed_height_tp1[i];
     // std::cout << "C::" << i << "||" << tadd << "||" << sed_height_tp1[i] << std::endl;
+   // std::cout <<"3.4" << std::endl;
 
     this->add_to_sediment_tracking(i, -1*tadd, this_lab, sed_height_tp1[i]);
     // std::cout << "D::" << i << "||" << tadd << "||" << sed_height_tp1[i] << std::endl;
+   // std::cout <<"3.5" << std::endl;
 
     surface_elevation_tp1[i] -= tadd;
     sed_height_tp1[i] -= tadd;
@@ -542,7 +561,9 @@ void ModelRunner::finalise()
 
 
   }
+   // std::cout <<"3.6" << std::endl;
   this->io_double_array["lake_depth"] = tlake_depth;
+   // std::cout <<"3.7" << std::endl;
 }
 
 void ModelRunner::add_to_sediment_tracking(int index, double height, std::vector<double> label_prop, double sed_depth_here)
@@ -552,16 +573,17 @@ void ModelRunner::add_to_sediment_tracking(int index, double height, std::vector
   if(height == 0)
     return;
 
-  // std::cout << "BA" << std::endl;
   if(height<0 && is_there_sed_here[index] == false)
   {
     return;
   }
-  // std::cout << "BB" << std::endl;
 
   // No sediments previously there -> creating boxes of sediment here
   if(is_there_sed_here[index] == false)
   {
+    if(sed_prop_by_label[index].size()>0 )
+      throw std::runtime_error("Unexpected Behavior 56");
+
     int n_strata = std::ceil(std::abs(height / this->io_double["depths_res_sed_proportions"]));
     for(int i = 0; i<n_strata; i++)
     {
@@ -572,7 +594,12 @@ void ModelRunner::add_to_sediment_tracking(int index, double height, std::vector
     is_there_sed_here[index] = true;
     return;
   }
+
   // std::cout << "BE" << std::endl;
+  for(auto LAB:label_prop)
+    if(std::isfinite(LAB) == false)
+      std::cout << "NANLAB at label_prop::add_to_sediment_tracking_start" << std::endl;
+
 
   // Sediments already in there, getting more complex
   // Getting the proportion of the last box filled and the number of boxes
@@ -580,12 +607,22 @@ void ModelRunner::add_to_sediment_tracking(int index, double height, std::vector
   double n_strata_already_there;
   double prop_box_filled = std::modf(n_boxes, &n_strata_already_there);
   double n_boxes_to_fill = std::abs(height/this->io_double["depths_res_sed_proportions"]);
-  size_t current_box = sed_prop_by_label[index].size() - 1;
+  int current_box = int(sed_prop_by_label[index].size()) - 1;
 
-  // if(n_strata_already_there != int( sed_prop_by_label[index].size() ) )
-  // {
-  //   throw std::runtime_error("Unconsistent strata in sediment tracking, needs investigation");
-  // }
+  //TO DO BORIS:: CURRENT BOX SHOULD NEVER BE -1 HERE, WHY IS IT??
+  if(current_box < 0)
+  {
+    is_there_sed_here[index] = false;
+    return;
+  }
+
+
+  for(auto stuff:sed_prop_by_label[index][current_box])
+    if(std::isfinite(stuff) == false)
+      throw std::runtime_error("Unexpected behaviour 463");
+
+
+
   // n_boxes to add or remove
   int delta_boxes = std::floor(n_boxes_to_fill);
   // std::cout << "DB::" << delta_boxes << std::endl;
@@ -596,8 +633,26 @@ void ModelRunner::add_to_sediment_tracking(int index, double height, std::vector
     double comparator = n_boxes_to_fill;
     if(n_boxes_to_fill>1)
       comparator = 1;
+
+    // for(auto ugh:sed_prop_by_label[index][current_box])
+    // if(std::isfinite(ugh) != true)
+    // {
+    //   std::cout << "nan before" << std::endl;
+    // }
+    // for(auto ugh:label_prop)
+    // if(std::isfinite(ugh) != true)
+    // {
+    //   std::cout << "nan before" << std::endl;
+    // }
+
     // filling the current box with the mixed proportions of labels
     sed_prop_by_label[index][current_box] = this->mix_two_proportions(prop_box_filled, sed_prop_by_label[index][current_box], (comparator - prop_box_filled), label_prop);
+
+    // for(auto ugh:sed_prop_by_label[index][current_box])
+    // if(std::isfinite(ugh))
+    // {
+    //   throw std::runtime_error("Arg, nan sedafter");
+    // }
 
     // adding the boxes
     if(delta_boxes> 0)
@@ -605,9 +660,11 @@ void ModelRunner::add_to_sediment_tracking(int index, double height, std::vector
       for(int i=0; i<delta_boxes; i++)
         sed_prop_by_label[index].push_back(label_prop);
     }
+
   }
   else
   {
+
     // sediments to remove, easier
     if(delta_boxes > 0)
     {
@@ -619,30 +676,110 @@ void ModelRunner::add_to_sediment_tracking(int index, double height, std::vector
           sed_prop_by_label[index].pop_back();
       }
     }
+
     
   }
   //Done??
   if(sed_prop_by_label[index].size() == 0)
       is_there_sed_here[index] = false;
 
+  int curate = int(sed_prop_by_label[index].size()) -1;
+  if(curate>=0)
+  {
+    for(auto stuff:sed_prop_by_label[index][curate])
+      if(std::isfinite(stuff) == false)
+        throw std::runtime_error("Unexpected behaviour 465");
+  }
 }
 
 std::vector<double> ModelRunner::mix_two_proportions(double prop1, std::vector<double> labprop1, double prop2, std::vector<double> labprop2)
 {
   double prop_tot = prop1 + prop2;
+  // double coeff = 1/prop_tot;
+
+  // if(prop_tot <=0)
+  //   return labprop1;
+
+  // std::cout << prop_tot << std::endl;
+  double sum1 = 0;
+  double sum2 = 0;
+
+
   for(auto& val : labprop1)
-    val = val / prop_tot;
+  {
+    double copval = val;
+    sum1 += copval;
+    val = val;
+  }
   for(auto& val : labprop2)
-    val = val / prop_tot;
+  {
+    double copval = val;
+    sum2 += copval;
+    
+    val = val;
+  }
+
+  if(sum1 == 0)
+    return labprop2;
+  else if(sum2 == 0)
+    return labprop1;
+
+
+  // if(sum1 > 1.01 || sum1<0.99)
+  //   std::cout << "sum1 is not 1: " << sum1 << std::endl; 
+  // if(sum2 > 1.01 || sum2<0.99)
+  //   std::cout << "sum2 is not 1 " << sum2 << std::endl; 
+
+  //   for(auto LAB:labprop1)
+  //   if(std::isfinite(LAB) == false)
+  //     std::cout << "NANLAB at label_prop1" << std::endl;
+  // for(auto LAB:labprop2)
+  //   if(std::isfinite(LAB) == false)
+  //     std::cout << "NANLAB at label_prop2" << std::endl;
+  
 
   std::vector<double> output(labprop1.size());
+
+  double divider = 0.;
   for(size_t i=0; i<labprop1.size(); i++)
+  {
     output[i] = labprop1[i] + labprop2[i];
+    // std::cout << divider << "|" << labprop1[i] << "|" << labprop2[i] << std::endl;
+
+    divider += output[i];
+  }
+  double sumfin = 0;
+  for(size_t i=0; i<labprop1.size(); i++)
+  {
+    output[i] = output[i]/divider;
+    sumfin += output[i];
+  }
+
+  if(sumfin > 1.01 || sumfin < 0.99)
+    std::cout << sumfin << std::endl;
+
 
   return output;
 }
 
+xt::pytensor<double,2> ModelRunner::get_superficial_layer_sediment_prop()
+{
+  xt::pytensor<double,2> output = xt::zeros<double>({n_labels,this->io_int["n_elements"]});
 
+  for (int lab = 0; lab < this->n_labels; lab++)
+  {
+    for(size_t i = 0; i < this->io_int["n_elements"]; i++)
+    {
+      if(is_there_sed_here[i] && sed_prop_by_label[int(i)].size() != 0)
+      {
+        output(lab,i) = sed_prop_by_label[int(i)][sed_prop_by_label[int(i)].size() - 1][lab];
+      }
+      else
+        output(lab,i) = 0;
+    }
+  }
+  return output;
+}
 
 void ModelRunner::find_nodes_to_reprocess(int start, std::vector<bool>& is_processed, std::vector<int>& nodes_to_reprocess, std::vector<int>& nodes_to_relake, int lake_to_avoid)
 {
@@ -1091,6 +1228,40 @@ xt::pytensor<double,1> ModelRunner::get_erosion_flux()
 
 }
 
+xt::pytensor<double,1> ModelRunner::get_erosion_bedrock_only_flux()
+{
+  xt::pytensor<double,1> output = xt::zeros<double>({size_t(this->io_int["n_elements"])});
+  for(auto& tchonk:chonk_network)
+  {
+    output[tchonk.get_current_location()] = tchonk.get_erosion_flux_only_bedrock() ;
+  }
+  return output;
+
+}
+
+xt::pytensor<double,1> ModelRunner::get_erosion_sed_only_flux()
+{
+  xt::pytensor<double,1> output = xt::zeros<double>({size_t(this->io_int["n_elements"])});
+  for(auto& tchonk:chonk_network)
+  {
+    output[tchonk.get_current_location()] = tchonk.get_erosion_flux_only_sediments() ;
+  }
+  return output;
+
+}
+
+xt::pytensor<double,1> ModelRunner::get_sediment_creation_flux()
+{
+  xt::pytensor<double,1> output = xt::zeros<double>({size_t(this->io_int["n_elements"])});
+  for(auto& tchonk:chonk_network)
+  {
+    output[tchonk.get_current_location()] = tchonk.get_sediment_creation_flux() ;
+  }
+  return output;
+
+}
+
+
 xt::pytensor<double,1> ModelRunner::get_sediment_flux()
 {
   xt::pytensor<double,1> output = xt::zeros<double>({size_t(this->io_int["n_elements"])});
@@ -1264,10 +1435,12 @@ void Lake::drape_deposition_flux_to_chonks(std::vector<chonk>& chonk_network, xt
   if(ratio_of_dep>1)
     ratio_of_dep = 1;
   //   throw std::runtime_error("MORE_SEDIMENT_THAN_WATER_IN_LAKE_FINALISATION::" + std::to_string(ratio_of_dep) + "||" + std::to_string(this->volume));
-
   for(auto& no:this->nodes)
   {
-    chonk_network[no].add_sediment_creation_flux(ratio_of_dep * (this->water_elevation - surface_elevation[no]) / timestep);
+    double slangh = ratio_of_dep * (this->water_elevation - surface_elevation[no]) / timestep;
+    chonk_network[no].add_sediment_creation_flux(slangh);
+    if(slangh < 0)
+      std::cout << slangh << "||" << (this->water_elevation - surface_elevation[no]) << "||" << this->volume_of_sediment << "||" << this->volume << std::endl;
   }
 }
 
@@ -1407,6 +1580,7 @@ void Lake::pour_water_in_lake(
   {
     this->depths[Unot] = this->water_elevation - surface_elevation[Unot];
     node_in_lake[Unot] = this->lake_id;
+    chonk_network[Unot].reset();
   }
 
   // std::cout << "Water volume left: " << water_volume << std::endl;

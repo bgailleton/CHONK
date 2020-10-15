@@ -116,12 +116,16 @@ class OrderedMethods:
 
 
 @xs.process
-class StaticLabelling:
+class Labelling:
+	label_array = xs.variable(dims = ('y','x'))
+	label_list = xs.any_object()
+
+@xs.process
+class StaticLabelling(Labelling):
 	"""
 		To Do
 	"""
-	label_array = xs.variable(dims = ('y','x'))
-	label_list = xs.any_object()
+
 
 	def initialize(self):
 
@@ -185,8 +189,8 @@ class CoreModel:
 	method_string = xs.foreign(OrderedMethods, 'method_string')
 	move_method = xs.foreign(Flow, 'move_method')
 
-	label_array = xs.foreign(StaticLabelling, 'label_array')
-	label_list = xs.foreign(StaticLabelling, 'label_list')
+	label_array = xs.foreign(Labelling, 'label_array')
+	label_list = xs.foreign(Labelling, 'label_list')
 
 	# Variables in
 	depths_res_sed_proportions = xs.variable(intent = 'inout', description = "Depth resolution for saving sediments proportions") #, default = 1.
@@ -200,6 +204,13 @@ class CoreModel:
 	Q_water = xs.on_demand(dims = ('y','x'))
 	Q_sed = xs.on_demand(dims = ('y','x'))
 	HS = xs.on_demand(dims = ('y','x'))
+	lake_depth = xs.on_demand(dims = ('y','x'))
+	sed_thickness = xs.on_demand(dims = ('y','x'))
+	labprop_Qs = xs.on_demand(dims = ('n_labels','y','x'))
+	labprop_superficial_layer = xs.on_demand(dims = ('n_labels','y','x'))
+	E_r = xs.on_demand(dims = ('y','x'))
+	E_s = xs.on_demand(dims = ('y','x'))
+	sed_div = xs.on_demand(dims = ('y','x'))
 	
 
 	def initialize(self):
@@ -221,6 +232,7 @@ class CoreModel:
 		self.model.update_array_double_param("surface_elevation_tp1", np.copy( self.surface_elevation))
 		self.model.update_array_double_param("sed_height" , np.copy(self.sed_height))
 		self.model.update_array_double_param("sed_height_tp1" , np.copy(self.sed_height))
+		self.model.update_array_double_param("lake_depth" , np.zeros_like(self.sed_height))
 
 		self.model.update_move_method(self.move_method)
 		self.model.update_flux_methods(self.method_string)
@@ -238,11 +250,19 @@ class CoreModel:
 	@xs.runtime(args='step_delta')
 	def run_step(self, dt):
 
+		print("sdlkfja0")
 		self.model.update_timestep(dt)
+		print("sdlkfja1")
 		self.model.update_array_double_param("surface_elevation", np.copy(self.model.get_array_double_param("surface_elevation_tp1")) )
+		print("sdlkfja2")
+		self.model.update_array_double_param("sed_height", np.copy(self.model.get_array_double_param("sed_height_tp1")) )
+		print("sdlkfja3")
 		self.model.initiate_nodegraph()
+		print("sdlkfja4")
 		self.model.run()
+		print("sdlkfja5")
 		self.model.add_external_to_double_array("surface_elevation_tp1",self.uplift * dt)
+		print("sdlkfja6")
 
 	@topo.compute
 	def _topo(self):
@@ -256,12 +276,54 @@ class CoreModel:
 	def _Q_sed(self):
 		return self.model.get_sediment_flux().reshape(self.ny,self.nx)
 
+	@sed_thickness.compute
+	def _sed_thickness(self):
+		return self.model.get_array_double_param("sed_height_tp1").reshape(self.ny,self.nx)
+
+	@lake_depth.compute
+	def _lake_depth(self):
+		lake = self.model.get_array_double_param("lake_depth").reshape(self.ny,self.nx)
+		lake = np.abs(lake)
+		lake[lake<=0] = np.nan
+		return lake
+
 	@HS.compute
 	def _HS(self):
 		tester = np.copy(self.model.get_array_double_param("surface_elevation_tp1")).reshape(self.ny,self.nx)
 		this_HS = np.zeros_like(tester)
 		hillshading(tester.reshape(self.ny,self.nx),self.dx,self.dy,self.nx,self.ny,this_HS,np.deg2rad(60),np.deg2rad(125),1)
 		return this_HS.reshape(self.ny,self.nx)
+
+	@labprop_Qs.compute
+	def _labprop_Qs(self):
+		LAB = np.array(self.model.get_label_tracking_results())
+		temp = []
+		for sub in LAB:
+			temp.append(sub.reshape(self.ny,self.nx))
+		return np.array(temp)
+
+	@labprop_superficial_layer.compute
+	def _labprop_superficial_layer(self):
+		LAB = self.model.get_superficial_layer_sediment_prop()
+		temp = []
+		for sub in LAB:
+			temp.append(sub.reshape(self.ny,self.nx))
+		return np.array(temp)
+
+	@E_r.compute
+	def _E_r(self):
+		return self.model.get_erosion_bedrock_only_flux().reshape(self.ny,self.nx)
+
+	@E_s.compute
+	def _E_s(self):
+		return self.model.get_erosion_sed_only_flux().reshape(self.ny,self.nx)
+
+	@sed_div.compute
+	def _sed_div(self):
+		return self.model.get_sediment_creation_flux().reshape(self.ny,self.nx)
+
+
+
 
 
 

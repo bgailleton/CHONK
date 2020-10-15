@@ -315,10 +315,16 @@ class ModelRunner
     // # retrun erosion flux in L/T with T
     xt::pytensor<double,1> get_erosion_flux();
     xt::pytensor<double,1> get_sediment_flux();
+    xt::pytensor<double,1> get_erosion_bedrock_only_flux();
+    xt::pytensor<double,1> get_erosion_sed_only_flux();
+    xt::pytensor<double,1> get_sediment_creation_flux();
     // # return generic attribute
     xt::pytensor<double,1> get_other_attribute(std::string key);
     
     std::vector<xt::pytensor<double,1> > get_label_tracking_results();
+
+    xt::pytensor<double,2> get_superficial_layer_sediment_prop();
+
 
 
     // DEBUGGING FUNCTIONS
