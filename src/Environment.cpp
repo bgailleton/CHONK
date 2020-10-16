@@ -234,9 +234,22 @@ void ModelRunner::process_node(int& node, std::vector<bool>& is_processed, int& 
       int outlet = this->lake_network[lakeid].get_lake_outlet();
       // std::cout << "Bulf3.1" << std::endl;
       
+
+      // OK first step is to check wether this outlet is a lake itself or not
+      // STEP TO FINISH::reprocess lake outletting in lakes 
+      while(outlet >= 0 && is_processed[outlet] && node_in_lake[outlet]>=0)
+      {
+        if(node_in_lake[outlet] == lakeid || node_in_lake[outlet] == lake_network[lakeid].get_parent_lake())
+          throw std::runtime_error("ERROR FATAL::OUTLET OF LAKE IN LAKE ITSELF");
+        break;
+      }
+
+
+
       // checking if it exist AND ahs been processed before
       if(outlet >= 0 && is_processed[outlet])
       {
+
 
         // std::cout << "Bulf3.2" << std::endl;
         // Arg it has been, then this is where the code reprocess a bunch of node. It happens in two relatively rare cases:
@@ -298,6 +311,7 @@ void ModelRunner::process_node(int& node, std::vector<bool>& is_processed, int& 
             this->chonk_network[inode].set_erosion_flux_only_sediments(0.);
             this->chonk_network[inode].set_erosion_flux_only_bedrock(0.);
             this->chonk_network[inode].set_deposition_flux(0.);
+            this->chonk_network[inode].set_sediment_creation_flux(0.);
           }
 
         }
@@ -317,8 +331,14 @@ void ModelRunner::process_node(int& node, std::vector<bool>& is_processed, int& 
         this->chonk_network[outlet].set_water_flux(this_chonk.get_water_flux());
         std::vector<double> oatlab = this_chonk.get_other_attribute_array("label_tracker");
         this->chonk_network[outlet].set_sediment_flux(this_chonk.get_sediment_flux(), oatlab);
-
+        this->chonk_network[outlet].set_sediment_creation_flux(0.);
+        this->chonk_network[outlet].set_erosion_flux_undifferentiated(0.);
+        this->chonk_network[outlet].set_erosion_flux_only_sediments(0.);
+        this->chonk_network[outlet].set_erosion_flux_only_bedrock(0.);
+        this->chonk_network[outlet].set_deposition_flux(0.);
+        // std::cout << "bo";
         this->process_node_nolake_for_sure(outlet, is_processed, lake_incrementor, underfilled_lake, inctive_nodes, cellarea, surface_elevation, false, false);
+        // std::cout << "ris" << "|"; 
 
 
         // Reprocessing the fluxes from US to DS
@@ -331,7 +351,9 @@ void ModelRunner::process_node(int& node, std::vector<bool>& is_processed, int& 
             // if nodes are in the ones to reprocess, I proceed
             underfilled_lake++;
             // i know they are not in lakes by definition so I call a lighter function, and avoid too much recusrion which tend to break the code somehows
+        // std::cout << "ka";
             this->process_node_nolake_for_sure(inode, is_processed, lake_incrementor, underfilled_lake, inctive_nodes, cellarea, surface_elevation, false, true);
+        // std::cout << "ren" << "|";;
           }
         }
 
@@ -449,9 +471,11 @@ void ModelRunner::process_node_nolake_for_sure(int& node, std::vector<bool>& is_
     if(need_move_prep)
       this->manage_move_prep(this->chonk_network[node]);
   
-
+    // std::cout << "call from nodeproc nolake" << std::endl;
     this->manage_fluxes_after_moving_prep(this->chonk_network[node],this->label_array[node]);
+    // std::cout << "call from nodeproced nolake" << std::endl;
     // std::cout << "bite" << std::endl;
+
     this->chonk_network[node].split_and_merge_in_receiving_chonks(this->chonk_network, this->graph, this->io_double_array["surface_elevation_tp1"], io_double_array["sed_height_tp1"], this->timestep);
 }
 
@@ -464,8 +488,7 @@ void ModelRunner::finalise()
   xt::pytensor<double,1>& surface_elevation = this->io_double_array["surface_elevation"];
   xt::pytensor<double,1>& sed_height_tp1 = this->io_double_array["sed_height_tp1"];
   xt::pytensor<double,1> tlake_depth = xt::zeros<double>({size_t(this->io_int["n_elements"])});
-//   is_there_sed_here
-// sed_prop_by_label  
+
 
   // First dealing with lake deposition:
    // std::cout <<"1" << std::endl;
@@ -509,6 +532,8 @@ void ModelRunner::finalise()
 
     // Applying elevation changes from the sediments
     double sedcrea = tchonk.get_sediment_creation_flux() * timestep;
+    if(std::isfinite(sedcrea) == false)
+      throw std::runtime_error("NAN sedcrea finalisation not possible yo");
    // std::cout <<"3.2" << std::endl;
 
     // std::cout << "a" << std::endl;
@@ -590,7 +615,11 @@ void ModelRunner::add_to_sediment_tracking(int index, double height, std::vector
       sed_prop_by_label[index].push_back(label_prop);
     }
   // std::cout << "BD" << std::endl;
-
+    if(sed_prop_by_label[index].size() == 0)
+    {
+      std::cout << index << "||" << node_in_lake[index] << "||" << n_strata << "||" << height << std::endl;
+      throw std::runtime_error("Unexpected behaviour SEDBUTNOSED");
+    }
     is_there_sed_here[index] = true;
     return;
   }
@@ -783,24 +812,46 @@ xt::pytensor<double,2> ModelRunner::get_superficial_layer_sediment_prop()
 
 void ModelRunner::find_nodes_to_reprocess(int start, std::vector<bool>& is_processed, std::vector<int>& nodes_to_reprocess, std::vector<int>& nodes_to_relake, int lake_to_avoid)
 {
+  // Alright Now is the time to finally comment this function as it seems to be the reason of mass balance and sediment nan bug :(
+  // I have been dreading this moment as this function has been written in one go alongside all the lake reprocessing routines
+
+  // this was a debugging statement marking the start of the function to locate where it first segfaulted
   // std::cout << "start" << std::endl;
+
+  // Some magic to keep a nice balance between cpu and memory optimisation: I initialise a vector assuming I will probably not need to reprocess > 1/4 of the nodes
+  // if I eceed this size, I use push_back whihc is slightly slower
   int tsize = int(round(this->io_int["n_elements"]/4));
+  // I am initialising various ID to insert and read nodes in this vector
   int insert_id_trav = 0,insert_id_lake = 0,reading_id = -1, insert_id_proc = 1;
 
+  // traversal is my vector storing the nodes to reprocess in a BFS search-like algorithm. I think.
   std::vector<int> traversal;traversal.reserve(tsize);
+  // the Q storing the nodes to process
   std::vector<int> tQ;tQ.reserve(tsize);
+  // the lake IDs to (re)process
   std::vector<int> travlake;travlake.reserve(tsize);
+  // Sets to keep track of nodes already processed in this function. Again, should be more efficient than a full vector as the number of nodes whshould be relatively low
   std::set<int> is_in_Q,is_in_lake;
+
+  // Starting the processing with the starting node ofc
   tQ.emplace_back(start);
   is_in_Q.insert(start);
+
   // const bool is_in = container.find(element) != container.end();
+  // Iterating til' I decide it
   while(true)
   {
+    // Reading the next node in the Q
+    // if first time, -1 +1 =0 so it works aye
     reading_id++;
+    // if I reach the end of me Q, tis the end
+    // It works because I reserve some space in it, so I increase its CAPACITY but not its SIZE which grows with emplace_back
     if(reading_id >= tQ.size())
       break;
 
+    // getting the node
     int this_node = tQ[reading_id];
+    // if node is not start, I put it into the traversal, cause it has already been checked
     if(this_node != start)
     {  
       if(insert_id_trav < tsize)
@@ -813,19 +864,25 @@ void ModelRunner::find_nodes_to_reprocess(int start, std::vector<bool>& is_proce
     }
 
 
+    // iterating through all his neighbors
     for(auto node:this->graph.get_MF_receivers_at_node(this_node))
     {
 
+      // if the neightbor has not been processed originally no reproc
       if(is_processed[node] == false)
         continue;
 
+      // if the node is already in Q skip
       if(is_in_Q.find(node) != is_in_Q.end())
         continue;
 
+      // getting the lake id
       int this_lake_id = node_in_lake[node];
-      if(this_lake_id >= 0 && is_in_lake.find(node) == is_in_lake.end() && this_node != start)
+
+      // If this node is in a lake, but not processed yet by this function and not the starting one
+      if(this_lake_id >= 0 && is_in_lake.find(node) == is_in_lake.end()) // && this_node != start)
       {
-        // Checking and avoiding dedundancy
+        // Checking and avoiding dedundancy-> if is in the lake to avoid -> rework the receivers of the outlet and process it
         if(this_lake_id == lake_to_avoid || this->lake_network[this_lake_id].get_parent_lake() == lake_to_avoid)
         {
           std::vector<int> new_rec;
@@ -839,6 +896,8 @@ void ModelRunner::find_nodes_to_reprocess(int start, std::vector<bool>& is_proce
           continue;
         }
 
+        // if it passes this test, then the node is in a lake to reprocess
+
         is_in_lake.insert(node);
         if(insert_id_lake < tsize )
         {
@@ -847,13 +906,18 @@ void ModelRunner::find_nodes_to_reprocess(int start, std::vector<bool>& is_proce
         }
         else
           travlake.push_back(node);
+
+        // I do not want to reprocess this node, so I am putting "in the Q" so that it gets ignored now. I know I have to reprocess it
         is_in_Q.insert(node);
+        
         continue;
       }
 
-      if(this_node == start && (this_lake_id == lake_to_avoid || this->lake_network[this_lake_id].get_parent_lake() == lake_to_avoid))
+      // if is in lake to avoid at start, I stop here
+      if(this_node == start && (this_lake_id == lake_to_avoid || this->lake_network[this_lake_id].get_parent_lake() == lake_to_avoid) )
         continue;
 
+      // otherwise, I'll need to check this node and put it in teh traversal yolo
       is_in_Q.insert(node);
       if(insert_id_proc < tsize )
       {
@@ -867,8 +931,17 @@ void ModelRunner::find_nodes_to_reprocess(int start, std::vector<bool>& is_proce
 
   }
 
+
+  for (auto bugh:traversal)
+    if(node_in_lake[bugh] >= 0)
+      throw std::runtime_error("ERROAR! this nor should not be in this traversal");
+
   nodes_to_reprocess = std::move(traversal);
   nodes_to_relake = std::move(travlake);
+
+
+
+
   // // std::cout << "end" << std::endl;
   // std::map<int,int> node_counter;
   // for(auto n:nodes_to_reprocess)
@@ -989,7 +1062,11 @@ void ModelRunner::manage_fluxes_after_moving_prep(chonk& this_chonk, int label_i
         if(is_there_sed_here[index] && this->sed_prop_by_label[index].size()>0) // I SHOULD NOT NEED THE SECOND THING, WHY DO I FUTURE BORIS????
           these_sed_props = this->sed_prop_by_label[index][this->sed_prop_by_label[index].size() - 1];
       // std::cout << "B" << std::endl;
-
+      if(this->node_in_lake[index] >=0)
+      {
+        std::cout << "NODEINLAKEYO? " << this->node_in_lake[index] << std::endl;
+        throw std::runtime_error("node in lake yo should not charlicise");
+      }
         this_chonk.charlie_I(this->labelz_list_double["SPIL_n"][label_id], this->labelz_list_double["SPIL_m"][label_id], this->labelz_list_double["CHARLIE_I_Kr"][label_id], 
   this->labelz_list_double["CHARLIE_I_Ks"][label_id],
   this->labelz_list_double["CHARLIE_I_dimless_roughness"][label_id], this->io_double_array["sed_height"][index], 
@@ -1435,12 +1512,12 @@ void Lake::drape_deposition_flux_to_chonks(std::vector<chonk>& chonk_network, xt
   if(ratio_of_dep>1)
     ratio_of_dep = 1;
   //   throw std::runtime_error("MORE_SEDIMENT_THAN_WATER_IN_LAKE_FINALISATION::" + std::to_string(ratio_of_dep) + "||" + std::to_string(this->volume));
+
   for(auto& no:this->nodes)
   {
+    // std::cout <<  chonk_network[no].get_sediment_creation_flux() << "||";
     double slangh = ratio_of_dep * (this->water_elevation - surface_elevation[no]) / timestep;
     chonk_network[no].add_sediment_creation_flux(slangh);
-    if(slangh < 0)
-      std::cout << slangh << "||" << (this->water_elevation - surface_elevation[no]) << "||" << this->volume_of_sediment << "||" << this->volume << std::endl;
   }
 }
 
@@ -1519,7 +1596,8 @@ void Lake::pour_water_in_lake(
       this->outlet_node = outlet;
       // and readding the node to the depression
       this->depressionfiller.emplace(next_node);
-      // std::cout <<"OUTLET FOUND::" << this->outlet_node << std::endl;
+
+
       break;
     }
 
@@ -1556,6 +1634,15 @@ void Lake::pour_water_in_lake(
   }
   // std::cout << "After raw filling lake water volume is " << water_volume << " hence water flux is " <<  water_volume/dt << std::endl;
 
+    if(this->outlet_node>=0)
+      if(node_in_lake[this->outlet_node] == this->lake_id || node_in_lake[this->outlet_node] == this->get_parent_lake())
+      {
+
+        std::cout << "SDJFKHSDKJLFHJKJSDHFLKJHSDLJKFHSLKJDHFKJLSDHFKJHSDKJFHKJSDHFKJ" << node_in_lake[this->outlet_node] << "||" << this->lake_id << std::endl;
+        throw std::runtime_error("Fatal Error:: outletinlake");
+      }
+
+
 
   // checking that I did not overfilled my lake:
   if(water_volume <0)
@@ -1581,6 +1668,7 @@ void Lake::pour_water_in_lake(
     this->depths[Unot] = this->water_elevation - surface_elevation[Unot];
     node_in_lake[Unot] = this->lake_id;
     chonk_network[Unot].reset();
+    // std::cout <<  chonk_network[Unot].get_sediment_creation_flux() << "||";
   }
 
   // std::cout << "Water volume left: " << water_volume << std::endl;
@@ -1749,7 +1837,14 @@ int Lake::check_neighbors_for_outlet_or_existing_lakes(
     // Else, if not in queue and has lower elevation, then the current mother node IS an outlet
     else
     {
-      this->outlet_node = next_node.node;
+      // In some rare cases the outlet is already labelled as in this lake: for example if I already processed the lake before and readd water or more convoluted situations where I had a single pixeld lake
+      if(node_in_lake[next_node.node]<0)
+        this->outlet_node = next_node.node;
+
+      else if(node_in_lake[next_node.node] != this->lake_id && lake_network[node_in_lake[next_node.node]].get_parent_lake() != this->lake_id)
+        this->outlet_node = next_node.node;
+
+
       // IMPORTANT::not breaking the loop: I want to get all myneighbors in the queue for potential repouring water in the thingy
     }
 
@@ -1826,7 +1921,10 @@ void  ModelRunner::find_underfilled_lakes_already_processed_and_give_water(int S
 
 
     this->manage_move_prep(chonk_network[node]);
+    // std::cout << "call from reproc" << std::endl;
+    // std::cout << "call from reproc" << std::endl;
     this->manage_fluxes_after_moving_prep(chonk_network[node], this->label_array[node]);
+    // std::cout << "called from reproc" << std::endl;
 
     // need to check if some nodes give in lake
     std::vector<int> to_ignore;
