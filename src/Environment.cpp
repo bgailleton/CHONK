@@ -211,6 +211,7 @@ void ModelRunner::process_node(int& node, std::vector<bool>& is_processed, int& 
         lakeid = lake_incrementor;
         lake_incrementor++;
       }
+
        // If my existing lake has a parent (ie a mother lake that had ingested it beforehand) then I consider the new as the one
       else if(this->lake_network[lakeid].get_parent_lake() >= 0)
       {
@@ -223,30 +224,59 @@ void ModelRunner::process_node(int& node, std::vector<bool>& is_processed, int& 
       // CHONK directly stores the total sediment volume (already a Volume there)
       double sedvol = this->chonk_network[node].get_sediment_flux();
       
+      // pouring sediment into the lake
+      this->lake_network[lakeid].pour_sediment_into_lake(sedvol, this->chonk_network[node].get_other_attribute_array("label_tracker") );      
       // Pouring water into the lake, it also finds if there is an outlet and reprocess the water fluxes for dat one
       this->lake_network[lakeid].pour_water_in_lake(water_volume, node, node_in_lake, is_processed, inctive_nodes,lake_network, surface_elevation,graph, cellarea, timestep,chonk_network);
-      
-      // pouring sediment into the lake
-      this->lake_network[lakeid].pour_sediment_into_lake(sedvol);
-      // std::cout << "Bulf3::" << lakeid << "||" << this->lake_network.size() <<std::endl;
-
+    
       // getting the outlet node of my lake. aOOOOOOOOOOOO . will be -9999 if there is no
-      int outlet = this->lake_network[lakeid].get_lake_outlet();
-      // std::cout << "Bulf3.1" << std::endl;
-      
+      int outlet = this->lake_network[lakeid].get_lake_outlet();      
 
       // OK first step is to check wether this outlet is a lake itself or not
-      // STEP TO FINISH::reprocess lake outletting in lakes 
-      while(outlet >= 0 && is_processed[outlet] && node_in_lake[outlet]>=0)
+      if(outlet<=0)
+        return;
+
+      int lakoutid = node_in_lake[outlet];
+      if(lakoutid>=0)
+        if(this->lake_network[lakoutid].get_parent_lake() >= 0)
+          lakoutid = this->lake_network[lakoutid].get_parent_lake();
+
+      
+      // This steps check wether the lake outflows directly in another lake
+      while(outlet >= 0 && is_processed[outlet] && lakoutid > -1)
       {
-        if(node_in_lake[outlet] == lakeid || node_in_lake[outlet] == lake_network[lakeid].get_parent_lake())
-          throw std::runtime_error("ERROR FATAL::OUTLET OF LAKE IN LAKE ITSELF");
-        break;
+        // Pouring sediments into the new lake
+        this->lake_network[lakoutid].pour_sediment_into_lake(this->lake_network[lakeid].get_outletting_chonk().get_sediment_flux(),
+         this->lake_network[lakeid].get_outletting_chonk().get_other_attribute_array("label_tracker"));
+
+        // Pouring water into the new lake
+        this->lake_network[lakoutid].pour_water_in_lake(this->lake_network[lakeid].get_outletting_chonk().get_water_flux() * this->timestep,
+         outlet, node_in_lake, is_processed, inctive_nodes,lake_network, surface_elevation,graph, cellarea, timestep,chonk_network);
+
+        // Getting new outlet
+        int lekoutoutlet = this->lake_network[lakoutid].get_lake_outlet();
+
+        // Chekcing if the parent lake has been ingested by the old one
+        if (lekoutoutlet < 0)
+        {
+          // No lake, stopping the processing of this node here
+          return;
+        }
+        else
+        {
+          //It outlets in another lake, I change the referential to this new lake
+          lakeid = lakoutid;
+          outlet = lekoutoutlet;
+          lakoutid = node_in_lake[outlet];
+          if(lakoutid >=0)
+            if(this->lake_network[lakoutid].get_parent_lake() >= 0)
+              lakoutid = this->lake_network[lakoutid].get_parent_lake();
+        }
       }
 
 
 
-      // checking if it exist AND ahs been processed before
+      // checking if my final outlet exists AND ahs been processed before
       if(outlet >= 0 && is_processed[outlet])
       {
 
@@ -266,6 +296,9 @@ void ModelRunner::process_node(int& node, std::vector<bool>& is_processed, int& 
         // and lake node requiring merging into a single refilling event
         this->find_nodes_to_reprocess(outlet, is_processed, node_to_reprocess, reproc_in_lakes, lakeid);
 
+
+
+
         // A bit of optimisation here: finding the ID in the stack of the nodes to reprocess in order to reprocess them in the right order
         int min_stackID = std::numeric_limits<int>::max(), max_stack_id = -1;
         std::unordered_set<int> checker;
@@ -280,14 +313,22 @@ void ModelRunner::process_node(int& node, std::vector<bool>& is_processed, int& 
           checker.insert(newnode);
         }
 
+
+        // TO DO : FOR EXAMPLE DO I NEED DAT
         // Saving the fluxes pre correction in the lakes, in order to be able to correct it
+        // std::map<int, double > lake_water_corrector, lake_sed_corrector;
+        // for(auto lanode:reproc_in_lakes)
+        // {
+        //   lake_water_corrector[lanode] =  this->chonk_network[lanode].get_water_flux();
+        //   lake_sed_corrector[lanode] = this->chonk_network[lanode].get_sediment_flux();
+        // }
+        // TO DO TEMP FIX FOR ABOVE
         std::map<int, double > lake_water_corrector, lake_sed_corrector;
         for(auto lanode:reproc_in_lakes)
         {
-          lake_water_corrector[lanode] =  this->chonk_network[lanode].get_water_flux();
-          lake_sed_corrector[lanode] = this->chonk_network[lanode].get_sediment_flux();
+          lake_water_corrector[lanode] =  0;
+          lake_sed_corrector[lanode] = 0;
         }
-
 
         // Cancelling the fluxes from DS to US
         for(int i = max_stack_id; i >= min_stackID; i--)
@@ -331,6 +372,7 @@ void ModelRunner::process_node(int& node, std::vector<bool>& is_processed, int& 
         this->chonk_network[outlet].set_water_flux(this_chonk.get_water_flux());
         std::vector<double> oatlab = this_chonk.get_other_attribute_array("label_tracker");
         this->chonk_network[outlet].set_sediment_flux(this_chonk.get_sediment_flux(), oatlab);
+        
         this->chonk_network[outlet].set_sediment_creation_flux(0.);
         this->chonk_network[outlet].set_erosion_flux_undifferentiated(0.);
         this->chonk_network[outlet].set_erosion_flux_only_sediments(0.);
@@ -405,6 +447,7 @@ void ModelRunner::process_node(int& node, std::vector<bool>& is_processed, int& 
 
           // getting the lakeid
           int tlakeid = toproclake.first;
+          std::cout << " Happens here !!!" << "|";
           // the water flux to add (will be translated to vulume in the next function)
           double water_to_add = toproclake.second;
           // Sediment flux to add
@@ -416,7 +459,12 @@ void ModelRunner::process_node(int& node, std::vector<bool>& is_processed, int& 
           this->chonk_network[node_id].initialise_local_label_tracker_in_sediment_flux(this->n_labels);
           this->chonk_network[node_id].set_water_flux(water_to_add);
           auto baluf = lake_chonks[toproclake.first].get_other_attribute_array("label_tracker");
+
+          // TODO:: SORT THAT...
+          if(sed_to_add <0)
+            sed_to_add = 0;
           this->chonk_network[node_id].set_sediment_flux(sed_to_add, baluf);
+
           this->process_node(node_id, is_processed, lake_incrementor, underfilled_lake, inctive_nodes, cellarea, surface_elevation,false);
         }
 
@@ -456,6 +504,7 @@ void ModelRunner::process_node(int& node, std::vector<bool>& is_processed, int& 
       this->manage_move_prep(this->chonk_network[node]);
     // Fluxes after moving prep are active fluxes such as erosion or other thingies
     this->manage_fluxes_after_moving_prep(this->chonk_network[node],this->label_array[node]);
+    
     // Apply the changes and propagate the fluxes downstream
     this->chonk_network[node].split_and_merge_in_receiving_chonks(this->chonk_network, this->graph, this->io_double_array["surface_elevation_tp1"], io_double_array["sed_height_tp1"], this->timestep);
 }
@@ -472,7 +521,9 @@ void ModelRunner::process_node_nolake_for_sure(int& node, std::vector<bool>& is_
       this->manage_move_prep(this->chonk_network[node]);
   
     // std::cout << "call from nodeproc nolake" << std::endl;
+    // std::cout << "ka";
     this->manage_fluxes_after_moving_prep(this->chonk_network[node],this->label_array[node]);
+    // std::cout << "ren";
     // std::cout << "call from nodeproced nolake" << std::endl;
     // std::cout << "bite" << std::endl;
 
@@ -532,6 +583,7 @@ void ModelRunner::finalise()
 
     // Applying elevation changes from the sediments
     double sedcrea = tchonk.get_sediment_creation_flux() * timestep;
+
     if(std::isfinite(sedcrea) == false)
       throw std::runtime_error("NAN sedcrea finalisation not possible yo");
    // std::cout <<"3.2" << std::endl;
@@ -663,25 +715,25 @@ void ModelRunner::add_to_sediment_tracking(int index, double height, std::vector
     if(n_boxes_to_fill>1)
       comparator = 1;
 
-    // for(auto ugh:sed_prop_by_label[index][current_box])
-    // if(std::isfinite(ugh) != true)
-    // {
-    //   std::cout << "nan before" << std::endl;
-    // }
-    // for(auto ugh:label_prop)
-    // if(std::isfinite(ugh) != true)
-    // {
-    //   std::cout << "nan before" << std::endl;
-    // }
+    for(auto ugh:sed_prop_by_label[index][current_box])
+    if(std::isfinite(ugh) != true)
+    {
+      std::cout << "nan before" << std::endl;
+    }
+    for(auto ugh:label_prop)
+    if(std::isfinite(ugh) != true)
+    {
+      std::cout << "nan before" << std::endl;
+    }
 
     // filling the current box with the mixed proportions of labels
-    sed_prop_by_label[index][current_box] = this->mix_two_proportions(prop_box_filled, sed_prop_by_label[index][current_box], (comparator - prop_box_filled), label_prop);
+    sed_prop_by_label[index][current_box] = mix_two_proportions(prop_box_filled, sed_prop_by_label[index][current_box], (comparator - prop_box_filled), label_prop);
 
-    // for(auto ugh:sed_prop_by_label[index][current_box])
-    // if(std::isfinite(ugh))
-    // {
-    //   throw std::runtime_error("Arg, nan sedafter");
-    // }
+    for(auto ugh:sed_prop_by_label[index][current_box])
+    if(std::isfinite(ugh) == false)
+    {
+      throw std::runtime_error("Arg, nan sedafter");
+    }
 
     // adding the boxes
     if(delta_boxes> 0)
@@ -721,75 +773,7 @@ void ModelRunner::add_to_sediment_tracking(int index, double height, std::vector
   }
 }
 
-std::vector<double> ModelRunner::mix_two_proportions(double prop1, std::vector<double> labprop1, double prop2, std::vector<double> labprop2)
-{
-  double prop_tot = prop1 + prop2;
-  // double coeff = 1/prop_tot;
 
-  // if(prop_tot <=0)
-  //   return labprop1;
-
-  // std::cout << prop_tot << std::endl;
-  double sum1 = 0;
-  double sum2 = 0;
-
-
-  for(auto& val : labprop1)
-  {
-    double copval = val;
-    sum1 += copval;
-    val = val;
-  }
-  for(auto& val : labprop2)
-  {
-    double copval = val;
-    sum2 += copval;
-    
-    val = val;
-  }
-
-  if(sum1 == 0)
-    return labprop2;
-  else if(sum2 == 0)
-    return labprop1;
-
-
-  // if(sum1 > 1.01 || sum1<0.99)
-  //   std::cout << "sum1 is not 1: " << sum1 << std::endl; 
-  // if(sum2 > 1.01 || sum2<0.99)
-  //   std::cout << "sum2 is not 1 " << sum2 << std::endl; 
-
-  //   for(auto LAB:labprop1)
-  //   if(std::isfinite(LAB) == false)
-  //     std::cout << "NANLAB at label_prop1" << std::endl;
-  // for(auto LAB:labprop2)
-  //   if(std::isfinite(LAB) == false)
-  //     std::cout << "NANLAB at label_prop2" << std::endl;
-  
-
-  std::vector<double> output(labprop1.size());
-
-  double divider = 0.;
-  for(size_t i=0; i<labprop1.size(); i++)
-  {
-    output[i] = labprop1[i] + labprop2[i];
-    // std::cout << divider << "|" << labprop1[i] << "|" << labprop2[i] << std::endl;
-
-    divider += output[i];
-  }
-  double sumfin = 0;
-  for(size_t i=0; i<labprop1.size(); i++)
-  {
-    output[i] = output[i]/divider;
-    sumfin += output[i];
-  }
-
-  if(sumfin > 1.01 || sumfin < 0.99)
-    std::cout << sumfin << std::endl;
-
-
-  return output;
-}
 
 xt::pytensor<double,2> ModelRunner::get_superficial_layer_sediment_prop()
 {
@@ -1064,7 +1048,7 @@ void ModelRunner::manage_fluxes_after_moving_prep(chonk& this_chonk, int label_i
       // std::cout << "B" << std::endl;
       if(this->node_in_lake[index] >=0)
       {
-        std::cout << "NODEINLAKEYO? " << this->node_in_lake[index] << std::endl;
+        std::cout << "NODEINLAKEYO? " << index << "|" << this->node_in_lake[index] << "|" << this-> lake_network[this->node_in_lake[index]].get_lake_outlet() << std::endl;
         throw std::runtime_error("node in lake yo should not charlicise");
       }
         this_chonk.charlie_I(this->labelz_list_double["SPIL_n"][label_id], this->labelz_list_double["SPIL_m"][label_id], this->labelz_list_double["CHARLIE_I_Kr"][label_id], 
@@ -1155,6 +1139,7 @@ void ModelRunner::initialise_label_list(std::vector<labelz> these_labelz)
   this->labelz_list = these_labelz;
   this->n_labels = int(these_labelz.size());
   this->prepare_label_to_list_for_processes();
+
   // initialising the sediment tracking device
   is_there_sed_here = std::vector<bool>(this->io_int["n_elements"], false);
   sed_prop_by_label = std::map<int, std::vector<std::vector<double> > >() ;
@@ -1477,11 +1462,14 @@ void Lake::ingest_other_lake(
     this->depressionfiller.emplace(this_nodium);
     this_PQ.pop();
   }
+  this->pour_sediment_into_lake(other_lake.get_volume_of_sediment(), other_lake.get_lake_lab_prop());
 
-  this->pour_sediment_into_lake(other_lake.get_volume_of_sediment());
+  this->volume += other_lake.get_lake_volume();
 
   // Deleting this lake and setting its parent lake
   int save_ID = other_lake.get_lake_id();
+
+
   Lake temp = Lake(save_ID);
   other_lake = temp;
   other_lake.set_parent_lake(this->lake_id);
@@ -1494,9 +1482,68 @@ void Lake::ingest_other_lake(
   return;
 }
 
-void Lake::pour_sediment_into_lake(double sediment_volume)
+void Lake::pour_sediment_into_lake(double sediment_volume, std::vector<double> label_prop)
 {
+  if(this->volume_of_sediment<0)
+    std::cout << "NEG BEFORE POURING SED" << std::endl;
+  if(sediment_volume<0)
+    std::cout << "NEG POURED" << std::endl;
+
+  std::vector<double> coplaklab = this->lake_label_prop;
+  std::vector<double> copaddlab = label_prop;
+  
+  if(this->lake_label_prop.size()>0)
+  {
+    // std::cout << "bo";
+    for(auto lb:this->lake_label_prop)
+      if(std::isfinite(lb) == false)
+        std::cout << "NANINF in lake already" << std::endl;
+    for(auto lb:label_prop)
+      if(std::isfinite(lb) == false)
+        std::cout << "NANINF coming in" << std::endl;
+    if(this->volume_of_sediment > 0)
+    {
+      // std::cout << "go";
+      this->lake_label_prop = mix_two_proportions(this->volume_of_sediment, this->lake_label_prop, sediment_volume, label_prop);
+      // std::cout << "ris";
+    }
+    else
+    {
+      this->lake_label_prop = label_prop;
+    }
+
+      
+    for(auto lb:this->lake_label_prop)
+      if(std::isfinite(lb) == false)
+      {
+        std::cout << "NANINF in lake after::" << this->volume_of_sediment << "||" << sediment_volume << std::endl;
+        for(auto yu:this->lake_label_prop)
+          std::cout << yu << "|";
+        std::cout << std::endl;
+        for(auto yu:label_prop)
+          std::cout << yu << "|";
+        std::cout << std::endl;
+        for(auto yu:copaddlab)
+          std::cout << yu << "|";
+        std::cout << std::endl;
+        for(auto yu:coplaklab)
+          std::cout << yu << "|";
+        std::cout << std::endl;
+        
+        throw std::runtime_error("NANINF in lake sed pouring");
+      }
+    // std::cout << "ris";
+  }
+  else
+    this->lake_label_prop = label_prop;
+
   this->volume_of_sediment += sediment_volume;
+  if(this->volume_of_sediment<0)
+  {
+    std::cout << "NEG AFTER POURING SED " << sediment_volume << std::endl;
+    // throw std::runtime_error("sedneg issue number 5");
+  }
+
 }
 
 // Give the deposition fluxe from lakes to the 
@@ -1507,6 +1554,7 @@ void Lake::drape_deposition_flux_to_chonks(std::vector<chonk>& chonk_network, xt
     return;
 
   double ratio_of_dep = this->volume_of_sediment/this->volume;
+  
 
   // NEED TO DEAL WITH THAT BOBO
   if(ratio_of_dep>1)
@@ -1515,10 +1563,20 @@ void Lake::drape_deposition_flux_to_chonks(std::vector<chonk>& chonk_network, xt
 
   for(auto& no:this->nodes)
   {
-    // std::cout <<  chonk_network[no].get_sediment_creation_flux() << "||";
+    double pre = chonk_network[no].get_sediment_creation_flux();
+    if(std::isfinite(pre) ==false)
+     throw std::runtime_error("already naninf before draping");// std::cout <<  chonk_network[no].get_sediment_creation_flux() << "||";
+    
+
     double slangh = ratio_of_dep * (this->water_elevation - surface_elevation[no]) / timestep;
     chonk_network[no].add_sediment_creation_flux(slangh);
+
+    pre = chonk_network[no].get_sediment_creation_flux();
+    if(std::isfinite(pre) ==false)
+      throw std::runtime_error(" naninf after draping");
   }
+
+
 }
 
 // Fill a lake with a certain amount of water for the first time of the run
@@ -1535,10 +1593,15 @@ void Lake::pour_water_in_lake(
   double dt,
   std::vector<chonk>& chonk_network
   )
-{
+{ 
+
+  // std:: cout << "Pouring water into " << this->lake_id << std::endl;
+
+
   // std::cout << "Entering water volume is " << water_volume << " hence water flux is " <<  water_volume/dt << std::endl;
   double save_entering_water = water_volume;
   double save_preexistingwater = this->volume;
+  int n_labels = int(chonk_network[originode].get_other_attribute_array("label_tracker").size());
 
   // Some ongoing debugging
   // if(originode == 8371)
@@ -1593,9 +1656,20 @@ void Lake::pour_water_in_lake(
       this->water_elevation = next_node.elevation;
 
       // I therefore save it and break the loop
+      // std::cout << "{" << outlet << "|" << this->outlet_node << "}";
       this->outlet_node = outlet;
       // and readding the node to the depression
       this->depressionfiller.emplace(next_node);
+      if(this->outlet_node>=0)
+      {
+        if(node_in_lake[this->outlet_node]>=0)
+        {
+          if(node_in_lake[this->outlet_node] == this->lake_id || node_in_lake[this->outlet_node] == this->get_parent_lake())
+          {
+            std::cout << "GGG" <<  std::endl;
+          }
+        }
+      }
 
 
       break;
@@ -1629,18 +1703,24 @@ void Lake::pour_water_in_lake(
     this->water_elevation = next_node.elevation;
         // Otehr wise, I do not have an outlet and I can save this node as in depression
     this->nodes.push_back(next_node.node);
+    node_in_lake[next_node.node] = this->lake_id;
     this->n_nodes ++;
     // At this point I either have enough water to carry on or I stop the process
   }
   // std::cout << "After raw filling lake water volume is " << water_volume << " hence water flux is " <<  water_volume/dt << std::endl;
 
-    if(this->outlet_node>=0)
-      if(node_in_lake[this->outlet_node] == this->lake_id || node_in_lake[this->outlet_node] == this->get_parent_lake())
-      {
+  // if(this->outlet_node>=0)
+  // {
+  //   if(node_in_lake[this->outlet_node]>=0)
+  //   {
+  //     if(node_in_lake[this->outlet_node] == this->lake_id || node_in_lake[this->outlet_node] == this->get_parent_lake())
+  //     {
 
-        std::cout << "SDJFKHSDKJLFHJKJSDHFLKJHSDLJKFHSLKJDHFKJLSDHFKJHSDKJFHKJSDHFKJ" << node_in_lake[this->outlet_node] << "||" << this->lake_id << std::endl;
-        throw std::runtime_error("Fatal Error:: outletinlake");
-      }
+  //       std::cout << "SSDF" << node_in_lake[this->outlet_node] << "||" << this->lake_id <<  "||" << this->nodes.size() << "||" << this->get_parent_lake() << std::endl;
+  //       throw std::runtime_error("Fatal Error:: outletinlake");
+  //     }
+  //   }
+  // }
 
 
 
@@ -1668,6 +1748,7 @@ void Lake::pour_water_in_lake(
     this->depths[Unot] = this->water_elevation - surface_elevation[Unot];
     node_in_lake[Unot] = this->lake_id;
     chonk_network[Unot].reset();
+    chonk_network[Unot].initialise_local_label_tracker_in_sediment_flux(n_labels);
     // std::cout <<  chonk_network[Unot].get_sediment_creation_flux() << "||";
   }
 
@@ -1727,7 +1808,7 @@ void Lake::pour_water_in_lake(
 
       this->outlet_chonk = chonk(-1, -1, false); //  this is creating a "fake" chonk so its id is -1
       this->outlet_chonk.reinitialise_moving_prep();
-      this->outlet_chonk.initialise_local_label_tracker_in_sediment_flux( int(chonk_network[originode].get_other_attribute_array("label_tracker").size() ) );
+      this->outlet_chonk.initialise_local_label_tracker_in_sediment_flux( n_labels );
       // forcing the new water flux
 
       this->outlet_chonk.set_water_flux(out_water_rate);
@@ -1744,8 +1825,8 @@ void Lake::pour_water_in_lake(
       {
         double outsed = this->volume_of_sediment - this->volume;
         this->volume_of_sediment -= outsed;
-        this->outlet_chonk.set_sediment_flux(0., chonk_network[originode].get_other_attribute_array("label_tracker"));
-        this->outlet_chonk.add_to_sediment_flux(outsed, chonk_network[originode].get_other_attribute_array("label_tracker"));
+        this->outlet_chonk.set_sediment_flux(0., this->lake_label_prop);
+        this->outlet_chonk.add_to_sediment_flux(outsed, this->lake_label_prop);
       }
       else
       {
@@ -1783,6 +1864,7 @@ int Lake::check_neighbors_for_outlet_or_existing_lakes(
 
   // No outlet so far
   int outlet = -9999;
+  bool has_eaten = false;
   // Checking all neighbours
   for(auto node : neightbors)
   {
@@ -1821,6 +1903,7 @@ int Lake::check_neighbors_for_outlet_or_existing_lakes(
         continue;
       // OK let's try to drink it 
       this->ingest_other_lake(lake_network[lake_index], node_in_lake, is_in_queue,lake_network);
+      has_eaten = true; 
       continue;
     }
 
@@ -1837,12 +1920,19 @@ int Lake::check_neighbors_for_outlet_or_existing_lakes(
     // Else, if not in queue and has lower elevation, then the current mother node IS an outlet
     else
     {
-      // In some rare cases the outlet is already labelled as in this lake: for example if I already processed the lake before and readd water or more convoluted situations where I had a single pixeld lake
-      if(node_in_lake[next_node.node]<0)
-        this->outlet_node = next_node.node;
-
-      else if(node_in_lake[next_node.node] != this->lake_id && lake_network[node_in_lake[next_node.node]].get_parent_lake() != this->lake_id)
-        this->outlet_node = next_node.node;
+      int outlake = node_in_lake[next_node.node] ;
+      // std::cout << "{" << outlake << "}";
+       // In some rare cases the outlet is already labelled as in this lake: for example if I already processed the lake before and readd water or more convoluted situations where I had a single pixeld lake
+      if(outlake < 0)
+      {
+        // std::cout <<"gabul1";
+        outlet = next_node.node;
+      }
+      else if(outlake != this->lake_id && lake_network[outlake].get_parent_lake() != this->lake_id)
+      {
+        // std::cout <<"gabul2";
+        outlet = next_node.node;
+      }
 
 
       // IMPORTANT::not breaking the loop: I want to get all myneighbors in the queue for potential repouring water in the thingy
@@ -1850,9 +1940,19 @@ int Lake::check_neighbors_for_outlet_or_existing_lakes(
 
     // Moving to the next neighbour
   }
-  // outlet is >= 0 -> tehre is an outlet
 
-  return this->outlet_node;
+  // if a lake ahs been ingested, it makes the outlet ambiguous and need reprocessing of this node
+  if(has_eaten)
+  {
+    this->depressionfiller.emplace(next_node);
+    outlet = -9999;
+  }
+
+  // // outlet is >= 0 -> tehre is an outlet
+  // if(outlet>=0)
+  //   std::cout << "POCHTRAC::" << outlet << "||" << node_in_lake[outlet] << "||" << this->lake_id << std::endl;
+
+  return outlet;
 }
 
 void  ModelRunner::find_underfilled_lakes_already_processed_and_give_water(int SS_ID, std::vector<bool>& is_processed )
@@ -1869,6 +1969,7 @@ void  ModelRunner::find_underfilled_lakes_already_processed_and_give_water(int S
   std::vector<bool> to_reprocessed(n_elements,false);
   std::vector<int> traversal(n_elements,-9999); // -9999 is nodata
   std::unordered_map<int,double> to_add_in_lakes, to_add_in_lakes_sed_edition;
+  std::unordered_map<int, std::vector<double> >to_add_in_lakes_sed_edition_but_label_tracker;
   traversal[0] = SS_ID;
   to_reprocessed[SS_ID] = true;
   // basically here I wneed to reprocess all nodes dowstream of that one!
@@ -1898,7 +1999,7 @@ void  ModelRunner::find_underfilled_lakes_already_processed_and_give_water(int S
     reading_ID++;
     // will break here if next node is -9999
   }
-  std::cout << writing_ID << "||";
+  // std::cout << writing_ID << "||";
 
 
   //Reinitialising all the concerned nodes but the outlet to repropagate correctly the thingies 
@@ -1939,6 +2040,18 @@ void  ModelRunner::find_underfilled_lakes_already_processed_and_give_water(int S
         int lake_to_consider = node_in_lake[crec[i]];
         to_add_in_lakes[lake_to_consider] += cwawe[i] * chonk_network[crec[i]].get_water_flux() * dt;
         to_add_in_lakes_sed_edition[lake_to_consider] += chonk_network[crec[i]].get_sediment_flux() * csedw[i];
+        if(to_add_in_lakes_sed_edition_but_label_tracker.count(lake_to_consider) == 0)
+        {
+          to_add_in_lakes_sed_edition_but_label_tracker[lake_to_consider] = chonk_network[crec[i]].get_other_attribute_array("label_tracker");
+        }
+        else
+        {
+    std::cout << "ka";
+          to_add_in_lakes_sed_edition_but_label_tracker[lake_to_consider] = mix_two_proportions(to_add_in_lakes_sed_edition[lake_to_consider],
+            to_add_in_lakes_sed_edition_but_label_tracker[lake_to_consider]
+            ,chonk_network[crec[i]].get_sediment_flux() * csedw[i], chonk_network[crec[i]].get_other_attribute_array("label_tracker"));
+    std::cout << "ren";
+        }
       }
     }
 
@@ -1951,8 +2064,10 @@ void  ModelRunner::find_underfilled_lakes_already_processed_and_give_water(int S
     if(lake_network[lake_to_fill].get_parent_lake()>=0)
       lake_to_fill = lake_network[lake_to_fill].get_parent_lake();
     double water_volume = x.second;
+    std::cout << "dar";
 
-    this->lake_network[lake_to_fill].pour_sediment_into_lake(to_add_in_lakes_sed_edition[lake_to_fill]);
+    this->lake_network[lake_to_fill].pour_sediment_into_lake(to_add_in_lakes_sed_edition[lake_to_fill], to_add_in_lakes_sed_edition_but_label_tracker[lake_to_fill]);
+    std::cout << "de";
 
     this->lake_network[lake_to_fill].pour_water_in_lake(water_volume,lake_network[lake_to_fill].get_lake_nodes()[0], // pouring water in a random nodfe in the lake, it does not matter
   node_in_lake, is_processed, active_nodes,lake_network, surface_elevation,graph, cellarea, timestep,chonk_network);

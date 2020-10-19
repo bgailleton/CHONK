@@ -183,4 +183,8 @@ class chonk
     void create(int tchonkID, int tcurrent_node, bool tmemory_saver);
 };
 
+std::vector<double> mix_two_proportions(double prop1, std::vector<double> labprop1, double prop2, std::vector<double> labprop2);
+bool double_equals(double a, double b, double epsilon = 0.0001);
+
+
 #endif

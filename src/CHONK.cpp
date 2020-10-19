@@ -44,6 +44,13 @@
 //####################################################
 //
 
+bool double_equals(double a, double b, double epsilon)
+{
+    return std::abs(a - b) < epsilon;
+}
+
+
+
 void chonk::create()
 {
   this->reset();
@@ -134,8 +141,8 @@ void chonk::cancel_split_and_merge_in_receiving_chonks(std::vector<chonk>& chonk
 {
   // Iterating through the receivers
   std::vector<double> oatalab = other_attributes_arrays["label_tracker"];
-  for(auto& oat:oatalab)
-    oat = -1 * oat;
+  // for(auto& oat:oatalab)
+  //   oat = -1 * oat;
 
   for(size_t i=0; i < this->receivers.size(); i++)
   {
@@ -151,7 +158,16 @@ void chonk::cancel_split_and_merge_in_receiving_chonks(std::vector<chonk>& chonk
     //   other_chonk.set_water_flux(0.);
     // }
 
+    // std::cout << "PALUF";
     other_chonk.add_to_sediment_flux( -1 * this->sediment_flux * this->weigth_sediment_fluxes[i], oatalab);
+    // std::cout << "FIN";
+
+
+    // TO DO:: SORT THIS SHIT IS NOT NORMAL
+    // if(other_chonk.get_sediment_flux() < 0)
+    //   other_chonk.set_sediment_flux(0., oatalab);
+
+
     // std::cout << "SEDFLUXDEBUG::" << this->sediment_flux << "||" << this->weigth_sediment_fluxes[i] << "||water::" << this->weigth_water_fluxes[i] << std::endl;
   }
 
@@ -175,7 +191,9 @@ void chonk::split_and_merge_in_receiving_chonks_ignore_some(std::vector<chonk>& 
     chonk& other_chonk = chonkscape[this->receivers[i]];
     // Adding the fluxes*modifyer
     other_chonk.add_to_water_flux(this->water_flux * this->weigth_water_fluxes[i]);
+    // std::cout << "COR";
     other_chonk.add_to_sediment_flux(this->sediment_flux * this->weigth_sediment_fluxes[i], oatalab);
+    // std::cout << "kar";
   }
 
   // and kill this chonk is memory saving is activated
@@ -656,6 +674,12 @@ std::vector<double> chonk::get_preexisting_sediment_flux_by_receivers()
 // Index of the label array is the label, and the sum of the proportions should be 1
 void chonk::set_sediment_flux(double value, std::vector<double> label_proportions)
 {
+  if(value< 0)
+  {
+    std::cout << value << std::endl;
+    throw std::runtime_error("SETTER sed to neg>>");
+  }
+
   this->sediment_flux = value;
   std::vector<double>& oatalab = other_attributes_arrays["label_tracker"];
   for(int i=0; i< int(label_proportions.size()); i++)
@@ -667,88 +691,29 @@ void chonk::set_sediment_flux(double value, std::vector<double> label_proportion
 // Add a certain amount to the sediment flux
 void chonk::add_to_sediment_flux(double value, std::vector<double> label_proportions)
 {
-
-  // First I am getting the proportions of stuff I wanna add
-  double total_proportion = 1;
-  // getting current proportions
-  std::vector<double>& oatalab = other_attributes_arrays["label_tracker"];
-
-
-
-  double sum_test_pre = 0.;
-  for(auto val:oatalab)
-    sum_test_pre += val;
-
-  // If I already have sediments, then normalising the new proportions to add to the thingy
-  if(this->sediment_flux>0)
-  {    
-    for(auto& prop:label_proportions)
-    {
-      double temp = prop;
-      double temp3 = prop;
-      prop = temp * value / this->sediment_flux;
-      // if(std::isfinite(temp3) == false)
-      //   std::cout << "NANPROP::" << temp << "||" << value << "||" << this->sediment_flux << "||" << temp3 << std::endl;
-    }
-  }
-  else
-  {
-    // Otherwise these proportions shall be the new truth
-    total_proportion = sum_test_pre;
-  }
-
-  // for(auto ugh:oatalab)
-  // if(std::isfinite(ugh) == false)
-  // {
-  //   std::cout << "nan before here" << std::endl;
-  // }
-  // for(auto ugh:label_proportions)
-  // if(std::isfinite(ugh) == false)
-  // {
-  //   std::cout << "nan before label_proportions" << std::endl;
-  // }
-
-  // Applying it
-  for(int i=0; i< int(label_proportions.size()); i++)
-  {
-    total_proportion += label_proportions[i];
-    oatalab[i] += label_proportions[i];
-  }
-
-  // if(total_proportion == 0)
-  //   return;
-
-  for(int i=0; i< int(label_proportions.size()); i++)
-  {
-    if(total_proportion!=0)
-      oatalab[i] = oatalab[i]/total_proportion; 
-  }
-
-  // for(auto ugh:oatalab)
-  // if(std::isfinite(ugh) == false)
-  // {
-  //   throw std::runtime_error("nan after");
-  // }
-
-  // Finally adding the full amount
-
-
-  // keeping this debugging here in case
-  // double sum_test = 0.;
-  // for(auto val:oatalab)
-  //   sum_test += val;
-
-  // if(sum_test>1.1)
-  // {
-  //   double sum_acc = 0.;
-  //   for(auto val:label_proportions)
-  //     sum_acc += val;
-
-  //   std::cout << sum_acc << "||" << sum_test << "||" << sum_test_pre << "||" << this->sediment_flux << std::endl;
-  //   throw std::runtime_error("unfitted_proportion");
-  // }
   this->sediment_flux += value;
+  if(double_equals(this->sediment_flux,0))
+    return;
 
+
+  std::vector<double> newlabprop = mix_two_proportions(this->sediment_flux, this->other_attributes_arrays["label_tracker"], value, label_proportions);
+  this->other_attributes_arrays["label_tracker"] = newlabprop;
+
+  // for(auto garg:oatalab)
+  // {
+  //   if(std::isfinite(garg) == false)
+  //     std::cout << "NANCOMON:2" << std::endl; 
+  // }
+
+  // if(this->sediment_flux<0)
+  // {
+  //   std::cout << "sed fluxes neg after:"<< saveflflfl << " minused by " << value << std::endl;
+  //   std::cout << "WARNING PROBLEM SEDFLUX " << value << std::endl;
+  //   this->sediment_flux = 0;
+  //   // throw std::runtime_error("NEGSEDFLUXES");
+  // }
+  // if(std::isfinite(this->sediment_flux) == false)
+  //   std::cout << "sedflux naninf after";
 
 
 }
@@ -785,7 +750,9 @@ void chonk::active_simple_SPL(double n, double m, double K, double dt, double Xr
     // What has been eroded moves into the sediment flux (which needs to be converted into a volume)
     std::vector<double> buluf(this->other_attributes_arrays["label_tracker"].size(), 0.);
     buluf[label] = 1.;
+    std::cout << "bul";
     this->add_to_sediment_flux(this_eflux * Xres * Yres * dt, buluf);
+    std::cout << "ff";
     // recording the current flux 
     pre_sedfluxes[i] += this_eflux * Xres * Yres * dt;
 
@@ -818,6 +785,13 @@ void chonk::charlie_I(double n, double m, double K_r, double K_s,
   double Ds_tot = 0;
 
   double E_cap_s = 0;
+
+  if(this->water_flux <= 0)
+  {
+    std::cout << "Charlie_I saw Qw <0 and fixed it but you need to take care of that" << std::endl;
+    this->water_flux = 0;
+      return;
+  }
 
 
 
@@ -880,13 +854,10 @@ void chonk::charlie_I(double n, double m, double K_r, double K_s,
   // Adding the eroded bedrock to the sediment flux
   std::vector<double> buluf(this->other_attributes_arrays["label_tracker"].size(), 0.);
   buluf[zone_label] = 1.;
-  // std::cout << "a" << std::endl;
   this->add_to_sediment_flux(Er_tot * Xres * Yres * dt, buluf);
-  // std::cout << "b" << std::endl;
 
   // Adding the sediment entrained into the sedimetn flux
   this->add_to_sediment_flux(Es_tot * Xres * Yres * dt, sed_label_prop);
-  // std::cout << "c" << std::endl;
 
   this->sediment_flux = this->sediment_flux/depodivider;
 
@@ -946,8 +917,14 @@ void chonk::charlie_I(double n, double m, double K_r, double K_s,
   //   throw std::runtime_error("nan H:" + std::to_string((Ds_tot/(1-phi))/E_cap_s) + ":" + std::to_string(E_cap_s) );
   double new_sedcrea = (new_sed_height - this_sed_height) / dt;
   this->add_sediment_creation_flux(new_sedcrea);
-  if(abs(new_sedcrea)>100)
-    std::cout << new_sed_height << "||" << this_sed_height << "||" << Es_tot << "||" << Ds_tot << std::endl;
+
+
+
+  if(std::isfinite(this->sediment_creation_flux) == false)
+  {
+    std::cout << new_sed_height << "||" << this_sed_height << "||" << Es_tot << "||" << Ds_tot << "||" << this->sediment_flux << "||" << this->water_flux<< std::endl;
+    throw std::runtime_error("Sedcrea getting nan value in CHARLIE_I");
+  }
   // double sum_weight = 0.;
   // for(auto v:this->weigth_water_fluxes)
   //   sum_weight += v;
@@ -974,7 +951,126 @@ void chonk::charlie_I(double n, double m, double K_r, double K_s,
   return;
 }
 
+std::vector<double> mix_two_proportions(double prop1, std::vector<double> labprop1, double prop2, std::vector<double> labprop2)
+{
+  if(prop1<1 || prop2<1)
+  {
+    prop1 = prop1 * 1000;
+    prop2 = prop2 * 1000;
+  }
 
+  // getting the absolute final prop
+  double prop_tot = std::abs(prop1 + prop2);
+
+  if(double_equals(prop1,0))
+    return labprop2;
+
+  if(double_equals(prop2,0)| double_equals(prop_tot,0))
+    return labprop1;
+
+  double sum1 = 0;
+  double sum2 = 0;
+
+  std::vector<double> coplab1 = labprop1, coplab2 = labprop2;
+
+  // normalising proportions to their respectful prop
+  for(auto& val : labprop1)
+  {                                                                                                                                                                                                                             
+    double copval = val;
+    sum1 += copval;
+
+    val = val * prop1/prop_tot;
+  }
+
+  for(auto& val : labprop2)
+  {
+    double copval = val;
+    sum2 += copval;
+    
+    val = val * prop2/prop_tot;
+  }
+
+
+
+  if(sum1 == 0)
+    return coplab2;
+
+  else if(sum2 == 0)
+    return coplab1;
+
+  if((double_equals(sum1,1) == false && double_equals(sum1, 0.) == false ) || (double_equals(sum2,1) == false && double_equals(sum2 ,0.) == false ))
+  {
+    bool equalitu = (sum1 == 1);
+    std::cout << " oOo " << sum1 << "|" << equalitu << " oOo " << sum2 << std::endl;
+    throw std::runtime_error("entering sum not equal to 1");
+  }
+
+  bool nanhere = false;
+  for(auto LAB:labprop1)
+    if(std::isfinite(LAB) == false)
+    {
+      nanhere = true;
+      std::cout << "NANLAB at label_prop1" << std::endl;
+    }
+  for(auto LAB:labprop2)
+    if(std::isfinite(LAB) == false)
+    {
+      nanhere = true;
+      std::cout << "NANLAB at label_prop2" << std::endl;
+    }
+
+  if(nanhere)
+    throw std::runtime_error("NANHERE IN MIXING PROP");
+  
+
+  std::vector<double> output(labprop1.size());
+
+  double divider = prop_tot;
+  for(size_t i=0; i<labprop1.size(); i++)
+  {
+    output[i] = std::abs(labprop1[i] + labprop2[i]) ;///prop_tot;
+    // std::cout << divider << "|" << labprop1[i] << "|" << labprop2[i] << std::endl;
+
+    // divider += output[i];
+  }
+
+
+  double sumfin = 0;
+  for(size_t i=0; i<labprop1.size(); i++)
+  {
+    // output[i] = output[i]/divider;
+    sumfin += output[i];
+  }
+
+  while(double_equals(sumfin,1) == false)
+  {
+    if(std::isfinite(sumfin) == false)
+    {
+      std::cout << std::endl << prop_tot << std::endl;
+      throw std::runtime_error("Nansum in prop");
+    }
+    // std::cout << sumfin << "<->";
+    // throw std::runtime_error("out sum not equal to 1");
+    // double delta = abs(1 - sumfin);
+    double new_sumfin = 0;
+    for(auto& gag:output)
+    {
+      gag = gag/sumfin;
+      new_sumfin += gag;
+    }
+    sumfin = new_sumfin;
+    // std::cout << sumfin << std::endl;
+    // for(auto lab:coplab1)
+    //   std::cout << lab << "|";
+    // std::cout << "||";
+    // for(auto lab:coplab2)
+    //   std::cout << lab << "|";
+    // std::cout << std::endl;
+  }
+
+
+  return output;
+}
 
 
 

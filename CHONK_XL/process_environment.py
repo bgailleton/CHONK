@@ -250,19 +250,12 @@ class CoreModel:
 	@xs.runtime(args='step_delta')
 	def run_step(self, dt):
 
-		print("sdlkfja0")
 		self.model.update_timestep(dt)
-		print("sdlkfja1")
 		self.model.update_array_double_param("surface_elevation", np.copy(self.model.get_array_double_param("surface_elevation_tp1")) )
-		print("sdlkfja2")
 		self.model.update_array_double_param("sed_height", np.copy(self.model.get_array_double_param("sed_height_tp1")) )
-		print("sdlkfja3")
 		self.model.initiate_nodegraph()
-		print("sdlkfja4")
 		self.model.run()
-		print("sdlkfja5")
 		self.model.add_external_to_double_array("surface_elevation_tp1",self.uplift * dt)
-		print("sdlkfja6")
 
 	@topo.compute
 	def _topo(self):

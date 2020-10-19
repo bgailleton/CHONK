@@ -115,7 +115,7 @@ class Lake
     );
 
     // this function add sediment volume to the lake 
-    void pour_sediment_into_lake(double sediment_volume);
+    void pour_sediment_into_lake(double sediment_volume, std::vector<double> label_prop);
 
     // Core function of the lake dynamic: it pour water in the lake, empty or already bearing water
     // It also detects if the lake has an outlet, and save its value if it does
@@ -183,6 +183,7 @@ class Lake
     std::vector<int> get_ingested_lakes(){return ingested_lakes;}
     // Return the representative chonk of the lake, bearing its water flux and its sediment flux
     chonk& get_outletting_chonk(){return outlet_chonk;};
+    std::vector<double> get_lake_lab_prop(){return lake_label_prop;};
 
     void drape_deposition_flux_to_chonks(std::vector<chonk>& chonk_network, xt::pytensor<double,1>& surface_elevation, double timestep);
 
@@ -206,6 +207,8 @@ class Lake
 
     // outlet fluxes, representative particule holding lakes characteristic in order to propagate it downstream
     chonk outlet_chonk;
+
+    std::vector<double> lake_label_prop;
 
     // the index of the lake which ate this one
     int has_been_ingeted;
@@ -378,7 +381,6 @@ class ModelRunner
     
     void add_to_sediment_tracking(int index, double height, std::vector<double> label_prop, double sed_depth_here);
 
-    std::vector<double> mix_two_proportions(double prop1, std::vector<double> labprop1, double prop2, std::vector<double> labprop2);
 
     void add_external_to_double_array(std::string key,xt::pytensor<double,1>& adder){this->io_double_array[key] += adder;}
 
@@ -460,6 +462,8 @@ class ModelRunner
      
 
 };// End of ModelRunner
+
+
 
 
 // Ignore that at the moment
