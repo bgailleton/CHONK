@@ -328,6 +328,9 @@ class ModelRunner
 
     xt::pytensor<double,2> get_superficial_layer_sediment_prop();
 
+    xt::pytensor<int,1> get_lake_ID_array_raw();
+    xt::pytensor<int,1> get_lake_ID_array();
+    xt::pytensor<int,1> get_mstack_checker();
 
 
     // DEBUGGING FUNCTIONS

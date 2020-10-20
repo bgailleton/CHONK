@@ -64,6 +64,16 @@ class Topography:
 	surface_elevation = xs.variable(intent = 'out', dims = ('node'), description = "The surface topography initialised as random noise")
 	sed_height = xs.variable(intent = 'out', dims = ('node'), description = "initial non-layer of sediments")
 
+
+@xs.process
+class CustomInitialSurface(Topography):
+	this_surface_elevation = xs.variable(intent = 'inout', dims = ('node'), description = "The surface topography initialised as random noise")
+	def initialize(self):
+		self.surface_elevation = self.this_surface_elevation
+		self.surface_elevation[self.active_nodes == 0] = 0
+		self.sed_height = np.zeros_like(self.surface_elevation)
+
+
 @xs.process
 class RandomInitialSurface(Topography):
 	"""
@@ -211,6 +221,8 @@ class CoreModel:
 	E_r = xs.on_demand(dims = ('y','x'))
 	E_s = xs.on_demand(dims = ('y','x'))
 	sed_div = xs.on_demand(dims = ('y','x'))
+	lake_id_raw = xs.on_demand(dims = ('y','x'))
+	mstack_checker = xs.on_demand(dims = ('y','x'))
 	
 
 	def initialize(self):
@@ -279,6 +291,11 @@ class CoreModel:
 		lake = np.abs(lake)
 		lake[lake<=0] = np.nan
 		return lake
+	@lake_id_raw.compute
+	def _lake_id_raw(self):
+		lake = self.model.get_lake_ID_array_raw().reshape(self.ny,self.nx)
+		return lake
+
 
 	@HS.compute
 	def _HS(self):
@@ -315,8 +332,9 @@ class CoreModel:
 	def _sed_div(self):
 		return self.model.get_sediment_creation_flux().reshape(self.ny,self.nx)
 
-
-
+	@mstack_checker.compute
+	def _mstack_checker(self):
+		return self.model.get_mstack_checker().reshape(self.ny,self.nx)
 
 
 

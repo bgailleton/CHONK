@@ -676,8 +676,9 @@ void chonk::set_sediment_flux(double value, std::vector<double> label_proportion
 {
   if(value< 0)
   {
-    std::cout << value << std::endl;
-    throw std::runtime_error("SETTER sed to neg>>");
+    std::cout << " WARNING:negsed:" <<  value << std::endl;
+    value = 0;
+    // throw std::runtime_error("SETTER sed to neg>>");
   }
 
   this->sediment_flux = value;

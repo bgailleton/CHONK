@@ -86,6 +86,9 @@ PYBIND11_MODULE(CHONK_cpp, m)
       .def("get_erosion_bedrock_only_flux", &ModelRunner::get_erosion_bedrock_only_flux)
       .def("get_erosion_sed_only_flux", &ModelRunner::get_erosion_sed_only_flux)
       .def("get_sediment_creation_flux", &ModelRunner::get_sediment_creation_flux)
+      .def("get_lake_ID_array_raw", &ModelRunner::get_lake_ID_array_raw)
+      .def("get_lake_ID_array", &ModelRunner::get_lake_ID_array)
+      .def("get_mstack_checker", &ModelRunner::get_mstack_checker)
 
     ;
     m.def("set_DEBUG_switch_nodegraph",set_DEBUG_switch_nodegraph);
