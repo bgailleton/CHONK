@@ -1762,10 +1762,10 @@ void Lake::pour_water_in_lake(
   )
 { 
 
-  // std:: cout << "Pouring " << water_volume << " water (rate = " << water_volume/dt << ") into " << this->lake_id << std::endl;
+  std:: cout << "Pouring " << water_volume << " water (rate = " << water_volume/dt << ") into " << this->lake_id << std::endl;
 
 
-  // std::cout << "Entering water volume is " << water_volume << " hence water flux is " <<  water_volume/dt << std::endl;
+  std::cout << "Entering water volume is " << water_volume << " hence water flux is " <<  water_volume/dt << std::endl;
   double save_entering_water = water_volume;
   double save_preexistingwater = this->volume;
   int n_labels = int(chonk_network[originode].get_other_attribute_array("label_tracker").size());
@@ -1874,8 +1874,8 @@ void Lake::pour_water_in_lake(
     this->n_nodes ++;
     // At this point I either have enough water to carry on or I stop the process
   }
-  // std::cout << "After raw filling lake water volume is " << water_volume << " hence water flux is " <<  water_volume/dt << std::endl;
-  // std::cout << "outletting in " << this->outlet_node << std::endl;;
+  std::cout << "After raw filling lake water volume is " << water_volume << " hence water flux is " <<  water_volume/dt << std::endl;
+  std::cout << "Outletting in " << this->outlet_node << std::endl;;
 
   // if(this->outlet_node>=0)
   // {

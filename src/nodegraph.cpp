@@ -416,6 +416,7 @@ void NodeGraphV2::compute_receveivers_and_donors(xt::pytensor<bool,1>& active_no
     }
     std::vector<int> receivers,donors;
     std::vector<double> length2rec,length2don;
+
     int checker;
     if(i<ncols)
       checker = 1;
@@ -434,6 +435,7 @@ void NodeGraphV2::compute_receveivers_and_donors(xt::pytensor<bool,1>& active_no
     double SS = std::numeric_limits<double>::min();
     int SSid = -1;
     int idL = -1;
+    bool potential_flat = false;
     for(auto& adder:this->neightbourer[checker])
     {
       int node = i+adder;
@@ -455,11 +457,15 @@ void NodeGraphV2::compute_receveivers_and_donors(xt::pytensor<bool,1>& active_no
         donors.push_back(node);
         length2don.push_back(this->lengthener[idL]);
       }
+      else if (test_elev == this_elev)
+        potential_flat = true;
     }
+
     this->graph[i].receivers = receivers;
     this->graph[i].donors = donors;
     this->graph[i].length2rec = length2rec;
     this->graph[i].length2don = length2don;
+
     if(SSid>=0)
     {  
       this->graph[i].Sreceivers = SSid;
@@ -467,13 +473,74 @@ void NodeGraphV2::compute_receveivers_and_donors(xt::pytensor<bool,1>& active_no
     }
     else
     {
-      this->graph[i].Sreceivers = i;
+      // In this cases I am first checking if I need to resolve flat surfaces
+      if(potential_flat)
+      {
+        // flat solver here
+        std::queue<int> HighEdge,LowEdge;
+        std::vector<int> this_flat_surface_node = this->identify_flat(int(i), elevation, active_nodes, checker, HighEdge,LowEdge);
+      }
+      else
+        this->graph[i].Sreceivers = i;
     }
 
   }
 
 
 }
+
+
+std::vector<int> NodeGraphV2::identify_flat(int starting_node, xt::pytensor<double,1>& elevation,xt::pytensor<bool,1>& active_nodes, int checker,  std::queue<int>& HighEdge, std::queue<int>& LowEdge )
+{
+  std::vector<int> output;
+  std::set<int> is_queued;
+  std::queue<int> Quack;Quack.push(starting_node);
+  is_queued.insert(starting_node);
+  output.push_back(starting_node);
+
+  double checkelev = elevation[starting_node];
+  bool is_LE = false, is_HE = false;
+
+  while(Quack.size() >0)
+  {
+    int next_node = Quack.front();
+    Quack.pop();
+    for(auto& adder:this->neightbourer[checker])
+    {
+      int node = next_node+adder;
+
+      if(elevation[node]>checkelev)
+        is_HE = true;
+      if(elevation[node]<checkelev)
+        is_LE = true;
+
+      if(elevation[node]!=checkelev)
+        continue;
+
+      if(is_queued.find(node) != is_queued.end())
+        continue;
+
+      Quack.push(node);
+      is_queued.insert(node);
+      output.push_back(node);
+
+    }
+
+    if(active_nodes[next_node])
+      is_LE = true;
+
+    if(is_LE)
+      LowEdge.push(next_node);
+    else if(is_HE)
+      HighEdge.push(next_node);
+
+  }
+
+  return output;
+    
+
+}
+
 
 void NodeGraphV2::recompute_multi_receveivers_and_donors(xt::pytensor<bool,1>& active_nodes, xt::pytensor<double,1>& elevation, std::vector<int>& nodes_to_compute)
 {
@@ -1306,6 +1373,25 @@ void NodeGraphV2::_update_pits_receivers(xt::pytensor<int,2>& conn_basins,xt::py
     // }
   }
 }
+
+
+
+
+//                         . - ~ ~ ~ - .
+//       ..     _      .-~               ~-.
+//      //|     \ `..~                      `.
+//     || |      }  }              /       \  \
+// (\   \\ \~^..'                 |         }  \
+//  \`.-~  o      /       }       |        /    \
+//  (__          |       /        |       /      `.
+//   `- - ~ ~ -._|      /_ - ~ ~ ^|      /- _      `.
+//               |     /          |     /     ~-.     ~- _
+//               |_____|          |_____|         ~ - . _ _~_-_
+
+
+
+
+
 
 
 

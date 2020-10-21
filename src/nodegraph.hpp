@@ -182,6 +182,11 @@ std::vector<std::vector<int> > get_mstree_translated(){return this->mstree_trans
 
 void recompute_multi_receveivers_and_donors(xt::pytensor<bool,1>& active_nodes, xt::pytensor<double,1>& elevation, std::vector<int>& nodes_to_compute);
 
+// Flat surface resolver
+std::vector<int> identify_flat(int starting_node, xt::pytensor<double,1>& elevation,xt::pytensor<bool,1>& active_nodes, int checker,  std::queue<int>& HighEdge, std::queue<int>& LowEdge );
+
+
+
 protected:
 
   // Node graph: vector of all vertexes in the DEM

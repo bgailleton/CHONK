@@ -267,7 +267,7 @@ class CoreModel:
 
 	@xs.runtime(args='step_delta')
 	def run_step(self, dt):
-
+		# print("Running", dt)
 		self.model.update_timestep(dt)
 		self.model.update_array_double_param("surface_elevation", np.copy(self.model.get_array_double_param("surface_elevation_tp1")) )
 		self.model.update_array_double_param("sed_height", np.copy(self.model.get_array_double_param("sed_height_tp1")) )
