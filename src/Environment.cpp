@@ -72,10 +72,10 @@ void ModelRunner::create(double ttimestep, std::vector<std::string> tordered_flu
   // Initialising the labelling stuff
   this->initialise_intcorrespondance();
   this->prepare_label_to_list_for_processes(); 
-  Qw_in = 0;
-  Qw_out = 0;
-  Ql_in = 0;
-  Ql_out = 0;
+  this->Qw_in = 0;
+  this->Qw_out = 0;
+  this->Ql_in = 0;
+  this->Ql_out = 0;
 }
 
 // initialising the node graph and the chonk network
@@ -126,10 +126,10 @@ this->io_int["n_rows"], this->io_int["n_cols"]);
   }
 
   // Initialising water balance
-  Qw_in = 0;
-  Qw_out = 0;
-  Ql_in = 0;
-  Ql_out = 0;
+  this->Qw_in = 0;
+  this->Qw_out = 0;
+  this->Ql_in = 0;
+  this->Ql_out = 0;
 
   // Stuff
   // I NEED TO WORK ON THAT PART YO
@@ -1398,9 +1398,11 @@ void ModelRunner::process_inherited_water()
       {
         double this_elevation  = surface_elevation[node] + tlake.get_lake_depth_at_node(node, node_in_lake);
         double delta_elevation = this_elevation - min_elev;
-        lake_depth[node] -= delta_elevation;
+
+        // correcting the new remaining lake depth. I am not jsut applying the delta elevation because there can be some lake-bed elevation change too!
+        lake_depth[node] = surface_elevation[node] -  min_elev;
         double tvolume = delta_elevation * this->io_double["dx"] * this->io_double["dy"];
-        tlake.set_lake_depth_at_node(node, min_elev);
+        tlake.set_lake_depth_at_node(node, surface_elevation[node] -  min_elev);
         volume_to_transfer += tvolume;
       }
 
