@@ -224,6 +224,12 @@ class CoreModel:
 	lake_id_raw = xs.on_demand(dims = ('y','x'))
 	mstack_checker = xs.on_demand(dims = ('y','x'))
 	
+	Qw_in = xs.on_demand()
+	Qw_out = xs.on_demand()
+	Ql_in = xs.on_demand()
+	Ql_out = xs.on_demand()
+	water_balance_checker = xs.on_demand()
+	
 
 	def initialize(self):
 
@@ -338,10 +344,23 @@ class CoreModel:
 
 
 
+	@Qw_in.compute
+	def _Qw_in(self):
+		return self.model.get_Qw_in()
+	@Qw_out.compute
+	def _Qw_out(self):
+		return self.model.get_Qw_out()
+	@Ql_in.compute
+	def _Ql_in(self):
+		return self.model.get_Ql_in()
+	@Ql_out.compute
+	def _Ql_out(self):
+		return self.model.get_Ql_out()
 
 
-
-
+	@water_balance_checker.compute
+	def _water_balance_checker(self):
+		return self.model.get_Qw_in() - self.model.get_Qw_out() + self.model.get_Ql_in() - self.model.get_Ql_out()
 
 
 

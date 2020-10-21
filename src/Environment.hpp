@@ -388,6 +388,11 @@ class ModelRunner
     void add_external_to_double_array(std::string key,xt::pytensor<double,1>& adder){this->io_double_array[key] += adder;}
 
 
+    double get_Qw_in() {return Qw_in;};
+    double get_Qw_out() {return Qw_out;};
+    double get_Ql_in() {return Ql_in;};
+    double get_Ql_out() {return Ql_out;};
+
 
   protected:
 
@@ -456,6 +461,9 @@ class ModelRunner
     // Discretisation of sediment height
     std::vector<bool> is_there_sed_here;
     std::map<int, std::vector<std::vector<double> > > sed_prop_by_label;
+
+    // Parameters dealing with mass balance checks
+    double Qw_in, Qw_out, Ql_in, Ql_out;
 
 
   private:

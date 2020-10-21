@@ -89,6 +89,10 @@ PYBIND11_MODULE(CHONK_cpp, m)
       .def("get_lake_ID_array_raw", &ModelRunner::get_lake_ID_array_raw)
       .def("get_lake_ID_array", &ModelRunner::get_lake_ID_array)
       .def("get_mstack_checker", &ModelRunner::get_mstack_checker)
+      .def("get_Qw_in", &ModelRunner::get_Qw_in)
+      .def("get_Qw_out", &ModelRunner::get_Qw_out)
+      .def("get_Ql_in", &ModelRunner::get_Ql_in)
+      .def("get_Ql_out", &ModelRunner::get_Ql_out)
 
     ;
     m.def("set_DEBUG_switch_nodegraph",set_DEBUG_switch_nodegraph);
