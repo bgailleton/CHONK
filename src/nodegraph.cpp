@@ -414,8 +414,8 @@ void NodeGraphV2::compute_receveivers_and_donors(xt::pytensor<bool,1>& active_no
       this->graph[i].Sreceivers = i;
       continue;
     }
-    std::vector<int> receivers,donors;
-    std::vector<double> length2rec,length2don;
+    // std::vector<int> receivers,donors;
+    // std::vector<double> length2rec,length2don;
 
     int checker;
     if(i<ncols)
@@ -443,8 +443,8 @@ void NodeGraphV2::compute_receveivers_and_donors(xt::pytensor<bool,1>& active_no
       test_elev = elevation[node];
       if(test_elev<this_elev)
       {
-        receivers.push_back(node);
-        length2rec.push_back(this->lengthener[idL]);
+        this->graph[i].receivers.push_back(node);
+        this->graph[i].length2rec.push_back(this->lengthener[idL]);
         double slope = (this_elev - test_elev)/ this->lengthener[idL];
         if(slope>SS)
         {
@@ -454,17 +454,17 @@ void NodeGraphV2::compute_receveivers_and_donors(xt::pytensor<bool,1>& active_no
       }
       else if(test_elev>this_elev)
       {
-        donors.push_back(node);
-        length2don.push_back(this->lengthener[idL]);
+        this->graph[i].donors.push_back(node);
+        this->graph[i].length2don.push_back(this->lengthener[idL]);
       }
       else if (test_elev == this_elev)
         potential_flat = true;
     }
 
-    this->graph[i].receivers = receivers;
-    this->graph[i].donors = donors;
-    this->graph[i].length2rec = length2rec;
-    this->graph[i].length2don = length2don;
+    // this->graph[i].receivers = receivers;
+    // this->graph[i].donors = donors;
+    // this->graph[i].length2rec = length2rec;
+    // this->graph[i].length2don = length2don;
 
     if(SSid>=0)
     {  
@@ -478,7 +478,24 @@ void NodeGraphV2::compute_receveivers_and_donors(xt::pytensor<bool,1>& active_no
       {
         // flat solver here
         std::queue<int> HighEdge,LowEdge;
-        std::vector<int> this_flat_surface_node = this->identify_flat(int(i), elevation, active_nodes, checker, HighEdge,LowEdge);
+        std::vector<bool> is_high_edge,is_low_edge;
+        std::map<int,int>  this_flat_surface_node_index;
+        
+        std::vector<int> this_flat_surface_node = this->Barnes2014_identify_flat(int(i), elevation, active_nodes, checker, HighEdge, LowEdge, 
+          is_high_edge, is_low_edge, this_flat_surface_node_index);
+
+        std::vector<int> flat_mask(this_flat_surface_node.size(),0.);
+
+        int max_lab = -9999;
+
+        Barnes2014_AwayFromHigh( flat_mask, this_flat_surface_node, this_flat_surface_node_index,
+ checker, HighEdge,  elevation, elevation[int(i)], is_high_edge,  max_lab);
+
+        Barnes2014_TowardsLower( flat_mask, this_flat_surface_node, this_flat_surface_node_index,
+ checker, LowEdge, elevation, elevation[int(i)], is_low_edge,  max_lab);
+
+        // I need now to finish this part!!!
+
       }
       else
         this->graph[i].Sreceivers = i;
@@ -490,7 +507,8 @@ void NodeGraphV2::compute_receveivers_and_donors(xt::pytensor<bool,1>& active_no
 }
 
 
-std::vector<int> NodeGraphV2::identify_flat(int starting_node, xt::pytensor<double,1>& elevation,xt::pytensor<bool,1>& active_nodes, int checker,  std::queue<int>& HighEdge, std::queue<int>& LowEdge )
+std::vector<int> NodeGraphV2::Barnes2014_identify_flat(int starting_node, xt::pytensor<double,1>& elevation,xt::pytensor<bool,1>& active_nodes, int checker,  
+  std::queue<int>& HighEdge, std::queue<int>& LowEdge, std::vector<bool>& is_high_edge, std::vector<bool>& is_low_edge, std::map<int,int>&  this_flat_surface_node_index)
 {
   std::vector<int> output;
   std::set<int> is_queued;
@@ -498,8 +516,13 @@ std::vector<int> NodeGraphV2::identify_flat(int starting_node, xt::pytensor<doub
   is_queued.insert(starting_node);
   output.push_back(starting_node);
 
+  is_low_edge.push_back(false);
+  is_high_edge.push_back(false);
+  this_flat_surface_node_index[starting_node] = 0;
+
   double checkelev = elevation[starting_node];
   bool is_LE = false, is_HE = false;
+  int index = 1;
 
   while(Quack.size() >0)
   {
@@ -507,7 +530,7 @@ std::vector<int> NodeGraphV2::identify_flat(int starting_node, xt::pytensor<doub
     Quack.pop();
     for(auto& adder:this->neightbourer[checker])
     {
-      int node = next_node+adder;
+      int node = next_node + adder;
 
       if(elevation[node]>checkelev)
         is_HE = true;
@@ -523,6 +546,10 @@ std::vector<int> NodeGraphV2::identify_flat(int starting_node, xt::pytensor<doub
       Quack.push(node);
       is_queued.insert(node);
       output.push_back(node);
+      is_low_edge.push_back(false);
+      is_high_edge.push_back(false);
+      this_flat_surface_node_index[node] = index;
+      index++;
 
     }
 
@@ -530,14 +557,125 @@ std::vector<int> NodeGraphV2::identify_flat(int starting_node, xt::pytensor<doub
       is_LE = true;
 
     if(is_LE)
+    {
       LowEdge.push(next_node);
+      is_low_edge[this_flat_surface_node_index[next_node]] = true;
+    }
     else if(is_HE)
+    {
       HighEdge.push(next_node);
+      is_high_edge[this_flat_surface_node_index[next_node]] = true;
+    }
 
   }
 
   return output;
     
+
+}
+
+void NodeGraphV2::Barnes2014_AwayFromHigh(std::vector<int>& flat_mask, std::vector<int>& this_flat_surface_node, std::map<int,int>& this_flat_surface_node_index,
+ int checker, std::queue<int>& HighEdge, xt::pytensor<double,1>& elevation, double elev_check, std::vector<bool>& is_high_edge, int& max_lab)
+{
+  int score = 1;
+  int marker = -9999;
+  HighEdge.push(marker);
+  bool keep_going = true, last_one_was_marker = false;
+
+  while(keep_going)
+  {
+    int next_node = HighEdge.front(); HighEdge.pop();
+    if(next_node == marker)
+    {
+      if(last_one_was_marker)
+      {
+        keep_going = false;
+        break;
+      }
+
+      score ++;
+      last_one_was_marker = true;
+      HighEdge.push(marker);
+    }
+    else
+    {
+      int index = this_flat_surface_node[next_node];
+      flat_mask[index] = score;
+      max_lab = score;
+      for(auto& adder:this->neightbourer[checker])
+      {
+        int node = next_node + adder;
+
+        if(elevation[node] != elev_check)
+          continue;
+
+        index = this_flat_surface_node_index[node];
+
+        if(is_high_edge[index])
+          continue;
+        HighEdge.push(node);
+        is_high_edge[index] = true;
+      }
+
+    }
+  }
+
+
+}
+
+void NodeGraphV2::Barnes2014_TowardsLower(std::vector<int>& flat_mask, std::vector<int>& this_flat_surface_node, std::map<int,int>& this_flat_surface_node_index,
+ int checker, std::queue<int>& LowEdge, xt::pytensor<double,1>& elevation, double elev_check, std::vector<bool>& is_low_edge, int max_lab)
+{
+  int score = 1;
+  int marker = -9999;
+  LowEdge.push(marker);
+  bool keep_going = true, last_one_was_marker = false;
+  for (auto& val:flat_mask)
+    val = -val;
+
+  while(keep_going)
+  {
+    int next_node = LowEdge.front(); LowEdge.pop();
+    if(next_node == marker)
+    {
+      if(last_one_was_marker)
+      {
+        keep_going = false;
+        break;
+      }
+
+      score ++;
+      last_one_was_marker = true;
+      LowEdge.push(marker);
+    }
+    else
+    {
+      int index = this_flat_surface_node_index[next_node];
+      if(flat_mask[index]>0)
+        continue;
+      if(flat_mask[index] < 0)
+        flat_mask[index] = max_lab + flat_mask[index] + 2 * score;
+      else
+        flat_mask[index] = 2 * score;
+
+      for(auto& adder:this->neightbourer[checker])
+      {
+        int node = next_node + adder;
+
+        if(elevation[node] != elev_check)
+          continue;
+
+        index = this_flat_surface_node_index[node];
+
+        if(is_low_edge[index])
+          continue;
+        LowEdge.push(node);
+        is_low_edge[index] = true;
+      }
+
+    }
+  }
+
 
 }
 

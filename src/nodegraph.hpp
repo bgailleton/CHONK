@@ -183,9 +183,14 @@ std::vector<std::vector<int> > get_mstree_translated(){return this->mstree_trans
 void recompute_multi_receveivers_and_donors(xt::pytensor<bool,1>& active_nodes, xt::pytensor<double,1>& elevation, std::vector<int>& nodes_to_compute);
 
 // Flat surface resolver
-std::vector<int> identify_flat(int starting_node, xt::pytensor<double,1>& elevation,xt::pytensor<bool,1>& active_nodes, int checker,  std::queue<int>& HighEdge, std::queue<int>& LowEdge );
+std::vector<int> Barnes2014_identify_flat(int starting_node, xt::pytensor<double,1>& elevation,xt::pytensor<bool,1>& active_nodes, int checker,  
+  std::queue<int>& HighEdge, std::queue<int>& LowEdge, std::vector<bool>& is_high_edge, std::vector<bool>& is_low_edge, std::map<int,int>&  this_flat_surface_node_index);
 
+void Barnes2014_AwayFromHigh(std::vector<int>& flat_mask, std::vector<int>& this_flat_surface_node, std::map<int,int>& this_flat_surface_node_index,
+ int checker, std::queue<int>& HighEdge, xt::pytensor<double,1>& elevation, double elev_check, std::vector<bool>& is_high_edge, int& max_lab);
 
+void Barnes2014_TowardsLower(std::vector<int>& flat_mask, std::vector<int>& this_flat_surface_node, std::map<int,int>& this_flat_surface_node_index,
+ int checker, std::queue<int>& LowEdge, xt::pytensor<double,1>& elevation, double elev_check, std::vector<bool>& is_low_edge, int max_lab);
 
 protected:
 
