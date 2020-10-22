@@ -488,13 +488,52 @@ void NodeGraphV2::compute_receveivers_and_donors(xt::pytensor<bool,1>& active_no
 
         int max_lab = -9999;
 
-        Barnes2014_AwayFromHigh( flat_mask, this_flat_surface_node, this_flat_surface_node_index,
+        this->Barnes2014_AwayFromHigh( flat_mask, this_flat_surface_node, this_flat_surface_node_index,
  checker, HighEdge,  elevation, elevation[int(i)], is_high_edge,  max_lab);
 
-        Barnes2014_TowardsLower( flat_mask, this_flat_surface_node, this_flat_surface_node_index,
- checker, LowEdge, elevation, elevation[int(i)], is_low_edge,  max_lab);
+        if(LowEdge.size()>0)
+        {
+          this->Barnes2014_TowardsLower( flat_mask, this_flat_surface_node, this_flat_surface_node_index,
+              checker, LowEdge, elevation, elevation[int(i)], is_low_edge,  max_lab);
+        }
+        else
+        {
+          for(auto& val:flat_mask)
+            val = std::abs(val - max_lab);
+        }
 
-        // I need now to finish this part!!!
+        for(size_t j = 0 ; j < this_flat_surface_node.size() ; j++)
+        {
+          int node = this_flat_surface_node[j];
+          bool SS_done = false;
+          int idL = -1;
+
+          for(auto& adder:this->neightbourer[checker])
+          {
+            int next = node + adder;
+            idL ++;
+            if(elevation[node] != elevation[int(i)])
+              continue;
+
+            if(flat_mask[this_flat_surface_node_index[node]] > flat_mask[this_flat_surface_node_index[next]] )
+            {
+              this->graph[node].receivers.push_back(node);
+              this->graph[node].length2rec.push_back(this->lengthener[idL]);
+              if(SS_done == false)
+              {
+                SS_done = true;
+                this->graph[node].Sreceivers = next;
+                this->graph[next].Sdonors.push_back(node);
+              }
+
+            }
+            else if(flat_mask[this_flat_surface_node_index[node]] < flat_mask[this_flat_surface_node_index[next]] )
+            {
+              this->graph[node].donors.push_back(next);
+              this->graph[node].length2don.push_back(this->lengthener[idL]);
+            }
+          }
+        }
 
       }
       else
