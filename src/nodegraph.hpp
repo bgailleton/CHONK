@@ -34,6 +34,7 @@
 void set_DEBUG_switch_nodegraph(std::vector<std::string> params, std::vector<bool> values );
 
 
+
 // Vertx class: A class that manage one vertex: a node, its ID, receivers, length, donors, ...
 // Anything useful to generate a graph
 class Vertex 
@@ -192,6 +193,9 @@ void Barnes2014_AwayFromHigh(std::vector<int>& flat_mask, std::vector<int>& this
 void Barnes2014_TowardsLower(std::vector<int>& flat_mask, std::vector<int>& this_flat_surface_node, std::map<int,int>& this_flat_surface_node_index,
  int checker, std::queue<int>& LowEdge, xt::pytensor<double,1>& elevation, double elev_check, std::vector<char>& is_low_edge, int max_lab);
 
+
+xt::pytensor<int,1> get_flat_mask(){return flat_mask;};
+
 protected:
 
   // Node graph: vector of all vertexes in the DEM
@@ -232,6 +236,9 @@ protected:
   // helpers
   std::vector<std::vector<int> > neightbourer;
   std::vector<double> lengthener;
+
+  // DEBUGGUER
+  xt::pytensor<int,1> flat_mask;
 
 };
 

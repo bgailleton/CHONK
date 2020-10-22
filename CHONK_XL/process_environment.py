@@ -223,6 +223,7 @@ class CoreModel:
 	sed_div = xs.on_demand(dims = ('y','x'))
 	lake_id_raw = xs.on_demand(dims = ('y','x'))
 	mstack_checker = xs.on_demand(dims = ('y','x'))
+	flat_mask = xs.on_demand(dims = ('y','x'))
 	
 	Qw_in = xs.on_demand()
 	Qw_out = xs.on_demand()
@@ -362,6 +363,9 @@ class CoreModel:
 	def _water_balance_checker(self):
 		return self.model.get_Qw_in() - self.model.get_Qw_out() + self.model.get_Ql_in() - self.model.get_Ql_out()
 
+	@flat_mask.compute
+	def _flat_mask(self):
+		return self.model.get_flat_mask().reshape(self.ny,self.nx);
 
 
 

@@ -71,6 +71,8 @@ NodeGraphV2::NodeGraphV2(
   this->nrows = nrows;
   this->ncols = ncols;
 
+  this->flat_mask = xt::zeros<int>({this->un_element}) - 1;
+
   // these vectors are additioned to the node indice to test the neighbors
   this->neightbourer.push_back({-ncols - 1, - ncols, - ncols + 1, -1,1,ncols - 1, ncols, ncols + 1 }); // internal node 0
   this->neightbourer.push_back({(nrows - 1) * ncols - 1, (nrows - 1) * ncols, (nrows - 1) * ncols + 1, -1,1,ncols - 1, ncols, ncols + 1 });// periodic_first_row 1
@@ -91,16 +93,13 @@ NodeGraphV2::NodeGraphV2(
 
   // computing receivers and donors information, multi and SS flow
   this->compute_receveivers_and_donors(active_nodes,elevation);
-  std::cout << "hereA" << std::endl;
   // computing the original Single flow topological order
   this->Sstack = xt::zeros<int>({this->n_element});
   this->compute_stack();
-  std::cout << "hereB" << std::endl;
 
   // Computing basin info from stack
   this->compute_basins(active_nodes);
   this->compute_pits(active_nodes);
-  std::cout << "hereC" << std::endl;
 
   //# Iterating through the nodes on the stack to gather all the pits
   for(auto node:this->Sstack)
@@ -112,7 +111,6 @@ NodeGraphV2::NodeGraphV2(
     }
   }
 
-  std::cout << "hereD" << std::endl;
 
     // Now I am labelling my basins
   //# Initialising the vector of basin labels
@@ -129,10 +127,8 @@ NodeGraphV2::NodeGraphV2(
     }
     basin_labels[node] = label;
   }
-  std::cout << "hereE" << std::endl;
 
   this->correct_flowrouting(active_nodes, elevation);
-  std::cout << "hereF" << std::endl;
 
 
   // Initialising the node graph, a vector of Vertexes with their edges
@@ -176,7 +172,6 @@ NodeGraphV2::NodeGraphV2(
     // // Constructing the vertex in place in the vector. More efficient according to the internet
     // graph.emplace_back(Vertex(i,false1,false2,donors,receivers,length2rec));
   }
-  std::cout << "hereG" << std::endl;
 
   // Now I am correcting my outlet nodes:
   // The idea is to force any of its node to be directed to the next basin and avoid any cyclicity. 
@@ -202,7 +197,7 @@ NodeGraphV2::NodeGraphV2(
     }
     // Security check
     if(new_rec.size()==0 && active_nodes[this_node_to_check] == 1 )
-      throw std::runtime_error("At node " + std::to_string(this_node_to_check) + " no receivers after corrections! it came from pit " + std::to_string(origin_pit[i]));
+      throw std::runtime_error("At node " + std::to_string(this_node_to_check) + " no receivers after corrections! it came from pit " + std::to_string(origin_pit[i]) +" and flat mask is " + std::to_string(this->flat_mask[this_node_to_check]));
     // Correcting the rec
     this->graph[this_node_to_check].receivers = new_rec;
     this->graph[this_node_to_check].length2rec = new_length;
@@ -211,7 +206,6 @@ NodeGraphV2::NodeGraphV2(
   // I am now ready to create my topological order utilising a c++ port of the fortran algorithm from Jean Braun
   bool has_failed = false;
   Mstack = xt::adapt(multiple_stack_fastscape( n_element, graph, this->not_in_stack, has_failed));
-  std::cout << "hereH" << std::endl;
 
 
   // DEBUG CHECKING
@@ -244,12 +238,12 @@ NodeGraphV2::NodeGraphV2(
     // // Correcting the Vertex inplace
     // graph[node_to_check[i]].receivers = rec;
   }
-  std::cout << "hereK" << std::endl;
 
   // Last step: implementing the index in the stack
   this->index_in_Mstack = xt::zeros<int>({this->n_element});
   for(int i = 0; i< this->n_element ; i++)
     this->index_in_Mstack[this->Mstack[i]] = i;
+
   
   //Done
 
@@ -414,9 +408,12 @@ void NodeGraphV2::compute_receveivers_and_donors(xt::pytensor<bool,1>& active_no
 
 void NodeGraphV2::compute_receveivers_and_donors(xt::pytensor<bool,1>& active_nodes, xt::pytensor<double,1>& elevation, std::vector<int>& nodes_to_compute)
 {
+  std::vector<bool> processed(nodes_to_compute.size(), false);
+  std::vector<int> node_to_check_after_flat;
 
   for(auto& i:nodes_to_compute)
   {
+    processed[i] = true;
     if(active_nodes[i] == false)
     {
       this->graph[i].Sreceivers = i;
@@ -495,46 +492,44 @@ void NodeGraphV2::compute_receveivers_and_donors(xt::pytensor<bool,1>& active_no
         std::map<int,int>  this_flat_surface_node_index;
         bool aretherelow = true;
         int bottomcounter = 0;
-        std::cout << "A" << std::endl;;
         std::vector<int> this_flat_surface_node = this->Barnes2014_identify_flat(int(i), elevation, active_nodes, checker, HighEdge, LowEdge, 
           is_high_edge, is_low_edge, this_flat_surface_node_index);
-        std::cout << "B" << std::endl;;
-
-        std::vector<int> flat_mask(this_flat_surface_node.size(),0);
+        std::vector<int> this_flat_mask(this_flat_surface_node.size(),0);
 
         int max_lab = -9999;
-        std::cout << "C" << i << "|" <<HighEdge.size() << "|" << LowEdge.size() << "|" << flat_mask.size() << "|" << this_flat_surface_node.size()<< std::endl;;
         double elev_checker = elevation[int(i)];
 
-        std::cout << "C1" << std::endl;;
+            
 
-        this->Barnes2014_AwayFromHigh( flat_mask, this_flat_surface_node, this_flat_surface_node_index,
- checker, HighEdge,  elevation, elev_checker, is_high_edge,  max_lab);
-        std::cout << "D" << std::endl;;
-
+        this->Barnes2014_AwayFromHigh( this_flat_mask, this_flat_surface_node, this_flat_surface_node_index,
+          checker, HighEdge,  elevation, elev_checker, is_high_edge,  max_lab);
+      
         if(LowEdge.size()>0)
         {
-        std::cout << "E" << std::endl;;
-          this->Barnes2014_TowardsLower( flat_mask, this_flat_surface_node, this_flat_surface_node_index,
+          this->Barnes2014_TowardsLower( this_flat_mask, this_flat_surface_node, this_flat_surface_node_index,
               checker, LowEdge, elevation, elev_checker, is_low_edge,  max_lab);
-        std::cout << "F" << std::endl;;
         }
         else
         {
           aretherelow = false;
-          for(auto& val:flat_mask)
+          for(auto& val:this_flat_mask)
             val = std::abs(val - max_lab);
         }
-        std::cout << "G" << std::endl;;
 
-        for (auto val:this_flat_surface_node)
-          std::cout << "|" << val << "|";
 
         for(size_t j = 0 ; j < this_flat_surface_node.size() ; j++)
         {
           int node = this_flat_surface_node[j];
           bool SS_done = false;
           int idL = -1;
+
+
+          this->flat_mask[node] = this_flat_mask[this_flat_surface_node_index[node]];
+
+          if(active_nodes[node] == false)
+            continue;
+
+          bool all_flat = true;
 
           for(auto adder:this->neightbourer[checker])
           {
@@ -544,9 +539,9 @@ void NodeGraphV2::compute_receveivers_and_donors(xt::pytensor<bool,1>& active_no
             if(elevation[next] != elevation[int(i)])
               continue;
 
-            if(flat_mask[this_flat_surface_node_index[node]] > flat_mask[this_flat_surface_node_index[next]] )
+            if(this_flat_mask[this_flat_surface_node_index[node]] > this_flat_mask[this_flat_surface_node_index[next]] )
             {
-              std::cout << "scuda";
+              all_flat = false;
               this->graph[node].receivers.push_back(next);
               this->graph[node].length2rec.push_back(this->lengthener[idL]);
               if(SS_done == false)
@@ -558,22 +553,15 @@ void NodeGraphV2::compute_receveivers_and_donors(xt::pytensor<bool,1>& active_no
               }
 
             }
-            else if(flat_mask[this_flat_surface_node_index[node]] < flat_mask[this_flat_surface_node_index[next]] )
+            else if(this_flat_mask[this_flat_surface_node_index[node]] < this_flat_mask[this_flat_surface_node_index[next]] )
             {
-              std::cout << "scudo";
+              all_flat = false;
               this->graph[node].donors.push_back(next);
               this->graph[node].length2don.push_back(this->lengthener[idL]);
             }
           }
-
-          if(this->graph[node].receivers.size() == 0 && aretherelow)
-          {
-            bottomcounter++;
-            std::cout << "NO REC AFTER FLAT RESOLVING " << bottomcounter << std::endl;
-            // throw std::runtime_error("NO REC AFTER FLAT RESOLVING");
-          }
-          else if( aretherelow == false)
-            bottomcounter++;
+          if(all_flat)
+            node_to_check_after_flat.push_back(node);
 
         }
 
@@ -582,6 +570,11 @@ void NodeGraphV2::compute_receveivers_and_donors(xt::pytensor<bool,1>& active_no
         this->graph[i].Sreceivers = i;
     }
 
+  }
+  for(auto i: node_to_check_after_flat)
+  {
+    if(this->graph[i].receivers.size() == 0)
+      this->graph[i].Sreceivers = i;
   }
 
 
@@ -666,21 +659,17 @@ std::vector<int> NodeGraphV2::Barnes2014_identify_flat(int starting_node, xt::py
 void NodeGraphV2::Barnes2014_AwayFromHigh(std::vector<int>& flat_mask, std::vector<int>& this_flat_surface_node, std::map<int,int>& this_flat_surface_node_index,
  int checker, std::queue<int>& HighEdge, xt::pytensor<double,1>& elevation, double elev_check, std::vector<char>& is_high_edge, int& max_lab)
 {
-  std::cout << "C0";
 
   int score = 1;
   int marker = -9999;
   HighEdge.push(marker);
   bool keep_going = true, last_one_was_marker = false;
 
-  std::cout << "C1";
   while(keep_going)
   {
     int next_node = HighEdge.front(); HighEdge.pop();
-    std::cout << "C2::" << next_node;
     if(next_node == marker)
     {
-      std::cout << "C3" ;
       if(last_one_was_marker)
       {
         keep_going = false;
@@ -690,15 +679,14 @@ void NodeGraphV2::Barnes2014_AwayFromHigh(std::vector<int>& flat_mask, std::vect
       score ++;
       last_one_was_marker = true;
       HighEdge.push(marker);
-      std::cout << "C4" ;
     }
     else
     {
-      std::cout << "C5" ;
-      int index = this_flat_surface_node[next_node];
+      last_one_was_marker = false;
+      int index = this_flat_surface_node_index[next_node];
       flat_mask[index] = score;
       max_lab = score;
-      for(auto& adder:this->neightbourer[checker])
+      for(auto adder:this->neightbourer[checker])
       {
         int node = next_node + adder;
 
@@ -712,8 +700,6 @@ void NodeGraphV2::Barnes2014_AwayFromHigh(std::vector<int>& flat_mask, std::vect
         HighEdge.push(node);
         is_high_edge[index] = 't';
       }
-      std::cout << "C6" ;
-
     }
   }
 

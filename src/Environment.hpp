@@ -393,6 +393,7 @@ class ModelRunner
     double get_Ql_in() {return Ql_in;};
     double get_Ql_out() {return Ql_out;};
 
+    xt::pytensor<int,1> get_flat_mask(){return this->graph.get_flat_mask();};
 
   protected:
 
