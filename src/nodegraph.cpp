@@ -665,8 +665,7 @@ std::vector<int> NodeGraphV2::Barnes2014_identify_flat(int starting_node, xt::py
     {
       int node = next_node + adder;
 
-      if(elevation[node] != checkelev)
-        continue;
+      
 
       if(elevation[node]>checkelev)
         is_HE = true;
@@ -674,7 +673,8 @@ std::vector<int> NodeGraphV2::Barnes2014_identify_flat(int starting_node, xt::py
       else if(elevation[node]<checkelev)
         is_LE = true;
 
-
+      if(elevation[node] != checkelev)
+        continue;
 
       if(is_queued.find(node) != is_queued.end())
         continue;
