@@ -95,6 +95,15 @@ NodeGraphV2::NodeGraphV2(
   this->compute_receveivers_and_donors(active_nodes,elevation);
   // computing the original Single flow topological order
   this->Sstack = xt::zeros<int>({this->n_element});
+
+  // for(int i=0; i<n_element;i++)
+  // {
+  //   int rec = this->graph[i].Sreceivers;
+  //   for(auto neg :this->graph[i].Sdonors )
+  //     if(neg == rec)
+  //       throw std::runtime_error("Ambiguous Sdonors prebaslab");
+  // }
+
   this->compute_stack();
 
   // Computing basin info from stack
@@ -162,6 +171,7 @@ NodeGraphV2::NodeGraphV2(
       // Keepign this check just in case, will remove later. Throw an error in case cyclicity is detected
       if(basin_labels[tgnode] == basin_labels[i])
       {
+
         throw std::runtime_error("Receiver in same basin! Node " + std::to_string(i) + " gives to " + std::to_string(this->graph[i].Sreceivers) + " gives to " + std::to_string(tgnode));
       }
     }
@@ -408,12 +418,15 @@ void NodeGraphV2::compute_receveivers_and_donors(xt::pytensor<bool,1>& active_no
 
 void NodeGraphV2::compute_receveivers_and_donors(xt::pytensor<bool,1>& active_nodes, xt::pytensor<double,1>& elevation, std::vector<int>& nodes_to_compute)
 {
-  std::vector<bool> processed(nodes_to_compute.size(), false);
+  std::vector<bool> processed(this->un_element, false);
+  std::vector<bool> is_processed_for_flats(this->un_element, false);
   std::vector<int> node_to_check_after_flat;
+  std::vector<int> flat_ID(this->un_element,-1);
 
+  int flat_indenter = -1;
   for(auto& i:nodes_to_compute)
   {
-    processed[i] = true;
+
     if(active_nodes[i] == false)
     {
       this->graph[i].Sreceivers = i;
@@ -483,23 +496,30 @@ void NodeGraphV2::compute_receveivers_and_donors(xt::pytensor<bool,1>& active_no
 
       // In this cases I am first checking if I need to resolve flat surfaces
       // if(false)
-      if(potential_flat && this->graph[i].receivers.size() == 0)
+      if(potential_flat && this->graph[i].receivers.size() == 0 && is_processed_for_flats[i] == false)
       {
         // flat solver here
+        flat_indenter++;
 
         std::queue<int> HighEdge,LowEdge;
         std::vector<char> is_high_edge,is_low_edge;
         std::map<int,int>  this_flat_surface_node_index;
         bool aretherelow = true;
         int bottomcounter = 0;
+
         std::vector<int> this_flat_surface_node = this->Barnes2014_identify_flat(int(i), elevation, active_nodes, checker, HighEdge, LowEdge, 
           is_high_edge, is_low_edge, this_flat_surface_node_index);
         std::vector<int> this_flat_mask(this_flat_surface_node.size(),0);
 
         int max_lab = -9999;
         double elev_checker = elevation[int(i)];
-
-            
+        for(auto node:this_flat_surface_node)
+        {
+          int index = this_flat_surface_node_index[node];
+        }
+        
+        
+        std::vector<char> is_lower_edge_copy = is_low_edge;
 
         this->Barnes2014_AwayFromHigh( this_flat_mask, this_flat_surface_node, this_flat_surface_node_index,
           checker, HighEdge,  elevation, elev_checker, is_high_edge,  max_lab);
@@ -522,11 +542,17 @@ void NodeGraphV2::compute_receveivers_and_donors(xt::pytensor<bool,1>& active_no
           int node = this_flat_surface_node[j];
           bool SS_done = false;
           int idL = -1;
-
-
+          double S_max = -1;
+          double S_length = -1;
+          int S_id = -1;
+          is_processed_for_flats[node] = true;
           this->flat_mask[node] = this_flat_mask[this_flat_surface_node_index[node]];
+          // if(this_flat_mask[this_flat_surface_node_index[node]]<0)
+          //   throw std::runtime_error("Argh, nef flat mask yo");
 
           if(active_nodes[node] == false)
+            continue;
+          if(is_lower_edge_copy[this_flat_surface_node_index[node]] == 't')
             continue;
 
           bool all_flat = true;
@@ -544,30 +570,59 @@ void NodeGraphV2::compute_receveivers_and_donors(xt::pytensor<bool,1>& active_no
               all_flat = false;
               this->graph[node].receivers.push_back(next);
               this->graph[node].length2rec.push_back(this->lengthener[idL]);
-              if(SS_done == false)
+              double this_slope = this_flat_mask[this_flat_surface_node_index[node]] - this_flat_mask[this_flat_surface_node_index[next]];
+              this_slope = this_slope / this->lengthener[idL];
+
+              if(this_slope > S_max)
               {
-                SS_done = true;
-                this->graph[node].Sreceivers = next;
-                this->graph[node].length2Srec = this->lengthener[idL];
-                this->graph[next].Sdonors.push_back(node);
+                S_max = this_slope;
+                S_id = next;
+                S_length = this->lengthener[idL];
               }
+              // if(SS_done == false)
+              // {
+              //   SS_done = true;
+              //   this->graph[node].Sreceivers = next;
+              //   this->graph[node].length2Srec = this->lengthener[idL];
+              //   this->graph[next].Sdonors.push_back(node);
+              // }
 
             }
             else if(this_flat_mask[this_flat_surface_node_index[node]] < this_flat_mask[this_flat_surface_node_index[next]] )
             {
-              all_flat = false;
+              // all_flat = false;
               this->graph[node].donors.push_back(next);
               this->graph[node].length2don.push_back(this->lengthener[idL]);
             }
           }
+
+          if(S_id>=0)
+          {
+
+            if(processed[node] == true || (flat_ID[node] >= 0))
+            {
+              std::cout << "5.12:" << std::endl;
+              throw std::runtime_error("flat_resolver::SS_ID assigned multiple times");
+            }
+
+            processed[node] = true;
+            this->graph[node].Sreceivers = S_id;
+            this->graph[node].length2Srec = S_length;
+            this->graph[S_id].Sdonors.push_back(node);
+          }
+
           if(all_flat)
             node_to_check_after_flat.push_back(node);
+
+          flat_ID[node] = flat_indenter;
 
         }
 
       }
       else if (this->graph[i].receivers.size() == 0)
+      {
         this->graph[i].Sreceivers = i;
+      }
     }
 
   }
@@ -591,7 +646,7 @@ std::vector<int> NodeGraphV2::Barnes2014_identify_flat(int starting_node, xt::py
 
   is_queued.insert(starting_node);
   output.push_back(starting_node);
-  char lefalse = 'f', letrue = 'l';
+  char lefalse = 'f', letrue = 't';
 
   is_low_edge.push_back(lefalse);
   is_high_edge.push_back(lefalse);
@@ -610,14 +665,16 @@ std::vector<int> NodeGraphV2::Barnes2014_identify_flat(int starting_node, xt::py
     {
       int node = next_node + adder;
 
+      if(elevation[node] != checkelev)
+        continue;
+
       if(elevation[node]>checkelev)
         is_HE = true;
       
       else if(elevation[node]<checkelev)
         is_LE = true;
 
-      if(elevation[node] != checkelev)
-        continue;
+
 
       if(is_queued.find(node) != is_queued.end())
         continue;
@@ -667,6 +724,7 @@ void NodeGraphV2::Barnes2014_AwayFromHigh(std::vector<int>& flat_mask, std::vect
 
   while(keep_going)
   {
+
     int next_node = HighEdge.front(); HighEdge.pop();
     if(next_node == marker)
     {
@@ -697,6 +755,7 @@ void NodeGraphV2::Barnes2014_AwayFromHigh(std::vector<int>& flat_mask, std::vect
 
         if(is_high_edge[index] == 't')
           continue;
+
         HighEdge.push(node);
         is_high_edge[index] = 't';
       }
@@ -1119,6 +1178,10 @@ void NodeGraphV2::compute_stack()
       istack = this->_add2stack(inode, istack);
     }
   }
+  if(istack > this->n_element)
+  {
+    throw std::runtime_error("Sstack inconsistent");
+  }
 }
 
 int NodeGraphV2::_add2stack(int& inode, int& istack)
@@ -1141,6 +1204,8 @@ void NodeGraphV2::compute_basins(xt::pytensor<bool,1>& active_nodes)
   SBasinID = xt::zeros<int>({this->un_element});
   for(int inode=0; inode<this->n_element;inode++)
   {  
+    std::cout << inode << "||";
+
     istack = this->Sstack[inode];
     irec = this->graph[istack].Sreceivers;
 
@@ -1151,9 +1216,23 @@ void NodeGraphV2::compute_basins(xt::pytensor<bool,1>& active_nodes)
     }
     SBasinID[istack] = ibasin;
   }
+  std::cout << std::endl;
 
+  for(int inode=0; inode<this->n_element;inode++)
+  {
+    if(SBasinID[inode] != SBasinID[this->graph[inode].Sreceivers])
+    {
+      std::cout << inode << "||";
+      std::cout << SBasinID[inode] << "|";
+      std::cout << this->graph[inode].Sreceivers;
+      std::cout << "|" << SBasinID[this->graph[inode].Sreceivers];
+      throw std::runtime_error("Sstack screwed" );
+    }
+  }
   this->nbasins = ibasin + 1;
 }
+
+
 
 void NodeGraphV2::compute_pits(xt::pytensor<bool,1>& active_nodes)
 {
@@ -1459,7 +1538,7 @@ void NodeGraphV2::_orient_basin_tree(xt::pytensor<int,2>& conn_basins, xt::pyten
   // # nodes connections
   xt::xtensor<int,1> nodes_connects_size = xt::zeros<int>({this->nbasins});
   xt::xtensor<int,1> nodes_connects_ptr = xt::empty<int>({this->nbasins});
-  std::cout << "hereE4.1|" << std::endl;
+  std::cout << "hereE4.1|" << basin0 << "|" << std::endl;
 
   // # parse the edges to compute the number of edges per node
   for (auto i : tree)
