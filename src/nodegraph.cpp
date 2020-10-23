@@ -80,6 +80,7 @@ NodeGraphV2::NodeGraphV2(
   this->neightbourer.push_back({- 1, - ncols, - ncols + 1, (ncols - 1),1, 2 * ncols - 1, ncols, ncols + 1 });// periodic_first_col 3
   this->neightbourer.push_back({-ncols - 1, - ncols, - 2 * ncols + 1, -1,-ncols + 1, ncols - 1, ncols, 1 }); //periodic last_col 4
 
+
   double diag = std::sqrt(std::pow(dx,2) + std::pow(dy,2));
   this->lengthener = {diag,dy,diag,dx,dx,diag,dy,diag};
 
@@ -105,6 +106,7 @@ NodeGraphV2::NodeGraphV2(
   // }
 
   this->compute_stack();
+
 
   // Computing basin info from stack
   this->compute_basins(active_nodes);
@@ -253,6 +255,12 @@ NodeGraphV2::NodeGraphV2(
   this->index_in_Mstack = xt::zeros<int>({this->n_element});
   for(int i = 0; i< this->n_element ; i++)
     this->index_in_Mstack[this->Mstack[i]] = i;
+
+  // std::cout << "Here, 1472 rec are: ";
+  // for(auto val:this->graph[1472].receivers)
+  //   std::cout << val << "|";
+
+  // std:: cout << std::endl << "And the SS is " << this->graph[1472].Sreceivers;
 
   
   //Done
@@ -426,7 +434,6 @@ void NodeGraphV2::compute_receveivers_and_donors(xt::pytensor<bool,1>& active_no
   int flat_indenter = -1;
   for(auto& i:nodes_to_compute)
   {
-
     if(active_nodes[i] == false)
     {
       this->graph[i].Sreceivers = i;
@@ -435,31 +442,24 @@ void NodeGraphV2::compute_receveivers_and_donors(xt::pytensor<bool,1>& active_no
     // std::vector<int> receivers,donors;
     // std::vector<double> length2rec,length2don;
 
-    int checker;
-    if(i<ncols)
-      checker = 1;
-    else if (i >= this->n_element - ncols)
-      checker = 2;
-    else if(i % ncols == 0 || i == 0)
-      checker = 3;
-    else if((i + 1) % (ncols) == 0 )
-      checker = 4;
-    else
-      checker = 0;
+    int checker = this->get_checker(int(i));
 
 
-    double& this_elev = elevation[i];
+    double this_elev = elevation[i];
     double test_elev;
     double SS = std::numeric_limits<double>::min();
     int SSid = -1;
     int idL = -1;
     bool potential_flat = false;
-    for(auto& adder:this->neightbourer[checker])
+    for(auto adder:this->neightbourer[checker])
     {
       int node = i+adder;
+      
+      // if(i == 100)
+
       idL++;
       test_elev = elevation[node];
-      if(test_elev<this_elev)
+      if(test_elev < this_elev)
       {
         this->graph[i].receivers.push_back(node);
         this->graph[i].length2rec.push_back(this->lengthener[idL]);
@@ -476,7 +476,9 @@ void NodeGraphV2::compute_receveivers_and_donors(xt::pytensor<bool,1>& active_no
         this->graph[i].length2don.push_back(this->lengthener[idL]);
       }
       else if (test_elev == this_elev)
+      {
         potential_flat = true;
+      }
     }
 
     // this->graph[i].receivers = receivers;
@@ -510,6 +512,8 @@ void NodeGraphV2::compute_receveivers_and_donors(xt::pytensor<bool,1>& active_no
         std::vector<int> this_flat_surface_node = this->Barnes2014_identify_flat(int(i), elevation, active_nodes, checker, HighEdge, LowEdge, 
           is_high_edge, is_low_edge, this_flat_surface_node_index);
         std::vector<int> this_flat_mask(this_flat_surface_node.size(),0);
+        
+        // std::cout << "IDENTIFIED::" << this_flat_mask.size() << "::" << LowEdge.size() << "::" << HighEdge.size() << std::endl;
 
         int max_lab = -9999;
         double elev_checker = elevation[int(i)];
@@ -540,28 +544,32 @@ void NodeGraphV2::compute_receveivers_and_donors(xt::pytensor<bool,1>& active_no
         for(size_t j = 0 ; j < this_flat_surface_node.size() ; j++)
         {
           int node = this_flat_surface_node[j];
+          checker = this->get_checker(node);
+
           bool SS_done = false;
           int idL = -1;
           double S_max = -1;
           double S_length = -1;
           int S_id = -1;
-          is_processed_for_flats[node] = true;
           this->flat_mask[node] = this_flat_mask[this_flat_surface_node_index[node]];
           // if(this_flat_mask[this_flat_surface_node_index[node]]<0)
           //   throw std::runtime_error("Argh, nef flat mask yo");
 
           if(active_nodes[node] == false)
             continue;
-          if(is_lower_edge_copy[this_flat_surface_node_index[node]] == 't')
+
+          if(is_lower_edge_copy[this_flat_surface_node_index[node]] == 't' && active_nodes[node])
             continue;
 
+          is_processed_for_flats[node] = true;
+
           bool all_flat = true;
+
 
           for(auto adder:this->neightbourer[checker])
           {
             int next = node + adder;
             idL ++;
-
             if(elevation[next] != elevation[int(i)])
               continue;
 
@@ -598,7 +606,6 @@ void NodeGraphV2::compute_receveivers_and_donors(xt::pytensor<bool,1>& active_no
 
           if(S_id>=0)
           {
-
             if(processed[node] == true || (flat_ID[node] >= 0))
             {
               std::cout << "5.12:" << std::endl;
@@ -612,7 +619,9 @@ void NodeGraphV2::compute_receveivers_and_donors(xt::pytensor<bool,1>& active_no
           }
 
           if(all_flat)
+          {
             node_to_check_after_flat.push_back(node);
+          }
 
           flat_ID[node] = flat_indenter;
 
@@ -624,12 +633,42 @@ void NodeGraphV2::compute_receveivers_and_donors(xt::pytensor<bool,1>& active_no
         this->graph[i].Sreceivers = i;
       }
     }
-
   }
+
+
   for(auto i: node_to_check_after_flat)
   {
-    if(this->graph[i].receivers.size() == 0)
+    bool is_sorted = false;
+    // Attempted to sort stuff here
+    // if(this->graph[i].receivers.size() == 0)
+    // {
+    //   int checker = this->get_checker(i);
+    //   int idL =-1;
+    //   for(auto adder:this->neightbourer[checker])
+    //   {
+    //     int next = i + adder;
+    //     idL ++;
+    //     if(elevation[next]!= elevation[i])
+    //       continue;
+
+    //     if(this->graph[next].receivers.size()>0 && is_sorted == false)
+    //     {
+    //       is_sorted = true;
+    //       this->graph[i].Sreceivers = next;
+    //       this->graph[i].length2Srec = this->lengthener[idL];
+    //       this->graph[next].Sdonors.push_back(i);
+    //       this->graph[next].donors.push_back(i);
+    //       this->graph[i].length2don.push_back(this->lengthener[idL]);
+    //       this->graph[i].receivers.push_back(next);
+    //       this->graph[i].length2rec.push_back(this->lengthener[idL]);
+    //     }
+    //   }
+
+    // }
+    if(is_sorted == false)
       this->graph[i].Sreceivers = i;
+
+
   }
 
 
@@ -660,36 +699,45 @@ std::vector<int> NodeGraphV2::Barnes2014_identify_flat(int starting_node, xt::py
   {
     int next_node = Quack.front();
     Quack.pop();
+
+    checker = this->get_checker(next_node);
+
     is_LE = false, is_HE = false;
-    for(auto adder:this->neightbourer[checker])
-    {
-      int node = next_node + adder;
 
-      
+    if(active_nodes[next_node])
+    {      
+      for(auto adder:this->neightbourer[checker])
+      {
+        int node = next_node + adder;
+        if(node<0 || node >= this->n_element)
+        {
+          throw std::runtime_error("neightbourer problem flat");
+        }
+        
 
-      if(elevation[node]>checkelev)
-        is_HE = true;
-      
-      else if(elevation[node]<checkelev)
-        is_LE = true;
+        if(elevation[node]>checkelev)
+          is_HE = true;
+        
+        else if(elevation[node]<checkelev)
+          is_LE = true;
 
-      if(elevation[node] != checkelev)
-        continue;
+        if(elevation[node] != checkelev)
+          continue;
 
-      if(is_queued.find(node) != is_queued.end())
-        continue;
+        if(is_queued.find(node) != is_queued.end())
+          continue;
 
-      Quack.push(node);
-      is_queued.insert(node);
-      output.push_back(node);
-      is_low_edge.push_back(lefalse);
-      is_high_edge.push_back(lefalse);
-      this_flat_surface_node_index[node] = index;
-      index++;
+        Quack.push(node);
+        is_queued.insert(node);
+        output.push_back(node);
+        is_low_edge.push_back(lefalse);
+        is_high_edge.push_back(lefalse);
+        this_flat_surface_node_index[node] = index;
+        index++;
 
+      }
     }
-
-    if(active_nodes[next_node] == false)
+    else
       is_LE = true;
 
     if(is_LE)
@@ -726,6 +774,7 @@ void NodeGraphV2::Barnes2014_AwayFromHigh(std::vector<int>& flat_mask, std::vect
   {
 
     int next_node = HighEdge.front(); HighEdge.pop();
+    checker = this->get_checker(next_node);
     if(next_node == marker)
     {
       if(last_one_was_marker)
@@ -779,6 +828,7 @@ void NodeGraphV2::Barnes2014_TowardsLower(std::vector<int>& flat_mask, std::vect
   while(keep_going)
   {
     int next_node = LowEdge.front(); LowEdge.pop();
+    checker = this->get_checker(next_node);
     if(next_node == marker)
     {
       if(last_one_was_marker)
@@ -1180,6 +1230,7 @@ void NodeGraphV2::compute_stack()
   }
   if(istack > this->n_element)
   {
+    std::cout << "Sstack inconsistent? " << istack << std::endl;
     throw std::runtime_error("Sstack inconsistent");
   }
 }
@@ -1204,7 +1255,7 @@ void NodeGraphV2::compute_basins(xt::pytensor<bool,1>& active_nodes)
   SBasinID = xt::zeros<int>({this->un_element});
   for(int inode=0; inode<this->n_element;inode++)
   {  
-    std::cout << inode << "||";
+    // std::cout << inode << "||";
 
     istack = this->Sstack[inode];
     irec = this->graph[istack].Sreceivers;
@@ -1261,7 +1312,6 @@ void NodeGraphV2::correct_flowrouting(xt::pytensor<bool,1>& active_nodes, xt::py
 
     // """
     int& nnodes = this->n_element;
-    std::cout << "hereE0" << std::endl;
 
     // # theory of planar graph -> max nb. of connections known
     int nconn_max = this->nbasins * 7;
@@ -1281,10 +1331,8 @@ void NodeGraphV2::correct_flowrouting(xt::pytensor<bool,1>& active_nodes, xt::py
     for(auto& v:conn_weights)
       v = -2;
 
-    std::cout << "hereE1" << std::endl;
     int nconn, basin0;
     this->_connect_basins(conn_basins, conn_nodes, conn_weights, active_nodes, elevation, nconn, basin0);
-    std::cout << "hereE2" << std::endl;
     
     int scb = nconn, scn = nconn, scw = nconn;
     // for(size_t i=0;i<nconn_max;i++)
@@ -1318,7 +1366,6 @@ void NodeGraphV2::correct_flowrouting(xt::pytensor<bool,1>& active_nodes, xt::py
       conn_weights_2[i] = conn_weights[i];
 
     int g = 6;
-    std::cout << "hereE3" << std::endl;
 
     // if method == 'mst_linear':
     //     mstree = _compute_mst_linear(conn_basins, conn_weights, nbasins)
@@ -1327,12 +1374,9 @@ void NodeGraphV2::correct_flowrouting(xt::pytensor<bool,1>& active_nodes, xt::py
     // else:
     //     raise ValueError("invalid flow correction method %r" % method)
     mstree = _compute_mst_kruskal(conn_basins_2, conn_weights_2);
-    std::cout << "hereE4" << std::endl;
 
     this->_orient_basin_tree(conn_basins_2,conn_nodes_2,basin0, mstree);
-    std::cout << "hereE5" << std::endl;
     this->_update_pits_receivers(conn_basins_2, conn_nodes_2, mstree, elevation);    
-    std::cout << "hereE6" << std::endl;
 
 
     // _update_pits_receivers(receivers, dist2receivers, outlets,
@@ -1538,18 +1582,16 @@ void NodeGraphV2::_orient_basin_tree(xt::pytensor<int,2>& conn_basins, xt::pyten
   // # nodes connections
   xt::xtensor<int,1> nodes_connects_size = xt::zeros<int>({this->nbasins});
   xt::xtensor<int,1> nodes_connects_ptr = xt::empty<int>({this->nbasins});
-  std::cout << "hereE4.1|" << basin0 << "|" << std::endl;
+  // std::cout << "hereE4.1|" << basin0 << "|" << std::endl;
 
   // # parse the edges to compute the number of edges per node
   for (auto i : tree)
   {
-    std::cout << i << "|";
     // if(i<0)
     //   // std::cout << i << "||";
     nodes_connects_size[conn_basins(i, 0)]++;
     nodes_connects_size[conn_basins(i, 1)]++;
   }
-  std::cout << "hereE4.2" << std::endl;
 
   // # compute the id of first edge in adjacency table
   nodes_connects_ptr[0] = 0;
@@ -1559,13 +1601,11 @@ void NodeGraphV2::_orient_basin_tree(xt::pytensor<int,2>& conn_basins, xt::pyten
     nodes_connects_ptr[i] = (nodes_connects_ptr[i - 1] + nodes_connects_size[i - 1]);
     nodes_connects_size[i - 1] = 0;
   }
-  std::cout << "hereE4.3" << std::endl;
 
   // # create the adjacency table
   int nodes_adjacency_size = nodes_connects_ptr[nbasins - 1] + nodes_connects_size[nbasins - 1];
   nodes_connects_size[this->nbasins -1] = 0;
   xt::xtensor<int,1> nodes_adjacency = xt::zeros<int>({nodes_adjacency_size});
-  std::cout << "hereE4.4" << std::endl;
 
   // # parse the edges to update the adjacency
   for (auto i : tree)
@@ -1579,7 +1619,6 @@ void NodeGraphV2::_orient_basin_tree(xt::pytensor<int,2>& conn_basins, xt::pyten
     nodes_connects_size[n2] ++;
   }
 
-  std::cout << "hereE4.5" << std::endl;
 
   // # depth-first parse of the tree, starting from basin0
   // # stack of node, parent
@@ -1588,7 +1627,6 @@ void NodeGraphV2::_orient_basin_tree(xt::pytensor<int,2>& conn_basins, xt::pyten
   stack(0,0) = basin0;// (basin0, basin0)
   stack(0,1) = basin0;
 
-  std::cout << "hereE4.6" << std::endl;
   
   // CHEKCED UNTIL HERE
   int n_turn=0;

@@ -196,6 +196,23 @@ void Barnes2014_TowardsLower(std::vector<int>& flat_mask, std::vector<int>& this
 
 xt::pytensor<int,1> get_flat_mask(){return flat_mask;};
 
+int get_checker(int i)
+{
+  int checker;
+  if(i<this->ncols)
+    checker = 1;
+  else if (i >= this->n_element - this->ncols)
+    checker = 2;
+  else if(i % this->ncols == 0 || i == 0)
+    checker = 3;
+  else if((i + 1) % (this->ncols) == 0 )
+    checker = 4;
+  else
+    checker = 0;
+  return checker;
+}
+
+
 protected:
 
   // Node graph: vector of all vertexes in the DEM

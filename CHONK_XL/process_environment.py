@@ -224,6 +224,7 @@ class CoreModel:
 	lake_id_raw = xs.on_demand(dims = ('y','x'))
 	mstack_checker = xs.on_demand(dims = ('y','x'))
 	flat_mask = xs.on_demand(dims = ('y','x'))
+	NodeID =  xs.on_demand(dims = ('y','x'))
 	
 	Qw_in = xs.on_demand()
 	Qw_out = xs.on_demand()
@@ -366,6 +367,10 @@ class CoreModel:
 	@flat_mask.compute
 	def _flat_mask(self):
 		return self.model.get_flat_mask().reshape(self.ny,self.nx);
+
+	@NodeID.compute
+	def _NodeID(self):
+		return np.arange(0,(self.ny * self.nx)).reshape(self.ny,self.nx);
 
 
 

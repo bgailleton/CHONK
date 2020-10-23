@@ -256,6 +256,12 @@ void ModelRunner::process_node(int& node, std::vector<bool>& is_processed, int& 
      
       xt::pytensor<int,1>& active_nodes = this->io_int_array["active_nodes"];
 
+      if(active_nodes[outlet] == false)
+      {
+        chonk& this_chonk = this->lake_network[lakeid].get_outletting_chonk();
+        this->chonk_network[outlet].set_water_flux(this_chonk.get_water_flux());
+        return;
+      }
 
 
       // checking if my final outlet exists AND has been processed before
@@ -1762,10 +1768,10 @@ void Lake::pour_water_in_lake(
   )
 { 
 
-  std:: cout << "Pouring " << water_volume << " water (rate = " << water_volume/dt << ") into " << this->lake_id << std::endl;
+  // std::cout << "Pouring " << water_volume << " water (rate = " << water_volume/dt << ") into " << this->lake_id << std::endl;
 
 
-  std::cout << "Entering water volume is " << water_volume << " hence water flux is " <<  water_volume/dt << std::endl;
+  // std::cout << "Entering water volume is " << water_volume << " hence water flux is " <<  water_volume/dt << std::endl;
   double save_entering_water = water_volume;
   double save_preexistingwater = this->volume;
   int n_labels = int(chonk_network[originode].get_other_attribute_array("label_tracker").size());
@@ -1874,8 +1880,8 @@ void Lake::pour_water_in_lake(
     this->n_nodes ++;
     // At this point I either have enough water to carry on or I stop the process
   }
-  std::cout << "After raw filling lake water volume is " << water_volume << " hence water flux is " <<  water_volume/dt << std::endl;
-  std::cout << "Outletting in " << this->outlet_node << std::endl;;
+  // std::cout << "After raw filling lake water volume is " << water_volume << " hence water flux is " <<  water_volume/dt << std::endl;
+  // std::cout << "Outletting in " << this->outlet_node << std::endl;;
 
   // if(this->outlet_node>=0)
   // {
@@ -2044,6 +2050,9 @@ int Lake::check_neighbors_for_outlet_or_existing_lakes(
   // No outlet so far
   int outlet = -9999;
   bool has_eaten = false;
+
+
+
   // Checking all neighbours
   for(auto node : neightbors)
   {
@@ -2062,6 +2071,8 @@ int Lake::check_neighbors_for_outlet_or_existing_lakes(
       if(lake_index == this->lake_id || lake_network[lake_index].get_parent_lake() == this->lake_id )
         continue;
     }
+
+
     
     // lake depth
     double this_depth = 0.;
@@ -2086,8 +2097,10 @@ int Lake::check_neighbors_for_outlet_or_existing_lakes(
       continue;
     }
 
+
+    
     // If the node is at higher (or same) elevation than me water surface, I set it in the queue
-    if(tested_elevation >= next_node.elevation)
+    else if(tested_elevation >= next_node.elevation)
     {
       this->depressionfiller.emplace(nodium(node,tested_elevation));
       // Making sure I mark it as queued
@@ -2130,6 +2143,12 @@ int Lake::check_neighbors_for_outlet_or_existing_lakes(
   // // outlet is >= 0 -> tehre is an outlet
   // if(outlet>=0)
   //   std::cout << "POCHTRAC::" << outlet << "||" << node_in_lake[outlet] << "||" << this->lake_id << std::endl;
+
+  if(active_nodes[next_node.node] == false)
+  {
+    outlet = next_node.node;
+    
+  }
 
   return outlet;
 }
