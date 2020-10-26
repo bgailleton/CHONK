@@ -1909,7 +1909,7 @@ void Lake::pour_water_in_lake(
 
 
   // checking that I did not overfilled my lake:
-  if(water_volume <0)
+  if(water_volume < 0 && this->outlet_node <0)
   {
     double extra = abs(water_volume);
     this->n_nodes -= 1;
@@ -1945,8 +1945,10 @@ void Lake::pour_water_in_lake(
 
   // std::cout << "Water volume left: " << water_volume << std::endl;
   // Transmitting the water flux to the SS receiver not in the lake
-  if(water_volume > 0 && this->outlet_node >= 0)
+  if(water_volume > 0) // && this->outlet_node >= 0)
   {
+    if(this->outlet_node<0)
+      throw std::runtime_error("Uh??!!");
     // If the node is inactive, ie if its code is 0, the fluxes can escape the system and we stop it here
   
     // Otherwise: calculating the outflux: water_volume_remaining divided by the time step
