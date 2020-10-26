@@ -1845,7 +1845,7 @@ void Lake::pour_water_in_lake(
       }
 
 
-      break;
+      // break;
     }
 
 
@@ -1874,12 +1874,22 @@ void Lake::pour_water_in_lake(
     // (if 1st node -> elevation of the bottom of the depression)
     // (if other node -> lake water elevation)
     this->water_elevation = next_node.elevation;
+
+    if(outlet >= 0)
+      break;
         // Otehr wise, I do not have an outlet and I can save this node as in depression
     this->nodes.push_back(next_node.node);
     node_in_lake[next_node.node] = this->lake_id;
     this->n_nodes ++;
     // At this point I either have enough water to carry on or I stop the process
   }
+
+
+  double local_balance = (save_entering_water - water_volume) -  (save_preexistingwater - this->volume);
+
+  // if(save_entering_water = save_preexistingwater)
+
+  std::cout << "LOCAL BALANCE SHOULD BE 0::" << local_balance << std::endl;
   // std::cout << "After raw filling lake water volume is " << water_volume << " hence water flux is " <<  water_volume/dt << std::endl;
   // std::cout << "Outletting in " << this->outlet_node << std::endl;;
 
