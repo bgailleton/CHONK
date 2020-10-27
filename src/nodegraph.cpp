@@ -636,40 +636,56 @@ void NodeGraphV2::compute_receveivers_and_donors(xt::pytensor<bool,1>& active_no
   }
 
 
-  for(auto i: node_to_check_after_flat)
+  int n_sorted = 1;
+
+  while(node_to_check_after_flat.size() > 0 && n_sorted >0)
   {
-    bool is_sorted = false;
-    // Attempted to sort stuff here
-    // if(this->graph[i].receivers.size() == 0)
-    // {
-    //   int checker = this->get_checker(i);
-    //   int idL =-1;
-    //   for(auto adder:this->neightbourer[checker])
-    //   {
-    //     int next = i + adder;
-    //     idL ++;
-    //     if(elevation[next]!= elevation[i])
-    //       continue;
+    std::vector<int> next_to_check;
+    n_sorted = 0;
+    for(auto i: node_to_check_after_flat)
+    {
+      bool is_sorted = false;
+      // Attempted to sort stuff here
+      if(this->graph[i].receivers.size() == 0)
+      {
+        int checker = this->get_checker(i);
+        int idL =-1;
+        for(auto adder:this->neightbourer[checker])
+        {
+          int next = i + adder;
+          idL ++;
+          if(elevation[next]!= elevation[i])
+            continue;
 
-    //     if(this->graph[next].receivers.size()>0 && is_sorted == false)
-    //     {
-    //       is_sorted = true;
-    //       this->graph[i].Sreceivers = next;
-    //       this->graph[i].length2Srec = this->lengthener[idL];
-    //       this->graph[next].Sdonors.push_back(i);
-    //       this->graph[next].donors.push_back(i);
-    //       this->graph[i].length2don.push_back(this->lengthener[idL]);
-    //       this->graph[i].receivers.push_back(next);
-    //       this->graph[i].length2rec.push_back(this->lengthener[idL]);
-    //     }
-    //   }
+          if(this->graph[next].receivers.size()>0 && is_sorted == false && std::find(this->graph[next].receivers.begin(), this->graph[next].receivers.end(), i) == this->graph[next].receivers.end())
+          {
+            is_sorted = true;
+            this->graph[i].Sreceivers = next;
+            this->graph[i].length2Srec = this->lengthener[idL];
+            this->graph[next].Sdonors.push_back(i);
+            this->graph[next].donors.push_back(i);
+            this->graph[i].length2don.push_back(this->lengthener[idL]);
+            this->graph[i].receivers.push_back(next);
+            this->graph[i].length2rec.push_back(this->lengthener[idL]);
+          }
+        }
 
-    // }
-    if(is_sorted == false)
-      this->graph[i].Sreceivers = i;
+      }
+
+      if(is_sorted)
+        n_sorted ++;
+      else
+        next_to_check.push_back(i);
+      
+      //   this->graph[i].Sreceivers = i;
 
 
+    }
+    node_to_check_after_flat = next_to_check;
   }
+
+  for(auto no:node_to_check_after_flat)
+    this->graph[no].Sreceivers = no;
 
 
 }
@@ -1267,19 +1283,7 @@ void NodeGraphV2::compute_basins(xt::pytensor<bool,1>& active_nodes)
     }
     SBasinID[istack] = ibasin;
   }
-  std::cout << std::endl;
 
-  for(int inode=0; inode<this->n_element;inode++)
-  {
-    if(SBasinID[inode] != SBasinID[this->graph[inode].Sreceivers])
-    {
-      std::cout << inode << "||";
-      std::cout << SBasinID[inode] << "|";
-      std::cout << this->graph[inode].Sreceivers;
-      std::cout << "|" << SBasinID[this->graph[inode].Sreceivers];
-      throw std::runtime_error("Sstack screwed" );
-    }
-  }
   this->nbasins = ibasin + 1;
 }
 
@@ -1771,258 +1775,5 @@ void NodeGraphV2::_update_pits_receivers(xt::pytensor<int,2>& conn_basins,xt::py
 // //  //      `.                ,--'
 // //  //        `-._________,--'
 
-
-
-// DEPRECATED LAND, keeping for legacy
-
-// Set of functions managing graph traversal and topological sorts, lightweight and customisable
-
-
-// // Depth First Function utilised for customised topological sorting from a custom set of points.
-// bool dfs(Vertex& vertex, // The investigated vertex
-//  std::vector<Vertex>& stack, // The stack of vertexes (current topological sort)
-//  std::vector<int>& next_vertexes, // next vertexes to be investigated during the topological sort
-//  int& index_of_reading, // ignore this
-//  int& index_of_pushing, // index incrementing the next vertexes in the topological sort ("local modified" topological sort)
-//  std::vector<bool>& is_in_queue, // Check if a node has already been added in the next vertexes
-//  std::vector<Vertex>& graph, // the original, unsorted graph containing all nodes
-//  std::string& direction // Direction being "donors" or "receivers" to deterine in which way the DAG is considered
-//  ) 
-// {
-//     // std::cout << "6.0" << std::endl;
-//     vertex.visiting = true;
-//     // std::cout << "6.0.1" << std::endl;
-//     const std::vector<int>& childNode = (direction == "donors")? vertex.donors : vertex.receivers;
-
-//     for (auto chid : childNode) 
-//     {
-//       // std::cout << "6.1" << std::endl;
-//       if(chid<0)
-//           continue;
-//       // std::cout << "6.2" << std::endl;
-//       Vertex& childNode = graph[chid];
-
-//       // std::cout << "6.3::" << childNode.val << std::endl;
-//       if (childNode.visited == false) 
-//       {
-//         // std::cout << "6.4" << std::endl;
-//         if(is_in_queue[childNode.val] == false)
-//         {
-//           next_vertexes[index_of_pushing] = childNode.val;
-//           is_in_queue[childNode.val] = true;
-//           index_of_pushing++;
-//         }
-//         // std::cout << "6.5" << std::endl;
-//         // check for back-edge, i.e., cycle
-//         if (childNode.visiting) 
-//         {
-//           return false;
-//         }
-//         // std::cout << "6.6::" << vertex.val << std::endl;
-
-//         bool childResult = dfs(childNode, stack, next_vertexes, index_of_reading, index_of_pushing, is_in_queue, graph, direction);
-
-//         if (childResult == false) 
-//         {
-//           return false;
-//         }
-//         // std::cout << "6.7" << std::endl;
-            
-//       }
-//     }
-    
-//     // std::cout << "6.8" << std::endl;
-    
-//     // now that you have completely visited all the
-//     // donors of the vertex, push the vertex in the stack
-
-//     stack.emplace_back(vertex);
-
-//     // std::cout << "6.9" << std::endl;
-
-
-//     // this vertex is processed (all its descendents, i.e,
-//     // the nodes that are dependent on
-//     // this vertex along with this vertex itself have been visited 
-//     // and processed). So mark this vertex as Visited.
-//     vertex.visited = true;
-//     // std::cout << "6.10" << std::endl;
-
-    
-//     // mark vertex as visiting as false since we 
-//     // have completed visiting all the subtrees of 
-//     // the vertex, including itself. So the vertex is no more
-//     // in visiting state because it is done visited.
-//     // Another reason is (the critical one) now that all the 
-//     // descendents of the vertex are visited, any future 
-//     // inbound edge to the vertex won't be a back edge anymore. 
-//     vertex.visiting = false;  
-//     // std::cout << "6.11" << std::endl;
-
-
-//     return true;
-// }
-
-// // Second version of the depth first algorithm where the original set of nodes is fixed, eg full topological sorting
-// bool dfs(Vertex& vertex,
-//  std::vector<Vertex>& stack,
-//  std::vector<Vertex>& graph,
-//  std::string& direction
-//  ) 
-// {
-//     // std::cout << "6.0" << std::endl;
-//     vertex.visiting = true;
-//     // std::cout << "6.0.1" << std::endl;
-//     const std::vector<int>& childNode = (direction == "donors")? vertex.donors : vertex.receivers;
-
-//     for (auto chid : childNode) 
-//     {
-//       // std::cout << "6.1" << std::endl;
-//       if(chid<0)
-//           continue;
-//       // std::cout << "6.2" << std::endl;
-//       Vertex& childNode = graph[chid];
-
-//       // std::cout << "6.3::" << childNode.val << std::endl;
-//       if (childNode.visited == false) 
-//       {
-//         if (childNode.visiting) 
-//         {
-//           return false;
-//         }
-
-//         bool childResult = dfs(childNode, stack, graph, direction);
-
-//         if (childResult == false) 
-//         {
-//           return false;
-//         }
-//         // std::cout << "6.7" << std::endl;
-            
-//       }
-//     }
-    
-//     // std::cout << "6.8" << std::endl;
-    
-//     // now that you have completely visited all the
-//     // donors of the vertex, push the vertex in the stack
-
-//     stack.emplace_back(vertex);
-
-//     // std::cout << "6.9" << std::endl;
-
-
-//     // this vertex is processed (all its descendents, i.e,
-//     // the nodes that are dependent on
-//     // this vertex along with this vertex itself have been visited 
-//     // and processed). So mark this vertex as Visited.
-//     vertex.visited = true;
-//     // std::cout << "6.10" << std::endl;
-
-    
-//     // mark vertex as visiting as false since we 
-//     // have completed visiting all the subtrees of 
-//     // the vertex, including itself. So the vertex is no more
-//     // in visiting state because it is done visited.
-//     // Another reason is (the critical one) now that all the 
-//     // descendents of the vertex are visited, any future 
-//     // inbound edge to the vertex won't be a back edge anymore. 
-//     vertex.visiting = false;  
-//     // std::cout << "6.11" << std::endl;
-
-
-//     return true;
-// }
-
-
-//DEPRECATED
-// // returns null if no topological sort is possible
-// std::vector<int> topological_sort_by_dfs(std::vector<Vertex>& graph, int starting_node, std::string& direction) 
-// {
-//     std::vector<Vertex> stack;
-//     std::vector<int> next_vertexes(graph.size(), -1);
-//     std::vector<bool> is_in_queue(graph.size(), false);
-//     // std::cout << "1" << std::endl;
-//     // next_vertexes.reserve(graph.size());
-//     next_vertexes[0] = starting_node;
-//     is_in_queue[starting_node] = true;
-//     int index_of_reading = 0;
-//     int index_of_pushing = 1;
-//     // std::cout << "2" << std::endl;
-
-//     while(true)
-//     {
-//         // std::cout << "3" << std::endl;
-
-//         int next_ID = next_vertexes[index_of_reading];
-//         index_of_reading++;
-//         // if(next_ID==1714)
-//         //   std::cout << "GURG2.0!!!!!" << std::endl;
-//         // std::cout << "4" << std::endl;
-//         if(next_ID == -1)
-//             break;
-//         // std::cout << "5" << std::endl;
-//         Vertex vertex = graph[next_ID];
-//         // std::cout << "6" << std::endl;
-//         if (vertex.visited ==  false) 
-//         {
-//             bool dfs_result = dfs(vertex, stack, next_vertexes, index_of_reading, index_of_pushing, is_in_queue, graph,direction);
-//             // std::cout << "6bis" << std::endl;
-
-//             // if cycle found then there is no topological sort possible
-//             if (dfs_result == false) 
-//             {
-//               // std::cout << "gabul" << std::endl;
-//                 return {-9999};
-//             }
-//         }
-//         // std::cout << "7" << std::endl;
-//     }
-
-//     stack.shrink_to_fit();
-//     std::vector<int> result;result.reserve(stack.size());
-
-//     for (auto vertex : stack) {
-//         result.emplace_back(vertex.val);
-//     }
-//     result.shrink_to_fit();
-//     return result;
-// }
-
-// // returns null if no topological sort is possible
-// std::vector<int> topological_sort_by_dfs(std::vector<Vertex>& graph, std::string& direction) 
-// {
-//     std::vector<Vertex> stack;
-//     stack.reserve(graph.size());
-
-
-//     for(int next_ID = 0; next_ID< graph.size(); next_ID++)
-//     {
-//         Vertex& vertex = graph[next_ID];
-//         if (vertex.visited ==  false) 
-//         {
-//             bool dfs_result = dfs(vertex, stack, graph,direction);
-//             // std::cout << "6bis" << std::endl;
-
-//             // if cycle found then there is no topological sort possible
-//             if (dfs_result == false) 
-//             {
-//               // std::cout << "gabul" << std::endl;
-//                 return {-9999};
-//             }
-//         }
-//         // std::cout << "7" << std::endl;
-//     }
-
-//     stack.shrink_to_fit();
-//     std::vector<int> result;result.reserve(stack.size());
-
-//     for (auto vertex : stack) 
-//     {
-//         result.emplace_back(vertex.val);
-//     }
-//     result.shrink_to_fit();
-//     return result;
-// }
 
 #endif

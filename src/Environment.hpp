@@ -130,7 +130,8 @@ class Lake
       NodeGraphV2& graph,
       double cellarea,
       double dt,
-      std::vector<chonk>& chonk_network
+      std::vector<chonk>& chonk_network,
+      double& Ql_out
     );
 
     // Internal function checking the neighbors of a given node to ingest them in the lake queue

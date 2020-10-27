@@ -268,8 +268,15 @@ void chonk::move_to_steepest_descent(NodeGraphV2& graph, double dt, xt::pytensor
   }
 
 
+  if(all_minus_1 && graph.get_Srec(this->current_node) != this->current_node)
+  {
+    steepest_rec = graph.get_Srec(this->current_node);
+    steepest_S = 0.;
+  }
+
+
   // Base level! i am stopping the code there and treating it as a depression already solved to inhibit all the process
-  if(steepest_rec == this->current_node || all_minus_1 == true)
+  if(steepest_rec == this->current_node)
   {
     this->depression_solved_at_this_timestep = true;
     return;
@@ -303,6 +310,8 @@ void chonk::move_to_steepest_descent(NodeGraphV2& graph, double dt, xt::pytensor
   // }
 
   // There is a non-pit neighbor, let's save it with its attributes
+
+
   this->receivers.push_back(steepest_rec);
   this->weigth_water_fluxes.push_back(1.);
   this->weigth_sediment_fluxes.push_back(1.);
@@ -751,9 +760,7 @@ void chonk::active_simple_SPL(double n, double m, double K, double dt, double Xr
     // What has been eroded moves into the sediment flux (which needs to be converted into a volume)
     std::vector<double> buluf(this->other_attributes_arrays["label_tracker"].size(), 0.);
     buluf[label] = 1.;
-    std::cout << "bul";
     this->add_to_sediment_flux(this_eflux * Xres * Yres * dt, buluf);
-    std::cout << "ff";
     // recording the current flux 
     pre_sedfluxes[i] += this_eflux * Xres * Yres * dt;
 
@@ -806,7 +813,9 @@ void chonk::charlie_I(double n, double m, double K_r, double K_s,
   for(size_t i=0; i<this->receivers.size(); i++)
   {
     double this_Qw = this->water_flux * this->weigth_water_fluxes[i];
+
     double current_stream_power = std::pow(this_Qw,m) * std::pow(this->slope_to_rec[i],n);
+    // std::cout << "SLOPE IS " << this->slope_to_rec[i] << " CURRENT OMEGA = " << current_stream_power;
     // calculating the flux E = K s^n A^m
     double threshholder_bedrock = 0.;
     if(threshold_incision > 0)
@@ -854,11 +863,17 @@ void chonk::charlie_I(double n, double m, double K_r, double K_s,
 
   // Adding the eroded bedrock to the sediment flux
   std::vector<double> buluf(this->other_attributes_arrays["label_tracker"].size(), 0.);
+
+
   buluf[zone_label] = 1.;
+  // std::cout << "BA";
   this->add_to_sediment_flux(Er_tot * Xres * Yres * dt, buluf);
+  // std::cout << "BI";
 
   // Adding the sediment entrained into the sedimetn flux
+  // std::cout << "BE";
   this->add_to_sediment_flux(Es_tot * Xres * Yres * dt, sed_label_prop);
+  // std::cout << "L";
 
   this->sediment_flux = this->sediment_flux/depodivider;
 
@@ -991,7 +1006,7 @@ std::vector<double> mix_two_proportions(double prop1, std::vector<double> labpro
     val = val * prop2/prop_tot;
   }
 
-
+  // std::cout << "sum1:" << sum1 << " sum2 " << sum2 << "prop_tot " << prop_tot << "|" << prop1 << " " << prop2 ;
 
   if(sum1 == 0)
     return coplab2;
