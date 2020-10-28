@@ -311,6 +311,22 @@ void chonk::move_to_steepest_descent(NodeGraphV2& graph, double dt, xt::pytensor
 
   // There is a non-pit neighbor, let's save it with its attributes
 
+  // int steepest_rec = graph.get_Srec(this->current_node);
+
+  // double steepest_S;
+  // if(steepest_rec == this->current_node)
+  // {
+  //   throw std::runtime_error("D8MoveToItselfError::Should be detected before...");
+  //   return;
+  // }
+
+  // steepest_S = surface_elevation[this->current_node] - surface_elevation[steepest_rec];
+  // if(double_equals(steepest_S,0.,1e-6))
+  //   steepest_S = 0.;
+  // else
+  //   steepest_S = steepest_S/graph.get_length2Srec(this->current_node);
+
+  // std::cout << steepest_S << "||" << graph.get_length2Srec(this->current_node)  << std::endl;
 
   this->receivers.push_back(steepest_rec);
   this->weigth_water_fluxes.push_back(1.);
@@ -787,6 +803,7 @@ void chonk::charlie_I(double n, double m, double K_r, double K_s,
    // I am recording the current sediment fluxes in the model distributed for each receivers
   std::vector<double> pre_sedfluxes = get_preexisting_sediment_flux_by_receivers();
 
+  std::cout << "BITE?";
 
   double Er_tot = 0;
   double Es_tot = 0;
@@ -812,6 +829,8 @@ void chonk::charlie_I(double n, double m, double K_r, double K_s,
   // Calculation current fluxes
   for(size_t i=0; i<this->receivers.size(); i++)
   {
+
+    std::cout << "REC:" << this->receivers[i] << std::endl;
     double this_Qw = this->water_flux * this->weigth_water_fluxes[i];
 
     double current_stream_power = std::pow(this_Qw,m) * std::pow(this->slope_to_rec[i],n);

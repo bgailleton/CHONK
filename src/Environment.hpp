@@ -143,7 +143,10 @@ class Lake
       std::vector<Lake>& lake_network,
       xt::pytensor<double,1>& surface_elevation,
       std::vector<bool>& is_in_queue,
-      xt::pytensor<int,1>& active_nodes
+      xt::pytensor<int,1>& active_nodes,
+      std::vector<chonk>& chonk_network
+
+      
     );
 
     // Return the depth of this lake at a given node
@@ -395,6 +398,7 @@ class ModelRunner
     double get_Ql_out() {return Ql_out;};
 
     xt::pytensor<int,1> get_flat_mask(){return this->graph.get_flat_mask();};
+    void print_chonk_info(int node);
 
   protected:
 
@@ -466,6 +470,8 @@ class ModelRunner
 
     // Parameters dealing with mass balance checks
     double Qw_in, Qw_out, Ql_in, Ql_out;
+
+    std::vector<bool> is_processed;
 
 
   private:

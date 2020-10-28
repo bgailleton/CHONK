@@ -265,6 +265,12 @@ NodeGraphV2::NodeGraphV2(
   
   //Done
 
+  // for( auto re : this->graph[220].receivers)
+  //   std::cout << re << "||";
+
+  // std::cout << this->graph[220].Sreceivers << std::endl;
+  // throw std::runtime_error("checker!!");
+
 
   return;
 }

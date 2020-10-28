@@ -146,6 +146,7 @@ void get_D8_neighbors(int i, xt::pytensor<int,1>& active_nodes, std::vector<int>
 void get_D4_neighbors(int i, xt::pytensor<bool,1>& active_nodes, std::vector<int>& neightbouring_nodes, std::vector<double>& length2neigh);
 
 int get_Srec(int i) {return this->graph[i].Sreceivers;}
+double get_length2Srec(int i) {return this->graph[i].length2Srec;}
 
 std::vector<int> get_broken_nodes(){return not_in_stack;}
 
