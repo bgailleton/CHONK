@@ -641,7 +641,8 @@ void ModelRunner::process_node(int& node, std::vector<bool>& is_processed, int& 
                 lakoutid = this->lake_network[lakoutid].get_parent_lake();
           } 
           std::cout << "OUTLET 3 is " << outlet << std::endl;
-
+          if(active_nodes[outlet] == 0)
+            outlet = -9999;
           
 
             // // Simulating the refilling of a lake by reformatting the chonk
@@ -2281,11 +2282,11 @@ int Lake::check_neighbors_for_outlet_or_existing_lakes(
     outlet = next_node.node;
     
   }
-  if(outlet == 0)
-  {
+  // if(outlet == 0)
+  // {
 
-    throw std::runtime_error("Rec0Error from " + std::to_string(next_node.node));
-  }
+  //   throw std::runtime_error("Rec0Error from " + std::to_string(next_node.node));
+  // }
 
   return outlet;
 }
