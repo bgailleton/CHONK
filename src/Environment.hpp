@@ -305,7 +305,8 @@ class ModelRunner
     // Extremely annoying functions to code... they manage the particular case of underfilled lakes receiving water
     // from one of their supposedly "downstream" neightbour. This function finds all the nodes and lakes impacted
     void find_underfilled_lakes_already_processed_and_give_water(int SS_ID, std::vector<bool>& is_processed );
-    void find_nodes_to_reprocess(int start, std::vector<bool>& is_processed, std::vector<int>& nodes_to_reprocess, std::vector<int>& nodes_to_relake, int lake_to_avoid);
+    void find_nodes_to_reprocess(int start, std::vector<bool>& is_processed, std::vector<int>& nodes_to_reprocess, 
+        std::vector<int>& nodes_to_relake,std::vector<int>& nodes_to_recompute_neighbors_at_the_end, int lake_to_avoid);
 
     // Main function processing a given node. Call the fluxe managing functions and takes care of lake management
     void process_node(int& node, std::vector<bool>& is_processed, int& lake_incrementor, int& underfilled_lake,

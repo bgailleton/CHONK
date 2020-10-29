@@ -77,6 +77,7 @@ class chonk
     // Accessors and modifyers
     // # Admin attribute
     int get_current_location() {return current_node;}
+    void set_current_location(int cl) { current_node = cl;}
     // # Water flux
     double get_water_flux(){return water_flux;}
     void set_water_flux(double value){water_flux = value;}
