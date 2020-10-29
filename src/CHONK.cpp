@@ -803,7 +803,6 @@ void chonk::charlie_I(double n, double m, double K_r, double K_s,
    // I am recording the current sediment fluxes in the model distributed for each receivers
   std::vector<double> pre_sedfluxes = get_preexisting_sediment_flux_by_receivers();
 
-  std::cout << "BITE?";
 
   double Er_tot = 0;
   double Es_tot = 0;
@@ -830,7 +829,6 @@ void chonk::charlie_I(double n, double m, double K_r, double K_s,
   for(size_t i=0; i<this->receivers.size(); i++)
   {
 
-    std::cout << "REC:" << this->receivers[i] << std::endl;
     double this_Qw = this->water_flux * this->weigth_water_fluxes[i];
 
     double current_stream_power = std::pow(this_Qw,m) * std::pow(this->slope_to_rec[i],n);
@@ -855,26 +853,9 @@ void chonk::charlie_I(double n, double m, double K_r, double K_s,
 
     E_cap_s += (current_stream_power * K_s - threshholder_sed);
     
-
-    // double Ds = 0.;
-    // if(this_Qw > 0)
-    //   Ds = V_param * d_star * (this->sediment_flux/ (this_Qw * dt)) * this->weigth_sediment_fluxes[i];
-    
-    // std::cout << Es << "|" <<K_s << "|" << threshholder_sed << "|" << exp_sed_height_roughness << "|" <<  current_stream_power << std::endl;;
-
     Er_tot += Er;
     Es_tot += Es;
-    // Ds_tot += Ds;
-
-
-
-    // // stacking the erosion flux
-    // this->erosion_flux_undifferentiated += this_eflux;
-
-    // // What has been eroded moves into the sediment flux (which needs to be converted into a volume)
-    // std::vector<double> buluf(this->other_attributes_arrays["label_tracker"].size(), 0.);
-    // buluf[label] = 1.;
-    // this->add_to_sediment_flux(this_eflux * Xres * Yres * dt, buluf);
+ 
     // // recording the current flux 
     pre_sedfluxes[i] += (Er + Es) * Xres * Yres * dt / depodivider;
 
@@ -885,39 +866,25 @@ void chonk::charlie_I(double n, double m, double K_r, double K_s,
 
 
   buluf[zone_label] = 1.;
-  // std::cout << "BA";
   this->add_to_sediment_flux(Er_tot * Xres * Yres * dt, buluf);
-  // std::cout << "BI";
 
   // Adding the sediment entrained into the sedimetn flux
-  // std::cout << "BE";
   this->add_to_sediment_flux(Es_tot * Xres * Yres * dt, sed_label_prop);
-  // std::cout << "L";
 
   this->sediment_flux = this->sediment_flux/depodivider;
 
   if(this->receivers.size()>0)
   {
-    // std::cout << "|b|" << weigth_sediment_fluxes[0];
     for(size_t i=0; i<this->receivers.size(); i++)
     {
       if(this->sediment_flux>0)
         this->weigth_sediment_fluxes[i] = pre_sedfluxes[i]/this->sediment_flux;
     }
-    // std::cout << "|a|" << weigth_sediment_fluxes[0];
   }
-  
-  // Calculation current fluxes
-  // for(size_t i=0; i<this->receivers.size(); i++)
-  // {
-  //   double this_Qw = this->water_flux * this->weigth_water_fluxes[i];
-  //   if(this_Qw > 0)
-  //     Ds_tot += V_param * d_star * (this->sediment_flux/ (this_Qw * dt)) * this->weigth_sediment_fluxes[i];
-  // }
+
   Ds_tot += V_param * d_star * (this->sediment_flux/ (this->water_flux * dt));
 
   // removing the deposition from sediment flux
-  // this->add_to_sediment_flux(-1 * Ds_tot * Xres * Yres * dt, this->other_attributes_arrays["label_tracker"]);
 
   // Applying to the global fluxes
   this->erosion_flux_only_bedrock += Er_tot;
@@ -948,8 +915,6 @@ void chonk::charlie_I(double n, double m, double K_r, double K_s,
     new_sed_height = dimless_roughness * std::log( A * (B * (C + 1) - 1));
   }
 
-  // if(std::isnan(new_sed_height))
-  //   throw std::runtime_error("nan H:" + std::to_string((Ds_tot/(1-phi))/E_cap_s) + ":" + std::to_string(E_cap_s) );
   double new_sedcrea = (new_sed_height - this_sed_height) / dt;
   this->add_sediment_creation_flux(new_sedcrea);
 
@@ -960,27 +925,6 @@ void chonk::charlie_I(double n, double m, double K_r, double K_s,
     std::cout << new_sed_height << "||" << this_sed_height << "||" << Es_tot << "||" << Ds_tot << "||" << this->sediment_flux << "||" << this->water_flux<< std::endl;
     throw std::runtime_error("Sedcrea getting nan value in CHARLIE_I");
   }
-  // double sum_weight = 0.;
-  // for(auto v:this->weigth_water_fluxes)
-  //   sum_weight += v;
-  // sum_weight = std::round(sum_weight * 100)/100;
-  // if(sum_weight != 0 && sum_weight != 1)
-  //   throw std::runtime_error("WATERWEIGHTERROR::" + std::to_string(sum_weight));
-  // sum_weight = 0.;
-  // for(auto v:this->weigth_sediment_fluxes)
-  //   sum_weight += v;
-  // sum_weight = std::round(sum_weight * 100)/100;
-
-  // if(sum_weight != 0 && sum_weight != 1)
-  //   throw std::runtime_error("SEDWEIGHTERROR::" + std::to_string(sum_weight));
-
-  // if(this->deposition_flux>1e2)
-  // {
-  //   std::cout << Er_tot << "|" << Es_tot << "|" <<  this->sediment_flux  << std::endl;
-  //   // throw std::runtime_error("SHIT::" + std::to_string(Ds_tot));
-  // }
-    // Now I need to recalculate the sediment fluxes weights to each receivers
-  // std::cout << Er_tot * dt << "|";
 
   // Done
   return;
