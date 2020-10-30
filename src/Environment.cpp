@@ -1927,7 +1927,7 @@ void Lake::drape_deposition_flux_to_chonks(std::vector<chonk>& chonk_network, xt
     return;
 
   double ratio_of_dep = this->volume_of_sediment/this->volume;
-  std::cout << this->volume_of_sediment << "||" << this->volume << std::endl;
+  // std::cout << this->volume_of_sediment << "||" << this->volume << std::endl;
 
   // NEED TO DEAL WITH THAT BOBO
   if(ratio_of_dep>1)
