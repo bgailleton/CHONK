@@ -240,7 +240,9 @@ void ModelRunner::process_node(int& node, std::vector<bool>& is_processed, int& 
       // pouring sediment into the lake
       this->lake_network[lakeid].pour_sediment_into_lake(sedvol, this->chonk_network[node].get_other_attribute_array("label_tracker") );      
       // Pouring water into the lake, it also finds if there is an outlet and reprocess the water fluxes for dat one
+      std::cout << "bo";
       this->lake_network[lakeid].pour_water_in_lake(water_volume, node, node_in_lake, is_processed, inctive_nodes,lake_network, surface_elevation,graph, cellarea, timestep,chonk_network,this->Ql_out);
+      std::cout << "ris";
     
       // getting the outlet node of my lake. aOOOOOOOOOOOO . will be -9999 if there is no
       int outlet = this->lake_network[lakeid].get_lake_outlet();      
@@ -350,8 +352,10 @@ void ModelRunner::process_node(int& node, std::vector<bool>& is_processed, int& 
 
             // Pouring water into the new lake
             // std::cout << "bulf?" << std::endl;
+      std::cout << "dar";
             this->lake_network[lakoutid].pour_water_in_lake(this->lake_network[lakeid].get_outletting_chonk().get_water_flux() * this->timestep,
              outlet, node_in_lake, is_processed, inctive_nodes,lake_network, surface_elevation,graph, cellarea, timestep,chonk_network, this->Ql_out);
+      std::cout << "de";
             // std::cout << "bulf!" << std::endl;
 
             // Getting new outlet
@@ -659,9 +663,16 @@ void ModelRunner::process_node(int& node, std::vector<bool>& is_processed, int& 
           // saving the ingested lakes by this girl
           std::vector<int> prelakingestor = this->lake_network[tlakeid].get_ingested_lakes();
 
+          if(water_to_add<0)
+          {
+            water_to_add = 0;
+            sed_to_add = 0;
+          }
           this->lake_network[tlakeid].pour_sediment_into_lake(sed_to_add,baluf);
+      std::cout << "de";
           this->lake_network[tlakeid].pour_water_in_lake(water_to_add,node_id, node_in_lake, is_processed, active_nodes, lake_network, surface_elevation, 
             this->graph,this->io_double["dx"]*this->io_double["dy"], this->timestep, this->chonk_network, this->Ql_out);
+      std::cout << "phine";
           
           // checking the state of ingestion
           std::vector<int> postlakingestor = this->lake_network[tlakeid].get_ingested_lakes();
@@ -1982,6 +1993,12 @@ void Lake::pour_water_in_lake(
 
 
   std::cout << "Entering water volume is " << water_volume << " hence water flux is " <<  water_volume/dt << std::endl;
+
+
+  if(water_volume < -1)
+    throw std::runtime_error("NegWatPoured!!!");
+
+
   double save_entering_water = water_volume;
   double save_preexistingwater = this->volume;
   int n_labels = int(chonk_network[originode].get_other_attribute_array("label_tracker").size());
@@ -2108,9 +2125,9 @@ void Lake::pour_water_in_lake(
 
   // if(save_entering_water = save_preexistingwater)
 
-  // std::cout << "LOCAL BALANCE SHOULD BE 0::" << local_balance << std::endl;
-  // std::cout << "After raw filling lake water volume is " << water_volume << " hence water flux is " <<  water_volume/dt << std::endl;
-  // std::cout << "Outletting in " << this->outlet_node << std::endl;;
+  std::cout << "LOCAL BALANCE SHOULD BE 0::" << local_balance << std::endl;
+  std::cout << "After raw filling lake water volume is " << water_volume << " hence water flux is " <<  water_volume/dt << std::endl;
+  std::cout << "Outletting in " << this->outlet_node << std::endl;;
 
   // if(this->outlet_node>=0)
   // {
@@ -2133,7 +2150,9 @@ void Lake::pour_water_in_lake(
   {
     double extra = abs(water_volume);
     // this->n_nodes -= 1;
+    std::cout << this->nodes.size() - 1 << std::endl;
     int extra_node = this->nodes[this->nodes.size() - 1];
+    std::cout << ":bulf" << std::endl;
     this->depressionfiller.emplace(nodium(extra_node,surface_elevation[extra_node]));
     this->nodes.erase(this->nodes.begin() + this->nodes.size() - 1);
     sum_this_fill -= extra;
@@ -2150,7 +2169,7 @@ void Lake::pour_water_in_lake(
 
   // Ql_out += sum_this_fill/dt;
 
-  std::cout << "Water balance: " << this->volume - save_preexistingwater + water_volume << "should be equal to " << save_entering_water << std::endl;
+  // std::cout << "Water balance: " << this->volume - save_preexistingwater + water_volume << "should be equal to " << save_entering_water << std::endl;
 
 
   // Labelling the node in depression as belonging to this lake and saving their depth
@@ -2203,6 +2222,8 @@ void Lake::pour_water_in_lake(
       {
         SS = this_slope;
         SS_ID = receivers[i];
+        std::cout << "HURE::" << SS_ID << "||" << nodelakeid << "||" << node_in_lake[SS_ID]  << std::endl;
+
       }
     }
 
@@ -2212,6 +2233,7 @@ void Lake::pour_water_in_lake(
       int lsr = node_in_lake[sr];
       if(sr != this->outlet_node && lsr != this->lake_id && lake_network[lsr].get_parent_lake() != this->lake_id)
       {
+        std::cout << "HERE" << std::endl;
         SS_ID = sr;
         SS = 0;
       }
@@ -2219,6 +2241,8 @@ void Lake::pour_water_in_lake(
       // yes it can be: flat surfaces
       else
       {
+        std::cout << "HARE" << std::endl;
+
         // throw std::runtime_error(" The lake has an outlet with no downlslope neighbors ??? This is not possible, check Lake::initial_lake_fill or warn Boris that it happened");
 
         SS_ID = this->outlet_node;
@@ -2228,15 +2252,12 @@ void Lake::pour_water_in_lake(
 
     // here I am checking if my receiver is directly a lake, in whihc case I put my outlet directly in this lake to trigger merge. It will be simpler that way
     int SSlid = node_in_lake[SS_ID];
-    if(lake_network[SSlid].get_parent_lake() >= 0)
-      SSlid = lake_network[SSlid].get_parent_lake();
-
     bool SSlid_happened = false;
     if(SSlid >= 0)
     {
-      if(SSlid == this->lake_id)
-        throw std::runtime_error("Wjy is this happening");
-      
+      if(lake_network[SSlid].get_parent_lake() >= 0)
+        SSlid = lake_network[SSlid].get_parent_lake();
+
       SSlid_happened = true;
       // and I add the outlet of this thingy to the lake
       this->n_nodes ++;
@@ -2253,9 +2274,11 @@ void Lake::pour_water_in_lake(
       for(auto dut:toreadd)
         this->depressionfiller.push(dut);
 
-      std::cout << this->outlet_node << std::endl;
       // Formerly add the node to the lake
-      this->depths[this->outlet_node] = 0; // should be 0 here yo
+      this->nodes.push_back(this->outlet_node);
+      this->outlet_node = SS_ID;
+
+      this->depths[this->outlet_node] = this->water_elevation - surface_elevation[this->outlet_node]; // should be 0 here yo
       node_in_lake[this->outlet_node] = this->lake_id;
       double temp_watflux = chonk_network[this->outlet_node].get_water_flux();
       double temp_sedflux = chonk_network[this->outlet_node].get_sediment_flux();
@@ -2264,7 +2287,6 @@ void Lake::pour_water_in_lake(
       chonk_network[this->outlet_node].set_water_flux(temp_watflux);
       chonk_network[this->outlet_node].set_sediment_flux(temp_sedflux,oatlab);
       chonk_network[this->outlet_node].initialise_local_label_tracker_in_sediment_flux(n_labels);
-      this->outlet_node = SS_ID;
     }
 
     // resetting the outlet CHONK
