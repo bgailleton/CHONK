@@ -401,6 +401,9 @@ class ModelRunner
     xt::pytensor<int,1> get_flat_mask(){return this->graph.get_flat_mask();};
     void print_chonk_info(int node);
 
+    inline void increment_new_lake(int& lakeid);
+
+
   protected:
 
     // timestep of the model

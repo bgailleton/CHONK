@@ -212,6 +212,7 @@ void ModelRunner::process_node(int& node, std::vector<bool>& is_processed, int& 
     // Uf the lake solving is activated, then I go through the (more than I expected) complex process of filing a lake correctly
     if(this->lake_solver) 
     {
+
       // 1) checking if my node has a lake ID  
       int lakeid = this->node_in_lake[node];
 
@@ -222,19 +223,13 @@ void ModelRunner::process_node(int& node, std::vector<bool>& is_processed, int& 
       }
       
 
+      // Checking the lake existing status
       // if It has no preexisting lake AND is the bottom of the depression, I initiate a new lake in the lake network
       if(this->graph.is_depression(node) && lakeid == -1)
-      { 
-        this->lake_network.push_back(Lake(lake_incrementor));
-        lakeid = lake_incrementor;
-        lake_incrementor++;
-      }
-
-       // If my existing lake has a parent (ie a mother lake that had ingested it beforehand) then I consider the new as the one
+        this->increment_new_lake(lakeid);
       else if(this->lake_network[lakeid].get_parent_lake() >= 0)
-      {
         lakeid = this->lake_network[lakeid].get_parent_lake();
-      }
+      // If my existing lake has a parent (ie a mother lake that had ingested it beforehand) then I consider the new as the one
 
       // I have my existing/new lake in the (hopefuly) correct form, I need now to pour water in it
       // Calculating volume: the water flux of my CHONK * timestep (to transform into a volume of water)
@@ -250,23 +245,24 @@ void ModelRunner::process_node(int& node, std::vector<bool>& is_processed, int& 
       // getting the outlet node of my lake. aOOOOOOOOOOOO . will be -9999 if there is no
       int outlet = this->lake_network[lakeid].get_lake_outlet();      
 
+
+      // NO OUTLET, MY DEED IS DONE!
       // OK first step is to check wether this outlet is a lake itself or not
       if(outlet < 0)
         return;
 
+      // there is an outlet, is this outlet in a lake? It can happen in veryr rare cases
       int lakoutid = node_in_lake[outlet];
       if(lakoutid >= 0)
       {
         if(this->lake_network[lakoutid].get_parent_lake() >= 0)
           lakoutid = this->lake_network[lakoutid].get_parent_lake();
       }
-
-      
       
       // Checking if my node is active (i.e at a boundary or not)
       xt::pytensor<int,1>& active_nodes = this->io_int_array["active_nodes"];
 
-      // if in boundary: just transmit the flux and fuck off
+      // if in boundary: just transmit the flux and fuck off!
       if(active_nodes[outlet] == false)
       {
         chonk& this_chonk = this->lake_network[lakeid].get_outletting_chonk();
@@ -276,8 +272,7 @@ void ModelRunner::process_node(int& node, std::vector<bool>& is_processed, int& 
         return;
       }
 
-
-      // checking if my final outlet exists AND has been processed before
+      // Same comment if me outlet is not processed yet (rare): I just transmit the fluxes which will be taken off later
       if(is_processed[outlet] == false)
       {
         this->chonk_network[outlet].add_to_water_flux(this->lake_network[lakeid].get_outletting_chonk().get_water_flux());
@@ -286,32 +281,33 @@ void ModelRunner::process_node(int& node, std::vector<bool>& is_processed, int& 
         return;
       }
 
+
+      // right, Now I do have an outlet
       if(outlet >= 0)
       {
+        // this is where shit happens quite a lot
+        // I need to reprocess my lakes and nodes in cascade. It does not happens that often and usually is straightforward, but it can happens quite a lot at the start of some iterations
+        // with white noise for example
 
-        // std::cout << "OUTLET 0.1 is " << outlet << std::endl;
-        // std::cout << "Bulf3.2" << std::endl;
-        // Arg it has been, then this is where the code reprocess a bunch of node. It happens in two relatively rare cases:
-        // 1) the lake is outletting into an imbricated upstream but underfilled depression, then all the node had been processed to check wether this depression could be filled and plot twist it could not
-        // hence the reprocessing of the intermediate nodes to make sure I process them correctly before pouring more water into the dowstream(s) lake
-        // 2) Rare but can happen: my outlet does not correspond to the approximation of cordonnier et al. 2019
-        // The algorithm approximate lake outlets with a d8 flow routing, which in very rare cases does not correspond to the real case (especially in convoluted random noise landscapes)
-        // then usually a small pan of landscape needs to be reprocessed
 
+        // i will need a bunch of container to store temporary states of nodes and lake
         // Initiating the vector of nodes affected by this problem
-        std::map<int, double > lake_water_corrector, lake_sed_corrector;
+        std::map<int, double > lake_water_corrector, lake_sed_corrector; // deprecated
+        // Maps storing the water and sediments to be added in each lakes, as well as where does the thing comes from
         std::map<int, double > lake_water, lake_sed; std::map<int,int> lake_node_entry;
         std::map<int, std::vector<int> > lake_node_per_lake; // will replace the corrector in order to avoid stacking nodes
         std::map<int, std::vector<double> > lake_node_per_lake_valwat; // will replace the corrector in order to avoid stacking nodes
         std::map<int, std::vector<double> > lake_node_per_lake_valsed; // will replace the corrector in order to avoid stacking nodes
         std::map<int, std::vector< std::vector<double> > > lake_node_per_lake_oatablab; // will replace the corrector in order to avoid stacking nodes
         
-        std::map<int, chonk > lake_chonks;
+        std::map<int, chonk > lake_chonks; // deprecated
+        // queue of lake to be processed
         std::deque<int> lake_to_process;
+        // checker to which lakes are in the processing queue
         std::vector<bool> lakeinQ(this->lake_network.size(),false);
 
 
-        // TO DO OPTIMISE THIS
+        // TO DO :: OPTIMISE THIS
         // preparing an array of active nodes in boolean form
         xt::pytensor<bool,1> temp_bool = xt::zeros<bool>({this->io_int["n_elements"]});
         size_t it = 0;
@@ -329,6 +325,8 @@ void ModelRunner::process_node(int& node, std::vector<bool>& is_processed, int& 
         {
           // std::cout << "OUTLET IS " << outlet << std::endl;
 
+
+          // From here, I am in the loop processing all lakes and nodes needing reprocessing
           // This steps check wether the lake outflows directly in another lake
           // UPDATE:: I DONT THINK IT EVER HAPPENS!!!
           // UPDATE 2:: It rarely does actually
@@ -338,9 +336,11 @@ void ModelRunner::process_node(int& node, std::vector<bool>& is_processed, int& 
             // std::cout << "OUTLET 0.01 is " << outlet << std::endl;
             // throw std::runtime_error("HAPPENS f45v");?
 
-
+            // lakeid is my current lake, the one that has been processed and is outletting
             if(lake_network[lakeid].get_parent_lake()>=0)
               lakeid = lake_network[lakeid].get_parent_lake();
+
+            // lakoutid is the id of the outlet of me lake
             if(lake_network[lakoutid].get_parent_lake()>=0)
               lakoutid = lake_network[lakoutid].get_parent_lake();
 
@@ -844,6 +844,12 @@ void ModelRunner::process_node_nolake_for_sure(int& node, std::vector<bool>& is_
     this->chonk_network[node].split_and_merge_in_receiving_chonks(this->chonk_network, this->graph, this->io_double_array["surface_elevation_tp1"], io_double_array["sed_height_tp1"], this->timestep);
 }
 
+void ModelRunner::increment_new_lake(int& lakeid)
+{
+  this->lake_network.push_back(Lake(lake_incrementor));
+  lakeid = lake_incrementor;
+  lake_incrementor++;
+}
 
 void ModelRunner::finalise()
 {
@@ -1972,10 +1978,10 @@ void Lake::pour_water_in_lake(
   )
 { 
 
-  // std::cout << "Pouring " << water_volume << " water (rate = " << water_volume/dt << ") into " << this->lake_id << " from node " << originode << std::endl;
+  std::cout << "Pouring " << water_volume << " water (rate = " << water_volume/dt << ") into " << this->lake_id << " from node " << originode << std::endl;
 
 
-  // std::cout << "Entering water volume is " << water_volume << " hence water flux is " <<  water_volume/dt << std::endl;
+  std::cout << "Entering water volume is " << water_volume << " hence water flux is " <<  water_volume/dt << std::endl;
   double save_entering_water = water_volume;
   double save_preexistingwater = this->volume;
   int n_labels = int(chonk_network[originode].get_other_attribute_array("label_tracker").size());
@@ -2017,9 +2023,11 @@ void Lake::pour_water_in_lake(
   // I am processing new nodes while I still have water OR still nodes upstream 
   // (if an outlet in encountered, the loop is breaked anually)
   // UPDATE_09_2020:: No idea what I meant by anually.
+  // UPDATE_10_2020:: I meant manually, but with a typo.
+  std::cout << "starting loop" << std::endl;
   while(depressionfiller.empty() == false && water_volume > 0 )
   {
-    std::cout << this->water_elevation << "||" << water_volume << std::endl;
+    // std::cout << this->water_elevation << "||" << water_volume << std::endl;
     // Getting the next node and ...
     // (If this is the first time I fill a lake -> the first node is returned)
     // (If this is another node, it is jsut the next one the closest elevation to the water level)
@@ -2093,6 +2101,7 @@ void Lake::pour_water_in_lake(
     this->n_nodes ++;
     // At this point I either have enough water to carry on or I stop the process
   }
+  std::cout << "ending loop" << std::endl;
 
 
   double local_balance = (save_entering_water - water_volume)/dt -  sum_this_fill/dt;
@@ -2141,7 +2150,7 @@ void Lake::pour_water_in_lake(
 
   // Ql_out += sum_this_fill/dt;
 
-  // std::cout << "Water balance: " << this->volume - save_preexistingwater + water_volume << "should be equal to " << save_entering_water << std::endl;
+  std::cout << "Water balance: " << this->volume - save_preexistingwater + water_volume << "should be equal to " << save_entering_water << std::endl;
 
 
   // Labelling the node in depression as belonging to this lake and saving their depth
@@ -2217,6 +2226,47 @@ void Lake::pour_water_in_lake(
       }
     }
 
+    // here I am checking if my receiver is directly a lake, in whihc case I put my outlet directly in this lake to trigger merge. It will be simpler that way
+    int SSlid = node_in_lake[SS_ID];
+    if(lake_network[SSlid].get_parent_lake() >= 0)
+      SSlid = lake_network[SSlid].get_parent_lake();
+
+    bool SSlid_happened = false;
+    if(SSlid >= 0)
+    {
+      if(SSlid == this->lake_id)
+        throw std::runtime_error("Wjy is this happening");
+      
+      SSlid_happened = true;
+      // and I add the outlet of this thingy to the lake
+      this->n_nodes ++;
+      // removing it from the depressionfiller queue while making sure I readd others (the node should be right at the top of the queue so it will not empty and refill the whole queue)
+      std::vector<nodium> toreadd;
+      nodium dat = this->depressionfiller.top();
+      this->depressionfiller.pop();
+      while(dat.node != this->outlet_node)
+      {
+        toreadd.push_back(dat);
+        dat = this->depressionfiller.top();
+        this->depressionfiller.pop();
+      }
+      for(auto dut:toreadd)
+        this->depressionfiller.push(dut);
+
+      std::cout << this->outlet_node << std::endl;
+      // Formerly add the node to the lake
+      this->depths[this->outlet_node] = 0; // should be 0 here yo
+      node_in_lake[this->outlet_node] = this->lake_id;
+      double temp_watflux = chonk_network[this->outlet_node].get_water_flux();
+      double temp_sedflux = chonk_network[this->outlet_node].get_sediment_flux();
+      std::vector<double> oatlab = chonk_network[this->outlet_node].get_other_attribute_array("label_tracker");
+      chonk_network[this->outlet_node].reset();
+      chonk_network[this->outlet_node].set_water_flux(temp_watflux);
+      chonk_network[this->outlet_node].set_sediment_flux(temp_sedflux,oatlab);
+      chonk_network[this->outlet_node].initialise_local_label_tracker_in_sediment_flux(n_labels);
+      this->outlet_node = SS_ID;
+    }
+
     // resetting the outlet CHONK
     // if(is_processed[this->outlet_node])
     // {
@@ -2262,7 +2312,7 @@ void Lake::pour_water_in_lake(
   
 
   }
-  // std::cout << "done with lake " << this->lake_id << " outlet is " << this->outlet_node << std::endl;
+  std::cout << "done with lake " << this->lake_id << " outlet is " << this->outlet_node << std::endl;
 
 
   return;
