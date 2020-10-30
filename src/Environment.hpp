@@ -104,7 +104,7 @@ class Lake
     Lake() {};
     // Default initialiser
     Lake(int lake_id)
-    {this->lake_id = lake_id; n_nodes = 0; surface = 0; volume = 0; water_elevation = 0; outlet_node = -9999; nodes = std::vector<int>(); has_been_ingeted = -9999; volume_of_sediment = 0.; }
+    {this->lake_id = lake_id;ngested_nodes = 0; n_nodes = 0; surface = 0; volume = 0; water_elevation = 0; outlet_node = -9999; nodes = std::vector<int>(); has_been_ingeted = -9999; volume_of_sediment = 0.; }
 
     // This functions ingest a whole existing lake into the current one *slurp*
     void ingest_other_lake(
@@ -191,7 +191,7 @@ class Lake
 
     void drape_deposition_flux_to_chonks(std::vector<chonk>& chonk_network, xt::pytensor<double,1>& surface_elevation, double timestep);
 
-
+    double get_water_elevation(){return water_elevation;};
 
   protected:
     // Lake ID, i.e. the lake place in the parent environment vector of lakes
@@ -208,6 +208,9 @@ class Lake
     double volume_of_sediment;
     // The node outletting the lake
     int outlet_node;
+
+    // Temporary node counter
+    int ngested_nodes;
 
     // outlet fluxes, representative particule holding lakes characteristic in order to propagate it downstream
     chonk outlet_chonk;

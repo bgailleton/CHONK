@@ -416,6 +416,7 @@ void ModelRunner::process_node(int& node, std::vector<bool>& is_processed, int& 
 
               // the checker set helps me keeping track of which nodes to process
               checker.insert(newnode);
+              // std::cout << newnode << "IOIO";
             }
 
             // Saving the fluxes pre correction in the lakes, in order to be able to correct it
@@ -487,7 +488,6 @@ void ModelRunner::process_node(int& node, std::vector<bool>& is_processed, int& 
               // only reprocessing the noe if is in the list of course          
               if(checker.find(inode) != checker.end())
               {
-                // std::cout << "Cancelling fluxes on " << inode << std::endl;
                 // cancelling the fluxes
                 this->chonk_network[inode].cancel_split_and_merge_in_receiving_chonks(this->chonk_network, this->graph, this->timestep);
                 // Cancelling the prefluxes (will be readded anyway)
@@ -505,6 +505,9 @@ void ModelRunner::process_node(int& node, std::vector<bool>& is_processed, int& 
 
             }
 
+
+            // this->chonk_network[outlet].cancel_split_and_merge_in_receiving_chonks(this->chonk_network, this->graph, this->timestep);
+
             // std::cout << "OUTLET 0.5 is " << outlet << std::endl;
             // Last but not least, dealing with the outlet
             // this->cancel_fluxes_before_moving_prep(this->chonk_network[outlet], this->label_array[outlet]);
@@ -520,7 +523,7 @@ void ModelRunner::process_node(int& node, std::vector<bool>& is_processed, int& 
 
             this->chonk_network[outlet].external_moving_prep(rec,wwf,wsf,slope2rec);
             this->chonk_network[outlet].set_water_flux(this_chonk.get_water_flux());
-            // std::cout << outlet << "<----" << std::endl;
+            std::cout << outlet << "<----> will be giving " << this_chonk.get_water_flux() << std::endl;
 
             // std::cout << "OUTLET 0.6 is " << outlet << std::endl;
             std::vector<double> oatlab = this_chonk.get_other_attribute_array("label_tracker");
@@ -539,7 +542,9 @@ void ModelRunner::process_node(int& node, std::vector<bool>& is_processed, int& 
             this->chonk_network[outlet].set_deposition_flux(0.);
             // std::cout << "bo";
             // if(active_nodes[outlet]==1)
+            std::cout << "MAMAMAMA" << std::endl;
             this->process_node_nolake_for_sure(outlet, is_processed, lake_incrementor, underfilled_lake, inctive_nodes, cellarea, surface_elevation, false, false);
+            std::cout << "COMMON" << std::endl;
             // std::cout << "ris" << "|"; 
             // std::cout << "OUTLET 0.67 is " << outlet << std::endl;
 
@@ -849,9 +854,13 @@ void ModelRunner::process_node_nolake_for_sure(int& node, std::vector<bool>& is_
     // first step is to apply the right move method, to prepare the chonk to move
     if(need_move_prep)
       this->manage_move_prep(this->chonk_network[node]);
-  
-    this->manage_fluxes_after_moving_prep(this->chonk_network[node],this->label_array[node]);
+    
+    std::cout << node << " WILL BE GIVING TO ";
 
+    this->manage_fluxes_after_moving_prep(this->chonk_network[node],this->label_array[node]);
+    for(auto galb:this->chonk_network[node].get_chonk_receivers())
+      std::cout << galb << "|";
+    std::cout << std::endl;
     this->chonk_network[node].split_and_merge_in_receiving_chonks(this->chonk_network, this->graph, this->io_double_array["surface_elevation_tp1"], io_double_array["sed_height_tp1"], this->timestep);
 }
 
@@ -897,6 +906,9 @@ void ModelRunner::finalise()
     if(node_in_lake[i]>=0)
     {
       int lakeid = node_in_lake[i];
+      if(this->lake_network[lakeid].get_parent_lake() > 0)
+        lakeid = this->lake_network[lakeid].get_parent_lake();
+
       double tdepth = lake_network[lakeid].get_lake_depth_at_node(i,node_in_lake);
       tlake_depth[i] = tdepth;
     }
@@ -970,8 +982,12 @@ void ModelRunner::finalise()
 
   }
 
-  this->Ql_out += xt::sum(tlake_depth - this->io_double_array["lake_depth"])() * this->io_double["dx"] * this->io_double["dy"] / this->timestep;
-   // std::cout <<"3.6" << std::endl;
+  // this->Ql_out += xt::sum(tlake_depth - this->io_double_array["lake_depth"])() * this->io_double["dx"] * this->io_double["dy"] / this->timestep;
+  for(int i=0; i<this->io_int["n_elements"]; i++)
+  {
+    this->Ql_out += (tlake_depth[i] - this->io_double_array["lake_depth"][i]) * this->io_double["dx"] * this->io_double["dy"] / this->timestep;
+  }
+  
   this->io_double_array["lake_depth"] = tlake_depth;
    // std::cout <<"3.7" << std::endl;
 
@@ -1822,11 +1838,19 @@ void Lake::ingest_other_lake(
    std::vector<Lake>& lake_network
    )
 {
+  std::cout << "LAKE " << this->lake_id << " is ingesting lake " << other_lake.get_lake_id() << std::endl;
   // getting the attributes of the other lake
   std::vector<int>& these_nodes = other_lake.get_lake_nodes();
   std::vector<int>& these_node_in_queue = other_lake.get_lake_nodes_in_queue();
   std::unordered_map<int,double>& these_depths = other_lake.get_lake_depths();
   std::priority_queue< nodium, std::vector<nodium>, std::greater<nodium> >& this_PQ = other_lake.get_lake_priority_queue();
+
+  // if(this->water_elevation != other_lake.get_water_elevation())
+  // {
+  //   std::cout << this->water_elevation << "||" << other_lake.get_water_elevation() << std::endl;
+  //   throw std::runtime_error("IOIOIOIOIOIO");
+  // }
+
   // merging them into this lake while node forgetting to label them as visited and everything like that
   for(auto node:these_nodes)
   {
@@ -1842,7 +1866,11 @@ void Lake::ingest_other_lake(
 
   this->depths.insert(these_depths.begin(), these_depths.end());
 
-  this->n_nodes += other_lake.get_n_nodes();
+  this->ngested_nodes += int(other_lake.get_n_nodes());
+  // this->n_nodes += other_lake.get_n_nodes();
+
+  // if(int(these_nodes.size()) !=other_lake.get_n_nodes() )
+  //   throw std::runtime_error("TRRTRTTSTSK");
 
   // Transferring the PQ (not ideal but meh...)
   while(this_PQ.empty() == false)
@@ -2063,7 +2091,7 @@ void Lake::pour_water_in_lake(
     // If I have an outlet, then the outlet node is positive
     if(outlet >= 0)
     {
-      this->water_elevation = next_node.elevation;
+      // this->water_elevation = next_node.elevation;
 
       // I therefore save it and break the loop
       // std::cout << "{" << outlet << "|" << this->outlet_node << "}";
@@ -2110,6 +2138,17 @@ void Lake::pour_water_in_lake(
     // (if other node -> lake water elevation)
     this->water_elevation = next_node.elevation;
 
+    // Alright, what is hapenning here:
+    // I sometimes ingest other lakes, but I do not consider the ingested ndoes in my n_nodes at ingestion
+    // Why? because I would be rising a lot more nodes to water elevation than intended and artificially fill my lakes.
+    // So I am adding tham after dealing wih dV
+    if(this->ngested_nodes>0)
+    {
+      this->n_nodes += this->ngested_nodes;
+      std::cout << "ADDED " <<  this->ngested_nodes << " AFTER DV AND INGESTING" << std::endl;
+      this->ngested_nodes = 0;
+    }
+
     if(outlet >= 0)
       break;
         // Otehr wise, I do not have an outlet and I can save this node as in depression
@@ -2127,7 +2166,7 @@ void Lake::pour_water_in_lake(
 
   std::cout << "LOCAL BALANCE SHOULD BE 0::" << local_balance << std::endl;
   std::cout << "After raw filling lake water volume is " << water_volume << " hence water flux is " <<  water_volume/dt << std::endl;
-  std::cout << "Outletting in " << this->outlet_node << std::endl;;
+  std::cout << "Outletting in " << this->outlet_node << " AND I HAVE " << this->n_nodes << std::endl;;
 
   // if(this->outlet_node>=0)
   // {
@@ -2303,7 +2342,7 @@ void Lake::pour_water_in_lake(
     this->outlet_chonk.set_water_flux(out_water_rate);
 
     // Forcing receivers
-    // std::cout << "SS ID for routletting is " << SS_ID << std::endl;
+    std::cout << "SS ID for routletting is " << SS_ID << " and should receive " << out_water_rate << std::endl;
     std::vector<int> rec = {SS_ID};
     std::vector<double> wwf = {1.};
     std::vector<double> wws = {1.};
@@ -2411,6 +2450,7 @@ int Lake::check_neighbors_for_outlet_or_existing_lakes(
       // Well, before drinking it I need to make sure that I did not already ddid it
       if(lake_network[lake_index].get_parent_lake() == this->lake_id)
         continue;
+
       // OK let's try to drink it 
       this->ingest_other_lake(lake_network[lake_index], node_in_lake, is_in_queue,lake_network);
       has_eaten = true; 

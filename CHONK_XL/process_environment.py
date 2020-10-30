@@ -186,6 +186,7 @@ class CoreModel:
 	surface_elevation = xs.foreign(Topography, 'surface_elevation')
 	sed_height = xs.foreign(Topography, 'sed_height')
 	active_nodes = xs.foreign(BoundaryConditions, 'active_nodes')
+	topolake = xs.variable(dims = ('y','x'), intent = 'out')
 
 	dx = xs.foreign(GridSpec,'dx')
 	dy = xs.foreign(GridSpec,'dy')
@@ -247,6 +248,7 @@ class CoreModel:
 		self.model.update_double_param("threshold_single_flow", self.threshold_single_flow)
 		self.model.update_array_int_param("active_nodes", self.active_nodes)
 
+		self.topolake = np.copy(self.surface_elevation).reshape(self.ny,self.nx) 
 
 		self.model.update_array_double_param("surface_elevation", self.surface_elevation)
 		self.model.update_array_double_param("surface_elevation_tp1", np.copy( self.surface_elevation))
@@ -271,10 +273,13 @@ class CoreModel:
 	def run_step(self, dt):
 		# print("Running", dt)
 		self.model.update_timestep(dt)
+		tempolake = self.model.get_array_double_param("surface_elevation")
 		self.model.update_array_double_param("surface_elevation", np.copy(self.model.get_array_double_param("surface_elevation_tp1")) )
 		self.model.update_array_double_param("sed_height", np.copy(self.model.get_array_double_param("sed_height_tp1")) )
 		self.model.initiate_nodegraph()
 		self.model.run()
+		tempolake += self.model.get_array_double_param("lake_depth")
+		self.topolake = tempolake.reshape(self.ny,self.nx)
 		self.model.add_external_to_double_array("surface_elevation_tp1",self.uplift * dt)
 
 	@topo.compute
