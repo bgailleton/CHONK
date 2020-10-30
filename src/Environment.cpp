@@ -301,12 +301,18 @@ void ModelRunner::process_node(int& node, std::vector<bool>& is_processed, int& 
         // Initiating the vector of nodes affected by this problem
         std::map<int, double > lake_water_corrector, lake_sed_corrector;
         std::map<int, double > lake_water, lake_sed; std::map<int,int> lake_node_entry;
+        std::map<int, std::vector<int> > lake_node_per_lake; // will replace the corrector in order to avoid stacking nodes
+        std::map<int, std::vector<double> > lake_node_per_lake_valwat; // will replace the corrector in order to avoid stacking nodes
+        std::map<int, std::vector<double> > lake_node_per_lake_valsed; // will replace the corrector in order to avoid stacking nodes
+        std::map<int, std::vector< std::vector<double> > > lake_node_per_lake_oatablab; // will replace the corrector in order to avoid stacking nodes
+        
         std::map<int, chonk > lake_chonks;
         std::deque<int> lake_to_process;
         std::vector<bool> lakeinQ(this->lake_network.size(),false);
 
 
         // TO DO OPTIMISE THIS
+        // preparing an array of active nodes in boolean form
         xt::pytensor<bool,1> temp_bool = xt::zeros<bool>({this->io_int["n_elements"]});
         size_t it = 0;
         for(auto& Uf:active_nodes)
@@ -317,15 +323,21 @@ void ModelRunner::process_node(int& node, std::vector<bool>& is_processed, int& 
         }
 
 
+        // while there are still lakes to reprocess (cannot be more explicit haha)
         bool there_are_still_lakes_to_reproc = true;
-
         while(there_are_still_lakes_to_reproc)
         {
-           // This steps check wether the lake outflows directly in another lake
           // std::cout << "OUTLET IS " << outlet << std::endl;
+
+          // This steps check wether the lake outflows directly in another lake
+          // UPDATE:: I DONT THINK IT EVER HAPPENS!!!
+          // UPDATE 2:: It rarely does actually
           while(outlet >= 0 && is_processed[outlet] && lakoutid > -1)
           {
+          
             // std::cout << "OUTLET 0.01 is " << outlet << std::endl;
+            // throw std::runtime_error("HAPPENS f45v");?
+
 
             if(lake_network[lakeid].get_parent_lake()>=0)
               lakeid = lake_network[lakeid].get_parent_lake();
@@ -337,14 +349,14 @@ void ModelRunner::process_node(int& node, std::vector<bool>& is_processed, int& 
              this->lake_network[lakeid].get_outletting_chonk().get_other_attribute_array("label_tracker"));
 
             // Pouring water into the new lake
-            std::cout << "bulf?" << std::endl;
+            // std::cout << "bulf?" << std::endl;
             this->lake_network[lakoutid].pour_water_in_lake(this->lake_network[lakeid].get_outletting_chonk().get_water_flux() * this->timestep,
              outlet, node_in_lake, is_processed, inctive_nodes,lake_network, surface_elevation,graph, cellarea, timestep,chonk_network, this->Ql_out);
-            std::cout << "bulf!" << std::endl;
+            // std::cout << "bulf!" << std::endl;
 
             // Getting new outlet
             int lekoutoutlet = this->lake_network[lakoutid].get_lake_outlet();
-            std::cout << lekoutoutlet << "||" << outlet << std::endl;
+            // std::cout << lekoutoutlet << "||" << outlet << std::endl;
 
             // Chekcing if the parent lake has been ingested by the old one
             if (lekoutoutlet < 0)
@@ -367,7 +379,7 @@ void ModelRunner::process_node(int& node, std::vector<bool>& is_processed, int& 
 
           // std::cout << "OUTLET 0.2 is " << outlet << std::endl;
 
-
+          // Initialising the vector of nodes to reprocess and the vector of nodes already in a lake to reprocess
           std::vector<int> node_to_reprocess, reproc_in_lakes;
           std::vector<int> nodes_to_recompute_neighbors_at_the_end;
 
@@ -382,9 +394,6 @@ void ModelRunner::process_node(int& node, std::vector<bool>& is_processed, int& 
           {
             this->find_nodes_to_reprocess(outlet, is_processed, node_to_reprocess, reproc_in_lakes,nodes_to_recompute_neighbors_at_the_end, lakeid);
             // std::cout << "OUTLET 0.3 is " << outlet << std::endl;
-
-
-
             // std::cout << std::endl;
             // std::cout << "Reprocessing::";
             // A bit of optimisation here: finding the ID in the stack of the nodes to reprocess in order to reprocess them in the right order
@@ -409,25 +418,51 @@ void ModelRunner::process_node(int& node, std::vector<bool>& is_processed, int& 
             for(auto lanode:reproc_in_lakes)
             {
 
-
+              // getting the ID of the lake and correcting it if the lake has a parent
               int tlakeid = this->node_in_lake[lanode];
-              if(tlakeid>=0)
+              // they should all be >0 but we never know
+              if(tlakeid >= 0)
               {
                 if(this->lake_network[tlakeid].get_parent_lake() >= 0)
                   tlakeid = this->lake_network[tlakeid].get_parent_lake();
 
+                // if the lake is already in the queue, just adding the water fluxes to correct
                 if(lakeinQ[tlakeid] == true)
                 {
-                  lake_water_corrector[tlakeid] +=  this->chonk_network[lanode].get_water_flux();
-                  lake_sed_corrector[tlakeid] += this->chonk_network[lanode].get_sediment_flux();
+                  // lake_water_corrector[tlakeid] +=  this->chonk_network[lanode].get_water_flux();
+                  // lake_sed_corrector[tlakeid] += this->chonk_network[lanode].get_sediment_flux();
+                  std::vector<int>& datvecofnode = lake_node_per_lake[tlakeid];
+                  std::vector<double>& datvecofnode_valwat = lake_node_per_lake_valwat[tlakeid];
+                  std::vector<double>& datvecofnode_valsed = lake_node_per_lake_valsed[tlakeid];
+                  std::vector< std::vector<double> >& datvecofnode_oatalab = lake_node_per_lake_oatablab[tlakeid];
+                  auto it = std::find(datvecofnode.begin(), datvecofnode.end(),lanode);
+
+                  if(it == datvecofnode.end())
+                  {
+                    datvecofnode.push_back(lanode);
+                    datvecofnode_valwat.push_back( this->chonk_network[lanode].get_water_flux() );
+                    datvecofnode_valsed.push_back( this->chonk_network[lanode].get_sediment_flux() );
+                    datvecofnode_oatalab.push_back( this->chonk_network[lanode].get_other_attribute_array("label_tracker") );
+                  }
+                  else
+                  {
+                    int index = std::distance(datvecofnode.begin(), it);
+                    datvecofnode_valwat[index] = this->chonk_network[lanode].get_water_flux();
+                    datvecofnode_valsed[index] = this->chonk_network[lanode].get_sediment_flux();
+                    datvecofnode_oatalab[index] = this->chonk_network[lanode].get_other_attribute_array("label_tracker");
+                  }
                 }
                 else
                 {
                   lakeinQ[tlakeid] = true;
                   lake_to_process.push_back(tlakeid);
                 
-                  lake_water_corrector[tlakeid] =  this->chonk_network[lanode].get_water_flux();
-                  lake_sed_corrector[tlakeid] = this->chonk_network[lanode].get_sediment_flux();
+                  // lake_water_corrector[tlakeid] =  this->chonk_network[lanode].get_water_flux();
+                  // lake_sed_corrector[tlakeid] = this->chonk_network[lanode].get_sediment_flux();
+                  lake_node_per_lake[tlakeid] = { lanode };
+                  lake_node_per_lake_valwat[tlakeid] = { this->chonk_network[lanode].get_water_flux() };
+                  lake_node_per_lake_valsed[tlakeid] = { this->chonk_network[lanode].get_sediment_flux() };
+                  lake_node_per_lake_oatablab[tlakeid] = {this->chonk_network[lanode].get_other_attribute_array("label_tracker")} ;
                 }
                 
               }
@@ -588,13 +623,38 @@ void ModelRunner::process_node(int& node, std::vector<bool>& is_processed, int& 
           // std::cout << "OUTLET 0.9 is " << outlet << " next lake is " << tlakeid << std::endl;
 
           // the water flux to add (will be translated to vulume in the next function)
-          double water_to_add = ( lake_water[tlakeid] - lake_water_corrector[tlakeid] ) * this->timestep;
+          double correction4datlake_water = 0;
+          double correction4datlake_sed = 0;
+          std::vector<double> correction4datlake_prop;
+
+          bool vec_initialised = false;
+
+          for(size_t hylia = 0; hylia <lake_node_per_lake[tlakeid].size(); hylia ++ )
+          {
+            
+            if(vec_initialised == false)
+            {
+              vec_initialised = true;
+              correction4datlake_prop = lake_node_per_lake_oatablab[tlakeid][hylia];
+            }
+            else
+            {
+              std::vector<double> this_prop = mix_two_proportions(correction4datlake_sed,correction4datlake_prop,lake_node_per_lake_valsed[tlakeid][hylia], lake_node_per_lake_oatablab[tlakeid][hylia]);
+              correction4datlake_prop = this_prop;
+            }
+
+            correction4datlake_water += lake_node_per_lake_valwat[tlakeid][hylia];
+            correction4datlake_sed +=  lake_node_per_lake_valsed[tlakeid][hylia];
+            
+          }
+
+          double water_to_add = ( lake_water[tlakeid] - correction4datlake_water ) * this->timestep;
           // Sediment flux to add
-          double sed_to_add = lake_sed[tlakeid] - lake_sed_corrector[tlakeid];
+          double sed_to_add = lake_sed[tlakeid] - correction4datlake_sed;
           // entry node
           int node_id = lake_node_entry[tlakeid];
 
-          auto baluf = lake_chonks[tlakeid].get_other_attribute_array("label_tracker");
+          auto baluf = correction4datlake_prop;
 
           // saving the ingested lakes by this girl
           std::vector<int> prelakingestor = this->lake_network[tlakeid].get_ingested_lakes();
@@ -603,6 +663,7 @@ void ModelRunner::process_node(int& node, std::vector<bool>& is_processed, int& 
           this->lake_network[tlakeid].pour_water_in_lake(water_to_add,node_id, node_in_lake, is_processed, active_nodes, lake_network, surface_elevation, 
             this->graph,this->io_double["dx"]*this->io_double["dy"], this->timestep, this->chonk_network, this->Ql_out);
           
+          // checking the state of ingestion
           std::vector<int> postlakingestor = this->lake_network[tlakeid].get_ingested_lakes();
 
           lakeid = tlakeid;
@@ -634,6 +695,16 @@ void ModelRunner::process_node(int& node, std::vector<bool>& is_processed, int& 
               lake_node_entry[tlakeid] += lake_node_entry[la];
               lake_sed_corrector[tlakeid] += lake_sed_corrector[la];
               lake_water_corrector[tlakeid] += lake_water_corrector[la];
+              size_t hylia= 0;
+              for(auto tla : lake_node_per_lake[la])
+              {
+                lake_node_per_lake[tlakeid].push_back(tla);
+                lake_node_per_lake_valwat[tlakeid].push_back(lake_node_per_lake_valwat[la][hylia]);
+                lake_node_per_lake_valsed[tlakeid].push_back(lake_node_per_lake_valsed[la][hylia]);
+                lake_node_per_lake_oatablab[tlakeid].push_back(lake_node_per_lake_oatablab[la][hylia]);
+                hylia++;
+              }
+
               lake_chonks[tlakeid].add_to_sediment_flux(lake_sed[la], lake_chonks[la].get_other_attribute_array("label_tracker"));
 
               lake_water.erase(la);
@@ -643,6 +714,10 @@ void ModelRunner::process_node(int& node, std::vector<bool>& is_processed, int& 
               lake_water_corrector.erase(la);
               lake_sed_corrector.erase(la);
               lake_chonks.erase(la);
+              lake_node_per_lake.erase(la);
+              lake_node_per_lake_valwat.erase(la);
+              lake_node_per_lake_valsed.erase(la);
+              lake_node_per_lake_oatablab.erase(la);
 
               lake_to_process.erase(std::remove(lake_to_process.begin(), lake_to_process.end(), la), lake_to_process.end());
 
@@ -659,6 +734,10 @@ void ModelRunner::process_node(int& node, std::vector<bool>& is_processed, int& 
             lake_water_corrector.erase(tlakeid);
             lake_sed_corrector.erase(tlakeid);
             lake_chonks.erase(tlakeid);
+            lake_node_per_lake.erase(tlakeid);
+            lake_node_per_lake_valwat.erase(tlakeid);
+            lake_node_per_lake_valsed.erase(tlakeid);
+            lake_node_per_lake_oatablab.erase(tlakeid);
           }
           else
           {
