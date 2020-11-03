@@ -466,7 +466,7 @@ void chonk::move_MF_from_fastscapelib_threshold_SF(NodeGraphV2& graph, double th
   double sumslopes = 0;
   double maxslope = -9999;
   int id_max_slope = 0;
-
+  int avger = 0;
   if(these_neighbors.size() > 1)
   {
     for(size_t i=0; i< these_neighbors.size(); i++)
@@ -478,13 +478,26 @@ void chonk::move_MF_from_fastscapelib_threshold_SF(NodeGraphV2& graph, double th
         maxslope = this_slope;
         id_max_slope = i;
       }
-      powerslope[i] = std::pow(this_slope,(0.5 + 0.6 * this_slope));
+
+      powerslope[i] = this_slope;
+      sumslopes += this_slope;
+      avger++;
+    }
+
+    double avgslope = sumslopes/avger;
+    sumslopes = 0;
+
+    for(size_t i=0; i< these_neighbors.size(); i++)
+    {
+      powerslope[i] = std::pow(powerslope[i],(0.5 + 0.6 * avgslope));
       sumslopes += powerslope[i];
     }
+
     for(size_t i=0; i< these_neighbors.size(); i++)
     {
       waterweigths[i] = powerslope[i]/sumslopes;
     }
+
   }
   else
   {
