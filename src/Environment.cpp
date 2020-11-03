@@ -207,6 +207,13 @@ void ModelRunner::process_node(int& node, std::vector<bool>& is_processed, int& 
     // manages the fluxes before moving the particule: accumulating DA, precipitation, infiltration, evaporation, ...
     this->manage_fluxes_before_moving_prep(this->chonk_network[node],this->label_array[node] );
 
+    // THIS WAS A TEST TO CHECK THAT I DO NOT REPROCESS NODE ALREADY PROCESSED NATURALLY
+    // ?? AND I DO NOT. Keeping that here as a proof
+    // for(auto nono:this->chonk_network[node].get_chonk_receivers() )
+    // {
+    //   if(is_processed[nono])
+    //     throw std::runtime_error("Nodeproc to proc?");
+    // }
 
 
     // Uf the lake solving is activated, then I go through the (more than I expected) complex process of filing a lake correctly

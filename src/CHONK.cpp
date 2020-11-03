@@ -492,12 +492,15 @@ void chonk::move_MF_from_fastscapelib_threshold_SF(NodeGraphV2& graph, double th
       powerslope[i] = std::pow(powerslope[i],(0.5 + 0.6 * avgslope));
       sumslopes += powerslope[i];
     }
-
+    double sumcheique = 0;
     for(size_t i=0; i< these_neighbors.size(); i++)
     {
       waterweigths[i] = powerslope[i]/sumslopes;
+      sumcheique += waterweigths[i];
     }
 
+    if(double_equals(sumcheique,1., 1e-4) == false)
+      throw std::runtime_error("SUMCHECK not 1???::" + std::to_string(sumcheique));
   }
   else
   {
