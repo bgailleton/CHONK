@@ -177,12 +177,7 @@ void ModelRunner::run()
     // std::cout << this->chonk_network[node].get_water_flux() << std::endl; 
     // Switching to the next node in line
   }
-
   std::cout << "Ending the run" << std::endl;
-  // temp debug thingy 
-  // if(underfilled_lake>0)
-  //   std::cout << "DEBUGINFO::I called the underfilled function " << underfilled_lake << "times" << std::endl;
-
   // Calling the finalising function: it applies the changes in topography and I think will apply the lake sedimentation
   this->finalise();
   // Done

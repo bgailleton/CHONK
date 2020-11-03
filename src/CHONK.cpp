@@ -457,56 +457,113 @@ void chonk::move_MF_from_fastscapelib_threshold_SF(NodeGraphV2& graph, double th
   // I need the receicing neighbours and the distance to them
   std::vector<int> these_neighbors = graph.get_MF_receivers_at_node(this->current_node);
   std::vector<double> these_lengths = graph.get_MF_lengths_at_node(this->current_node);
+  
+  // No receiver? No prep
   if(these_neighbors.size() == 0)
     return;
 
-
+  // Temporary vectors for the flow partitionning
   std::vector<double> waterweigths(these_neighbors.size());
   std::vector<double> powerslope(these_neighbors.size());
+
+  // Sum, max and ID of the slope of interest
   double sumslopes = 0;
+  int avger = 0;
   double maxslope = -9999;
   int id_max_slope = 0;
-  int avger = 0;
+
+  // If I only have one receiver -> weight is 1
   if(these_neighbors.size() > 1)
   {
+    // Calculating the slope for each rec
     for(size_t i=0; i< these_neighbors.size(); i++)
     {
 
+      // Local slope
       double this_slope = (surface_elevation[this->current_node] -  surface_elevation[these_neighbors[i]])/these_lengths[i];
+
+      // Saving the max slope and its ID
       if(this_slope>maxslope)
       {
         maxslope = this_slope;
         id_max_slope = i;
       }
 
+      // Important checker to avoid slope == 0
+      if(double_equals(this_slope,0,1e-7))
+        this_slope = 1e-6;
+
+      // Powerslope starts by being the slope
       powerslope[i] = this_slope;
+      // umming the slope
       sumslopes += this_slope;
+      // n slopes ++
       avger++;
     }
 
+    // Getting the average slope
     double avgslope = sumslopes/avger;
+
+    // Reinitialising the summer for other purposes
     sumslopes = 0;
 
-    for(size_t i=0; i< these_neighbors.size(); i++)
+    // if My average slope is 0 I skip (not possible anymore ??!!)
+    if(avgslope > 0)
     {
-      powerslope[i] = std::pow(powerslope[i],(0.5 + 0.6 * avgslope));
-      sumslopes += powerslope[i];
-    }
-    double sumcheique = 0;
-    for(size_t i=0; i< these_neighbors.size(); i++)
-    {
-      waterweigths[i] = powerslope[i]/sumslopes;
-      sumcheique += waterweigths[i];
+      // Iterating through the rec and ...
+      for(size_t i=0; i< these_neighbors.size(); i++)
+      {
+        // ... transforming the power into the power of itself to 0.5 + 0.6 * average slope -> see Jean Braun for explanation
+        powerslope[i] = std::pow(powerslope[i],(0.5 + 0.6 * avgslope));
+        // Summing the powerslopes
+        sumslopes += powerslope[i];
+      }
     }
 
+    // DEBUGGING VARIABLE to catch few exceptions. Will delete after a while
+    double sumcheique = 0;
+
+    // If all the powers are not 0
+    if(sumslopes >0)
+    {
+      // iterating through the rec to finally get the weight
+      for(size_t i=0; i< these_neighbors.size(); i++)
+      {
+        waterweigths[i] = powerslope[i]/sumslopes;
+        sumcheique += waterweigths[i];
+      }
+    }
+    else
+    {
+      // if all is 0: equal partitionning though the receivers
+      for(size_t i=0; i< these_neighbors.size(); i++)
+      {
+        waterweigths[i] = 1/int(these_neighbors.size());
+        sumcheique += waterweigths[i];
+      }
+    }
+
+    // DEBUG CHECKER --  I'll delete after a bit of time to make sure the algorithm is stable
     if(double_equals(sumcheique,1., 1e-4) == false)
+    {
+      std::cout << "Gulug::!!!!!" << these_neighbors.size() << std::endl;;
+      for(size_t i=0; i< these_neighbors.size(); i++)
+      {
+        std::cout << "gaft::" << these_neighbors[i] << std::endl;
+        std::cout << "WWW:::" << waterweigths[i] << std::endl;
+        std::cout << "WWW:::" << powerslope[i] << std::endl;
+      }
       throw std::runtime_error("SUMCHECK not 1???::" + std::to_string(sumcheique));
+    }
+    //-------------------------------------
   }
   else
   {
+    // 1 rec -> weight is 1 
     waterweigths[0] = 1;
   }
 
+  // Checking if I am above the flow threshold or not, to switch to single flow
   if(this->water_flux >= threshold_Q)
   {
     for(size_t i=0; i< waterweigths.size(); i++)
@@ -519,11 +576,11 @@ void chonk::move_MF_from_fastscapelib_threshold_SF(NodeGraphV2& graph, double th
   }
 
 
+  // Finally giving the info to the CHONK
   bool all_minus_1 = true;
   // looping through neighbors
   for(size_t i=0; i<these_neighbors.size(); i++)
   {
-    // std::cout << "1.4" << std::endl;
     int this_neightbor = these_neighbors[i];
     // checking if this is a neighbor, nodata will be -1 (fastscapelib standards)
     if(this_neightbor < 0 || this_neightbor == this->current_node)
@@ -531,9 +588,9 @@ void chonk::move_MF_from_fastscapelib_threshold_SF(NodeGraphV2& graph, double th
       continue;
     }
 
-    // std::cout << "1.5" << this_neightbor << std::endl;
-
     all_minus_1 = false;
+    
+    double weight = waterweigths[i];
 
     // getting the slope, dz/dx
     double this_slope = 0;
@@ -545,11 +602,7 @@ void chonk::move_MF_from_fastscapelib_threshold_SF(NodeGraphV2& graph, double th
       // update:: should not happen anymore
       this_slope = 0;
     }
-    // std::cout << "1.7" << std::endl;
 
-
-
-    // NEED TO CHECK WHY IT DDOES THAT!!
     // update:: should not happen anymore
     if(this_slope<0)
     {
@@ -557,38 +610,6 @@ void chonk::move_MF_from_fastscapelib_threshold_SF(NodeGraphV2& graph, double th
     }
 
 
-    // DEPRECATED
-    // //IF I REACH PIT BOTTOM I WANNA STOP THE FUNCTION
-    // // This is the part where I deal with topographic depression now
-    // int pit_id = graph.get_pits_ID_at_node(current_node);
-
-    // // Is this a pit?
-    // if(pit_id>=0)
-    // {
-      
-    //   // Apparently so, let's check if I am at the bottom
-    //   int pit_bottom = graph.get_pits_bottom_at_pit_ID(pit_id);
-
-    //   if(current_node == pit_bottom)
-    //   {
-    //     // Need to deal with depressions here!!!!
-    //     this->solve_depression_simple(graph,  dt, sed_height, sed_height_tp1, surface_elevation, surface_elevation_tp1, Xres, Yres, chonk_network);
-    //     // # I WANT TO STOP HERE IF THE DEPRESSION IS SOLVED!!!
-    //     // # The depression solving routine takes care of the receivers and all
-    //     return;
-    //   }
-    // }
-    // std::cout << "1.8" << std::endl;
-
-
-    // There is a non-pit neighbor, let's save it with its attributes
-    double weight = waterweigths[i];
-    if(std::isnan(weight))
-    {
-      std::cout << "weight is " << weight << " slope is " << this_slope << " water flux is " << this->water_flux << std::endl;
-      throw std::runtime_error("NANWATERERROR");
-    }
-    // std::cout << "WATER WEIGHT " << weight << std::endl;
     this->receivers.push_back(this_neightbor);
     this->weigth_water_fluxes.push_back(weight);
     this->weigth_sediment_fluxes.push_back(weight);
