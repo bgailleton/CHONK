@@ -589,7 +589,7 @@ void chonk::move_MF_from_fastscapelib_threshold_SF(NodeGraphV2& graph, double th
     }
 
     all_minus_1 = false;
-    
+
     double weight = waterweigths[i];
 
     // getting the slope, dz/dx
@@ -970,124 +970,186 @@ void chonk::charlie_I(double n, double m, double K_r, double K_s,
 
 std::vector<double> mix_two_proportions(double prop1, std::vector<double> labprop1, double prop2, std::vector<double> labprop2)
 {
-  if(prop1<1 || prop2<1)
+  std::vector<double>output(labprop1.size(),0.);
+  double sumall = 0;
+  for(size_t i=0; i< labprop1.size(); i++)
   {
-    prop1 = prop1 * 1000;
-    prop2 = prop2 * 1000;
+    output[i] = std::abs( prop1 * labprop1[i] + prop2 * labprop2[i]);
+    sumall += output[i];
   }
+  if(double_equals(sumall,0.,1e-6))
+    return output;
 
-  // getting the absolute final prop
-  double prop_tot = std::abs(prop1 + prop2);
-
-  if(double_equals(prop1,0))
-    return labprop2;
-
-  if(double_equals(prop2,0)| double_equals(prop_tot,0))
-    return labprop1;
-
-  double sum1 = 0;
-  double sum2 = 0;
-
-  std::vector<double> coplab1 = labprop1, coplab2 = labprop2;
-
-  // normalising proportions to their respectful prop
-  for(auto& val : labprop1)
-  {                                                                                                                                                                                                                             
-    double copval = val;
-    sum1 += copval;
-
-    val = val * prop1/prop_tot;
-  }
-
-  for(auto& val : labprop2)
+  do
   {
-    double copval = val;
-    sum2 += copval;
-    
-    val = val * prop2/prop_tot;
-  }
-
-  // std::cout << "sum1:" << sum1 << " sum2 " << sum2 << "prop_tot " << prop_tot << "|" << prop1 << " " << prop2 ;
-
-  if(sum1 == 0)
-    return coplab2;
-
-  else if(sum2 == 0)
-    return coplab1;
-
-  if((double_equals(sum1,1) == false && double_equals(sum1, 0.) == false ) || (double_equals(sum2,1) == false && double_equals(sum2 ,0.) == false ))
-  {
-    bool equalitu = (sum1 == 1);
-    std::cout << " oOo " << sum1 << "|" << equalitu << " oOo " << sum2 << std::endl;
-    throw std::runtime_error("entering sum not equal to 1");
-  }
-
-  bool nanhere = false;
-  for(auto LAB:labprop1)
-    if(std::isfinite(LAB) == false)
-    {
-      nanhere = true;
-      std::cout << "NANLAB at label_prop1" << std::endl;
-    }
-  for(auto LAB:labprop2)
-    if(std::isfinite(LAB) == false)
-    {
-      nanhere = true;
-      std::cout << "NANLAB at label_prop2" << std::endl;
-    }
-
-  if(nanhere)
-    throw std::runtime_error("NANHERE IN MIXING PROP");
-  
-
-  std::vector<double> output(labprop1.size());
-
-  double divider = prop_tot;
-  for(size_t i=0; i<labprop1.size(); i++)
-  {
-    output[i] = std::abs(labprop1[i] + labprop2[i]) ;///prop_tot;
-    // std::cout << divider << "|" << labprop1[i] << "|" << labprop2[i] << std::endl;
-
-    // divider += output[i];
-  }
-
-
-  double sumfin = 0;
-  for(size_t i=0; i<labprop1.size(); i++)
-  {
-    // output[i] = output[i]/divider;
-    sumfin += output[i];
-  }
-
-  while(double_equals(sumfin,1) == false)
-  {
-    if(std::isfinite(sumfin) == false)
-    {
-      std::cout << std::endl << prop_tot << std::endl;
-      throw std::runtime_error("Nansum in prop");
-    }
-    // std::cout << sumfin << "<->";
-    // throw std::runtime_error("out sum not equal to 1");
-    // double delta = abs(1 - sumfin);
     double new_sumfin = 0;
     for(auto& gag:output)
     {
-      gag = gag/sumfin;
+      gag = gag/sumall;
       new_sumfin += gag;
     }
-    sumfin = new_sumfin;
-    // std::cout << sumfin << std::endl;
-    // for(auto lab:coplab1)
-    //   std::cout << lab << "|";
-    // std::cout << "||";
-    // for(auto lab:coplab2)
-    //   std::cout << lab << "|";
-    // std::cout << std::endl;
-  }
+    sumall = new_sumfin;
+  }while(double_equals(sumall,1) == false);
 
+  for(auto gag:output)
+    if(std::isfinite(gag) == false)
+      throw std::runtime_error("There are some nan/inf in the mixing proportions");
 
   return output;
+  // for(auto gag:output)
+  // {
+  //   if(double_equals(gag,0.5,1e-5))
+  //   {
+  //     std::cout << "0.5 here" << std::endl;
+  //     std::cout << prop1 << "||" << prop2 << std::endl;
+  //     for(auto val:coplab1)
+  //       std::cout << "LB1::" << val << std::endl;
+  //     for(auto val:coplab2)
+  //       std::cout << "LB2::" << val << std::endl;
+
+  //     throw std::runtime_error("why o' ming?");
+  //   }
+
+  // }
 }
+
+// std::vector<double> mix_two_proportions(double prop1, std::vector<double> labprop1, double prop2, std::vector<double> labprop2)
+// {
+//   if(prop1<1 || prop2<1)
+//   {
+//     prop1 = prop1 * 1000;
+//     prop2 = prop2 * 1000;
+//   }
+
+//   // getting the absolute final prop
+//   double prop_tot = std::abs(prop1 + prop2);
+
+//   if(double_equals(prop1,0))
+//     return labprop2;
+
+//   if(double_equals(prop2,0) || double_equals(prop_tot,0))
+//     return labprop1;
+
+//   double sum1 = 0;
+//   double sum2 = 0;
+
+//   std::vector<double> coplab1 = labprop1, coplab2 = labprop2;
+
+//   // normalising proportions to their respectful prop
+//   for(auto& val : labprop1)
+//   {                                                                                                                                                                                                                             
+//     double copval = val;
+//     sum1 += copval;
+
+//     val = val * prop1/prop_tot;
+//   }
+
+//   for(auto& val : labprop2)
+//   {
+//     double copval = val;
+//     sum2 += copval;
+    
+//     val = val * prop2/prop_tot;
+//   }
+
+//   // std::cout << "sum1:" << sum1 << " sum2 " << sum2 << "prop_tot " << prop_tot << "|" << prop1 << " " << prop2 ;
+
+//   if(sum1 == 0)
+//     return coplab2;
+
+//   else if(sum2 == 0)
+//     return coplab1;
+
+//   if((double_equals(sum1,1) == false && double_equals(sum1, 0.) == false ) || (double_equals(sum2,1) == false && double_equals(sum2 ,0.) == false ))
+//   {
+//     bool equalitu = (sum1 == 1);
+//     std::cout << " oOo " << sum1 << "|" << equalitu << " oOo " << sum2 << std::endl;
+//     throw std::runtime_error("entering sum not equal to 1");
+//   }
+
+//   bool nanhere = false;
+//   for(auto LAB:labprop1)
+//     if(std::isfinite(LAB) == false)
+//     {
+//       nanhere = true;
+//       std::cout << "NANLAB at label_prop1" << std::endl;
+//     }
+//   for(auto LAB:labprop2)
+//     if(std::isfinite(LAB) == false)
+//     {
+//       nanhere = true;
+//       std::cout << "NANLAB at label_prop2" << std::endl;
+//     }
+
+//   if(nanhere)
+//     throw std::runtime_error("NANHERE IN MIXING PROP");
+  
+
+//   std::vector<double> output(labprop1.size());
+
+//   double divider = prop_tot;
+//   for(size_t i=0; i<labprop1.size(); i++)
+//   {
+//     output[i] = std::abs(labprop1[i] + labprop2[i]) ;///prop_tot;
+//     // std::cout << divider << "|" << labprop1[i] << "|" << labprop2[i] << std::endl;
+
+//     // divider += output[i];
+//   }
+
+
+//   double sumfin = 0;
+//   for(size_t i=0; i<labprop1.size(); i++)
+//   {
+//     // output[i] = output[i]/divider;
+//     sumfin += output[i];
+//   }
+
+//   while(double_equals(sumfin,1) == false)
+//   {
+//     if(std::isfinite(sumfin) == false)
+//     {
+//       std::cout << std::endl << prop_tot << std::endl;
+//       throw std::runtime_error("Nansum in prop");
+//     }
+//     // std::cout << sumfin << "<->";
+//     // throw std::runtime_error("out sum not equal to 1");
+//     // double delta = abs(1 - sumfin);
+//     double new_sumfin = 0;
+//     for(auto& gag:output)
+//     {
+//       gag = gag/sumfin;
+//       new_sumfin += gag;
+//     }
+//     sumfin = new_sumfin;
+//     // std::cout << sumfin << std::endl;
+//     // for(auto lab:coplab1)
+//     //   std::cout << lab << "|";
+//     // std::cout << "||";
+//     // for(auto lab:coplab2)
+//     //   std::cout << lab << "|";
+//     // std::cout << std::endl;
+//   }
+
+//   for(auto gag:output)
+//   {
+//     if(double_equals(gag,0.5,1e-5))
+//     {
+//       std::cout << "0.5 here" << std::endl;
+//       std::cout << prop1 << "||" << prop2 << std::endl;
+//       for(auto val:coplab1)
+//         std::cout << "LB1::" << val << std::endl;
+//       for(auto val:coplab2)
+//         std::cout << "LB2::" << val << std::endl;
+
+//       throw std::runtime_error("why o' ming?");
+//     }
+
+//   }
+
+
+//   return output;
+    
+// }
 
 
 
