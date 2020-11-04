@@ -968,18 +968,28 @@ void chonk::charlie_I(double n, double m, double K_r, double K_s,
   return;
 }
 
+
+// Mixe two proportions
 std::vector<double> mix_two_proportions(double prop1, std::vector<double> labprop1, double prop2, std::vector<double> labprop2)
 {
+
+  // The ouput will eb the same size as the inputs
   std::vector<double>output(labprop1.size(),0.);
+  
+  // Saving the global sum
   double sumall = 0;
+  // summing all proportions with their respective weigths
   for(size_t i=0; i< labprop1.size(); i++)
   {
+    // Absolute value because one of the two proportions might be negative, if I am revmoving element for example.
     output[i] = std::abs( prop1 * labprop1[i] + prop2 * labprop2[i]);
     sumall += output[i];
   }
+  // If all is 0, all is 0
   if(double_equals(sumall,0.,1e-6))
     return output;
 
+  // Normalising the new proportions and checking that the sum is 1 (can take few iterations is cases where there are very small proportions in order to ensure numerical stability)
   do
   {
     double new_sumfin = 0;
@@ -991,26 +1001,12 @@ std::vector<double> mix_two_proportions(double prop1, std::vector<double> labpro
     sumall = new_sumfin;
   }while(double_equals(sumall,1) == false);
 
+  // Keeping that check for a bit
   for(auto gag:output)
     if(std::isfinite(gag) == false)
       throw std::runtime_error("There are some nan/inf in the mixing proportions");
 
   return output;
-  // for(auto gag:output)
-  // {
-  //   if(double_equals(gag,0.5,1e-5))
-  //   {
-  //     std::cout << "0.5 here" << std::endl;
-  //     std::cout << prop1 << "||" << prop2 << std::endl;
-  //     for(auto val:coplab1)
-  //       std::cout << "LB1::" << val << std::endl;
-  //     for(auto val:coplab2)
-  //       std::cout << "LB2::" << val << std::endl;
-
-  //     throw std::runtime_error("why o' ming?");
-  //   }
-
-  // }
 }
 
 // std::vector<double> mix_two_proportions(double prop1, std::vector<double> labprop1, double prop2, std::vector<double> labprop2)
