@@ -887,27 +887,30 @@ void ModelRunner::finalise()
 
 
   // First dealing with lake deposition:
-   // std::cout <<"1" << std::endl;
-
+  // So far only lake draping is implemented
+  // thsi section calculates the deposition volume from lakes and add it to each CHONK, it does not directly run teh deposition
   for(auto& loch:this->lake_network)
   {
     if(loch.get_parent_lake()>=0)
       continue;
     loch.drape_deposition_flux_to_chonks(this->chonk_network, surface_elevation, this->timestep);
   }
-   // std::cout <<"2" << std::endl;
+
+  // then actively finalising the deposition and other details
   // Iterating through all nodes
   for(int i=0; i< this->io_int["n_elements"]; i++)
   {
-   // std::cout <<"3.1" << std::endl;
     // Getting the current chonk
     chonk& tchonk = this->chonk_network[i];
+    // getting the current composition of the sediment flux
     auto this_lab = tchonk.get_other_attribute_array("label_tracker");
+
+    // NANINF DEBUG CHECKER
     for(auto LAB:this_lab)
       if(std::isfinite(LAB) ==false)
         std::cout << LAB << " << naninf for sedflux" << std::endl;
 
-    // getting the lake stuffs
+    // getting the lake ID and depth
     if(node_in_lake[i]>=0)
     {
       int lakeid = node_in_lake[i];
@@ -919,75 +922,74 @@ void ModelRunner::finalise()
     }
     else
     {
+      // if no lake, depth is 0 NSS
       tlake_depth[i] = 0;
     }
+    
 
-
-
-    // First applying the specific erosion flux
-    // std::cout << surface_elevation_tp1[i] << "||";
+    // First applying the bedrock-only erosion flux: decrease the overal surface elevation without affecting the sediment layer
     surface_elevation_tp1[i] -= tchonk.get_erosion_flux_only_bedrock() * timestep;
-    // std::cout << surface_elevation_tp1[i] << "||";
 
     // Applying elevation changes from the sediments
+    // Reminder: sediment creation flux is the absolute rate of removal/creation of sediments
     double sedcrea = tchonk.get_sediment_creation_flux() * timestep;
 
+    // NANINF DEBUG CHECKER
     if(std::isfinite(sedcrea) == false)
       throw std::runtime_error("NAN sedcrea finalisation not possible yo");
-   // std::cout <<"3.2" << std::endl;
 
-    // std::cout << "a" << std::endl;
-    // std::cout << sedcrea << "|" << tchonk.get_erosion_flux_only_sediments() * timestep  << "||";
+    // TEMP DEBUGGER TOO
+    // AT TERM THIS SHOULD NOT HAPPEN???
+    // if I end up with a negative sediment layer
     if(sedcrea + sed_height_tp1[i] < 0)
     {
-      std::cout << "happens??" <<sedcrea << "||" << sed_height_tp1[i] << "||" << this->node_in_lake[i] << std::endl;
+      std::cout << "happens??" << sedcrea << "||" << sed_height_tp1[i] << "||" << this->node_in_lake[i] << std::endl;
       surface_elevation_tp1[i] -= sed_height_tp1[i];
       sed_height_tp1[i] = 0.;
       sed_prop_by_label[i] = std::vector<std::vector<double> >();
+      is_there_sed_here[i] = false;
     } 
     else
     {
-    // std::cout << "b" << std::endl;
-     this->add_to_sediment_tracking(i, sedcrea, this_lab, sed_height_tp1[i]);
-    // std::cout << "c" << std::endl;
+      // Calling the function managing the sediment layer composition tracking
+      this->add_to_sediment_tracking(i, sedcrea, this_lab, sed_height_tp1[i]);
 
-     surface_elevation_tp1[i] += sedcrea;
-     sed_height_tp1[i] += sedcrea;
+      // Applying the delta_h on both surface elevation and sediment layer
+      surface_elevation_tp1[i] += sedcrea;
+      sed_height_tp1[i] += sedcrea;
     }
 
-   // std::cout <<"3.3" << std::endl;
-
-    // std::cout << surface_elevation_tp1[i] << std::endl;;
-
-    // double to_remove = tchonk.get_erosion_flux_undifferentiated();
+    //Dealing now with "undifferentiated" Erosion rates
     double tadd = tchonk.get_erosion_flux_undifferentiated() * timestep;
-    // std::cout << tadd << "|";
-    // std::cout << " Eund is " << tadd << std::endl;
-    if(sed_height_tp1[i] < 0)
-      tadd = tadd + sed_height_tp1[i];
-    // std::cout << "C::" << i << "||" << tadd << "||" << sed_height_tp1[i] << std::endl;
-   // std::cout <<"3.4" << std::endl;
 
-    this->add_to_sediment_tracking(i, -1*tadd, this_lab, sed_height_tp1[i]);
-    // std::cout << "D::" << i << "||" << tadd << "||" << sed_height_tp1[i] << std::endl;
-   // std::cout <<"3.5" << std::endl;
+    if(std::abs(tadd)>0)
+    {
+      // What was that again??
+      // if(sed_height_tp1[i] < 0)
+      //   tadd = tadd + sed_height_tp1[i];
 
-    surface_elevation_tp1[i] -= tadd;
-    sed_height_tp1[i] -= tadd;
+      this->add_to_sediment_tracking(i, -1*tadd, this_lab, sed_height_tp1[i]);
 
+      surface_elevation_tp1[i] -= tadd;
+      sed_height_tp1[i] -= tadd;
+    }
 
+    // LAST_DEBUG_CHECK
     if(sed_height_tp1[i]<0)
     {
       // to_remove = std::abs(sed_height_tp1[i]);
       sed_height_tp1[i] = 0;
       sed_prop_by_label[i] = std::vector<std::vector<double> >();
+      is_there_sed_here[i] = false;
       // surface_elevation_tp1[i] += to_remove;
     }
 
 
+
   }
 
-  // this->Ql_out += xt::sum(tlake_depth - this->io_double_array["lake_depth"])() * this->io_double["dx"] * this->io_double["dy"] / this->timestep;
+
+  // Calculating the water balance thingies
   double save_Ql_out = this->Ql_out;
   this->Ql_out = 0;
   for(int i=0; i<this->io_int["n_elements"]; i++)
@@ -995,15 +997,13 @@ void ModelRunner::finalise()
     this->Ql_out += (tlake_depth[i] - this->io_double_array["lake_depth"][i]) * this->io_double["dx"] * this->io_double["dy"] / this->timestep;
   }
 
-
-  // if(double_equals(this->Ql_out,save_Ql_out) == false)
-  //   throw std::runtime_error("QlOUT is no good::"+ std::to_string(this->Ql_out - save_Ql_out));
   
+  // Saving the new lake depth  
   this->io_double_array["lake_depth"] = tlake_depth;
-   // std::cout <<"3.7" << std::endl;
 
+
+  // calculating other water mass balance.
   xt::pytensor<int,1>& active_nodes = this->io_int_array["active_nodes"];
-
   for(int i =0; i<this->io_int["n_elements"]; i++)
   {
     if(active_nodes[i] == 0)
@@ -1015,15 +1015,17 @@ void ModelRunner::finalise()
 
 void ModelRunner::add_to_sediment_tracking(int index, double height, std::vector<double> label_prop, double sed_depth_here)
 {
-  // trying to remove sediments but no sediments are here
+  // trying to add/remove sediments but no sediments are here
   // Nothing happens then
   if(height == 0)
     return;
-
   if(height<0 && is_there_sed_here[index] == false)
   {
     return;
   }
+
+  double depth_res = this->io_double["depths_res_sed_proportions"];
+
 
   // No sediments previously there -> creating boxes of sediment here
   if(is_there_sed_here[index] == false)
@@ -1031,33 +1033,45 @@ void ModelRunner::add_to_sediment_tracking(int index, double height, std::vector
     if(sed_prop_by_label[index].size()>0 )
       throw std::runtime_error("Unexpected Behavior 56");
 
-    int n_strata = std::ceil(std::abs(height / this->io_double["depths_res_sed_proportions"]));
+    // So the number of boxes I need to create is the ceiling of the height of sediment I want to add divided by the depths resolution at wich I want to create the boxes
+    // For example, my res is 1m, and I add 1.5 metres of sediment -> 2 boxes are needed, the first one is full and the second one is half
+    int n_strata = std::ceil(std::abs(height / depth_res));
+    // I fill these boxes wih the sediment proportion in input
     for(int i = 0; i<n_strata; i++)
     {
       sed_prop_by_label[index].push_back(label_prop);
     }
-  // std::cout << "BD" << std::endl;
+
+    // DEBUG CHECKER TO REMOVE ONCE STABLE
     if(sed_prop_by_label[index].size() == 0)
     {
       std::cout << index << "||" << node_in_lake[index] << "||" << n_strata << "||" << height << std::endl;
       throw std::runtime_error("Unexpected behaviour SEDBUTNOSED");
     }
+
+    // Remembering that I do have sediment there
     is_there_sed_here[index] = true;
+
+    // this was a simple case and it should be done by now
     return;
   }
 
-  // std::cout << "BE" << std::endl;
+  // DEBUG CHECKER
   for(auto LAB:label_prop)
     if(std::isfinite(LAB) == false)
       std::cout << "NANLAB at label_prop::add_to_sediment_tracking_start" << std::endl;
 
-
+  // In that case, things are more complex, I need to (i) detect how many boxes I am addig/removing and (ii) mix the proportions
   // Sediments already in there, getting more complex
   // Getting the proportion of the last box filled and the number of boxes
-  double n_boxes = sed_depth_here/this->io_double["depths_res_sed_proportions"];
+  double n_boxes = sed_depth_here/depth_res;
+  // this is the number of boxes fully filled already there
   double n_strata_already_there;
+  // This is the proportion of the underfilled box
   double prop_box_filled = std::modf(n_boxes, &n_strata_already_there);
-  double n_boxes_to_fill = std::abs(height/this->io_double["depths_res_sed_proportions"]);
+  // This is the number of boxes to fill with the incoming flux
+  double n_boxes_to_fill = std::abs(height/depth_res);
+  // index of the last box -> the underfilled one
   int current_box = int(sed_prop_by_label[index].size()) - 1;
 
   //TO DO BORIS:: CURRENT BOX SHOULD NEVER BE -1 HERE, WHY IS IT??
@@ -1067,37 +1081,20 @@ void ModelRunner::add_to_sediment_tracking(int index, double height, std::vector
     return;
   }
 
-
+  // DEBUG CHECKER TO REMOVE ONCE STABLE
   for(auto stuff:sed_prop_by_label[index][current_box])
     if(std::isfinite(stuff) == false)
       throw std::runtime_error("Unexpected behaviour 463");
 
-
-
-  // n_boxes to add or remove
+  // n_boxes to add or remove entirely
   int delta_boxes = std::floor(n_boxes_to_fill);
-  // std::cout << "DB::" << delta_boxes << std::endl;
+
   // Sediment addition case
   if(height > 0)
   {
-    // Calculating the number of boxes to add
-    double comparator = n_boxes_to_fill;
-    if(n_boxes_to_fill>1)
-      comparator = 1;
-
-    for(auto ugh:sed_prop_by_label[index][current_box])
-    if(std::isfinite(ugh) != true)
-    {
-      std::cout << "nan before" << std::endl;
-    }
-    for(auto ugh:label_prop)
-    if(std::isfinite(ugh) != true)
-    {
-      std::cout << "nan before" << std::endl;
-    }
 
     // filling the current box with the mixed proportions of labels
-    sed_prop_by_label[index][current_box] = mix_two_proportions(prop_box_filled, sed_prop_by_label[index][current_box], (comparator - prop_box_filled), label_prop);
+    sed_prop_by_label[index][current_box] = mix_two_proportions(prop_box_filled, sed_prop_by_label[index][current_box], (height - delta_boxes), label_prop);
 
     for(auto ugh:sed_prop_by_label[index][current_box])
     if(std::isfinite(ugh) == false)
@@ -1111,7 +1108,6 @@ void ModelRunner::add_to_sediment_tracking(int index, double height, std::vector
       for(int i=0; i<delta_boxes; i++)
         sed_prop_by_label[index].push_back(label_prop);
     }
-
   }
   else
   {
@@ -1124,8 +1120,14 @@ void ModelRunner::add_to_sediment_tracking(int index, double height, std::vector
       {
         // NEED TO CHECK WHY IS THIS HAPPENING HERE!!!! IT SHOULD NOT TRY TO POP BACK IF THERE IS NOTHING TO POP BACK 
         if(sed_prop_by_label[index].size() > 0)
+        {
           sed_prop_by_label[index].pop_back();
+          current_box -- ;
+        }
       }
+      // mixing the current box by removing an amount of sediment. However as there can be sediment deposition and mobilisation simultaneously there is still a mixing of proportions happening
+      if(current_box >= 0)
+        sed_prop_by_label[index][current_box] = mix_two_proportions(prop_box_filled, sed_prop_by_label[index][current_box], (1 - prop_box_filled), label_prop);
     }
 
     
