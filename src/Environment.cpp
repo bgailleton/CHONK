@@ -883,7 +883,7 @@ void ModelRunner::finalise()
   xt::pytensor<double,1>& surface_elevation = this->io_double_array["surface_elevation"];
   xt::pytensor<double,1>& sed_height_tp1 = this->io_double_array["sed_height_tp1"];
   xt::pytensor<double,1> tlake_depth = xt::zeros<double>({size_t(this->io_int["n_elements"])});
-
+  xt::pytensor<int,1>& active_nodes = this->io_int_array["active_nodes"];
 
   // First dealing with lake deposition:
   // So far only lake draping is implemented
@@ -901,6 +901,9 @@ void ModelRunner::finalise()
   // Iterating through all nodes
   for(int i=0; i< this->io_int["n_elements"]; i++)
   {
+    if(active_nodes[i] == 0)
+      continue;
+    
     // Getting the current chonk
     chonk& tchonk = this->chonk_network[i];
     // getting the current composition of the sediment flux
@@ -1013,7 +1016,7 @@ void ModelRunner::finalise()
 
 
   // calculating other water mass balance.
-  xt::pytensor<int,1>& active_nodes = this->io_int_array["active_nodes"];
+  // xt::pytensor<int,1>& active_nodes = this->io_int_array["active_nodes"];
   for(int i =0; i<this->io_int["n_elements"]; i++)
   {
     if(active_nodes[i] == 0)
