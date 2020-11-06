@@ -824,15 +824,22 @@ void ModelRunner::process_node(int& node, std::vector<bool>& is_processed, int& 
         if(this->graph.is_depression(next_node) == false)
           next_node = this->graph.get_Srec(next_node);
 
-        this->chonk_network[next_node].add_to_water_flux(this->chonk_network[node].get_water_flux());
-        this->chonk_network[next_node].add_to_sediment_flux(this->chonk_network[node].get_sediment_flux(), this->chonk_network[node].get_other_attribute_array("label_tracker"));
-  
+        // this->chonk_network[next_node].add_to_water_flux(this->chonk_network[node].get_water_flux());
+        // this->chonk_network[next_node].add_to_sediment_flux(this->chonk_network[node].get_sediment_flux(), this->chonk_network[node].get_other_attribute_array("label_tracker"));
+        
+        this->chonk_network[node].reinitialise_moving_prep();
+        this->chonk_network[node].external_moving_prep({next_node},{1.},{1.},{0});
+        this->manage_fluxes_after_moving_prep(this->chonk_network[node],this->label_array[node]);
+        this->chonk_network[node].split_and_merge_in_receiving_chonks(this->chonk_network, this->graph, this->io_double_array["surface_elevation_tp1"], io_double_array["sed_height_tp1"], this->timestep);
+
+
         // node = next_node;
         is_processed[node] = true;
         // goto nolake;
       }
       else
         goto nolake;
+
       return;
     }
     nolake:
@@ -903,7 +910,7 @@ void ModelRunner::finalise()
   {
     if(active_nodes[i] == 0)
       continue;
-    
+
     // Getting the current chonk
     chonk& tchonk = this->chonk_network[i];
     // getting the current composition of the sediment flux
