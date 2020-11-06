@@ -896,6 +896,8 @@ void ModelRunner::finalise()
     loch.drape_deposition_flux_to_chonks(this->chonk_network, surface_elevation, this->timestep);
   }
 
+  // std::cout << "0.1" << std::endl;
+
   // then actively finalising the deposition and other details
   // Iterating through all nodes
   for(int i=0; i< this->io_int["n_elements"]; i++)
@@ -938,6 +940,8 @@ void ModelRunner::finalise()
     if(std::isfinite(sedcrea) == false)
       throw std::runtime_error("NAN sedcrea finalisation not possible yo");
 
+
+    // std::cout << "0.2" << std::endl;
     // TEMP DEBUGGER TOO
     // AT TERM THIS SHOULD NOT HAPPEN???
     // if I end up with a negative sediment layer
@@ -951,9 +955,10 @@ void ModelRunner::finalise()
     } 
     else
     {
+      // std::cout << "0.3" << std::endl;
       // Calling the function managing the sediment layer composition tracking
       this->add_to_sediment_tracking(i, sedcrea, this_lab, sed_height_tp1[i]);
-
+      // std::cout << "0.4" << std::endl;
       // Applying the delta_h on both surface elevation and sediment layer
       surface_elevation_tp1[i] += sedcrea;
       sed_height_tp1[i] += sedcrea;
@@ -967,9 +972,9 @@ void ModelRunner::finalise()
       // What was that again??
       // if(sed_height_tp1[i] < 0)
       //   tadd = tadd + sed_height_tp1[i];
-
+      // std::cout << "0.5" << std::endl;
       this->add_to_sediment_tracking(i, -1*tadd, this_lab, sed_height_tp1[i]);
-
+      // std::cout << "0.6" << std::endl;
       surface_elevation_tp1[i] -= tadd;
       sed_height_tp1[i] -= tadd;
     }
@@ -1042,18 +1047,23 @@ void ModelRunner::add_to_sediment_tracking(int index, double height, std::vector
   double box_ta_ufill = std::modf(delta_boxes, &boxes_ta_filled);
   
   // Index of current box
+  // std::cout << "A" << std::endl;;
   int current_box = int(sed_prop_by_label[index].size() - 1);
+  // std::cout << "B" << std::endl;;
 
 
   // If I am removing sediments
   if(height < 0)
   {
+    // std::cout << "C" << std::endl;;
+
     // Removing the full boxes I can
     for(int i = 0; i<int(boxes_ta_filled); i++)
     {
       sed_prop_by_label[index].pop_back();
       current_box--;
     }
+    // std::cout << "D" << std::endl;;
     // Getting the height of the remaining boxe
     double this_hbox = box_there_ufill - box_ta_ufill;
 
@@ -1064,51 +1074,67 @@ void ModelRunner::add_to_sediment_tracking(int index, double height, std::vector
     // But if the prop is negative, I need to remove a last box
     if(this_hbox < 0)
     {
+      // std::cout << "E" << std::endl;;
       // Popping it
       sed_prop_by_label[index].pop_back();
       current_box--;
       // I am now removing from a full box
       prop1 = 1;
       prop2 = -1 * (1 + this_hbox);
+      // std::cout << "F" << std::endl;;
     }
     // finally mixing the two depositions
+    // std::cout << "G" << std::endl;;
     this->sed_prop_by_label[index][current_box] = mix_two_proportions(prop1,sed_prop_by_label[index][current_box], prop2, label_prop);
   }
   else
   {
     // I am adding sediment, first filling the current box
 
-
+    // std::cout << "H" << std::endl;;
     double this_hbox = box_there_ufill + box_ta_ufill;
     double prop1 = box_there_ufill;
     double prop2 = box_ta_ufill;
 
-
+    if(sed_prop_by_label[index].size() == 0)
+    {
+      sed_prop_by_label[index].push_back(std::vector<double>(label_prop.size(), 0.) );
+      current_box = 0;
+    }
 
     if(this_hbox > 1)
     {
+      // std::cout << "I" << std::endl;;
       this->sed_prop_by_label[index][current_box] = mix_two_proportions(prop1,sed_prop_by_label[index][current_box], 1 - prop1, label_prop);
       for(int i = 0; i<=int(boxes_ta_filled); i++)
       {
         sed_prop_by_label[index].push_back(label_prop);
         current_box++;
       }
+      // std::cout << "J" << std::endl;;
     }
     else if(boxes_ta_filled > 0)
     {
+      // std::cout << "K" << std::endl;;
       this->sed_prop_by_label[index][current_box] = mix_two_proportions(prop1,sed_prop_by_label[index][current_box], (1 - prop1), label_prop);
       for(int i = 0; i<int(boxes_ta_filled); i++)
       {
         sed_prop_by_label[index].push_back(label_prop);
         current_box++;
       }
+      // std::cout << "L" << std::endl;;
     }
     else
     {
+      // std::cout << "M" << std::endl;;
       this->sed_prop_by_label[index][current_box] = mix_two_proportions(prop1,sed_prop_by_label[index][current_box], prop2, label_prop);
+      // std::cout << "N" << std::endl;;
     }
     
   }
+
+  // for(auto gabro:this->sed_prop_by_label[index][current_box])
+  //   std::cout << "GABRO::" <<gabro << std::endl;
 
 }
 
@@ -1286,7 +1312,7 @@ xt::pytensor<double,2> ModelRunner::get_superficial_layer_sediment_prop()
   {
     for(size_t i = 0; i < this->io_int["n_elements"]; i++)
     {
-      if(is_there_sed_here[i] && sed_prop_by_label[int(i)].size() != 0)
+      if(sed_prop_by_label[int(i)].size() != 0)
       {
         output(lab,i) = sed_prop_by_label[int(i)][sed_prop_by_label[int(i)].size() - 1][lab];
       }
