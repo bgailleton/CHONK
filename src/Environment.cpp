@@ -825,8 +825,7 @@ void ModelRunner::process_node(int& node, std::vector<bool>& is_processed, int& 
           next_node = this->graph.get_Srec(next_node);
 
         this->chonk_network[next_node].add_to_water_flux(this->chonk_network[node].get_water_flux());
-        if(is_processed[next_node] == true && inctive_nodes[next_node] )
-          throw std::runtime_error("FATAL_ERROR::NG24, node " + std::to_string(node) + " gives water to " + std::to_string(next_node) + " but is processed already");
+        this->chonk_network[next_node].add_to_sediment_flux(this->chonk_network[node].get_sediment_flux(), this->chonk_network[node].get_other_attribute_array("label_tracker"));
   
         // node = next_node;
         is_processed[node] = true;
