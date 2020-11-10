@@ -68,9 +68,11 @@ class Topography:
 @xs.process
 class CustomInitialSurface(Topography):
 	this_surface_elevation = xs.variable(intent = 'inout', dims = ('node'), description = "The surface topography initialised as random noise")
+	recast_boundaries = xs.variable(intent = 'in', default = True)
 	def initialize(self):
 		self.surface_elevation = self.this_surface_elevation
-		self.surface_elevation[self.active_nodes == 0] = 0
+		if(self.recast_boundaries):
+			self.surface_elevation[self.active_nodes == 0] = 0
 		self.sed_height = np.zeros_like(self.surface_elevation)
 
 
@@ -172,6 +174,19 @@ class BlockUplift(Uplift):
 
 		self.uplift = self.uplift.ravel()
 		self.uplift[self.active_nodes == 0] = 0
+
+@xs.process
+class BlockUpliftCustomBounds(Uplift):
+	"""
+		Simple block uplift to be applied to the topography, but the boundary conditions are not corrected (ie, there can be vertical motions at outlets)
+	"""
+
+	surface_elevation = xs.foreign(Topography, 'surface_elevation')
+	active_nodes = xs.foreign(BoundaryConditions, 'active_nodes')
+
+	def initialize(self):
+
+		self.uplift = self.uplift.ravel()
 
 
 

@@ -111,6 +111,7 @@ class chonk
     void set_other_attribute(std::string key, double val){other_attributes[key] = val;}
     double get_other_attribute(std::string key){return other_attributes[key];}
     std::vector<double> get_other_attribute_array(std::string key){return other_attributes_arrays[key];}
+    void set_other_attribute_array(std::string key, std::vector<double> val){ other_attributes_arrays[key] = val;}
 
     // receivers
     std::vector<int>& get_chonk_receivers(){return receivers;}

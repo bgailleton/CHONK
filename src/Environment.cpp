@@ -818,30 +818,34 @@ void ModelRunner::process_node(int& node, std::vector<bool>& is_processed, int& 
     }
     else
     {
+      // If the lake solver is not activated, I am transferring the fluxes to the receiver according to Cordonnier et al. planar graph (see node graph)  
       if(inctive_nodes[node] == 1 && this->graph.is_depression(node))
       {
+        // Getting the so-called node
         int next_node = this->graph.get_Srec(node);
+        // Not sure this is required
         if(this->graph.is_depression(next_node) == false)
-          next_node = this->graph.get_Srec(next_node);
-
-        // this->chonk_network[next_node].add_to_water_flux(this->chonk_network[node].get_water_flux());
-        // this->chonk_network[next_node].add_to_sediment_flux(this->chonk_network[node].get_sediment_flux(), this->chonk_network[node].get_other_attribute_array("label_tracker"));
-        
+          next_node = this->graph.get_Srec(next_node);   
+        // Formatting the depression moving pattern     
         this->chonk_network[node].reinitialise_moving_prep();
         this->chonk_network[node].external_moving_prep({next_node},{1.},{1.},{0});
+
+        // Applying the fluxes modifyers
         this->manage_fluxes_after_moving_prep(this->chonk_network[node],this->label_array[node]);
+        // Splitting the fluxes
         this->chonk_network[node].split_and_merge_in_receiving_chonks(this->chonk_network, this->graph, this->io_double_array["surface_elevation_tp1"], io_double_array["sed_height_tp1"], this->timestep);
-
-
-        // node = next_node;
         is_processed[node] = true;
-        // goto nolake;
+        // Done        
       }
       else
+      {
+        // this is a normal node and I go to the nolake management routiness
         goto nolake;
+      }
 
       return;
     }
+    // LABEL
     nolake:
     
 
@@ -2152,12 +2156,10 @@ void Lake::drape_deposition_flux_to_chonks(std::vector<chonk>& chonk_network, xt
     return;
 
   double ratio_of_dep = this->volume_of_sediment/this->volume;
-  // std::cout << this->volume_of_sediment << "||" << this->volume << std::endl;
 
   // NEED TO DEAL WITH THAT BOBO
   if(ratio_of_dep>1)
     ratio_of_dep = 1;
-  //   throw std::runtime_error("MORE_SEDIMENT_THAN_WATER_IN_LAKE_FINALISATION::" + std::to_string(ratio_of_dep) + "||" + std::to_string(this->volume));
 
   for(auto& no:this->nodes)
   {
@@ -2168,6 +2170,7 @@ void Lake::drape_deposition_flux_to_chonks(std::vector<chonk>& chonk_network, xt
 
     double slangh = ratio_of_dep * (this->water_elevation - surface_elevation[no]) / timestep;
     chonk_network[no].add_sediment_creation_flux(slangh);
+    chonk_network[no].set_other_attribute_array("label_tracker", this->outlet_chonk.get_other_attribute_array("label_tracker"));
 
     pre = chonk_network[no].get_sediment_creation_flux();
     if(std::isfinite(pre) == false)
