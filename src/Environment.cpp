@@ -922,7 +922,7 @@ void ModelRunner::finalise()
 
     // NANINF DEBUG CHECKER
     for(auto LAB:this_lab)
-      if(std::isfinite(LAB) ==false)
+      if(std::isfinite(LAB) == false)
         std::cout << LAB << " << naninf for sedflux" << std::endl;
 
     // getting the lake ID and depth
@@ -1007,6 +1007,9 @@ void ModelRunner::finalise()
         throw std::runtime_error("It should not happens!!!!!!!!!");
 
     }
+
+    if(sed_prop_by_label[i].size() == 0 && sed_height_tp1[i] > 0)
+      throw std::runtime_error("Sediment but no tracking error");
 
 
 
