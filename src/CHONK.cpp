@@ -755,35 +755,27 @@ void chonk::set_sediment_flux(double value, std::vector<double> label_proportion
 // Add a certain amount to the sediment flux
 void chonk::add_to_sediment_flux(double value, std::vector<double> label_proportions)
 {
-  this->sediment_flux += value;
-  if(double_equals(this->sediment_flux,0))
+
+  // if I have no sediment: do nothing
+  if(double_equals(value,0, 1e-8))
+  {
     return;
+  }
+
+  // If my sediment flux is 0: bunk
+  if(double_equals(this->sediment_flux,0))
+  {
+    this->sediment_flux += value;
+    this->other_attributes_arrays["label_tracker"] = label_proportions;
+    return;
+  }
 
 
-  std::vector<double> newlabprop = mix_two_proportions(this->sediment_flux, this->other_attributes_arrays["label_tracker"], value, label_proportions);
-  this->other_attributes_arrays["label_tracker"] = newlabprop;
-
-  // for(auto garg:oatalab)
-  // {
-  //   if(std::isfinite(garg) == false)
-  //     std::cout << "NANCOMON:2" << std::endl; 
-  // }
-
-  // if(this->sediment_flux<0)
-  // {
-  //   std::cout << "sed fluxes neg after:"<< saveflflfl << " minused by " << value << std::endl;
-  //   std::cout << "WARNING PROBLEM SEDFLUX " << value << std::endl;
-  //   this->sediment_flux = 0;
-  //   // throw std::runtime_error("NEGSEDFLUXES");
-  // }
-  // if(std::isfinite(this->sediment_flux) == false)
-  //   std::cout << "sedflux naninf after";
-
+  // std::vector<double> newlabprop = mix_two_proportions(this->sediment_flux, this->other_attributes_arrays["label_tracker"], value, label_proportions);
+  this->other_attributes_arrays["label_tracker"] = mix_two_proportions(this->sediment_flux, this->other_attributes_arrays["label_tracker"], value, label_proportions);;
+  this->sediment_flux += value;
 
 }
-// next step:: propagte proportions to split and merge
-
-
 
 
 

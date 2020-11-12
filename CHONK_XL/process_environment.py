@@ -7,6 +7,8 @@ import numpy as np
 import xsimlab as xs
 import CHONK_cpp as ch
 from .hillshading import hillshading
+import numcodecs
+import zarr
 
 @xs.process
 class GridSpec:
@@ -241,6 +243,7 @@ class CoreModel:
 	mstack_checker = xs.on_demand(dims = ('y','x'))
 	flat_mask = xs.on_demand(dims = ('y','x'))
 	NodeID =  xs.on_demand(dims = ('y','x'))
+	full_sed_pile_prop = xs.on_demand(dims = ('y','x'), encoding = {"dtype": np.object, "object_codec": numcodecs.JSON()})
 	
 	Qw_in = xs.on_demand()
 	Qw_out = xs.on_demand()
@@ -391,6 +394,18 @@ class CoreModel:
 	@NodeID.compute
 	def _NodeID(self):
 		return np.arange(0,(self.ny * self.nx)).reshape(self.ny,self.nx);
+
+	@full_sed_pile_prop.compute
+	def _full_sed_pile_prop(self):
+		temp = self.model.get_sed_prop_by_label()
+		out = np.empty((self.ny*self.nx), dtype = np.object)
+		for key,val in temp.items():
+			out[key] = val
+		return out.reshape(self.ny,self.nx)
+		# z = zarr.empty(1, dtype=object, object_codec=numcodecs.JSON())
+		# z[0] = temp
+		# return z
+
 
 
 

@@ -94,6 +94,7 @@ PYBIND11_MODULE(CHONK_cpp, m)
       .def("get_Ql_in", &ModelRunner::get_Ql_in)
       .def("get_Ql_out", &ModelRunner::get_Ql_out)
       .def("get_flat_mask", &ModelRunner::get_flat_mask)
+      .def("get_sed_prop_by_label", &ModelRunner::get_sed_prop_by_label)
 
     ;
     m.def("set_DEBUG_switch_nodegraph",set_DEBUG_switch_nodegraph);

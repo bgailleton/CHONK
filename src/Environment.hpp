@@ -406,6 +406,9 @@ class ModelRunner
 
     inline void increment_new_lake(int& lakeid);
 
+    std::map<int, std::vector<std::vector<double> > > get_sed_prop_by_label() {return sed_prop_by_label;};
+    xt::pytensor<float,4> get_sed_prop_by_label_matrice(int n_depths);
+
 
   protected:
 
