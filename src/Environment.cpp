@@ -1154,170 +1154,27 @@ void ModelRunner::add_to_sediment_tracking(int index, double height, std::vector
 
 }
 
-// void ModelRunner::add_to_sediment_tracking(int index, double height, std::vector<double> label_prop, double sed_depth_here)
-// {
-//   // trying to add/remove sediments but no sediments are here
-//   // Nothing happens then
-//   if(height == 0)
-//     return;
-//   if(height<0 && is_there_sed_here[index] == false)
-//   {
-//     return;
-//   }
+xt::pytensor<float,4> ModelRunner::get_sed_prop_by_label_matrice(int n_depths)
+{
+  xt::pytensor<float,4> output = xt::zeros<float>({this->io_int["ny"], this->io_int["nx"], n_depths, this->n_labels});
+  int nx = this->io_int["nx"];
+  // Watching Alex and Mikael's talk while writing that code
+  for ( auto& alex_attal : this->sed_prop_by_label)
+  {
+    int node = alex_attal.first;
+    int row,col;
+    col = node % nx;
+    row = std::floor(node/nx);
+    for(int i=0; i< alex_attal.second.size();i++)
+      for(int j=0; j<n_labels; j++)
+      {
+        output(row,col,i,j) = alex_attal.second[i][j];
+      }
 
-//   double depth_res = this->io_double["depths_res_sed_proportions"];
+  }
+  return output;
 
-
-//   // No sediments previously there -> creating boxes of sediment here
-//   if(is_there_sed_here[index] == false)
-//   {
-//     if(sed_prop_by_label[index].size()>0 )
-//       throw std::runtime_error("Unexpected Behavior 56");
-
-//     // So the number of boxes I need to create is the ceiling of the height of sediment I want to add divided by the depths resolution at wich I want to create the boxes
-//     // For example, my res is 1m, and I add 1.5 metres of sediment -> 2 boxes are needed, the first one is full and the second one is half
-//     int n_strata = std::ceil(std::abs(height / depth_res));
-//     // I fill these boxes wih the sediment proportion in input
-//     for(int i = 0; i<n_strata; i++)
-//     {
-//       sed_prop_by_label[index].push_back(label_prop);
-//     }
-
-//     // DEBUG CHECKER TO REMOVE ONCE STABLE
-//     if(sed_prop_by_label[index].size() == 0)
-//     {
-//       std::cout << index << "||" << node_in_lake[index] << "||" << n_strata << "||" << height << std::endl;
-//       throw std::runtime_error("Unexpected behaviour SEDBUTNOSED");
-//     }
-
-//     // Remembering that I do have sediment there
-//     is_there_sed_here[index] = true;
-
-//     // this was a simple case and it should be done by now
-//     return;
-//   }
-
-//   // DEBUG CHECKER
-//   for(auto LAB:label_prop)
-//     if(std::isfinite(LAB) == false)
-//       std::cout << "NANLAB at label_prop::add_to_sediment_tracking_start" << std::endl;
-
-//   // In that case, things are more complex, I need to (i) detect how many boxes I am addig/removing and (ii) mix the proportions
-//   // Sediments already in there, getting more complex
-//   // Getting the proportion of the last box filled and the number of boxes
-//   double n_boxes = sed_depth_here/depth_res;
-//   // this is the number of boxes fully filled already there
-//   double n_strata_already_there;
-//   // This is the proportion of the underfilled box
-//   double prop_box_filled = std::modf(n_boxes, &n_strata_already_there);
-//   // This is the number of boxes to fill with the incoming flux
-//   double n_boxes_to_fill = std::abs(height/depth_res);
-//   // index of the last box -> the underfilled one
-//   int current_box = int(sed_prop_by_label[index].size()) - 1;
-
-//   //TO DO BORIS:: CURRENT BOX SHOULD NEVER BE -1 HERE, WHY IS IT??
-//   if(current_box < 0)
-//   {
-//     is_there_sed_here[index] = false;
-//     return;
-//   }
-
-//   // DEBUG CHECKER TO REMOVE ONCE STABLE
-//   for(auto stuff:sed_prop_by_label[index][current_box])
-//     if(std::isfinite(stuff) == false)
-//       throw std::runtime_error("Unexpected behaviour 463");
-
-//   // n_boxes to add or remove entirely
-//   int delta_boxes = std::floor(n_boxes_to_fill);
-
-//   // Sediment addition case
-//   if(height > 0)
-//   {
-
-//     // filling the current box with the mixed proportions of labels
-//     sed_prop_by_label[index][current_box] = mix_two_proportions(prop_box_filled, sed_prop_by_label[index][current_box], (n_boxes_to_fill - delta_boxes), label_prop);
-
-//     for(auto ugh:sed_prop_by_label[index][current_box])
-//     if(std::isfinite(ugh) == false)
-//     {
-//       throw std::runtime_error("Arg, nan sedafter");
-//     }
-
-//     // adding the boxes
-//     if(delta_boxes> 0)
-//     {
-//       for(int i=0; i<delta_boxes; i++)
-//         sed_prop_by_label[index].push_back(label_prop);
-//     }
-//   }
-//   else
-//   {
-
-//     // sediments to remove, easier
-//     if(delta_boxes > 0)
-//     {
-
-//       for(int i=0; i<delta_boxes; i++)
-//       {
-//         // NEED TO CHECK WHY IS THIS HAPPENING HERE!!!! IT SHOULD NOT TRY TO POP BACK IF THERE IS NOTHING TO POP BACK 
-//         if(sed_prop_by_label[index].size() > 0)
-//         {
-//           sed_prop_by_label[index].pop_back();
-//           current_box -- ;
-//         }
-//       }
-//       // mixing the current box by removing an amount of sediment. However as there can be sediment deposition and mobilisation simultaneously there is still a mixing of proportions happening
-//     }
-//     if(current_box >= 0)
-//     {
-//       double cor_h = n_boxes_to_fill - delta_boxes;
-//       if(prop_box_filled -  cor_h > 0)
-//         sed_prop_by_label[index][current_box] = mix_two_proportions(prop_box_filled, sed_prop_by_label[index][current_box], cor_h, label_prop);
-//       else
-//       {
-//         sed_prop_by_label[index].pop_back();
-//         current_box -- ;
-//         if(current_box >= 0)
-//         {
-//           double new_prop_to_fill =1 - std::abs(prop_box_filled -  cor_h);
-//           sed_prop_by_label[index][current_box] = mix_two_proportions(new_prop_to_fill, sed_prop_by_label[index][current_box], (1 - new_prop_to_fill), label_prop);
-//         }
-
-//       }
-
-//     }
-
-
-    
-//   }
-
-
-
-
-//   //Done??
-//   if(sed_prop_by_label[index].size() == 0)
-//     is_there_sed_here[index] = false;
-//   else
-//   {
-//     auto gougle =  sed_prop_by_label[index][sed_prop_by_label[index].size() - 1];
-//     bool all_0 = true;
-//     for(auto bast:gougle)
-//       if(bast > 0)
-//         all_0 = false;
-
-//     if(all_0)
-//       throw std::runtime_error("???");
-
-//   }
-//   int curate = int(sed_prop_by_label[index].size()) -1;
-//   if(curate>=0)
-//   {
-//     for(auto stuff:sed_prop_by_label[index][curate])
-//       if(std::isfinite(stuff) == false)
-//         throw std::runtime_error("Unexpected behaviour 465");
-//   }
-// }
-
+}
 
 
 xt::pytensor<double,2> ModelRunner::get_superficial_layer_sediment_prop()
