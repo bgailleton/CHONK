@@ -912,6 +912,11 @@ void ModelRunner::finalise()
   // Iterating through all nodes
   for(int i=0; i< this->io_int["n_elements"]; i++)
   {
+    if(std::isfinite(surface_elevation_tp1[i]) == false)
+    {
+      throw std::runtime_error("NAN IN ELEV WHILE FINIlIISAFJ");
+    }
+
     if(active_nodes[i] == 0)
       continue;
 
@@ -1063,9 +1068,9 @@ void ModelRunner::add_to_sediment_tracking(int index, double height, std::vector
   double box_ta_ufill = std::modf(delta_boxes, &boxes_ta_filled);
   
   // Index of current box
-  // std::cout << "A" << std::endl;;
+  // std::cout << "A::" << boxes_there << std::endl;;
   int current_box = int(sed_prop_by_label[index].size() - 1);
-  // std::cout << "B" << std::endl;;
+  // std::cout << "B::"  << current_box<< std::endl;;
 
 
   // If I am removing sediments
@@ -1159,18 +1164,20 @@ xt::pytensor<float,4> ModelRunner::get_sed_prop_by_label_matrice(int n_depths)
   xt::pytensor<float,4> output = xt::zeros<float>({this->io_int["ny"], this->io_int["nx"], n_depths, this->n_labels});
   int nx = this->io_int["nx"];
   // Watching Alex and Mikael's talk while writing that code
-  for ( auto& alex_attal : this->sed_prop_by_label)
+  for ( auto alex_attal : this->sed_prop_by_label)
   {
+  // Watching Alex and Mikael's talk while writing that code
+
     int node = alex_attal.first;
     int row,col;
-    col = node % nx;
+    col = int(node % nx);
     row = std::floor(node/nx);
-    for(int i=0; i< alex_attal.second.size();i++)
+
+    for(int i=0; i< int(alex_attal.second.size());i++)
       for(int j=0; j<n_labels; j++)
       {
-        output(row,col,i,j) = alex_attal.second[i][j];
+        output(row,col,int(alex_attal.second.size()) - i - 1,j) = alex_attal.second[i][j];
       }
-
   }
   return output;
 

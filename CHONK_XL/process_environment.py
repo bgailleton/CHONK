@@ -223,7 +223,9 @@ class CoreModel:
 	# Variables in
 	depths_res_sed_proportions = xs.variable(intent = 'inout', description = "Depth resolution for saving sediments proportions") #, default = 1.
 	lake_solver = xs.variable(intent = 'inout', description = 'Switch on or off the lake management. True: the lake will be dynamically filled (or not) with water and sediment. False: water and sediment fluxes are rerouted from lake bottom to outlet.') #, default = True
-
+	n_depth_sed_tracking = xs.variable(intent = 'in', default = 50)
+	n_depths_recorded = xs.index(dims = 'n_depths_recorded')
+	
 	# what gets out
 	model = xs.any_object( description = "The main model object, controls the c++ part (I/O, results, run function, process order of execution, ...)")
 
@@ -243,7 +245,7 @@ class CoreModel:
 	mstack_checker = xs.on_demand(dims = ('y','x'))
 	flat_mask = xs.on_demand(dims = ('y','x'))
 	NodeID =  xs.on_demand(dims = ('y','x'))
-	full_sed_pile_prop = xs.on_demand(dims = ('y','x'), encoding = {"dtype": np.object, "object_codec": numcodecs.JSON()})
+	full_sed_pile_prop = xs.on_demand(dims = ('y','x','n_depths_recorded','n_labels'))
 	
 	Qw_in = xs.on_demand()
 	Qw_out = xs.on_demand()
@@ -253,13 +255,16 @@ class CoreModel:
 	
 
 	def initialize(self):
+		self.n_depths_recorded = np.arange(0,self.depths_res_sed_proportions * self.n_depth_sed_tracking,self.depths_res_sed_proportions)
 
 		# Initialising the model itself with default processes
 		self.model = ch.ModelRunner( 1, ["move"], "") 
 
 		self.model.update_double_param("dx", self.dx)
 		self.model.update_double_param("dy", self.dy)
+		self.model.update_int_param("ny", self.ny)
 		self.model.update_int_param("n_rows", self.ny)
+		self.model.update_int_param("nx", self.nx)
 		self.model.update_int_param("n_cols", self.nx)
 		self.model.update_int_param("n_elements",self.ny*self.nx)
 
@@ -397,11 +402,8 @@ class CoreModel:
 
 	@full_sed_pile_prop.compute
 	def _full_sed_pile_prop(self):
-		temp = self.model.get_sed_prop_by_label()
-		out = np.empty((self.ny*self.nx), dtype = np.object)
-		for key,val in temp.items():
-			out[key] = val
-		return out.reshape(self.ny,self.nx)
+		return  self.model.get_sed_prop_by_label_matrice(self.n_depth_sed_tracking)
+		# return out.reshape(self.ny,self.nx)
 		# z = zarr.empty(1, dtype=object, object_codec=numcodecs.JSON())
 		# z[0] = temp
 		# return z

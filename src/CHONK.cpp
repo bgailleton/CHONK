@@ -963,7 +963,11 @@ void chonk::charlie_I(double n, double m, double K_r, double K_s,
 
 // Mixe two proportions
 std::vector<double> mix_two_proportions(double prop1, std::vector<double> labprop1, double prop2, std::vector<double> labprop2)
-{
+{ 
+  if(labprop1.size() == 0)
+    return labprop2;
+  if(labprop2.size() == 0)
+    return labprop1;
 
   // The ouput will eb the same size as the inputs
   std::vector<double>output(labprop1.size(),0.);
@@ -975,6 +979,7 @@ std::vector<double> mix_two_proportions(double prop1, std::vector<double> labpro
   {
     // Absolute value because one of the two proportions might be negative, if I am revmoving element for example.
     output[i] = std::abs( prop1 * labprop1[i] + prop2 * labprop2[i]);
+
     sumall += output[i];
   }
   // If all is 0, all is 0
