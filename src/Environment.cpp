@@ -980,6 +980,12 @@ void ModelRunner::finalise()
       // Applying the delta_h on both surface elevation and sediment layer
       surface_elevation_tp1[i] += sedcrea;
       sed_height_tp1[i] += sedcrea;
+      if(std::ceil(sed_height_tp1[i]/this->io_double["depths_res_sed_proportions"]) != int(sed_prop_by_label[i].size()))
+      {
+        std::cout << "called with " << i << "|" << sedcrea << "|" << sed_height_tp1[i] << std::endl;
+        std::cout << std::ceil(sed_height_tp1[i]/this->io_double["depths_res_sed_proportions"]) << "||" << int(sed_prop_by_label[i].size()) << std::endl;
+        throw std::runtime_error("COCKROACH");
+      }
     }
 
     //Dealing now with "undifferentiated" Erosion rates
@@ -1057,7 +1063,7 @@ void ModelRunner::add_to_sediment_tracking(int index, double height, std::vector
 
   // First, let's calculates stats about the current box situation
   double boxes_there = sed_depth_here/depth_res;
-  double delta_boxes = height/depth_res;
+  double delta_boxes = std::abs(height/depth_res);
 
   // Breakdown into filled and underfilled
   double boxes_there_filled;
@@ -1069,7 +1075,13 @@ void ModelRunner::add_to_sediment_tracking(int index, double height, std::vector
   
   // Index of current box
   // std::cout << "A::" << boxes_there << std::endl;;
-  int current_box = int(sed_prop_by_label[index].size() - 1);
+  int current_box = int(sed_prop_by_label[index].size()) - 1;
+  int current_box_test = int(std::ceil(boxes_there)) - 1;
+  // if(current_box != current_box_test)
+  // {
+    // std::cout << "Beef::" << current_box << "||" << current_box_test << "||" << boxes_there << "||" << sed_depth_here << std::endl;
+    // throw std::runtime_error("C**K!!!");
+  // }
   // std::cout << "B::"  << current_box<< std::endl;;
 
 
@@ -1084,9 +1096,9 @@ void ModelRunner::add_to_sediment_tracking(int index, double height, std::vector
       sed_prop_by_label[index].pop_back();
       current_box--;
     }
-    // std::cout << "D" << std::endl;;
     // Getting the height of the remaining boxe
     double this_hbox = box_there_ufill - box_ta_ufill;
+    // std::cout << "D::" << this_hbox << "::" << box_there_ufill << "::" << box_ta_ufill << std::endl;;
 
     // I will remove prop2 from prop1
     double prop1 = box_there_ufill;
@@ -1101,7 +1113,8 @@ void ModelRunner::add_to_sediment_tracking(int index, double height, std::vector
       current_box--;
       // I am now removing from a full box
       prop1 = 1;
-      prop2 = -1 * (1 + this_hbox);
+      // prop2 = -1 * (1 + this_hbox);
+      prop2 = this_hbox;
       // std::cout << "F" << std::endl;;
     }
     // finally mixing the two depositions
@@ -1114,6 +1127,7 @@ void ModelRunner::add_to_sediment_tracking(int index, double height, std::vector
 
     // std::cout << "H" << std::endl;;
     double this_hbox = box_there_ufill + box_ta_ufill;
+    // std::cout << box_there_ufill << "opo" << box_ta_ufill << std::endl;
     double prop1 = box_there_ufill;
     double prop2 = box_ta_ufill;
 
@@ -1127,7 +1141,8 @@ void ModelRunner::add_to_sediment_tracking(int index, double height, std::vector
     {
       // std::cout << "I" << std::endl;;
       this->sed_prop_by_label[index][current_box] = mix_two_proportions(prop1,sed_prop_by_label[index][current_box], 1 - prop1, label_prop);
-      for(int i = 0; i<=int(boxes_ta_filled); i++)
+
+      for(int i = 0; i < int(boxes_ta_filled) + 1; i++)
       {
         sed_prop_by_label[index].push_back(label_prop);
         current_box++;
@@ -1138,7 +1153,8 @@ void ModelRunner::add_to_sediment_tracking(int index, double height, std::vector
     {
       // std::cout << "K" << std::endl;;
       this->sed_prop_by_label[index][current_box] = mix_two_proportions(prop1,sed_prop_by_label[index][current_box], (1 - prop1), label_prop);
-      for(int i = 0; i<int(boxes_ta_filled); i++)
+
+      for(int i = 0; i < int(boxes_ta_filled); i++)
       {
         sed_prop_by_label[index].push_back(label_prop);
         current_box++;
@@ -1153,6 +1169,9 @@ void ModelRunner::add_to_sediment_tracking(int index, double height, std::vector
     }
     
   }
+
+  // std::cout << "AFFAF::" << current_box << "||" << current_box_test << "||" << boxes_there << "||" << sed_depth_here << std::endl;
+
 
   // for(auto gabro:this->sed_prop_by_label[index][current_box])
   //   std::cout << "GABRO::" <<gabro << std::endl;
