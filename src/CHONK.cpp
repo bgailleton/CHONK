@@ -117,12 +117,23 @@ void chonk::split_and_merge_in_receiving_chonks(std::vector<chonk>& chonkscape, 
   // Iterating through the receivers
   std::vector<double> oatalab = other_attributes_arrays["label_tracker"];
   double sum_weight_sed = 0;
+
+  if(this->chonkID == 466)
+  {
+    std::cout << "466 has " << this->weigth_water_fluxes.size() << " receivers" << std::endl;
+  }
   for(size_t i=0; i < this->receivers.size(); i++)
   {
     // Adressing the chonk
     chonk& other_chonk = chonkscape[this->receivers[i]];
 
     // Adding the fluxes*modifyer
+    if(this->chonkID == 466)
+    {
+      std::cout << "466 giving to " << this->receivers[i] << "||" << this->water_flux * this->weigth_water_fluxes[i] << std::endl;
+    }
+
+
     // std::cout << this->current_node << "GIVING " << this->water_flux * this->weigth_water_fluxes[i] << " to " << receivers[i] << std::endl;
     other_chonk.add_to_water_flux(this->water_flux * this->weigth_water_fluxes[i]);
 

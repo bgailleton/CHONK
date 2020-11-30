@@ -297,7 +297,8 @@ class CoreModel:
 		# print("Running", dt)
 		self.model.update_timestep(dt)
 		tempolake = self.model.get_array_double_param("surface_elevation")
-		self.model.update_array_double_param("surface_elevation", np.copy(self.model.get_array_double_param("surface_elevation_tp1")) )
+		self.model.update_array_double_param("surface_elevation", np.copy(self.model.get_array_double_param("surface_elevation_tp1") + np.random.rand(self.nx * self.ny) * 1e-7 ) )
+		# self.model.update_array_double_param("surface_elevation", np.copy(self.model.get_array_double_param("surface_elevation_tp1")) )
 		self.model.update_array_double_param("sed_height", np.copy(self.model.get_array_double_param("sed_height_tp1")) )
 		self.model.initiate_nodegraph()
 		self.model.run()
@@ -342,6 +343,7 @@ class CoreModel:
 
 	@labprop_Qs.compute
 	def _labprop_Qs(self):
+		import time
 		LAB = np.array(self.model.get_label_tracking_results())
 		temp = []
 		for sub in LAB:

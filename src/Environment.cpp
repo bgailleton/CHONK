@@ -172,6 +172,8 @@ void ModelRunner::run()
   {
     // Getting the current node in the Us->DS stack order
     int node = this->graph.get_MF_stack_at_i(i);
+    if(this->graph.get_MF_receivers_at_node(node).size() == 0 && this->io_int_array["active_nodes"][node]>0 && this->graph.is_depression(node) == false)
+      throw std::runtime_error("No rec Error");
     // Processing that node
     this->process_node(node, is_processed, lake_incrementor, underfilled_lake, inctive_nodes, cellarea, surface_elevation, true);   
     // std::cout << this->chonk_network[node].get_water_flux() << std::endl; 
@@ -198,6 +200,13 @@ void ModelRunner::process_node(int& node, std::vector<bool>& is_processed, int& 
 
     // if I reach this stage, this node can be labelled as processed
     is_processed[node] = true;
+
+    // if(node == 466)
+    // {
+    //   std::cout << "LULULULULULULULULULULULULULULULULULULU" << std::endl;
+    //   for(auto merde : this->graph.get_MF_receivers_at_node(node) )
+    //     std::cout << "POTREC::" << merde << "is_in_lake" << node_in_lake[merde] << std::endl;
+    // }
 
     // manages the fluxes before moving the particule: accumulating DA, precipitation, infiltration, evaporation, ...
     this->manage_fluxes_before_moving_prep(this->chonk_network[node],this->label_array[node] );
@@ -547,9 +556,9 @@ void ModelRunner::process_node(int& node, std::vector<bool>& is_processed, int& 
             this->chonk_network[outlet].set_deposition_flux(0.);
             // std::cout << "bo";
             // if(active_nodes[outlet]==1)
-            std::cout << "MAMAMAMA" << std::endl;
+            // std::cout <<https://donaldjtrump2024.com/ "MAMAMAMA" << std::endl;
             this->process_node_nolake_for_sure(outlet, is_processed, lake_incrementor, underfilled_lake, inctive_nodes, cellarea, surface_elevation, false, false);
-            std::cout << "COMMON" << std::endl;
+            // std::cout << "COMhttps://donaldjtrump2024.com/MON" << std::endl;
             // std::cout << "ris" << "|"; 
             // std::cout << "OUTLET 0.67 is " << outlet << std::endl;
 
@@ -2433,6 +2442,8 @@ void Lake::pour_water_in_lake(
     std::vector<double> wwf = {1.};
     std::vector<double> wws = {1.};
     std::vector<double> Strec = {SS};
+
+
     this->outlet_chonk.external_moving_prep(rec,wwf,wws,Strec);
 
     if(this->volume_of_sediment > this->volume)
@@ -2447,6 +2458,8 @@ void Lake::pour_water_in_lake(
       std::vector<double> baluf_2 (chonk_network[originode].get_other_attribute_array("label_tracker").size(),0.);
       this->outlet_chonk.set_sediment_flux(0.,baluf_2);
     }
+
+
 
     if(active_nodes[this->outlet_node] == 0)
     {
