@@ -1,7 +1,7 @@
 import lsdnumbatools as lsdnb
 import numpy as np
 import numba as nb
-import inspects
+import inspect
 
 float_type = np.float32
 int_type = np.int32
@@ -11,6 +11,11 @@ def rename_function_string(func,newname):
   funclines = inspect.getsourcelines(func)
   return ''.join(['def %s('%(newname) + ', '.join(map(str, argas)) + '):\n'] +funclines[0][1:])
 
+def funcsample1(a):
+    return a
+
+def funcsample2(i,a):
+    return a[i]
 
 class GALET_POC(object):
   """docstring for GALET_POC"""
@@ -40,6 +45,7 @@ class GALET_POC(object):
     self._processes_jitted_function = []
     self._processes_jitted_args = []
     self.nfuncs = 0
+    self.all_quantity_names = []
 
     self._params_jitted_function = []
     self._params_jitted_args = []
@@ -56,9 +62,9 @@ class GALET_POC(object):
     "distance_to_steepest_receiver", # distances to steepest receiver
     }
 
-    self.param_keys = {}
+    self.param_keys = set()
 
-    self.valid_arg_keys = built_in_arg_keys.copy()
+    self.valid_arg_keys = self.built_in_arg_keys.copy()
 
 
   def run(self):
@@ -69,24 +75,32 @@ class GALET_POC(object):
     self.graph.correct_D8S_depressions()
 
   def _register_quantity(self, name, original_value, type_of_quantity = "quantity", 
-    force_dtype = "f1d", need_tp1 = False, accumulative = False, tracker = False,
+    force_dtype = "f1d", need_delta = False, accumulative = False, tracker = False,
     is_main_topography = False):
 
-  if(is_main_topography):
-    self.main_topography = name
+    if(is_main_topography):
+      self.main_topography = name
 
-    
-    which_list = self.type2list(dtype)
+    self.all_quantity_names.append(name)
+    which_list = self.type2list(force_dtype)
 
-    self.meta_info[name].update({"type": type_of_quantity, "dtype":force_dtype, "index_array": len(which_list), 
-    "tp1": need_tp1, "accumulative": accumulative, "tracker": tracker})
+    updater = {"type": type_of_quantity, "dtype":force_dtype, "index_array": len(which_list), 
+    "tp1": need_delta, "accumulative": accumulative, "tracker": tracker}
+    if(name not in self.meta_info):
+      self.meta_info.update({name:updater})
+    else:
+      self.meta_info[name].update(updater)
+
+    if(self.meta_info[name]["type"] in ["quantity_delta", "quantity_splitter"]):
+      self.meta_info[name]["parent_index"] = self.meta_info[name[:-6]]["index_array"]
+      self.meta_info[name]["parent_dtype"] = self.meta_info[name[:-6]]["dtype"]
 
     which_list.append(original_value)
 
     self.valid_arg_keys.add(name)
 
-    if(need_tp1):
-      self._register_quantity(name+"_tp1", force_dtype = force_dtype, np.copy(original_value))
+    if(need_delta):
+      self._register_quantity(name+"_delta", np.copy(original_value), type_of_quantity = 'quantity_delta' ,force_dtype = force_dtype)
 
     if(accumulative or tracker):
       if(force_dtype == "f1d"):
@@ -102,42 +116,37 @@ class GALET_POC(object):
         tforce_dtype = "i3d"
         tdtype = int_type
 
-      self._register_quantity(name+"_split", np.full((list(original_value.shape).append(8)), -1, dtype = tdtype ), force_dtype = tforce_type)
+      self._register_quantity(name+"_split", np.full((list(original_value.shape).append(8)), -1, dtype = tdtype ), 
+        type_of_quantity = 'quantity_splitter', force_dtype = tforce_dtype)
 
   def _register_param(self, param_name, value = None, dtype = "f0d"):
 
-    this_function_name = "_INTERNAL_param_" + self.nparams + "_" + param_name
+    this_function_name = "_INTERNAL_param_" + str(self.nparams) + "_" + param_name
     self.nparams += 1
+    self.meta_info[param_name] = {}
     self.meta_info[param_name]["function_name"] = this_function_name
     self.meta_info[param_name]["function_index"] = len(self._params_jitted_function)
     self.param_keys.add(param_name)
     self.valid_arg_keys.add(param_name)
 
-    which_list = type2list(dtype)
+    which_list = self.type2list(dtype)
     if(which_list is not None):
-      self._register_quantity( param_name, value,type_of_quantity = "param", force_type = dtype, need_tp1 = False, accumulative = False, tracker = False)
+      self._register_quantity( param_name, value, type_of_quantity = "param", force_dtype = dtype, need_delta = False, accumulative = False, tracker = False)
 
       if("0d" in dtype):
 
-        # @nb.njit()
-        def func(a):
-          return a
-
-        self._params_jitted_function.append(rename_function_string(func,this_function_name))
+        self._params_jitted_function.append(rename_function_string(funcsample1,this_function_name))
         self._params_jitted_args.append([this_function_name, param_name])
 
       elif("1d" in dtype):
-        # @nb.njit()
-        def func(i,a):
-          return a[i]
 
-        self._params_jitted_function.append(rename_function_string(func,this_function_name))
+        self._params_jitted_function.append(rename_function_string(funcsample2,this_function_name))
         self._params_jitted_args.append([this_function_name, "i",param_name])
       else:
         raise ValueError(dtype + " is not supported yet")
 
     elif(callable(value)):
-      name, arguments = funcarg_parser(value)
+      name, arguments = self.funcarg_parser(value)
 
       these_args = []
       these_args.append(this_function_name)
@@ -156,20 +165,21 @@ class GALET_POC(object):
       self._params_jitted_args.append(these_args)
 
   def _register_process(self, name, function):
-
+    
+    self.meta_info[name] = {}
     self.meta_info[name]["type"] = "process"
-    this_function_name = "_INTERNAL_process_" + len(self._processes_jitted_function) + "_" + name
+    this_function_name = "_INTERNAL_process_" + str(len(self._processes_jitted_function)) + "_" + name
 
     self.meta_info[name]["function_name"] = this_function_name
     self.meta_info[name]["function_index"] = len(self._processes_jitted_function)
 
-    name, arguments = funcarg_parser(function)
+    name, arguments = self.funcarg_parser(function)
     these_args = []
     these_args.append(this_function_name)
     # checker:
     for ar in arguments:
       if(ar not in self.valid_arg_keys):
-        raise ValueError("Argument not understood")
+        raise ValueError("Argument " + str(ar) + " not understood")
 
       if(ar in self.valid_arg_keys):
         these_args.append(ar)
@@ -192,6 +202,9 @@ class GALET_POC(object):
 
     # writting the core running function now
     self._generate_running_code()
+
+    # Writing the finalisation function
+    self._generate_finalising_code()
 
 
   def _numpyification_of_lists(self):
@@ -220,6 +233,29 @@ class GALET_POC(object):
     """
     # Starting with the imports
     self.code_string = """
+'''
+This code has been automatically generated by GALET_MF:\n
+Here is a small relaxing view before the struggle!
+
+                                   /\\
+                              /\\  //\\\\
+                       /\\    //\\\\///\\\\\\        /\\
+                      //\\\\  ///\\////\\\\\\\\  /\\  //\\\\
+         /\\          /  ^ \\/^ ^/^  ^  ^ \\/^ \\/  ^ \\
+        / ^\\    /\\  / ^   /  ^/ ^ ^ ^   ^\\ ^/  ^^  \\
+       /^   \\  / ^\\/ ^ ^   ^ / ^  ^    ^  \\/ ^   ^  \\       *
+      /  ^ ^ \\/^  ^\\ ^ ^ ^   ^  ^   ^   ____  ^   ^  \\     /|\\
+     / ^ ^  ^ \\ ^  _\\___________________|  |_____^ ^  \\   /||o\\
+    / ^^  ^ ^ ^\\  /______________________________\\ ^ ^ \\ /|o|||\\
+   /  ^  ^^ ^ ^  /________________________________\\  ^  /|||||o|\\
+  /^ ^  ^ ^^  ^    ||___|___||||||||||||___|__|||      /||o||||||\\       |
+ / ^   ^   ^    ^  ||___|___||||||||||||___|__|||          | |           |
+/ ^ ^ ^  ^  ^  ^   ||||||||||||||||||||||||||||||oooooooooo| |ooooooo  |
+ooooooooooooooooooooooooooooooooooooooooooooooooooooooooo
+
+
+'''
+
 import numba as nb
 import numpy as np
 import math\n\n\n"""
@@ -253,18 +289,56 @@ quantity_int0D,quantity_int1D,quantity_int2D,quantity_int3D,
 quantity_float0D,quantity_float1D,quantity_float2D,quantity_float3D,
 D8Srec,D8Sdist,D8Sdons,D8Sndons,D8Mrecs,D8Mnrecs,D8Mdist,D8Mdons,D8Mndons,D8Mdondist,SStack,MStack):
 
-for i in range(n_elements):
+\tfor i in range(n_elements):
 """
     
     # writing the param and function calls
-    for funcarg in _processes_jitted_args:
+    for funcarg in self._processes_jitted_args:
       funame = funcarg[0]
       fuargs = funcarg[1:]
 
       args2write = []
 
-      for targ,tid in funcarg:
+      for targ in fuargs:
         args2write.append(self._arg2code_writer(targ))
+      self.code_string += "\n"
+      self.code_string += "\t\t" + funame + "(" + ',\n\t\t\t'.join(map(str, args2write)) + ')\n'
+
+    # Writting teh splitting props now
+    self.code_string += "\n"
+    self.code_string += "\t\tfor neight in range(D8Mnrecs[i]):\n"
+    self.code_string += "\t\t\t"
+    self.code_string += "rec = D8Mrecs[neight]\n"
+    for qtt in self.all_quantity_names:
+      if(self.meta_info[qtt]["type"] in ["quantity_splitter"]):
+        self.code_string += "\t\t\t"
+        datarr = self.type2list( self.meta_info[qtt]["dtype"], as_string_for_code_gen = True) 
+        parentarr = self.type2list( self.meta_info[qtt]["parent_dtype"], as_string_for_code_gen = True) 
+        self.code_string += parentarr
+        self.code_string += "[" + str(int(self.meta_info[qtt]["parent_index"])) + ",rec] += " + datarr + "[" + str(int(self.meta_info[qtt]["index_array"])) + ",i,neight]"
+
+
+
+  def _generate_finalising_code(self):
+
+    self.code_string += """
+@nb.njit()
+def _finalise_step(n_elements, 
+quantity_int0D,quantity_int1D,quantity_int2D,quantity_int3D,
+quantity_float0D,quantity_float1D,quantity_float2D,quantity_float3D,
+D8Srec,D8Sdist,D8Sdons,D8Sndons,D8Mrecs,D8Mnrecs,D8Mdist,D8Mdons,D8Mndons,D8Mdondist,SStack,MStack):
+
+\tfor i in range(n_elements):
+"""
+    for qtt in self.all_quantity_names:
+      if(self.meta_info[qtt]["type"] == "quantity_delta"):
+        self.code_string += "\t\t"
+        self.code_string += self.type2list( self.meta_info[qtt]["dtype"], as_string_for_code_gen = True)
+        self.code_string += "[" + str(self.meta_info[qtt]["parent_index"]) + "]" + " += "
+        self.code_string += self.type2list( self.meta_info[qtt]["dtype"], as_string_for_code_gen = True)
+        self.code_string += "[" + str(self.meta_info[qtt]["index_array"]) + "]"
+
+
 
 
   def funcarg_parser(self, func):
@@ -275,35 +349,35 @@ for i in range(n_elements):
   def type2list(self, dtype, as_string_for_code_gen = False):
     which_list = None
 
-    if force_type == "f1d":
-      which_list = self._quantity_float
+    if dtype == "f1d":
+      which_list = self._quantity_float1D
       if(as_string_for_code_gen):
-        which_list = "quantity_float"
-    elif force_type == "f2d":
+        which_list = "quantity_float1D"
+    elif dtype == "f2d":
       which_list = self._quantity_float2D
       if(as_string_for_code_gen):
         which_list = "quantity_float2D"
-    elif force_type == "i1d":
+    elif dtype == "i1d":
       which_list = self._quantity_int1D
       if(as_string_for_code_gen):
         which_list = "quantity_int1D"
-    elif force_type == "i2d":
+    elif dtype == "i2d":
       which_list = self._quantity_int2D
       if(as_string_for_code_gen):
         which_list = "quantity_int2D"
-    elif force_type == "f3d":
+    elif dtype == "f3d":
       which_list = self._quantity_float3D
       if(as_string_for_code_gen):
         which_list = "quantity_float3D"
-    elif force_type == "i3d":
+    elif dtype == "i3d":
       which_list = self._quantity_int3D
       if(as_string_for_code_gen):
         which_list = "quantity_int3D"
-    elif force_type == "i0d":
+    elif dtype == "i0d":
       which_list = self._quantity_int0D
       if(as_string_for_code_gen):
         which_list = "quantity_int0D"
-    elif force_type == "f0d":
+    elif dtype == "f0d":
       which_list = self._quantity_float0D
       if(as_string_for_code_gen):
         which_list = "quantity_float0D"
@@ -340,7 +414,10 @@ for i in range(n_elements):
 
     elif(targ in self.param_keys and inside_param_call == False):
       # IS PARAM (not called from param)
-      this_func_call = self.meta_info[targ]["function_name"] + "("
+      try:
+        this_func_call = self.meta_info[targ]["function_name"] + "("
+      except:
+        raise ValueError(str(targ) + " does not have function_name")
       tid = self.meta_info[targ]["function_index"]
       internal_args = []
       for params in self._params_jitted_args[tid]:
@@ -349,8 +426,9 @@ for i in range(n_elements):
       return this_func_call
 
     elif(targ in self.valid_arg_keys):
-
-
+      tid = self.meta_info[targ]["index_array"]
+      arrayst = self.type2list( self.meta_info[targ]["dtype"], as_string_for_code_gen = True)
+      return arrayst + "[" + str(int(tid)) + "]" 
 
 
 
