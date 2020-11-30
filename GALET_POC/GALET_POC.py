@@ -171,10 +171,8 @@ class GALET_POC(object):
       if(ar not in self.valid_arg_keys):
         raise ValueError("Argument not understood")
 
-      if(ar in self.built_in_arg_keys):
-        these_args.append((ar,None))
-      elif(ar in self.valid_arg_keys):
-        these_args.append((name, self.meta_info["index_array"]))
+      if(ar in self.valid_arg_keys):
+        these_args.append(ar)
       else:
         raise ValueError("Something went wrong in the argument translation during the ingestion of process function")
 
@@ -274,35 +272,52 @@ for i in range(n_elements):
     arguments = inspect.getfullargspec(func).args
     return name, arguments
 
-  def type2list(self, dtype):
+  def type2list(self, dtype, as_string_for_code_gen = False):
     which_list = None
 
     if force_type == "f1d":
       which_list = self._quantity_float
+      if(as_string_for_code_gen):
+        which_list = "quantity_float"
     elif force_type == "f2d":
       which_list = self._quantity_float2D
+      if(as_string_for_code_gen):
+        which_list = "quantity_float2D"
     elif force_type == "i1d":
       which_list = self._quantity_int1D
+      if(as_string_for_code_gen):
+        which_list = "quantity_int1D"
     elif force_type == "i2d":
       which_list = self._quantity_int2D
+      if(as_string_for_code_gen):
+        which_list = "quantity_int2D"
     elif force_type == "f3d":
       which_list = self._quantity_float3D
+      if(as_string_for_code_gen):
+        which_list = "quantity_float3D"
     elif force_type == "i3d":
       which_list = self._quantity_int3D
+      if(as_string_for_code_gen):
+        which_list = "quantity_int3D"
     elif force_type == "i0d":
       which_list = self._quantity_int0D
+      if(as_string_for_code_gen):
+        which_list = "quantity_int0D"
     elif force_type == "f0d":
       which_list = self._quantity_float0D
+      if(as_string_for_code_gen):
+        which_list = "quantity_float0D"
 
     return which_list
 
-  def _arg2code_writer(self, targ):
+  def _arg2code_writer(self, targ, inside_param_call = False):
     """
     Function parts of the code generator toolchain
     DO NOT CALL OUTSIDE THE CODE GENERATOR TOOLCHAIN
     """
 
     if(targ in self.built_in_arg_keys):
+      # IS BUILTIN
       if(targ == "i"): # current node
         return "i"
       elif(targ == "receivers"):
@@ -321,7 +336,22 @@ for i in range(n_elements):
         return "D8Sdist[i]"
       else:
         raise ValueError("I cannot find the param in the _arg2code_writer")
-    elif(targ in self.param_keys):
+
+
+    elif(targ in self.param_keys and inside_param_call == False):
+      # IS PARAM (not called from param)
+      this_func_call = self.meta_info[targ]["function_name"] + "("
+      tid = self.meta_info[targ]["function_index"]
+      internal_args = []
+      for params in self._params_jitted_args[tid]:
+        internal_args.append(self._arg2code_writer( params, inside_param_call = True))
+      this_func_call += ',\n'.join(map(str, internal_args)) + ')\n'
+      return this_func_call
+
+    elif(targ in self.valid_arg_keys):
+
+
+
 
 
 
