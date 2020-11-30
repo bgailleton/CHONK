@@ -6,19 +6,27 @@ import inspects
 float_type = np.float32
 int_type = np.int32
 
+def rename_function_string(func,newname):
+  argas = inspect.getfullargspec(func).args
+  funclines = inspect.getsourcelines(func)
+  return ''.join(['def %s('%(newname) + ', '.join(map(str, argas)) + '):\n'] +funclines[0][1:])
+
+
 class GALET_POC(object):
   """docstring for GALET_POC"""
-  def __init__(self, topography, dx, dy, node_type):
+  def __init__(self, dx, dy, node_type):
 
     super(GALET_POC, self).__init__()
 
-    self.topography = topography
+    self.main_topography = None
     self.dx = dx
     self.dy = dy
 
     self.graph = None
 
     self.meta_info = {}
+
+    self.code_string = None
 
     self._quantity_int0D = []
     self._quantity_int1D = []
@@ -48,6 +56,8 @@ class GALET_POC(object):
     "distance_to_steepest_receiver", # distances to steepest receiver
     }
 
+    self.param_keys = {}
+
     self.valid_arg_keys = built_in_arg_keys.copy()
 
 
@@ -58,7 +68,12 @@ class GALET_POC(object):
     self.graph.compute_D8M_graph()
     self.graph.correct_D8S_depressions()
 
-  def _register_quantity(self, name, original_value, type_of_quantity = "quantity", force_dtype = "f1d", need_tp1 = False, accumulative = False, tracker = False):
+  def _register_quantity(self, name, original_value, type_of_quantity = "quantity", 
+    force_dtype = "f1d", need_tp1 = False, accumulative = False, tracker = False,
+    is_main_topography = False):
+
+  if(is_main_topography):
+    self.main_topography = name
 
     
     which_list = self.type2list(dtype)
@@ -91,10 +106,12 @@ class GALET_POC(object):
 
   def _register_param(self, param_name, value = None, dtype = "f0d"):
 
-    this_function_name = "_INTERNAL_P_" + self.nparams + "_" + param_name
+    this_function_name = "_INTERNAL_param_" + self.nparams + "_" + param_name
     self.nparams += 1
     self.meta_info[param_name]["function_name"] = this_function_name
-    self.meta_info[param_name]["function_ID"] = len(self._params_jitted_function)
+    self.meta_info[param_name]["function_index"] = len(self._params_jitted_function)
+    self.param_keys.add(param_name)
+    self.valid_arg_keys.add(param_name)
 
     which_list = type2list(dtype)
     if(which_list is not None):
@@ -102,20 +119,20 @@ class GALET_POC(object):
 
       if("0d" in dtype):
 
-        @nb.njit()
-        def f(a):
+        # @nb.njit()
+        def func(a):
           return a
 
-        self._params_jitted_function.append(inspect.getsource(f))
-        self._params_jitted_args.append([this_function_name, (dtype),self.meta_info[param_name]["index_array"]])
+        self._params_jitted_function.append(rename_function_string(func,this_function_name))
+        self._params_jitted_args.append([this_function_name, param_name])
 
       elif("1d" in dtype):
-        @nb.njit()
-        def f(i,a):
+        # @nb.njit()
+        def func(i,a):
           return a[i]
 
-        self._params_jitted_function.append(inspect.getsource(f))
-        self._params_jitted_args.append([this_function_name, ("i",None),(dtype,self.meta_info[param_name]["index_array"])])
+        self._params_jitted_function.append(rename_function_string(func,this_function_name))
+        self._params_jitted_args.append([this_function_name, "i",param_name])
       else:
         raise ValueError(dtype + " is not supported yet")
 
@@ -129,51 +146,127 @@ class GALET_POC(object):
         if(ar not in self.valid_arg_keys):
           raise ValueError("Argument not understood")
 
-        if(ar in self.built_in_arg_keys):
-          these_args.append((ar,None))
-        elif(ar in self.valid_arg_keys):
-          these_args.append((self.meta_info["dtype"], self.meta_info["index_array"]))
+        if(ar in self.valid_arg_keys):
+          these_args.append(ar)
         else:
           raise ValueError("Something went wrong in the argument translation during the ingestion of parameter function")
 
 
-      self._params_jitted_function.append(inspect.getsource(value))
+      self._params_jitted_function.append(rename_function_string(value,this_function_name))
       self._params_jitted_args.append(these_args)
 
+  def _register_process(self, name, function):
 
-              
-# def f(i, proportions_in_Qsed):
-#   return (proportions_in_Qsed[i,0] * 0.8 + proportions_in_Qsed[i,1] * 0.2) * 1e-5
+    self.meta_info[name]["type"] = "process"
+    this_function_name = "_INTERNAL_process_" + len(self._processes_jitted_function) + "_" + name
 
-# def SPIL(i, topography, receivers, distances_to_receivers, water_quantity, water_quantity_split, sediment_quantity, K, m, n, Erosion):
-#   this_E = 0
-#   for j in range(receivers.shape[0]):
-#     this_E += np.power((topography[i] - topography[receivers[j]])/ distances_to_receivers[j], n) 
-#     * np.power(water_quantity[i] * water_quantity_split[i,j],m)
-#     * K
-#   Erosion[i] += this_E
+    self.meta_info[name]["function_name"] = this_function_name
+    self.meta_info[name]["function_index"] = len(self._processes_jitted_function)
 
-# @nb.njit()
-# def model_runner(...):
+    name, arguments = funcarg_parser(function)
+    these_args = []
+    these_args.append(this_function_name)
+    # checker:
+    for ar in arguments:
+      if(ar not in self.valid_arg_keys):
+        raise ValueError("Argument not understood")
 
-#   for i in graph.topological_order:
-#     ...
+      if(ar in self.built_in_arg_keys):
+        these_args.append((ar,None))
+      elif(ar in self.valid_arg_keys):
+        these_args.append((name, self.meta_info["index_array"]))
+      else:
+        raise ValueError("Something went wrong in the argument translation during the ingestion of process function")
 
-#   optional_finalising_function(...)
-# model._register_param(self, param_name, value = None, dtype = "f0d")
-
-# model._register_quantity(name, original_value, force_type = "f1d", need_tp1 = False, accumulative = False, tracker = False)
+    self._processes_jitted_function.append(rename_function_string(function,this_function_name))
+    self._processes_jitted_args.append(these_args)
 
 
+  def build(self):
+    # first step is to statically set the params
+    self._numpyification_of_lists()
+
+    # Adding the njit decorator to the functions
+    self._add_decorators()
+
+    # Starting the code generation with the imports and the param functions
+    self._initiate_code()
+
+    # writting the core running function now
+    self._generate_running_code()
 
 
-  def _register_process(self,func, function_name):
-    # Getting the arguments
-    arguments = inspect.getfullargspec(func).args
+  def _numpyification_of_lists(self):
+    """
+    Compiles all the python lists of quantities into numpy array with static dimensions and dtype
+    """
+    self._quantity_int0D = np.array(self._quantity_int0D)
+    self._quantity_int1D = np.array(self._quantity_int1D)
+    self._quantity_int2D = np.array(self._quantity_int2D)
+    self._quantity_int3D = np.array(self._quantity_int3D)
+    self._quantity_float0D = np.array(self._quantity_float0D)
+    self._quantity_float1D = np.array(self._quantity_float1D)
+    self._quantity_float2D = np.array(self._quantity_float2D)
+    self._quantity_float3D = np.array(self._quantity_float3D)
 
-    self.meta_info[function_name] = {}
-    self.meta_info[function_name]["original_arguments"] = arguments
-    self.meta_info[function_name]["original_function"] = func
+  def _add_decorators(self):
+
+    for i in range(len(self._processes_jitted_function)):
+      self._processes_jitted_function[i] = "@nb.njit()\n" + self._processes_jitted_function[i] 
+    for i in range(len(self._processes_jitted_function)):
+      self._params_jitted_function[i] = "@nb.njit()\n" + self._params_jitted_function[i] 
+
+  def _initiate_code(self):
+    """
+    Starts a script with the imports and all the jitted functions
+    """
+    # Starting with the imports
+    self.code_string = """
+import numba as nb
+import numpy as np
+import math\n\n\n"""
+    
+    # Now writing all the param functions, which will be called later
+    for func in self._params_jitted_function:
+      for line in func:
+        self.code_string += line
+      self.code_string += "\n\n"
+
+    # Now writing all the process functions, which will be called later
+    for func in self._processes_jitted_function:
+      for line in func:
+        self.code_string += line
+      self.code_string += "\n\n"
+
+    self.code_string += "# --------------------------------------------- \n"
+    self.code_string += "# --------------------------------------------- \n"
+    self.code_string += "# ------------ MAIN FUNCTIONS BELOW ----------- \n"
+    self.code_string += "# --------------------------------------------- \n"
+    self.code_string += "# --------------------------------------------- \n"
+
+  def _generate_running_code(self):
+
+    self.code_string += "\n\n\n"
+    # Writing the function def line
+    self.code_string += """
+@nb.njit()
+def _internal_run(n_elements, 
+quantity_int0D,quantity_int1D,quantity_int2D,quantity_int3D,
+quantity_float0D,quantity_float1D,quantity_float2D,quantity_float3D,
+D8Srec,D8Sdist,D8Sdons,D8Sndons,D8Mrecs,D8Mnrecs,D8Mdist,D8Mdons,D8Mndons,D8Mdondist,SStack,MStack):
+
+for i in range(n_elements):
+"""
+    
+    # writing the param and function calls
+    for funcarg in _processes_jitted_args:
+      funame = funcarg[0]
+      fuargs = funcarg[1:]
+
+      args2write = []
+
+      for targ,tid in funcarg:
+        args2write.append(self._arg2code_writer(targ))
 
 
   def funcarg_parser(self, func):
@@ -203,6 +296,32 @@ class GALET_POC(object):
 
     return which_list
 
+  def _arg2code_writer(self, targ):
+    """
+    Function parts of the code generator toolchain
+    DO NOT CALL OUTSIDE THE CODE GENERATOR TOOLCHAIN
+    """
+
+    if(targ in self.built_in_arg_keys):
+      if(targ == "i"): # current node
+        return "i"
+      elif(targ == "receivers"):
+        # all the downslopes receivers of the current node
+        return "D8Mrecs[i,:D8Mnrecs[i]]"
+      elif(targ == "distances_to_receivers"):
+        # distances to receivers
+        return "D8Mdist[i,:D8Mnrecs[i]]"
+      elif(targ == "donors"):
+        return "D8Mdons[i,:D8Mndons[i]]"
+      elif(targ == "distances_to_donors"):
+        return "D8Mdondist[i,:D8Mndons[i]]"
+      elif(targ == "steepest_receiver"):
+        return "D8Srec[i]"
+      elif(targ == "distance_to_steepest_receiver"):
+        return "D8Sdist[i]"
+      else:
+        raise ValueError("I cannot find the param in the _arg2code_writer")
+    elif(targ in self.param_keys):
 
 
 
@@ -225,41 +344,28 @@ class GALET_POC(object):
 
 
 
-    # to get outputs:
-
-    # self.cppmodel.output_times:
-    ## 1d array of time for each outputs
-
-    # self.cppmodel.output_depthsFS
-    ## 1D array (dim=time) of depths where the minimum factor of safety is for each timestep
-    ## Might always be the surface that ones!!!
-
-    # self.cppmodel.output_minFS
-    ## 1D array (dim=time) giving the minimum FS of the whole depths column (its depths is given by self.cppmodel.output_depthsFS)
-    
-    # self.cppmodel.output_PsiFS
-    ## 1darray (dim = ?) not sure how it gets PSI here ...
-
-    # self.cppmodel.output_durationFS
-    ## 1D array of dureation of each rain events (in seconds ?)
-
-    # self.cppmodel.output_intensityFS
-    ## !d array (dim = time) containing the corresponding intensities of rain events
-
-    # self.cppmodel.output_failure_times
-    ## 1darray (dim = time) erm the time corresponding to the output_failure_bool
-
-    # self.cppmodel.output_failure_bool
-    ## 1darray (dim = time) 1 if there is a failure at that timestep
 
 
-    # self.cppmodel.output_failure_mindepths
-    ## 1d array (dim = time): the minimum depth at which there is a factor of safety < 1 (WARNING, 9999 if no failure) 
-    # self.cppmodel.output_failure_maxdepths
-    ## 1d array (dim = time): the maximum depth at which there is a factor of safety < 1 (WARNING, 0 if no failure) 
 
-    # self.cppmodel.output_Psi_timedepth
-    ## 2D array (dims = time,depths) of Psi values
-    # self.cppmodel.output_FS_timedepth
-    ## 2D array (dims = time,depths) of factor of safety values
+
+
+
+
+
+
+
+
+
+
+
+
+
+# END OF FILE
+
+
+
+
+
+
+
 
