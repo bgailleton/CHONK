@@ -492,8 +492,12 @@ class ModelRunner
 
 };// End of ModelRunner
 
-
-
+#pragma once
+namespace chonk_utilities
+{
+    // Random utilities
+    bool has_duplicates(std::vector<int>& datvec);
+}
 
 // Ignore that at the moment
 xt::pytensor<double,1> pop_elevation_to_SS_SF_SPIL(xt::pytensor<int,1>& stack, xt::pytensor<int,1>& rec,xt::pytensor<double,1>& length , xt::pytensor<double,1>& erosion, 

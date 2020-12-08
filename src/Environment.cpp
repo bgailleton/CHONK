@@ -52,6 +52,17 @@ bool operator<( const nodium& lhs, const nodium& rhs )
   return lhs.elevation < rhs.elevation;
 }
 
+bool chonk_utilities::has_duplicates(std::vector<int>& datvec)
+{
+  std::set<int> countstuff;
+  for( auto U : datvec)
+  {
+    if(countstuff.find(U) != countstuff.end())
+      return true;
+    countstuff.insert(U);
+  }
+  return false;
+}
 
 // ######################################################################
 // ######################################################################
@@ -157,6 +168,7 @@ void ModelRunner::run()
   
   // Keeping track of which node is processed, for debugging and lake management
   is_processed = std::vector<bool>(io_int["n_elements"],false);
+  this->io_double_array["topography"] = xt::pytensor<double,1>(this->io_double_array["surface_elevation"]);
 
 
   // Aliases for efficiency
@@ -407,6 +419,7 @@ void ModelRunner::process_node(int& node, std::vector<bool>& is_processed, int& 
           // and lake node requiring merging into a single refilling event
           if(outlet>=0)
           {
+
             this->find_nodes_to_reprocess(outlet, is_processed, node_to_reprocess, reproc_in_lakes,nodes_to_recompute_neighbors_at_the_end, lakeid);
             std::cout << "OUTLET 0.3 is " << outlet << std::endl;
             // std::cout << std::endl;
@@ -534,33 +547,35 @@ void ModelRunner::process_node(int& node, std::vector<bool>& is_processed, int& 
             std::vector<double> wwf = this_chonk.get_chonk_water_weight_copy();
             std::vector<double> wsf = this_chonk.get_chonk_sediment_weight_copy();
             this->chonk_network[outlet].reinitialise_moving_prep();
+            if(chonk_utilities::has_duplicates(rec))
+              throw std::runtime_error("DUPLICATES FOUND HERE #1");
 
             this->chonk_network[outlet].external_moving_prep(rec,wwf,wsf,slope2rec);
             this->chonk_network[outlet].set_water_flux(this_chonk.get_water_flux());
             std::cout << outlet << "<----> will be giving " << this_chonk.get_water_flux() << std::endl;
 
-            // std::cout << "OUTLET 0.6 is " << outlet << std::endl;
+            std::cout << "OUTLET 0.6 is " << outlet << std::endl;
             std::vector<double> oatlab = this_chonk.get_other_attribute_array("label_tracker");
-            // std::cout << "OUTLET 0.61 is " << outlet << std::endl;
+            std::cout << "OUTLET 0.61 is " << outlet << std::endl;
             this->chonk_network[outlet].set_sediment_flux(this_chonk.get_sediment_flux(), oatlab);
-            // std::cout << "OUTLET 0.62 is " << outlet << std::endl;
+            std::cout << "OUTLET 0.62 is " << outlet << std::endl;
             
             this->chonk_network[outlet].set_sediment_creation_flux(0.);
-            // std::cout << "OUTLET 0.63 is " << outlet << std::endl;
+            std::cout << "OUTLET 0.63 is " << outlet << std::endl;
             this->chonk_network[outlet].set_erosion_flux_undifferentiated(0.);
-            // std::cout << "OUTLET 0.64 is " << outlet << std::endl;
+            std::cout << "OUTLET 0.64 is " << outlet << std::endl;
             this->chonk_network[outlet].set_erosion_flux_only_sediments(0.);
-            // std::cout << "OUTLET 0.65 is " << outlet << std::endl;
+            std::cout << "OUTLET 0.65 is " << outlet << std::endl;
             this->chonk_network[outlet].set_erosion_flux_only_bedrock(0.);
-            // std::cout << "OUTLET 0.66 is " << outlet << std::endl;
+            std::cout << "OUTLET 0.66 is " << outlet << std::endl;
             this->chonk_network[outlet].set_deposition_flux(0.);
-            // std::cout << "bo";
+            std::cout << "bo";
             // if(active_nodes[outlet]==1)
             // std::cout <<https://donaldjtrump2024.com/ "MAMAMAMA" << std::endl;
             this->process_node_nolake_for_sure(outlet, is_processed, lake_incrementor, underfilled_lake, inctive_nodes, cellarea, surface_elevation, false, false);
             // std::cout << "COMhttps://donaldjtrump2024.com/MON" << std::endl;
-            // std::cout << "ris" << "|"; 
-            // std::cout << "OUTLET 0.67 is " << outlet << std::endl;
+            std::cout << "ris" << "|"; 
+            std::cout << "OUTLET 0.67 is " << outlet << std::endl;
 
 
             // Reprocessing the fluxes from US to DS where I am sure there is no lake
@@ -574,21 +589,34 @@ void ModelRunner::process_node(int& node, std::vector<bool>& is_processed, int& 
                 underfilled_lake++;
                 // i know they are not in lakes by definition so I call a lighter function, and avoid too much recusrion which tend to break the code somehows
             // std::cout << "ka";
-              // std::cout << "reprocessing :: " << inode << std::endl;
+              std::cout << "reprocessing :: " << inode << std::endl;
                 this->process_node_nolake_for_sure(inode, is_processed, lake_incrementor, underfilled_lake, inctive_nodes, cellarea, surface_elevation, true, true);
             // std::cout << "ren" << "|";;
               }
             }
           }
-          // std::cout << "OUTLET 0.7 is " << outlet << std::endl;
+          std::cout << "OUTLET 0.7 is " << outlet << std::endl;
           // i recomputed the receivers of some nodes, I need to reinitialise it here
           // This was to avoid nodes giving back water to some lakes
-          this->graph.compute_receveivers_and_donors( temp_bool, surface_elevation, nodes_to_recompute_neighbors_at_the_end );
 
+          for( auto tnode: nodes_to_recompute_neighbors_at_the_end)
+          {
+            std::vector<int> rec = this->chonk_network[tnode].get_chonk_receivers_copy();
+            if(chonk_utilities::has_duplicates(rec))
+              throw std::runtime_error("DUPLICATES FOUND HERE #6");
+          }
+          this->graph.compute_receveivers_and_donors( temp_bool, surface_elevation, nodes_to_recompute_neighbors_at_the_end );
+          for( auto tnode: nodes_to_recompute_neighbors_at_the_end)
+          {
+            std::vector<int> rec = this->chonk_network[tnode].get_chonk_receivers_copy();
+            if(chonk_utilities::has_duplicates(rec))
+              throw std::runtime_error("DUPLICATES FOUND HERE #7");
+          }
 
           // If no lake to reprocess, well no lake to reprocess
           if(reproc_in_lakes.size() == 0 && lake_to_process.size() == 0)
           {
+            std::cout << std::endl << "BOUGH" << std::endl;
             return;
           }
 
@@ -614,7 +642,7 @@ void ModelRunner::process_node(int& node, std::vector<bool>& is_processed, int& 
 
           }
 
-          // std::cout << "OUTLET 0.8 is " << outlet << std::endl;
+          std::cout << "OUTLET 0.8 is " << outlet << std::endl;
           for(auto& lanode:reproc_in_lakes)
           {
             //Getting the lake id 
@@ -643,7 +671,7 @@ void ModelRunner::process_node(int& node, std::vector<bool>& is_processed, int& 
           if(lakeinQ[tlakeid] == false)
             throw std::runtime_error("ARG should not happen in lake sover");
           lakeinQ[tlakeid] = false;
-          // std::cout << "OUTLET 0.9 is " << outlet << " next lake is " << tlakeid << std::endl;
+          std::cout << "OUTLET 0.9 is " << outlet << " next lake is " << tlakeid << std::endl;
 
           // the water flux to add (will be translated to vulume in the next function)
           double correction4datlake_water = 0;
@@ -838,7 +866,8 @@ void ModelRunner::process_node(int& node, std::vector<bool>& is_processed, int& 
         // Formatting the depression moving pattern     
         this->chonk_network[node].reinitialise_moving_prep();
         this->chonk_network[node].external_moving_prep({next_node},{1.},{1.},{0});
-
+        if(next_node == node)
+          throw std::runtime_error("DUPLICATES FOUND HERE #2");
         // Applying the fluxes modifyers
         this->manage_fluxes_after_moving_prep(this->chonk_network[node],this->label_array[node]);
         // Splitting the fluxes
@@ -882,9 +911,10 @@ void ModelRunner::process_node_nolake_for_sure(int& node, std::vector<bool>& is_
     std::cout << node << " WILL BE GIVING TO ";
 
     this->manage_fluxes_after_moving_prep(this->chonk_network[node],this->label_array[node]);
-    for(auto galb:this->chonk_network[node].get_chonk_receivers())
-      std::cout << galb << "|";
-    std::cout << std::endl;
+    
+    if(this->chonk_network[node].get_chonk_receivers().size() == 0 && inctive_nodes[node] > 0)
+      throw std::runtime_error("NoRecError::internal flux broken");
+    
     this->chonk_network[node].split_and_merge_in_receiving_chonks(this->chonk_network, this->graph, this->io_double_array["surface_elevation_tp1"], io_double_array["sed_height_tp1"], this->timestep);
 }
 
@@ -1469,6 +1499,17 @@ void ModelRunner::manage_move_prep(chonk& this_chonk)
       
     default:
       std::cout << "WARNING::move method name unrecognised, not sure what will happen now, probably crash" << std::endl;
+  }
+  std::vector<int> rec = this_chonk.get_chonk_receivers_copy();
+  if(chonk_utilities::has_duplicates(rec))
+  {
+    std::cout << "RECS::";
+    for(auto bite:rec)
+    {
+      std::cout << bite << ":";
+    }
+    std::cout << std::endl;
+    throw std::runtime_error("DUPLICATES FOUND HERE #5");
   }
 }
 
@@ -2164,7 +2205,8 @@ void Lake::pour_water_in_lake(
     int outlet = -9999;
 
     // Adding the upstream neighbors to the queue and checking if there is an outlet node
-    outlet = this->check_neighbors_for_outlet_or_existing_lakes(next_node, graph, node_in_lake, lake_network, surface_elevation, is_in_queue, active_nodes, chonk_network);
+    outlet = this->check_neighbors_for_outlet_or_existing_lakes(next_node, graph, node_in_lake, lake_network, surface_elevation,
+     is_in_queue, active_nodes, chonk_network);
 
     bool isinnodelist = std::find(this->nodes.begin(), this->nodes.end(), next_node.node) == this->nodes.end();
     // If I have an outlet, then the outlet node is positive
@@ -2308,7 +2350,10 @@ void Lake::pour_water_in_lake(
     if(counting_nodes[Unot] >1)
       throw std::runtime_error("double_nodation_there");
     // std::cout << Unot << "|";
-    this->depths[Unot] = this->water_elevation - surface_elevation[Unot];
+    double this_depth = this->water_elevation - surface_elevation[Unot];
+    this->depths[Unot] = this_depth;
+    this->io_double_array["topography"][Unot] += this_depth;
+
     node_in_lake[Unot] = this->lake_id;
     double temp_watflux = chonk_network[Unot].get_water_flux();
     double temp_sedflux = chonk_network[Unot].get_sediment_flux();
@@ -2336,7 +2381,7 @@ void Lake::pour_water_in_lake(
     std::vector<double> length = graph.get_MF_lengths_at_node(this->outlet_node);
     // And finding the steepest slope 
     int SS_ID = -9999; 
-    double SS = -9999; // hmmmm I may need to change this name
+    double SS = 0; // hmmmm I may need to change this name
     for(size_t i=0; i<receivers.size(); i++)
     {
       int nodelakeid = node_in_lake[receivers[i]];
@@ -2347,14 +2392,36 @@ void Lake::pour_water_in_lake(
           continue;
       } 
 
-      double this_slope = (surface_elevation[this->outlet_node] - surface_elevation[receivers[i]])/length[i];
+      double elevA = surface_elevation[this->outlet_node];
+      double elevB = surface_elevation[receivers[i]];
+      int testlake = node_in_lake[this->outlet_node];
+      if( testlake >= 0)
+      {
+        if(lake_network[testlake].get_parent_lake() >=0)
+          testlake = lake_network[testlake].get_parent_lake();
+
+        elevA += lake_network[testlake].get_lake_depth_at_node(this->outlet_node, node_in_lake);
+
+      }
+      testlake = node_in_lake[receivers[i]] ;
+
+      if( testlake >= 0)
+      {
+        if(lake_network[testlake].get_parent_lake() >= 0)
+          testlake = lake_network[testlake].get_parent_lake();
+
+        elevB += lake_network[testlake].get_lake_depth_at_node(receivers[i], node_in_lake);
+
+      }
+
+      double this_slope = (elevA - elevB)/length[i];
 
 
-      if(this_slope>SS )
+      if(this_slope >= SS )
       {
         SS = this_slope;
         SS_ID = receivers[i];
-        std::cout << "HURE::" << SS_ID << "||" << nodelakeid << "||" << node_in_lake[SS_ID]  << std::endl;
+        // std::cout << "HURE::" << SS_ID << "||" << nodelakeid << "||" << node_in_lake[SS_ID]  << std::endl;
 
       }
     }
@@ -2365,7 +2432,7 @@ void Lake::pour_water_in_lake(
       int lsr = node_in_lake[sr];
       if(sr != this->outlet_node && lsr != this->lake_id && lake_network[lsr].get_parent_lake() != this->lake_id)
       {
-        std::cout << "HERE" << std::endl;
+        // std::cout << "HERE" << std::endl;
         SS_ID = sr;
         SS = 0;
       }
@@ -2373,9 +2440,9 @@ void Lake::pour_water_in_lake(
       // yes it can be: flat surfaces
       else
       {
-        std::cout << "HARE" << std::endl;
-
-        // throw std::runtime_error(" The lake has an outlet with no downlslope neighbors ??? This is not possible, check Lake::initial_lake_fill or warn Boris that it happened");
+        // std::cout << "HARE" << std::endl;
+        if(node_in_lake[SS_ID] < 0)
+          throw std::runtime_error("Outlet potential ambiguity");
 
         SS_ID = this->outlet_node;
         SS = 0.;
@@ -2409,6 +2476,7 @@ void Lake::pour_water_in_lake(
       // Formerly add the node to the lake
       if(std::find(this->nodes.begin(), this->nodes.end(), this->outlet_node) == this->nodes.end())
         this->nodes.push_back(this->outlet_node);
+
       this->depths[this->outlet_node] = this->water_elevation - surface_elevation[this->outlet_node]; // should be 0 here yo
       node_in_lake[this->outlet_node] = this->lake_id;
 
@@ -2445,6 +2513,8 @@ void Lake::pour_water_in_lake(
 
 
     this->outlet_chonk.external_moving_prep(rec,wwf,wws,Strec);
+    if(chonk_utilities::has_duplicates(rec))
+      throw std::runtime_error("DUPLICATES FOUND HERE #3");
 
     if(this->volume_of_sediment > this->volume)
     {

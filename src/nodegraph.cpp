@@ -80,6 +80,12 @@ NodeGraphV2::NodeGraphV2(
   this->neightbourer.push_back({- 1, - ncols, - ncols + 1, (ncols - 1),1, 2 * ncols - 1, ncols, ncols + 1 });// periodic_first_col 3
   this->neightbourer.push_back({-ncols - 1, - ncols, - 2 * ncols + 1, -1,-ncols + 1, ncols - 1, ncols, 1 }); //periodic last_col 4
 
+  this->is_border = std::vector<char>(this->un_element,'y');
+  for(size_t i=0; i <this->un_element; i++)
+  {
+    if(active_nodes[i])
+      is_border[i] = 'n';
+  }
 
   double diag = std::sqrt(std::pow(dx,2) + std::pow(dy,2));
   this->lengthener = {diag,dy,diag,dx,dx,diag,dy,diag};
@@ -256,50 +262,32 @@ NodeGraphV2::NodeGraphV2(
   for(int i = 0; i< this->n_element ; i++)
     this->index_in_Mstack[this->Mstack[i]] = i;
 
-  // std::cout << "Here, 1472 rec are: ";
-  // for(auto val:this->graph[1472].receivers)
-  //   std::cout << val << "|";
 
-  // std:: cout << std::endl << "And the SS is " << this->graph[1472].Sreceivers;
+
+
+  // #########################################
+  // ################ DEBUG ##################
+  // #########################################
+  // uncomment to check if the node graph produced duplicated receivers
+  for(int i = 0; i< this->n_element ; i++)
+  {
+    std::set<int> count_rec;
+
+    for(auto nono:this->graph[i].receivers)
+    {
+      if (count_rec.find(nono) != count_rec.end())
+        throw std::runtime_error("DuplicatedRecError:: node graph has duplicate in the MFD receiers");
+      else
+        count_rec.insert(nono);
+    }
+  }
 
   
   //Done
 
-  // for( auto re : this->graph[220].receivers)
-  //   std::cout << re << "||";
-
-  // std::cout << this->graph[220].Sreceivers << std::endl;
-  // throw std::runtime_error("checker!!");
-
 
   return;
 }
-
-// void is_MF_outet_SF_outlet(xt::pytensor<double,1>& elevation, xt::pytensor<bool,1>& active_nodes)
-// {
-//   std::vector<int> SF_outlets;
-//   std::vector<int> MF_outlets;
-//   for(auto n: this->pits_to_reroute)
-//   {
-//     SF_outlets.push_back(this->graph.Sreceivers);
-//     std::priority_queue< nodium, std::vector<nodium>, std::greater<nodium> > depressionfiller;
-//     std::vector<bool> is_in_Q(false, this->n_element);
-//     depressionfiller.emplace(nodium(n,elevation[n]));
-//     is_in_Q[n] = true;
-//     while(depressionfiller.empty() == false)
-//     {
-//       nodium next_node = depressionfiller.top();
-//       depressionfiller.pop();
-//       std::vector<int> d8; 
-//       std::vector<double> d8l;
-//       this->get_D8_neighbors(next_node.node, active_nodes, d8, d8l);
-//       for(auto )
-//     }
- 
-//    }
-
-
-// }
 
 
 void NodeGraphV2::fix_cyclicity(
@@ -503,8 +491,8 @@ void NodeGraphV2::compute_receveivers_and_donors(xt::pytensor<bool,1>& active_no
     {
 
       // In this cases I am first checking if I need to resolve flat surfaces
-      // if(false)
-      if(potential_flat && this->graph[i].receivers.size() == 0 && is_processed_for_flats[i] == false)
+      if(false)
+      // if(potential_flat && this->graph[i].receivers.size() == 0 && is_processed_for_flats[i] == false)
       {
         // flat solver here
         flat_indenter++;
@@ -691,7 +679,10 @@ void NodeGraphV2::compute_receveivers_and_donors(xt::pytensor<bool,1>& active_no
   }
 
   for(auto no:node_to_check_after_flat)
+  {
     this->graph[no].Sreceivers = no;
+  }
+  // for( aut)
 
 
 }

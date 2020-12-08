@@ -110,6 +110,9 @@ int nrows, // number of rows
 int ncols // number of cols
   );
 
+std::vector<char> is_border;
+
+
 // Multiple flow receivers can have some duplicates in fastscapelib-fortran. I somehow need to correct it
 void initial_correction_of_MF_receivers_and_donors(xt::pytensor<int,2>& tMF_rec, xt::pytensor<int,2>& tMF_don, xt::pytensor<double,1>& elevation);
 
@@ -239,6 +242,7 @@ protected:
   xt::pytensor<int,1> SBasinID;
   xt::xtensor<int,1> mstree;
   std::vector<std::vector<int> > mstree_translated;
+
 
   std::vector<std::vector<int> > DEBUG_connbas;
   std::vector<std::vector<int> > DEBUG_connode;

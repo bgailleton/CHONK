@@ -130,9 +130,9 @@ class chonk
 
 
     // reinitialise moving preparation by clearing all vectors of move
-    void reinitialise_moving_prep(){receivers.clear();weigth_water_fluxes.clear();weigth_sediment_fluxes.clear();slope_to_rec.clear();return;}
+    void reinitialise_moving_prep(){receivers.clear(); weigth_water_fluxes.clear(); weigth_sediment_fluxes.clear(); slope_to_rec.clear(); return;}
     void external_moving_prep(std::vector<int> rec,std::vector<double> wwf,std::vector<double> wws, std::vector<double> strec)
-         {receivers = rec;weigth_water_fluxes = wwf; weigth_sediment_fluxes = wws; slope_to_rec = strec;return;}
+         {receivers = rec; weigth_water_fluxes = wwf; weigth_sediment_fluxes = wws; slope_to_rec = strec; return;}
 
     // Tracking and labelling functions
     void initialise_local_label_tracker_in_sediment_flux(int n_labels){other_attributes_arrays["label_tracker"] = std::vector<double>(n_labels,0.);}

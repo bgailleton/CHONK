@@ -7,32 +7,47 @@ float_type = np.float32
 int_type = np.int32
 
 def rename_function_string(func,newname):
+  """
+    ingest a function and return a tstring of the source code with a new function name
+  """
   argas = inspect.getfullargspec(func).args
   funclines = inspect.getsourcelines(func)
   return ''.join(['def %s('%(newname) + ', '.join(map(str, argas)) + '):\n'] +funclines[0][1:])
 
+# sample functions for very simple cases
 def funcsample1(a):
     return a
 
 def funcsample2(i,a):
     return a[i]
 
+##########################################
+
+
 class GALET_POC(object):
-  """docstring for GALET_POC"""
-  def __init__(self, dx, dy, node_type):
+  """GALET_POC would be the fastscape context doing the backend work"""
+  def __init__(self):
 
     super(GALET_POC, self).__init__()
 
+    # NAme of the main topo
     self.main_topography = None
-    self.dx = dx
-    self.dy = dy
 
+    # will host the graph object from lsdnumbatools
     self.graph = None
+    # graph speciations
+    self.nx = None
+    self.ny = None
+    self.dx = None
+    self.dy = None
 
+    # Main dictionary containing a dictionary for each of the variable and processes
     self.meta_info = {}
 
+    # The generated code
     self.code_string = None
 
+    # List of quantities per type and dimensions
     self._quantity_int0D = []
     self._quantity_int1D = []
     self._quantity_int2D = []
@@ -42,10 +57,17 @@ class GALET_POC(object):
     self._quantity_float2D = []
     self._quantity_float3D = []
 
+    # list of process functions to be added in the right order
     self._processes_jitted_function = []
+    # Sma eindex than above containing the param
     self._processes_jitted_args = []
     self.nfuncs = 0
+
+    # list of quantity string name
     self.all_quantity_names = []
+    # All the quantities needing reinitialisation
+    self.all_reinitialisable_names = []
+
 
     self._params_jitted_function = []
     self._params_jitted_args = []
@@ -62,30 +84,62 @@ class GALET_POC(object):
     "distance_to_steepest_receiver", # distances to steepest receiver
     }
 
+    # Set orf param keys
     self.param_keys = set()
 
+    # Set of all valid keywords
     self.valid_arg_keys = self.built_in_arg_keys.copy()
 
 
-  def run(self):
-
-    self.graph = lsdnb.node_graph.graph(topography.shape[1],topography.shape[0],dx,dy, node_type = topography, topography = node_type)
+  def set_graph(self,nx,ny,dx,dy,node_type):
+    """
+    Initialise the graph
+    """
+    self.nx = nx
+    self.ny = ny
+    self.dx = dx
+    self.dy = dy
+    self.node_type = node_type
+    # Finding the main topo
+    which_list = self.type2list(self.meta_info[self.main_topography]["dtype"])
+    tid = self.type2list(self.meta_info[self.main_topography]["index_array"])
+    # running the graph routines
+    self.graph = lsdnb.node_graph.graph(self.nx, self.ny, self.dx, self.dy, node_type = node_type, topography = which_list[tid])
     self.graph.compute_D8S_graph()
     self.graph.compute_D8M_graph()
     self.graph.correct_D8S_depressions()
 
+  def run(self):
+    """
+    the running function UNFINISHED 
+    """
+    for name in self.all_reinitialisable_names:
+      which_list = self.type2list(self.meta_info[name]["dtype"])
+      tid = self.meta_info[name]["index_array"]
+      which_list[tid] = np.zeros_like(which_list[tid])
+    # WILL CALL THE RUN AND FINALISE FUNCTION HERE
+
+
   def _register_quantity(self, name, original_value, type_of_quantity = "quantity", 
     force_dtype = "f1d", need_delta = False, accumulative = False, tracker = False,
-    is_main_topography = False):
+    is_main_topography = False, reinitialisable = False):
+    """
+    Register a new quantity depending on its type
+    """
 
     if(is_main_topography):
       self.main_topography = name
 
     self.all_quantity_names.append(name)
+
+    if(reinitialisable):
+      self.all_reinitialisable_names.append(name)
+
     which_list = self.type2list(force_dtype)
 
     updater = {"type": type_of_quantity, "dtype":force_dtype, "index_array": len(which_list), 
     "tp1": need_delta, "accumulative": accumulative, "tracker": tracker}
+
     if(name not in self.meta_info):
       self.meta_info.update({name:updater})
     else:
@@ -100,8 +154,9 @@ class GALET_POC(object):
     self.valid_arg_keys.add(name)
 
     if(need_delta):
-      self._register_quantity(name+"_delta", np.copy(original_value), type_of_quantity = 'quantity_delta' ,force_dtype = force_dtype)
+      self._register_quantity(name+"_delta", np.copy(original_value), type_of_quantity = 'quantity_delta' ,force_dtype = force_dtype, reinitialisable = True)
 
+    # Adding a dimension to the subarray
     if(accumulative or tracker):
       if(force_dtype == "f1d"):
         tforce_dtype = "f2d"
@@ -120,6 +175,7 @@ class GALET_POC(object):
         type_of_quantity = 'quantity_splitter', force_dtype = tforce_dtype)
 
   def _register_param(self, param_name, value = None, dtype = "f0d"):
+    # Similar than registering a quantity, but can be a function
 
     this_function_name = "_INTERNAL_param_" + str(self.nparams) + "_" + param_name
     self.nparams += 1
@@ -165,7 +221,10 @@ class GALET_POC(object):
       self._params_jitted_args.append(these_args)
 
   def _register_process(self, name, function):
-    
+    """
+    ingest a function in the system
+    """
+
     self.meta_info[name] = {}
     self.meta_info[name]["type"] = "process"
     this_function_name = "_INTERNAL_process_" + str(len(self._processes_jitted_function)) + "_" + name
@@ -297,6 +356,9 @@ D8Srec,D8Sdist,D8Sdons,D8Sndons,D8Mrecs,D8Mnrecs,D8Mdist,D8Mdons,D8Mndons,D8Mdon
       funame = funcarg[0]
       fuargs = funcarg[1:]
 
+      self.code_string += "\n"
+      self.code_string += "# Writing the process " + funame[18:]
+
       args2write = []
 
       for targ in fuargs:
@@ -422,7 +484,7 @@ D8Srec,D8Sdist,D8Sdons,D8Sndons,D8Mrecs,D8Mnrecs,D8Mdist,D8Mdons,D8Mndons,D8Mdon
       internal_args = []
       for params in self._params_jitted_args[tid]:
         internal_args.append(self._arg2code_writer( params, inside_param_call = True))
-      this_func_call += ',\n'.join(map(str, internal_args)) + ')\n'
+      this_func_call += ','.join(map(str, internal_args)) + ')\n'
       return this_func_call
 
     elif(targ in self.valid_arg_keys):
