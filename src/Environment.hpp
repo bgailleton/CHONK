@@ -112,7 +112,9 @@ class Lake
        std::vector<int>& node_in_lake, 
        std::vector<bool>& is_in_queue,
        std::vector<Lake>& lake_network,
-       xt::pytensor<double,1>& topography
+       xt::pytensor<double,1>& topography,
+       NodeGraphV2& graph,
+       xt::pytensor<int,1>& active_nodes
     );
 
     // this function add sediment volume to the lake 
