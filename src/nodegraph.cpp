@@ -279,6 +279,9 @@ NodeGraphV2::NodeGraphV2(
         throw std::runtime_error("DuplicatedRecError:: node graph has duplicate in the MFD receiers");
       else
         count_rec.insert(nono);
+      if(nono == i)
+        throw std::runtime_error("DuplicatedRecError:: node graph giving to itself in the MFD receiers");
+
     }
   }
 
@@ -433,6 +436,10 @@ void NodeGraphV2::compute_receveivers_and_donors(xt::pytensor<bool,1>& active_no
       this->graph[i].Sreceivers = i;
       continue;
     }
+    this->graph[i].receivers.clear();
+    this->graph[i].length2rec.clear();
+    this->graph[i].donors.clear();
+    this->graph[i].length2don.clear();
     // std::vector<int> receivers,donors;
     // std::vector<double> length2rec,length2don;
 
