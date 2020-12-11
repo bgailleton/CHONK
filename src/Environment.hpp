@@ -235,6 +235,48 @@ class Lake
 
 };
 
+class LakeLite
+{
+public:
+    LakeLite(){
+                water_elevation = 0;
+                volume_water = 0;
+                volume_sed = 0;
+                is_now = -1;
+                outlet = -1;
+                id = -1;};
+    LakeLite(int id){
+                water_elevation = 0;
+                volume_water = 0;
+                volume_sed = 0;
+                is_now = -1;
+                outlet = -1;
+                this->id = id;
+            };
+
+
+    double water_elevation;
+    double volume_water;
+    double volume_sed;
+    std::vector<int> nodes;
+    std::vector<double> label_prop;
+    int is_now;
+    int outlet;
+    int id;
+};
+
+class EntryPoint
+{
+
+public:
+    EntryPoint(){this->volume_water = 0;this->volume_sed = 0;this->node = 0;}
+    EntryPoint(double volume_water, double volume_sed, int node, std::vector<double> label_prop)
+        {this->volume_water = volume_water;this->volume_sed = volume_sed;this->node = node;this->label_prop = label_prop;}
+    double volume_water;
+    double volume_sed;
+    int node;
+    std::vector<double> label_prop;
+};
 
 
 // The modelrunner manages the whole model run, it brings together the node graph, te chonks and the lakes while processing I/O and running the timesteps
@@ -412,6 +454,17 @@ class ModelRunner
     std::map<int, std::vector<std::vector<double> > > get_sed_prop_by_label() {return sed_prop_by_label;};
     xt::pytensor<float,4> get_sed_prop_by_label_matrice(int n_depths);
 
+   
+    // New lake solver
+    // Go through all the flat neighbors when originating a lake in order to deal with flat surfaces
+    void original_gathering_of_water_and_sed_from_pixel_or_flat_area(int starting_node, double& water_volume, double& sediment_volume, std::vector<double>& label_prop);
+    void iterative_lake_solver();
+    int fill_mah_lake(EntryPoint& entry_point, std::queue<EntryPoint>& iteralake);
+    void eat_lake(int id_eater, int id_edible);
+    int motherlake(int this_lake_id);
+
+    std::vector<int> lake_in_order;
+    std::vector<int> lake_status;
 
   protected:
 
@@ -485,6 +538,8 @@ class ModelRunner
     double Qw_in, Qw_out, Ql_in, Ql_out;
 
     std::vector<bool> is_processed;
+
+    std::vector<LakeLite> lakes;
 
 
   private:

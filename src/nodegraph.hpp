@@ -215,7 +215,7 @@ int get_checker(int i)
     checker = 0;
   return checker;
 }
-
+std::vector<int> get_Cordonnier_order();
 
 protected:
 

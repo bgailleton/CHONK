@@ -140,21 +140,24 @@ void chonk::split_and_merge_in_receiving_chonks(std::vector<chonk>& chonkscape, 
     // std::cout << "SEDFLUXDEBUG::" << this->sediment_flux << "||" << this->weigth_sediment_fluxes[i] << "||water::" << this->weigth_water_fluxes[i] << std::endl;
   }
   // std::cout << sum_weight_sed << "||";
-  if(double_equals(this->water_flux, sum_outwat, 1e-3) == false && graph.is_border[this->current_node] == 'n')
-  {
-    std::cout << this->water_flux<< " to start with, but " << sum_outwat << " got out " << std::endl;
-    std::cout << "I had " <<  this->receivers.size() << " receivers:" << std::endl;
-    for (auto rec : this->receivers)
-      std::cout << rec << "!";
-    std::cout << std::endl;
-    throw std::runtime_error("WaterFluxError::Some water is lost in the splitting process");
-    // std::cout << "GULUUUUUUUUUB::::::::::" << this->water_flux - sum_outwat << std::endl;
-  }
 
-  if(graph.is_border[this->current_node] == 'n' && this->receivers.size() == 0)
-  {
-    throw std::runtime_error("NoRecError::No receivers in splitting");
-  }
+
+
+  // if(double_equals(this->water_flux, sum_outwat, 1e-3) == false && graph.is_border[this->current_node] == 'n')
+  // {
+  //   std::cout << this->water_flux<< " to start with, but " << sum_outwat << " got out " << std::endl;
+  //   std::cout << "I had " <<  this->receivers.size() << " receivers:" << std::endl;
+  //   for (auto rec : this->receivers)
+  //     std::cout << rec << "!";
+  //   std::cout << std::endl;
+  //   throw std::runtime_error("WaterFluxError::Some water is lost in the splitting process");
+  //   // std::cout << "GULUUUUUUUUUB::::::::::" << this->water_flux - sum_outwat << std::endl;
+  // }
+
+  // if(graph.is_border[this->current_node] == 'n' && this->receivers.size() == 0)
+  // {
+  //   throw std::runtime_error("NoRecError::No receivers in splitting");
+  // }
 
   for (auto rec : this->receivers)
   {
