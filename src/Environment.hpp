@@ -90,6 +90,19 @@ class nodium
     int node;
 };
 
+class node_to_reproc
+{
+  public:
+    // empty constructor
+    node_to_reproc(){};
+    // Constructor by default
+    node_to_reproc(int node,int id_in_mstack){this->node = node; this->id_in_mstack = id_in_mstack;};
+    // Elevation data
+    int id_in_mstack;
+    // Node index
+    int node;
+};
+
 
 // #####################################################
 // ############# Lake ##################################

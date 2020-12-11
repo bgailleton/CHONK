@@ -52,6 +52,17 @@ bool operator<( const nodium& lhs, const nodium& rhs )
   return lhs.elevation < rhs.elevation;
 }
 
+bool operator>( const node_to_reproc& lhs, const node_to_reproc& rhs )
+{
+  return lhs.id_in_mstack > rhs.id_in_mstack;
+}
+bool operator<( const node_to_reproc& lhs, const node_to_reproc& rhs )
+{
+  return lhs.id_in_mstack < rhs.id_in_mstack;
+}
+
+
+
 bool chonk_utilities::has_duplicates(std::vector<int>& datvec)
 {
   std::set<int> countstuff;
@@ -59,6 +70,7 @@ bool chonk_utilities::has_duplicates(std::vector<int>& datvec)
   {
     if(countstuff.find(U) != countstuff.end())
       return true;
+
     countstuff.insert(U);
   }
   return false;
@@ -242,11 +254,137 @@ void ModelRunner::iterative_lake_solver()
     // If there is an outlet detected in the current lake solver
     if(this->lakes[current_lake].outlet >= 0)
     {
-      int yuiop = 0;
-      // this->reprocess_nodes_from_lake_outlet();
+      this->reprocess_nodes_from_lake_outlet();
     }
 
   }
+}
+
+void ModelRunner::reprocess_nodes_from_lake_outlet(int current_lake, int outlet)
+{
+  xt::pytensor<double,1>& topography = this->io_double_array["topography"];
+  xt::pytensor<int,1>& active_nodes = this->io_int_array["active_nodes"];
+
+  // initialising a priority queue sorting the nodes to reprocess by their id in the Mstack. the smallest Ids should come first
+  // Because I am only processing nodes in between 2 discrete lakes, it should not be a problem
+  std::priority_queue< node_to_reproc, std::vector<node_to_reproc>, std::greater<node_to_reproc> > ORDEEEEEER;
+  
+  // Temporary queue gathering nodes to transmit
+  std::queue<int> transec;
+  
+  // keeping track of which nodes are already in teh queue (or more generally to avoid)
+  std::vector<char> is_in_queue(this->io_int["n_elements"],'n');
+
+  //keeping track of the delta sed/all contributing to potential lakes to add
+  std::vector<double> delta_sed(this->lakes.size(),0), delta_water(this->lakes.size(),0);
+  std::vector<std::vector<double> > label_prop_of_delta(this->lakes.size(), std::vector<double>(this->n_labels,0.) );
+
+  // avoinding nodes in the lakes
+  for(auto tnode:this->lakes[current_lake].nodes)
+  {
+    is_in_queue[tnode] = 'y';
+  }
+
+  // Initiating the transec with the outlet, but not putting it the 
+  transec.emplace(outlet);
+  is_in_queue[outlet] = 'y';
+
+  // I will also reprocess a bunch of donors, but I cannot be sure they will be to reprocess before the end
+  std::vector<int> node_to_deltaise_to_lake;
+
+  while(transec.empty() == false)
+  {
+    int next_node = transec.front();
+    transec.pop();
+
+    // if this is not the outlet and if it is an active node, I add it in the PQ to reproc
+    if(next_node != outlet && active_nodes[next_node] > 0)
+    {
+      ORDEEEEEER.emplace(node_to_reproc(next_node,this->graph.get_index_MF_stack_at_i(next_node)));
+      is_in_queue[tnode] = 'y';
+    }
+
+    // otherwise going through neightbors
+    std::vector<int> neightbors; std::vector<double> dummy ; graph.get_D8_neighbors(next_node, active_nodes, neightbors, dummy);
+
+    // checking the state of the neightbor
+    for (auto tnode : neightbors)
+    {
+      // If is already processed, in queue, or in the original lake, ingore it
+      if(is_in_queue[tnode] != 'n' && is_in_queue[tnode] != 'd')
+        continue;
+      // if it is below my current node
+      if(topography[tnode] < topography[next_node] )
+      {
+        // If already in an existing lake, saving the node as lake potential
+        if(this->node_in_lake[tnode] >= 0)
+        {
+          node_to_deltaise_to_lake.push_back(tnode);
+          is_in_queue[tnode] = 'y';
+          continue;
+        }
+        else
+        {
+          //Else, this is a node to reproc, well done
+          transec.emplace(tnode);
+          is_in_queue[tnode] = 'y';
+          continue;
+        }
+      }
+      else if (topography[tnode] > topography[next_node])
+      {
+        if(is_in_queue[tnode] != 'd' && is_in_queue[tnode] != 'y')
+        {
+          is_in_queue[tnode] = 'd';
+          continue;
+        }
+      }
+
+    }
+
+
+
+  }
+
+
+  // Adding the donors to the PQ
+  for(int i =0; i<this->io_int["n_elements"]; i++)
+  {
+    if (is_in_queue[tnode] == 'd')
+      ORDEEEEEER.emplace(node_to_reproc(next_node,this->graph.get_index_MF_stack_at_i(next_node)));
+  }
+
+  // Formatting the iteratorer, whatever the name this thing is. not iterator. is something else. I guess. I think. why would you care anyway as I'd be surprised anyone ever reads this code.
+  std::vector<int> local_mstack; local_mstack.reserve(ORDEEEEEER.size());
+  // emptying the queue and reinitialising the chonks
+  while(ORDEEEEEER.empty() == false)
+  {
+    // Getting the firsrt node
+    int tnode = ORDEEEEEER.top();
+    // POP!
+    ORDEEEEEER.pop();
+    // Geeting in teh local stack  
+    local_mstack.emplace_back(tnode);
+
+    // if not a donor, reset the MF node
+    if(is_in_queue[tnode] != 'd')
+      this->chonk_network[tnode].reset();
+  }
+
+  // Now deprocessing the receivers in potential lake while saving their contribution to lakes in order to calculate the delta
+  for(auto tnode : node_to_deltaise_to_lake)
+  {
+
+    int tlakid = this->node_in_lake
+
+    delta_sed
+    delta_water
+    label_prop_of_delta
+
+  }
+
+
+
 }
 
 int ModelRunner::fill_mah_lake(EntryPoint& entry_point, std::queue<EntryPoint>& iteralake)
@@ -336,9 +474,12 @@ int ModelRunner::fill_mah_lake(EntryPoint& entry_point, std::queue<EntryPoint>& 
   if(outlet >= 0)
     this->lakes[current_lake].outlet = outlet;
 
-  // Now merging with lakes below
+  // Now merging with lakes below adn updating the topography
   for(auto tnode: this->lakes[current_lake].nodes)
   {
+    // updating topography
+    topography[tnode] = this->lakes[current_lake].water_elevation;
+    // checking if the node belongs to a lake, in which case I ingest it
     if(this->node_in_lake[tnode] >= 0)
     {
       if(this->motherlake(this->node_in_lake[tnode]) != this->lakes[current_lake].id)
