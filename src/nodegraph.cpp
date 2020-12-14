@@ -155,7 +155,7 @@ NodeGraphV2::NodeGraphV2(
   std::vector<int> force_target_basin;
   //# and the origin of the pit
   std::vector<int> origin_pit;
-  if(this->lake_solver)
+  if(this->lake_solver == false)
   {  // Initialising the node graph, a vector of Vertexes with their edges
 
       //#Iterating through the nodes
@@ -232,7 +232,7 @@ NodeGraphV2::NodeGraphV2(
 
   // DEBUG CHECKING
   // this->is_MF_outet_SF_outlet(); 
-  if(this->lake_solver)
+  if(this->lake_solver == false)
   {
     // I got my topological order, I can now restore the corrupted receiver I had
     for(size_t i=0; i<node_to_check.size(); i++)

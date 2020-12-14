@@ -61,8 +61,7 @@ bool operator<( const node_to_reproc& lhs, const node_to_reproc& rhs )
   return lhs.id_in_mstack < rhs.id_in_mstack;
 }
 
-
-
+// Small function utilised into the debugging
 bool chonk_utilities::has_duplicates(std::vector<int>& datvec)
 {
   std::set<int> countstuff;
@@ -236,21 +235,39 @@ void ModelRunner::iterative_lake_solver()
   this->lakes = std::vector<LakeLite>();
 
 
-  // Initialising all the lakes to empty
+  // Initialising the queue with the first lakes. Also I am preprocessing the flat surfaces
   for(auto starting_node : this->lake_in_order)
   {
-    if(this->lake_status[starting_node]>0)
+    // If this depression if already incorporated into another flat surface
+    if(this->lake_status[starting_node] > 0)
       continue;
 
-    double water_volume,sediment_volume;std::vector<double> label_prop;
+    // getting the full water and sed volumes to add to the lake
+    double water_volume,sediment_volume; std::vector<double> label_prop;
+    // This function checks if there are flats around it and process the whole lake as a single flat
     this->original_gathering_of_water_and_sed_from_pixel_or_flat_area(starting_node, water_volume, sediment_volume, label_prop);
+    // emplce the entry point and its characteristics into the lake
     iteralake.emplace(EntryPoint( water_volume,  sediment_volume,  starting_node, label_prop));
   }
 
+  // I am iterating while I still have some lakes to fill
   while(iteralake.empty() == false)
   {
+    // this is a FIFO queue, First in, first out
     EntryPoint entry_point = iteralake.front();
+    // removing the thingy
     iteralake.pop();
+//        
+// POP!       
+//     * []
+//        *  *
+//   * '*' *'
+//      \*'/
+//       ||
+//      |* |
+//      |__|
+//      | *|
+//      |__|
 
 
     // Function that fills and updates the topography, also checks for an outlet
@@ -437,6 +454,9 @@ int ModelRunner::fill_mah_lake(EntryPoint& entry_point, std::queue<EntryPoint>& 
   xt::pytensor<int,1>& active_nodes = this->io_int_array["active_nodes"];
 
   depressionfiller.emplace(nodium(entry_point.node, topography[entry_point.node]));
+
+  //DEBUG STATEMENT
+  std::cout << "Filling lake at node " << entry_point.node << " with " << entry_point.water_volume << std::endl;
 
   int current_lake = this->lake_incrementor;
   this->lakes.push_back(LakeLite(this->lake_incrementor));
