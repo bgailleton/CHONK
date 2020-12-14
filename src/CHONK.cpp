@@ -584,7 +584,7 @@ void chonk::move_MF_from_fastscapelib_threshold_SF(NodeGraphV2& graph, double th
         std::cout << "WWW:::" << waterweigths[i] << std::endl;
         std::cout << "WWW:::" << powerslope[i] << std::endl;
       }
-      throw std::runtime_error("SUMCHECK not 1???::" + std::to_string(sumcheique));
+      // throw std::runtime_error("SUMCHECK not 1???::" + std::to_string(sumcheique));
     }
     //-------------------------------------
   }

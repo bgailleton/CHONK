@@ -475,7 +475,7 @@ class ModelRunner
     int fill_mah_lake(EntryPoint& entry_point, std::queue<EntryPoint>& iteralake);
     void drink_lake(int id_eater, int id_edible);
     int motherlake(int this_lake_id);
-    void reprocess_nodes_from_lake_outlet(int current_lake, int outlet, std::vector<bool>& is_processed, std::queue<EntryPoint>& iteralake);
+    void reprocess_nodes_from_lake_outlet(int current_lake, int outlet, std::vector<bool>& is_processed, std::queue<EntryPoint>& iteralake, EntryPoint& entry_point);
     void drape_deposition_flux_to_chonks();
 
     std::vector<int> lake_in_order;
