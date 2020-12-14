@@ -374,7 +374,7 @@ class ModelRunner
   xt::pytensor<int,1>& inctive_nodes, double& cellarea, xt::pytensor<double,1>& surface_elevation, bool need_move_prep);
 
     // Avoid recursion by having this relatively small function processing node that I am sure won't need lake management
-    void process_node_nolake_for_sure(int& node, std::vector<bool>& is_processed, int& lake_incrementor, int& underfilled_lake,
+    void process_node_nolake_for_sure(int& node, std::vector<bool>& is_processed,
   xt::pytensor<int,1>& inctive_nodes, double& cellarea, xt::pytensor<double,1>& surface_elevation, bool need_move_prep , bool need_flux_before_move);
 
 
@@ -475,7 +475,7 @@ class ModelRunner
     int fill_mah_lake(EntryPoint& entry_point, std::queue<EntryPoint>& iteralake);
     void eat_lake(int id_eater, int id_edible);
     int motherlake(int this_lake_id);
-
+    void reprocess_nodes_from_lake_outlet(int current_lake, int outlet, std::vector<bool>& is_processed, std::queue<EntryPoint>& iteralake);
     std::vector<int> lake_in_order;
     std::vector<int> lake_status;
 

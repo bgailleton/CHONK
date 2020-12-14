@@ -254,13 +254,13 @@ void ModelRunner::iterative_lake_solver()
     // If there is an outlet detected in the current lake solver
     if(this->lakes[current_lake].outlet >= 0)
     {
-      this->reprocess_nodes_from_lake_outlet();
+      this->reprocess_nodes_from_lake_outlet(current_lake, this->lakes[current_lake].outlet, is_processed, iteralake);
     }
 
   }
 }
 
-void ModelRunner::reprocess_nodes_from_lake_outlet(int current_lake, int outlet)
+void ModelRunner::reprocess_nodes_from_lake_outlet(int current_lake, int outlet, std::vector<bool>& is_processed, std::queue<EntryPoint>& iteralake)
 {
   xt::pytensor<double,1>& topography = this->io_double_array["topography"];
   xt::pytensor<int,1>& active_nodes = this->io_int_array["active_nodes"];
@@ -276,6 +276,9 @@ void ModelRunner::reprocess_nodes_from_lake_outlet(int current_lake, int outlet)
   std::vector<char> is_in_queue(this->io_int["n_elements"],'n');
 
   //keeping track of the delta sed/all contributing to potential lakes to add
+  std::vector<double> pre_sed(this->lakes.size(),0), pre_water(this->lakes.size(),0);
+  std::vector<int> pre_entry_node(this->lakes.size(),-9999);
+  std::vector<std::vector<double> > label_prop_of_pre(this->lakes.size(), std::vector<double>(this->n_labels,0.) );
   std::vector<double> delta_sed(this->lakes.size(),0), delta_water(this->lakes.size(),0);
   std::vector<std::vector<double> > label_prop_of_delta(this->lakes.size(), std::vector<double>(this->n_labels,0.) );
 
@@ -301,7 +304,7 @@ void ModelRunner::reprocess_nodes_from_lake_outlet(int current_lake, int outlet)
     if(next_node != outlet && active_nodes[next_node] > 0)
     {
       ORDEEEEEER.emplace(node_to_reproc(next_node,this->graph.get_index_MF_stack_at_i(next_node)));
-      is_in_queue[tnode] = 'y';
+      is_in_queue[next_node] = 'y';
     }
 
     // otherwise going through neightbors
@@ -350,8 +353,8 @@ void ModelRunner::reprocess_nodes_from_lake_outlet(int current_lake, int outlet)
   // Adding the donors to the PQ
   for(int i =0; i<this->io_int["n_elements"]; i++)
   {
-    if (is_in_queue[tnode] == 'd')
-      ORDEEEEEER.emplace(node_to_reproc(next_node,this->graph.get_index_MF_stack_at_i(next_node)));
+    if (is_in_queue[i] == 'd')
+      ORDEEEEEER.emplace(node_to_reproc(i,this->graph.get_index_MF_stack_at_i(i)));
   }
 
   // Formatting the iteratorer, whatever the name this thing is. not iterator. is something else. I guess. I think. why would you care anyway as I'd be surprised anyone ever reads this code.
@@ -360,7 +363,8 @@ void ModelRunner::reprocess_nodes_from_lake_outlet(int current_lake, int outlet)
   while(ORDEEEEEER.empty() == false)
   {
     // Getting the firsrt node
-    int tnode = ORDEEEEEER.top();
+    node_to_reproc n2r = ORDEEEEEER.top();
+    int tnode = n2r.node;
     // POP!
     ORDEEEEEER.pop();
     // Geeting in teh local stack  
@@ -371,20 +375,55 @@ void ModelRunner::reprocess_nodes_from_lake_outlet(int current_lake, int outlet)
       this->chonk_network[tnode].reset();
   }
 
+  // Final size OK
+  local_mstack.shrink_to_fit();
+
   // Now deprocessing the receivers in potential lake while saving their contribution to lakes in order to calculate the delta
   for(auto tnode : node_to_deltaise_to_lake)
   {
-
-    int tlakid = this->node_in_lake
-
-    delta_sed
-    delta_water
-    label_prop_of_delta
-
+    // Current lake
+    int tlakid = motherlake(this->node_in_lake[tnode]);
+    // mixing the proportions
+    label_prop_of_pre[tlakid] = mix_two_proportions(pre_sed[tlakid],label_prop_of_pre[tlakid],this->chonk_network[tnode].get_sediment_flux(),this->chonk_network[tnode].get_other_attribute_array("label_tracker"));
+    // Adding all the shits
+    pre_sed[tlakid] += this->chonk_network[tnode].get_water_flux();
+    pre_water[tlakid] += this->chonk_network[tnode].get_sediment_flux();
+    // Setting the entry point, it does not really matter where the thingy comes from, as long as it is in the lake
+    pre_entry_node[tlakid] = tnode;
   }
 
+  // I am now ready to reprocess all the node from upstream to downstream, and then rechek the delat for me lakes
+  for(auto tnode:local_mstack)
+  {
+    double cellarea = this->io_double["dx"] * this->io_double["dy"];
+    this->process_node_nolake_for_sure(tnode, is_processed, active_nodes, 
+      cellarea,topography, true, true);
+  }
 
+  // I have reprocessed my stuff, lets calculate the delta by lakes to add entry points to the queue
 
+  for(auto tnode : node_to_deltaise_to_lake)
+  {
+    // Current lake
+    int tlakid = motherlake(this->node_in_lake[tnode]);
+    // mixing the proportions
+    label_prop_of_delta[tlakid] = mix_two_proportions(delta_sed[tlakid],label_prop_of_pre[tlakid],this->chonk_network[tnode].get_sediment_flux(),this->chonk_network[tnode].get_other_attribute_array("label_tracker"));
+    // Adding all the shits
+    delta_sed[tlakid] += this->chonk_network[tnode].get_water_flux();
+    delta_water[tlakid] += this->chonk_network[tnode].get_sediment_flux();
+  }
+
+  for(size_t i=0; i < this->lakes.size(); i++ )
+  {
+    double dwat = delta_water[i] - pre_water[i];
+    double dsed = delta_sed[i] - pre_sed[i];
+    
+    if(dwat == 0 && dsed == 0)
+      continue;
+
+    iteralake.emplace(EntryPoint(dwat, dsed, pre_entry_node[i], label_prop_of_delta[i]));
+  }
+  // Doen
 }
 
 int ModelRunner::fill_mah_lake(EntryPoint& entry_point, std::queue<EntryPoint>& iteralake)
@@ -568,30 +607,11 @@ void ModelRunner::process_node(int& node, std::vector<bool>& is_processed, int& 
     if(this->lake_solver == false && is_processed[node])
       return;
 
-    // DEBUG
-    // this->print_chonk_info(node);
-    // std::cout << "Proc: " << node << " this->chonk_network[0] is " << this->chonk_network[0].get_current_location() << std::endl;
-
     // if I reach this stage, this node can be labelled as processed
     is_processed[node] = true;
 
-    // if(node == 466)
-    // {
-    //   std::cout << "LULULULULULULULULULULULULULULULULULULU" << std::endl;
-    //   for(auto merde : this->graph.get_MF_receivers_at_node(node) )
-    //     std::cout << "POTREC::" << merde << "is_in_lake" << node_in_lake[merde] << std::endl;
-    // }
-
     // manages the fluxes before moving the particule: accumulating DA, precipitation, infiltration, evaporation, ...
     this->manage_fluxes_before_moving_prep(this->chonk_network[node],this->label_array[node] );
-
-    // THIS WAS A TEST TO CHECK THAT I DO NOT REPROCESS NODE ALREADY PROCESSED NATURALLY
-    // ?? AND I DO NOT. Keeping that here as a proof
-    // for(auto nono:this->chonk_network[node].get_chonk_receivers() )
-    // {
-    //   if(is_processed[nono])
-    //     throw std::runtime_error("Nodeproc to proc?");
-    // }
 
 
     // Uf the lake solving is activated, then I go through the (more than I expected) complex process of filing a lake correctly
@@ -642,7 +662,6 @@ void ModelRunner::process_node(int& node, std::vector<bool>& is_processed, int& 
     // LABEL
     nolake:
     
-
     // first step is to apply the right move method, to prepare the chonk to move
     if(need_move_prep)
     {
@@ -661,7 +680,7 @@ void ModelRunner::process_node(int& node, std::vector<bool>& is_processed, int& 
     this->chonk_network[node].split_and_merge_in_receiving_chonks(this->chonk_network, this->graph, this->io_double_array["surface_elevation_tp1"], io_double_array["sed_height_tp1"], this->timestep);
 }
 
-void ModelRunner::process_node_nolake_for_sure(int& node, std::vector<bool>& is_processed, int& lake_incrementor, int& underfilled_lake,
+void ModelRunner::process_node_nolake_for_sure(int& node, std::vector<bool>& is_processed,
   xt::pytensor<int,1>& inctive_nodes, double& cellarea, xt::pytensor<double,1>& surface_elevation, bool need_move_prep, bool need_flux_before_move)
 {
     is_processed[node] = true;
@@ -671,8 +690,6 @@ void ModelRunner::process_node_nolake_for_sure(int& node, std::vector<bool>& is_
     if(need_move_prep)
       this->manage_move_prep(this->chonk_network[node]);
     
-    std::cout << node << " WILL BE GIVING TO ";
-
     this->manage_fluxes_after_moving_prep(this->chonk_network[node],this->label_array[node]);
     
     if(this->chonk_network[node].get_chonk_receivers().size() == 0 && inctive_nodes[node] > 0)
