@@ -179,7 +179,9 @@ void ModelRunner::run()
   std::cout << "Starting the run" << std::endl;
 
   this->lake_in_order = this->graph.get_Cordonnier_order();
+
   this->lake_status = std::vector<int>(this->io_int["n_elements"],-1);
+  
   for(auto tn:lake_in_order)
   {
     this->lake_status[tn] = 0;
@@ -211,7 +213,15 @@ void ModelRunner::run()
     // std::cout << this->chonk_network[node].get_water_flux() << std::endl; 
     // Switching to the next node in line
   }
-  std::cout << "Ending the run" << std::endl;
+  std::cout << "First pass done" << std::endl;
+
+  if(this->lake_solver)
+  {
+    std::cout << "Iterative lake pass..." << std::endl;
+    this->iterative_lake_solver();
+    std::cout << "Iterative lake pass... done" << std::endl;
+  }
+
   // Calling the finalising function: it applies the changes in topography and I think will apply the lake sedimentation
   this->finalise();
   // Done
@@ -238,9 +248,12 @@ void ModelRunner::iterative_lake_solver()
   // Initialising the queue with the first lakes. Also I am preprocessing the flat surfaces
   for(auto starting_node : this->lake_in_order)
   {
+    std::cout << this->lake_status[starting_node] << " Starting node = " << starting_node << std::endl;
     // If this depression if already incorporated into another flat surface
     if(this->lake_status[starting_node] > 0)
       continue;
+
+    std::cout << "DEBUG::Will sort lake at " << starting_node << "!" << std::endl;
 
     // getting the full water and sed volumes to add to the lake
     double water_volume,sediment_volume; std::vector<double> label_prop;
@@ -1279,13 +1292,6 @@ void ModelRunner::manage_move_prep(chonk& this_chonk)
   int this_case = intcorrespondance[this->move_method];
 
   std::vector<int> rec = this_chonk.get_chonk_receivers_copy();
-  std::cout << "RECS_BEEF::";
-  for(auto bite:rec)
-  {
-    std::cout << bite << ":";
-  }
-  std::cout << std::endl;
-
   switch(this_case)
   {
     case 2:
@@ -1303,18 +1309,6 @@ void ModelRunner::manage_move_prep(chonk& this_chonk)
       
     default:
       std::cout << "WARNING::move method name unrecognised, not sure what will happen now, probably crash" << std::endl;
-  }
-  
-  rec = this_chonk.get_chonk_receivers_copy();
-  if(chonk_utilities::has_duplicates(rec))
-  {
-    std::cout << "RECS::";
-    for(auto bite:rec)
-    {
-      std::cout << bite << ":";
-    }
-    std::cout << std::endl;
-    throw std::runtime_error("DUPLICATES FOUND HERE #5");
   }
 }
 

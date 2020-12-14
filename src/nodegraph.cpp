@@ -268,6 +268,13 @@ NodeGraphV2::NodeGraphV2(
   for(int i = 0; i< this->n_element ; i++)
     this->index_in_Mstack[this->Mstack[i]] = i;
 
+  // std::cout << "PITS TO REROUTE::";
+  // for(size_t i=0 ; i< this->un_element; i++)
+  // {
+  //   if(pits_to_reroute[i])
+  //     std::cout << i << "||";
+  // }
+  // std::cout << std::endl;
 
 
 
@@ -301,7 +308,7 @@ NodeGraphV2::NodeGraphV2(
 std::vector<int> NodeGraphV2::get_Cordonnier_order()
 {
   std::vector<int> output;
-  for(int i = this->n_element - 1; i >=0; i-- )
+  for(int i = this->n_element - 1; i >= 0; i-- )
   {
     if(this->is_depression(i))
       output.push_back(i);
