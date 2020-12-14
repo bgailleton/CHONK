@@ -456,7 +456,7 @@ int ModelRunner::fill_mah_lake(EntryPoint& entry_point, std::queue<EntryPoint>& 
   depressionfiller.emplace(nodium(entry_point.node, topography[entry_point.node]));
 
   //DEBUG STATEMENT
-  std::cout << "Filling lake at node " << entry_point.node << " with " << entry_point.water_volume << std::endl;
+  std::cout << "Filling lake at node " << entry_point.node << " with " << entry_point.volume_water << std::endl;
 
   int current_lake = this->lake_incrementor;
   this->lakes.push_back(LakeLite(this->lake_incrementor));
