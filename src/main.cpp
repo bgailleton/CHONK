@@ -101,12 +101,12 @@ PYBIND11_MODULE(CHONK_cpp, m)
     m.def("set_DEBUG_switch_nodegraph",set_DEBUG_switch_nodegraph);
     m.def("pop_elevation_to_SS_SF_SPIL", pop_elevation_to_SS_SF_SPIL);
 
-    py::class_<NodeGraphV2>(m, "NodeGraph",py::dynamic_attr())
-      .def(py::init<>())
-      .def(py::init([]( xt::pytensor<double,1>& elevation,xt::pytensor<bool,1>& active_nodes, 
-        double dx, double dy, int nrows, int ncols){return std::unique_ptr<NodeGraphV2>(new NodeGraphV2( elevation,active_nodes,  dx,  dy, nrows, ncols)); }))
-      .def("get_MF_stack_full", &NodeGraphV2::get_MF_stack_full)
-      ;
+    // py::class_<NodeGraphV2>(m, "NodeGraph",py::dynamic_attr())
+    //   .def(py::init<>())
+    //   .def(py::init([]( xt::pytensor<double,1>& elevation,xt::pytensor<bool,1>& active_nodes, 
+    //     double dx, double dy, int nrows, int ncols){return std::unique_ptr<NodeGraphV2>(new NodeGraphV2( elevation,active_nodes,  dx,  dy, nrows, ncols)); }))
+    //   .def("get_MF_stack_full", &NodeGraphV2::get_MF_stack_full)
+    //   ;
 
     py::class_<labelz>(m, "label",py::dynamic_attr())
       .def(py::init<>())

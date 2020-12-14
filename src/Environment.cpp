@@ -127,7 +127,7 @@ void ModelRunner::initiate_nodegraph()
   //Dat is the real stuff:
   // Initialising the graph
   this->graph = NodeGraphV2(this->io_double_array["surface_elevation"], active_nodes,this->io_double["dx"], this->io_double["dy"],
-this->io_int["n_rows"], this->io_int["n_cols"]);
+this->io_int["n_rows"], this->io_int["n_cols"], this->lake_solver);
 
   // std::cout << "done, sorting few stuff around ..." << std::endl;
   
@@ -224,10 +224,15 @@ void ModelRunner::run()
 void ModelRunner::iterative_lake_solver()
 {
   // Right 
+  // Initialising an empty queue of entry points, ie, points which will initiate a lake with a given sed and wat content
   std::queue<EntryPoint> iteralake;
+
+  // Initialising the lake_status array: -1 = not a lake; 0 = to be processed and 1= processed at least once
+  // setting all potential entry_points to 0
   for(auto starting_node : this->lake_in_order)
     this->lake_status[starting_node] = 0;
 
+  // reinitialising the lakes
   this->lakes = std::vector<LakeLite>();
 
 
@@ -256,7 +261,6 @@ void ModelRunner::iterative_lake_solver()
     {
       this->reprocess_nodes_from_lake_outlet(current_lake, this->lakes[current_lake].outlet, is_processed, iteralake);
     }
-
   }
 }
 
@@ -711,21 +715,13 @@ void ModelRunner::finalise()
   // First gathering all the aliases 
   xt::pytensor<double,1>& surface_elevation_tp1 = this->io_double_array["surface_elevation_tp1"];
   xt::pytensor<double,1>& surface_elevation = this->io_double_array["surface_elevation"];
+  xt::pytensor<double,1>& topography = this->io_double_array["topography"];
   xt::pytensor<double,1>& sed_height_tp1 = this->io_double_array["sed_height_tp1"];
-  xt::pytensor<double,1> tlake_depth = xt::zeros<double>({size_t(this->io_int["n_elements"])});
+  // xt::pytensor<double,1> tlake_depth = xt::zeros<double>({size_t(this->io_int["n_elements"])});
   xt::pytensor<int,1>& active_nodes = this->io_int_array["active_nodes"];
 
   // First dealing with lake deposition:
-  // So far only lake draping is implemented
-  // thsi section calculates the deposition volume from lakes and add it to each CHONK, it does not directly run teh deposition
-  for(auto& loch:this->lake_network)
-  {
-    if(loch.get_parent_lake()>=0)
-      continue;
-    loch.drape_deposition_flux_to_chonks(this->chonk_network, surface_elevation, this->timestep);
-  }
-
-  // std::cout << "0.1" << std::endl;
+  this->drape_deposition_flux_to_chonks();
 
   // then actively finalising the deposition and other details
   // Iterating through all nodes
@@ -749,21 +745,21 @@ void ModelRunner::finalise()
       if(std::isfinite(LAB) == false)
         std::cout << LAB << " << naninf for sedflux" << std::endl;
 
-    // getting the lake ID and depth
-    if(node_in_lake[i]>=0)
-    {
-      int lakeid = node_in_lake[i];
-      if(this->lake_network[lakeid].get_parent_lake() > 0)
-        lakeid = this->lake_network[lakeid].get_parent_lake();
+    // // getting the lake ID and depth
+    // if(node_in_lake[i]>=0)
+    // {
+    //   int lakeid = node_in_lake[i];
+    //   if(this->lake_network[lakeid].get_parent_lake() > 0)
+    //     lakeid = this->lake_network[lakeid].get_parent_lake();
 
-      double tdepth = lake_network[lakeid].get_lake_depth_at_node(i,node_in_lake);
-      tlake_depth[i] = tdepth;
-    }
-    else
-    {
-      // if no lake, depth is 0 NSS
-      tlake_depth[i] = 0;
-    }
+    //   double tdepth = lake_network[lakeid].get_lake_depth_at_node(i,node_in_lake);
+    //   tlake_depth[i] = tdepth;
+    // }
+    // else
+    // {
+    //   // if no lake, depth is 0 NSS
+    //   tlake_depth[i] = 0;
+    // }
     
 
     // First applying the bedrock-only erosion flux: decrease the overal surface elevation without affecting the sediment layer
@@ -845,7 +841,7 @@ void ModelRunner::finalise()
 
   }
 
-
+  auto tlake_depth = this->io_double_array["topography"] - this->io_double_array["surface_elevation"];
   // Calculating the water balance thingies
   double save_Ql_out = this->Ql_out;
   this->Ql_out = 0;
@@ -1445,119 +1441,27 @@ void ModelRunner::initialise_label_list(std::vector<labelz> these_labelz)
 // POSSIBLE OPTIMISATION::Recreating lake objects, but I would need a bit of refactoring the Lake object. Will seee if this is very slow
 void ModelRunner::process_inherited_water()
 {
-  for(auto& tlake:this->lake_network)
+  for(auto& tlake:this->lakes)
   {
-    // getting node underwater
-    std::vector<int>& unodes = tlake.get_lake_nodes();
-    if(unodes.size() == 0 || tlake.get_parent_lake() >= 0)
+    if(tlake.is_now >= 0)
       continue;
 
-
-    // This following method was recalculating lake outlet with the new topography
-    // // going through all the nodes and gathering the potenial outlets
-    // // With the new topography, we can imagine a rare case whenre several breaches are opened in the lake within one timestep
-    // // It is unlikely that they would happened at the same time in real life so I just decide to drain it to the steepest descent one assuming it would arrive first
-    // // I have to say that this might be controversial, but also would only happen in very rare cases, even never to be fair
-    // std::vector<int> outlets, outlets_origin;
-
+    // getting node underwater
+    std::vector<int>& unodes = tlake.nodes;
     xt::pytensor<double,1>& surface_elevation = this->io_double_array["surface_elevation"];
-    // xt::pytensor<double,1>& lake_depth = this->io_double_array["lake_depth"];
 
-    // for(auto node:unodes)
-    // {
-    //     std::vector<int>& recs = graph.get_MF_receivers_at_node_no_rerouting(node);
-    //     std::vector<int>& dons = graph.get_MF_donors_at_node(node);
-    //     std::vector<int> neightbors;
-    //     neightbors.reserve(neightbors.size() + dons.size());
-
-    //     for (auto r:recs)
-    //       neightbors.emplace_back(r);
-    //     for (auto d:dons)
-    //       neightbors.emplace_back(d);
-
-    //   double elenode = surface_elevation[node] + tlake.get_lake_depth_at_node(node, node_in_lake);
-
-
-    //   for(auto nenode:neightbors)
-    //   {
-    //     int this_lake_id = tlake.get_lake_id();
-    //     if(this->node_in_lake[nenode] == this_lake_id)
-    //       continue;
-    //     double this_depth = 0.;
-
-    //     if(this_lake_id >= 0)
-    //       this_depth = this->lake_network[this_lake_id].get_lake_depth_at_node(nenode, node_in_lake);
-
-    //     double tselev = this_depth + surface_elevation[nenode];
-    //     if(tselev < elenode)
-    //     {
-    //       if(std::find(outlets.begin(), outlets.end(), nenode) != outlets.end())
-    //         continue;
-    //       outlets.push_back(nenode);
-    //       outlets_origin.push_back(node);
-    //     }
-    //   }
-    // }
-
-    // if(outlets.size() > 0)
-    // {
-    //   double min_elev = std::numeric_limits<double>::max();
-    //   int toutlet = -9999;
-    //   int index_toutlet = -9999;
-    //   for(size_t j=0; j<outlets.size(); j++)
-    //   {
-    //     int node = outlets[j];
-    //     double this_elev = surface_elevation[node];
-    //     // if(this->node_in_lake[nenode]>=0)
-    //     //   this_elev += this->lake_network[this[node_in_lake[node]]].get_lake_depth_at_node(node, node_in_lake);
-    //     if(this_elev < min_elev)
-    //     {
-    //       toutlet = node;
-    //       index_toutlet = int(j);
-    //       min_elev = this_elev;
-    //     }
-    //   }
-    //   // Now I need to remove the water from the lake
-    //   double volume_to_transfer = 0;
-    //   min_elev = surface_elevation[outlets_origin[index_toutlet]];
-    //   for(auto node:unodes)
-    //   {
-    //     double this_elevation  = surface_elevation[node] + tlake.get_lake_depth_at_node(node, node_in_lake);
-    //     double delta_elevation = this_elevation - min_elev;
-
-    //     // correcting the new remaining lake depth. I am not jsut applying the delta elevation because there can be some lake-bed elevation change too!
-    //     lake_depth[node] = surface_elevation[node] -  min_elev;
-    //     double tvolume = delta_elevation * this->io_double["dx"] * this->io_double["dy"];
-    //     tlake.set_lake_depth_at_node(node, surface_elevation[node] -  min_elev);
-    //     volume_to_transfer += tvolume;
-    //   }
-
-    //   tlake.set_lake_volume(tlake.get_lake_volume() - volume_to_transfer);
-    //   this->chonk_network[toutlet].add_to_water_flux(volume_to_transfer/(timestep));
-    //   this->Ql_in += volume_to_transfer/(this->timestep);
-
-
-
-    // And finally refeeding the water to the rest
-    // for(auto node:unodes)
-    // {
-    //   double mandragore = tlake.get_lake_depth_at_node(node, this->node_in_lake) * this->io_double["dx"] * this->io_double["dy"] / this->timestep;
-    //   this->chonk_network[node].add_to_water_flux(mandragore );
-    //   // this->Ql_in += mandragore;
-    //   this->Ql_out -= mandragore;
-    // }
 
     double minelev = std::numeric_limits<double>::max();
     int minnodor = -9999;
     double sumwat = 0;
-    for( auto node:tlake.get_lake_nodes())
+    for( auto node:unodes)
     {
       if(surface_elevation[node] < minelev)
       {
         minnodor = node;
         minelev = surface_elevation[node];
       }
-      sumwat += tlake.get_lake_depth_at_node(node, node_in_lake) * this->io_double["dx"] * this->io_double["dy"] / this->timestep ;
+      sumwat += this->io_double_array["lake_depth"][node] * this->io_double["dx"] * this->io_double["dy"] / this->timestep ;
     }
 
     this->chonk_network[minnodor].add_to_water_flux(sumwat);
@@ -1905,7 +1809,38 @@ void Lake::drape_deposition_flux_to_chonks(std::vector<chonk>& chonk_network, xt
       throw std::runtime_error(" naninf after draping");
     }
   }
+}
 
+// Give the deposition fluxe from lakes to the 
+void ModelRunner::drape_deposition_flux_to_chonks()
+{
+
+  xt::pytensor<double,1>& topography = this->io_double_array["topography"];
+  xt::pytensor<double,1>& surface_elevation = this->io_double_array["surface_elevation"];
+
+
+  for(auto& loch:this->lakes)
+  { 
+    // Checking if this is a main lake
+    if(loch.is_now >= 0)
+      continue;
+
+    double ratio_of_dep = loch.volume_sed/loch.volume_water;
+
+    // NEED TO DEAL WITH THAT BOBO
+    if(ratio_of_dep>1)
+      ratio_of_dep = 1;
+
+
+    for(auto no:loch.nodes)
+    {
+
+      double slangh = ratio_of_dep * (topography[no] - surface_elevation[no]) / timestep;
+      chonk_network[no].add_sediment_creation_flux(slangh);
+      chonk_network[no].set_other_attribute_array("label_tracker", loch.label_prop);
+
+    }
+  }
 
 }
 

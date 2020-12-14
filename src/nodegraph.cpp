@@ -59,7 +59,8 @@ NodeGraphV2::NodeGraphV2(
   double dx,
   double dy,
   int nrows,
-  int ncols
+  int ncols,
+  bool lake_solver
   )
 {
   // Saving general informations
@@ -70,6 +71,7 @@ NodeGraphV2::NodeGraphV2(
   this->un_element = nrows*ncols;
   this->nrows = nrows;
   this->ncols = ncols;
+  this->lake_solver = lake_solver;
 
   this->flat_mask = xt::zeros<int>({this->un_element}) - 1;
 
@@ -147,79 +149,81 @@ NodeGraphV2::NodeGraphV2(
 
   this->correct_flowrouting(active_nodes, elevation);
 
+  //# I will need a vector gathering the nodes I'll need to check for potential cyclicity
+  std::vector<int> node_to_check;
+  //# their target basin
+  std::vector<int> force_target_basin;
+  //# and the origin of the pit
+  std::vector<int> origin_pit;
+  if(this->lake_solver)
+  {  // Initialising the node graph, a vector of Vertexes with their edges
 
-  // // Initialising the node graph, a vector of Vertexes with their edges
-  // //# I will need a vector gathering the nodes I'll need to check for potential cyclicity
-  // std::vector<int> node_to_check;
-  // //# their target basin
-  // std::vector<int> force_target_basin;
-  // //# and the origin of the pit
-  // std::vector<int> origin_pit;
-  // //#Iterating through the nodes
-  // for(int i=0; i<n_element;i++)
-  // {
-  //   // If this receiver is a pit to reroute, I need to add to the receiver list the receiver of the outlet
-  //   if(pits_to_reroute[i] == true)
-  //   {
-  //     //# Node I wanna add
-  //     int tgnode = this->graph[i].Sreceivers;
-  //     if(pits_to_reroute[tgnode] == false)
-  //       tgnode = this->graph[tgnode].Sreceivers;
-  //     //# Will be a receiver
-  //     this->graph[i].receivers.push_back(tgnode);
-  //     //# I will have to check its own receivers for potential cyclicity
-  //     node_to_check.push_back(tgnode);
-  //     //# Which pit is it connected to
-  //     origin_pit.push_back(i);
-  //     //# Arbitrary length
-  //     this->graph[i].length2rec.push_back(dx*10000.);
-  //     //# The basin I DONT want to reach
-  //     force_target_basin.push_back(i);
-
-  //     // Keepign this check just in case, will remove later. Throw an error in case cyclicity is detected
-  //     if(basin_labels[tgnode] == basin_labels[i])
-  //     {
-
-  //       throw std::runtime_error("Receiver in same basin! Node " + std::to_string(i) + " gives to " + std::to_string(this->graph[i].Sreceivers) + " gives to " + std::to_string(tgnode));
-  //     }
-  //   }
-
-  //   // // I need these to initialise my Vertex
-  //   // bool false1 = false;
-  //   // bool false2 = false;
-  //   // // Constructing the vertex in place in the vector. More efficient according to the internet
-  //   // graph.emplace_back(Vertex(i,false1,false2,donors,receivers,length2rec));
-  // }
-
-  // // Now I am correcting my outlet nodes:
-  // // The idea is to force any of its node to be directed to the next basin and avoid any cyclicity. 
-  // //# iterating through them
-  // for(size_t i=0; i< node_to_check.size();i++)
-  // { 
-  //   //# Gathering the node to check
-  //   int this_node_to_check = node_to_check[i];
-  //   //# The basin to avoid
-  //   int this_target_basin = force_target_basin[i];
-  //   // new list of receivers, I am only keeping the ones NOT draining to original basin
-  //   std::vector<int> new_rec;
-  //   std::vector<double> new_length;
-  //   int idL=0;
-  //   for(auto trec:graph[this_node_to_check].receivers)
-  //   {
-  //     if(basin_labels[trec] != this_target_basin  || active_nodes[trec] == false) //|| trec == this_node_to_check??
-  //     {
-  //       new_rec.push_back(trec);
-  //       new_length.push_back(this->graph[this_node_to_check].length2rec[idL]);
-  //     }
-  //     idL++;
-  //   }
-  //   // Security check
-  //   if(new_rec.size()==0 && active_nodes[this_node_to_check] == 1 )
-  //     throw std::runtime_error("At node " + std::to_string(this_node_to_check) + " no receivers after corrections! it came from pit " + std::to_string(origin_pit[i]) +" and flat mask is " + std::to_string(this->flat_mask[this_node_to_check]));
-  //   // Correcting the rec
-  //   this->graph[this_node_to_check].receivers = new_rec;
-  //   this->graph[this_node_to_check].length2rec = new_length;
-  // }
+      //#Iterating through the nodes
+      for(int i=0; i<n_element;i++)
+      {
+        // If this receiver is a pit to reroute, I need to add to the receiver list the receiver of the outlet
+        if(pits_to_reroute[i] == true)
+        {
+          //# Node I wanna add
+          int tgnode = this->graph[i].Sreceivers;
+          if(pits_to_reroute[tgnode] == false)
+            tgnode = this->graph[tgnode].Sreceivers;
+          //# Will be a receiver
+          this->graph[i].receivers.push_back(tgnode);
+          //# I will have to check its own receivers for potential cyclicity
+          node_to_check.push_back(tgnode);
+          //# Which pit is it connected to
+          origin_pit.push_back(i);
+          //# Arbitrary length
+          this->graph[i].length2rec.push_back(dx*10000.);
+          //# The basin I DONT want to reach
+          force_target_basin.push_back(i);
+  
+          // Keepign this check just in case, will remove later. Throw an error in case cyclicity is detected
+          if(basin_labels[tgnode] == basin_labels[i])
+          {
+  
+            throw std::runtime_error("Receiver in same basin! Node " + std::to_string(i) + " gives to " + std::to_string(this->graph[i].Sreceivers) + " gives to " + std::to_string(tgnode));
+          }
+        }
+  
+        // // I need these to initialise my Vertex
+        // bool false1 = false;
+        // bool false2 = false;
+        // // Constructing the vertex in place in the vector. More efficient according to the internet
+        // graph.emplace_back(Vertex(i,false1,false2,donors,receivers,length2rec));
+      }
+  
+      // Now I am correcting my outlet nodes:
+      // The idea is to force any of its node to be directed to the next basin and avoid any cyclicity. 
+      //# iterating through them
+      for(size_t i=0; i< node_to_check.size();i++)
+      { 
+        //# Gathering the node to check
+        int this_node_to_check = node_to_check[i];
+        //# The basin to avoid
+        int this_target_basin = force_target_basin[i];
+        // new list of receivers, I am only keeping the ones NOT draining to original basin
+        std::vector<int> new_rec;
+        std::vector<double> new_length;
+        int idL=0;
+        for(auto trec:graph[this_node_to_check].receivers)
+        {
+          if(basin_labels[trec] != this_target_basin  || active_nodes[trec] == false) //|| trec == this_node_to_check??
+          {
+            new_rec.push_back(trec);
+            new_length.push_back(this->graph[this_node_to_check].length2rec[idL]);
+          }
+          idL++;
+        }
+        // Security check
+        if(new_rec.size()==0 && active_nodes[this_node_to_check] == 1 )
+          throw std::runtime_error("At node " + std::to_string(this_node_to_check) + " no receivers after corrections! it came from pit " + std::to_string(origin_pit[i]) +" and flat mask is " + std::to_string(this->flat_mask[this_node_to_check]));
+        // Correcting the rec
+        this->graph[this_node_to_check].receivers = new_rec;
+        this->graph[this_node_to_check].length2rec = new_length;
+      }
+  }
 
   // I am now ready to create my topological order utilising a c++ port of the fortran algorithm from Jean Braun
   bool has_failed = false;
@@ -228,34 +232,36 @@ NodeGraphV2::NodeGraphV2(
 
   // DEBUG CHECKING
   // this->is_MF_outet_SF_outlet(); 
+  if(this->lake_solver)
+  {
+    // I got my topological order, I can now restore the corrupted receiver I had
+    for(size_t i=0; i<node_to_check.size(); i++)
+    {
+      // // New receiver array
+      // std::vector<int> rec;
+      // // Repicking the ones from fastscapelib-fortran
+      // for(size_t j=0;j<8; j++)
+      // {
+      //   int trec = Mrec(node_to_check[i],j);
+      //   if(trec < 0 || node_to_check[i] == trec)
+      //   {continue;}
+      //   rec.push_back(trec);
+      // }
+      std::vector<int> to_recompute = {node_to_check[i]};
+      this->recompute_multi_receveivers_and_donors(active_nodes,elevation,to_recompute);
 
-  // // I got my topological order, I can now restore the corrupted receiver I had
-  // for(size_t i=0; i<node_to_check.size(); i++)
-  // {
-  //   // // New receiver array
-  //   // std::vector<int> rec;
-  //   // // Repicking the ones from fastscapelib-fortran
-  //   // for(size_t j=0;j<8; j++)
-  //   // {
-  //   //   int trec = Mrec(node_to_check[i],j);
-  //   //   if(trec < 0 || node_to_check[i] == trec)
-  //   //   {continue;}
-  //   //   rec.push_back(trec);
-  //   // }
-  //   std::vector<int> to_recompute = {node_to_check[i]};
-  //   this->recompute_multi_receveivers_and_donors(active_nodes,elevation,to_recompute);
+      // VERY IMPORTANT HERE!!!!!
+      // In the particular case where my outlet is *also* a pit, I do not want to remove its receiver Y though???
+      // if(pits_to_reroute[node_to_check[i]])
+      // {
+      //   this->graph[node_to_check[i]].receivers.push_back(this->graph[this->graph[node_to_check[i]].Sreceivers].Sreceivers);
+      //   this->graph[node_to_check[i]].length2rec.push_back(dx * 10000.);
+      // }
 
-  //   // VERY IMPORTANT HERE!!!!!
-  //   // In the particular case where my outlet is *also* a pit, I do not want to remove its receiver Y though???
-  //   // if(pits_to_reroute[node_to_check[i]])
-  //   // {
-  //   //   this->graph[node_to_check[i]].receivers.push_back(this->graph[this->graph[node_to_check[i]].Sreceivers].Sreceivers);
-  //   //   this->graph[node_to_check[i]].length2rec.push_back(dx * 10000.);
-  //   // }
-
-  //   // // Correcting the Vertex inplace
-  //   // graph[node_to_check[i]].receivers = rec;
-  // }
+      // // Correcting the Vertex inplace
+      // graph[node_to_check[i]].receivers = rec;
+    }
+  }
 
   // Last step: implementing the index in the stack
   this->index_in_Mstack = xt::zeros<int>({this->n_element});

@@ -107,7 +107,8 @@ xt::pytensor<bool,1>& active_nodes, // array of active node - ie true where the 
 double dx, // resolution in x
 double dy, // resolution in y
 int nrows, // number of rows
-int ncols // number of cols
+int ncols, // number of cols
+bool lake_solver // implicit if false, explicit if true
   );
 
 std::vector<char> is_border;
@@ -233,6 +234,10 @@ protected:
   double dx;
   // Y resolution
   double dy;
+
+  //lake solving method
+  bool lake_solver;
+
   // length is n_element and return true if the pit is to be rerouted
   std::vector<bool> pits_to_reroute;
   // The topological order of from top to bottom
