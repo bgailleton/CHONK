@@ -523,7 +523,7 @@ int ModelRunner::fill_mah_lake(EntryPoint& entry_point, std::queue<EntryPoint>& 
     {
       if(this->motherlake(this->node_in_lake[tnode]) != this->lakes[current_lake].id)
       {
-        this->eat_lake(this->lakes[current_lake].id, this->node_in_lake[tnode]);
+        this->drink_lake(this->lakes[current_lake].id, this->node_in_lake[tnode]);
         this->node_in_lake[tnode] = this->lakes[current_lake].id;
       }
     }
@@ -534,7 +534,7 @@ int ModelRunner::fill_mah_lake(EntryPoint& entry_point, std::queue<EntryPoint>& 
 }
 
 /// function eating a lake from another
-void ModelRunner::eat_lake(int id_eater, int id_edible)
+void ModelRunner::drink_lake(int id_eater, int id_edible)
 { 
   // Updating the id of the new lake
   this->lakes[id_edible].is_now = id_eater;

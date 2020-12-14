@@ -473,7 +473,7 @@ class ModelRunner
     void original_gathering_of_water_and_sed_from_pixel_or_flat_area(int starting_node, double& water_volume, double& sediment_volume, std::vector<double>& label_prop);
     void iterative_lake_solver();
     int fill_mah_lake(EntryPoint& entry_point, std::queue<EntryPoint>& iteralake);
-    void eat_lake(int id_eater, int id_edible);
+    void drink_lake(int id_eater, int id_edible);
     int motherlake(int this_lake_id);
     void reprocess_nodes_from_lake_outlet(int current_lake, int outlet, std::vector<bool>& is_processed, std::queue<EntryPoint>& iteralake);
     std::vector<int> lake_in_order;
