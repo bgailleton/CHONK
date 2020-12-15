@@ -525,7 +525,7 @@ void chonk::move_MF_from_fastscapelib_threshold_SF(NodeGraphV2& graph, double th
       }
 
       // Important checker to avoid slope == 0
-      if(double_equals(this_slope,0,1e-7))
+      if(double_equals(this_slope,0,1e-8) || this_slope < 0)
         this_slope = 1e-6;
 
       // Powerslope starts by being the slope
@@ -581,12 +581,13 @@ void chonk::move_MF_from_fastscapelib_threshold_SF(NodeGraphV2& graph, double th
     // DEBUG CHECKER --  I'll delete after a bit of time to make sure the algorithm is stable
     if(double_equals(sumcheique,1., 1e-4) == false)
     {
-      std::cout << "Gulug::!!!!!" << these_neighbors.size() << std::endl;;
+      std::cout << this->chonkID << "||" << surface_elevation[this->chonkID] << " Gulug::!!!!!" << these_neighbors.size() << std::endl;;
       for(size_t i=0; i< these_neighbors.size(); i++)
       {
         std::cout << "gaft::" << these_neighbors[i] << std::endl;
+        std::cout << "Z::" << surface_elevation[these_neighbors[i]] << std::endl;
         std::cout << "WWW:::" << waterweigths[i] << std::endl;
-        std::cout << "WWW:::" << powerslope[i] << std::endl;
+        std::cout << "POWERSLOPE:::" << powerslope[i] << std::endl;
       }
       // throw std::runtime_error("SUMCHECK not 1???::" + std::to_string(sumcheique));
     }

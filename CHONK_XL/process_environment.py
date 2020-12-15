@@ -297,19 +297,19 @@ class CoreModel:
 	def run_step(self, dt):
 		# print("Running", dt)
 		self.model.update_timestep(dt)
-		tempolake = self.model.get_array_double_param("surface_elevation")
+		# tempolake = self.model.get_array_double_param("surface_elevation")
 		# self.model.update_array_double_param("surface_elevation", np.copy(self.model.get_array_double_param("surface_elevation_tp1") + np.random.rand(self.nx * self.ny) * 1e-7 ) )
 		self.model.update_array_double_param("surface_elevation", np.copy(self.model.get_array_double_param("surface_elevation_tp1")) )
 		self.model.update_array_double_param("sed_height", np.copy(self.model.get_array_double_param("sed_height_tp1")) )
 		self.model.initiate_nodegraph()
 		self.model.run()
-		tempolake += self.model.get_array_double_param("lake_depth")
+		tempolake = self.model.get_array_double_param("topography")
 		self.topolake = tempolake.reshape(self.ny,self.nx)
 		self.model.add_external_to_double_array("surface_elevation_tp1",self.uplift * dt)
 
 	@topo.compute
 	def _topo(self):
-		return self.model.get_array_double_param("surface_elevation_tp1").reshape(self.ny,self.nx)
+		return self.model.get_array_double_param("surface_elevation").reshape(self.ny,self.nx)
 
 	@Q_water.compute
 	def _Q_water(self):

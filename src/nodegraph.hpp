@@ -146,6 +146,7 @@ void compute_receveivers_and_donors(xt::pytensor<bool,1>& active_nodes, xt::pyte
 
 void get_D8_neighbors(int i, xt::pytensor<bool,1>& active_nodes, std::vector<int>& neightbouring_nodes, std::vector<double>& length2neigh);
 void get_D8_neighbors(int i, xt::pytensor<int,1>& active_nodes, std::vector<int>& neightbouring_nodes, std::vector<double>& length2neigh);
+std::vector<int> get_all_flat_from_node(int i, xt::pytensor<double,1>& topography,  xt::pytensor<int,1>& active_nodes);
 
 void get_D4_neighbors(int i, xt::pytensor<bool,1>& active_nodes, std::vector<int>& neightbouring_nodes, std::vector<double>& length2neigh);
 

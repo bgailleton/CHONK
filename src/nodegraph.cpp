@@ -1003,6 +1003,34 @@ void NodeGraphV2::get_D8_neighbors(int i, xt::pytensor<bool,1>& active_nodes, st
   }
 }
 
+std::vector<int> NodeGraphV2::get_all_flat_from_node(int i, xt::pytensor<double,1>& topography,  xt::pytensor<int,1>& active_nodes)
+{
+  std::vector<char> is_in_queue(this->un_element,'n');
+  is_in_queue[i] = 'y';
+  std::queue<int> baal;baal.emplace(i);
+  std::vector<int> output;
+  while(baal.empty() == false)
+  {
+    std::vector<int> neightbouring_nodes; std::vector<double> length2neigh;
+    int next_node = baal.front();
+    output.push_back(next_node);
+    baal.pop();
+    this->get_D8_neighbors(next_node,  active_nodes,  neightbouring_nodes,  length2neigh);
+    for(auto tnode:neightbouring_nodes)
+    {
+      if(is_in_queue[tnode] == 'y')
+        continue;
+      if(topography[i] == topography[tnode])
+      {
+        is_in_queue[tnode] = 'y';
+        baal.emplace(tnode);
+      }
+    }
+  }
+  return output;
+
+}
+
 void NodeGraphV2::get_D8_neighbors(int i, xt::pytensor<int,1>& active_nodes, std::vector<int>& neightbouring_nodes, std::vector<double>& length2neigh)
 {
   // these vectors are additioned to the node indice to test the neighbors

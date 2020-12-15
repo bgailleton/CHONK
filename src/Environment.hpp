@@ -257,7 +257,9 @@ public:
                 volume_sed = 0;
                 is_now = -1;
                 outlet = -1;
-                id = -1;};
+                id = -1;
+                this->sum_outrate = 0;
+            };
     LakeLite(int id){
                 water_elevation = 0;
                 volume_water = 0;
@@ -265,12 +267,14 @@ public:
                 is_now = -1;
                 outlet = -1;
                 this->id = id;
+                this->sum_outrate = 0;
             };
 
 
     double water_elevation;
     double volume_water;
     double volume_sed;
+    double sum_outrate;
     std::vector<int> nodes;
     std::vector<double> label_prop;
     int is_now;
@@ -524,6 +528,9 @@ class ModelRunner
     std::vector<Lake> lake_network;
     //# Vetor containing the lake ID for each nodes of the landscape. -1 -> NAL node: Not A Lake
     std::vector<int> node_in_lake;
+
+    std::vector<double> gave_to_lake_water;
+    std::vector<double> gave_to_lake_sed;
 
     // parameters, stored un maps of thingies by type
     // these parameters are "model-wide parameters" like elevation, lake_depth or precipitation
