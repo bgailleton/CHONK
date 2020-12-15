@@ -143,16 +143,17 @@ void chonk::split_and_merge_in_receiving_chonks(std::vector<chonk>& chonkscape, 
 
 
 
-  // if(double_equals(this->water_flux, sum_outwat, 1e-3) == false && graph.is_border[this->current_node] == 'n')
-  // {
-  //   std::cout << this->water_flux<< " to start with, but " << sum_outwat << " got out " << std::endl;
-  //   std::cout << "I had " <<  this->receivers.size() << " receivers:" << std::endl;
-  //   for (auto rec : this->receivers)
-  //     std::cout << rec << "!";
-  //   std::cout << std::endl;
-  //   throw std::runtime_error("WaterFluxError::Some water is lost in the splitting process");
-  //   // std::cout << "GULUUUUUUUUUB::::::::::" << this->water_flux - sum_outwat << std::endl;
-  // }
+  if(double_equals(this->water_flux, sum_outwat, 1e-3) == false && graph.is_border[this->current_node] == 'n')
+  {
+    std::cout << this->water_flux<< " to start with, but " << sum_outwat << " got out. NodeID == " << this->chonkID << std::endl;
+    std::cout << "I had " <<  this->receivers.size() << " receivers:" << std::endl;
+    for (auto rec : this->receivers)
+      std::cout << rec << "!";
+    std::cout << std::endl;
+    if(this->receivers.size()>0)
+      throw std::runtime_error("WaterFluxError::Some water is lost in the splitting process");
+    // std::cout << "GULUUUUUUUUUB::::::::::" << this->water_flux - sum_outwat << std::endl;
+  }
 
   // if(graph.is_border[this->current_node] == 'n' && this->receivers.size() == 0)
   // {
@@ -222,7 +223,10 @@ void chonk::split_and_merge_in_receiving_chonks_ignore_some(std::vector<chonk>& 
     // Adressing the chonk
     chonk& other_chonk = chonkscape[this->receivers[i]];
     // Adding the fluxes*modifyer
+    // std::cout << this->chonkID << " gives to " << this->receivers[i] << " " << this->water_flux * this->weigth_water_fluxes[i] << " it had before " << chonkscape[this->receivers[i]].get_water_flux() << std::endl; 
     other_chonk.add_to_water_flux(this->water_flux * this->weigth_water_fluxes[i]);
+
+
     // std::cout << "COR";
     other_chonk.add_to_sediment_flux(this->sediment_flux * this->weigth_sediment_fluxes[i], oatalab);
     // std::cout << "kar";

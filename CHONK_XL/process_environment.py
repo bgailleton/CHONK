@@ -245,6 +245,7 @@ class CoreModel:
 	mstack_checker = xs.on_demand(dims = ('y','x'))
 	flat_mask = xs.on_demand(dims = ('y','x'))
 	NodeID =  xs.on_demand(dims = ('y','x'))
+	debugint =  xs.on_demand(dims = ('y','x'))
 	full_sed_pile_prop = xs.on_demand(dims = ('y','x','n_depths_recorded','n_labels'))
 	
 	Qw_in = xs.on_demand()
@@ -361,6 +362,10 @@ class CoreModel:
 	@E_r.compute
 	def _E_r(self):
 		return self.model.get_erosion_bedrock_only_flux().reshape(self.ny,self.nx)
+
+	@debugint.compute
+	def _debugint(self):
+		return self.model.get_debugint().reshape(self.ny,self.nx)
 
 	@E_s.compute
 	def _E_s(self):

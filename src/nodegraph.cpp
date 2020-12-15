@@ -978,8 +978,8 @@ void NodeGraphV2::get_D8_neighbors(int i, xt::pytensor<bool,1>& active_nodes, st
   neightbouring_nodes = std::vector<int>();
   length2neigh = std::vector<double>();
 
-  if(active_nodes[i] == false)
-    return;
+  // if(active_nodes[i] == false)
+  //   return;
 
   int checker;
   if(i<ncols)
@@ -1009,8 +1009,8 @@ void NodeGraphV2::get_D8_neighbors(int i, xt::pytensor<int,1>& active_nodes, std
   neightbouring_nodes = std::vector<int>();
   length2neigh = std::vector<double>();
 
-  if(active_nodes[i] == 0)
-    return;
+  // if(active_nodes[i] == 0)
+  //   return;
 
   int checker;
   if(i<ncols)

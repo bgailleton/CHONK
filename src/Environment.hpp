@@ -376,7 +376,8 @@ class ModelRunner
     // Avoid recursion by having this relatively small function processing node that I am sure won't need lake management
     void process_node_nolake_for_sure(int& node, std::vector<bool>& is_processed,
   xt::pytensor<int,1>& inctive_nodes, double& cellarea, xt::pytensor<double,1>& surface_elevation, bool need_move_prep , bool need_flux_before_move);
-
+    void process_node_nolake_for_sure(int& node, std::vector<bool>& is_processed,
+  xt::pytensor<int,1>& inctive_nodes, double& cellarea, xt::pytensor<double,1>& surface_elevation, bool need_move_prep, bool need_flux_before_move, std::vector<int>& ignore_some);
 
     // Accessing functions (so far only works when memory mode is normal)
     // # return the water flux at dt
@@ -470,7 +471,8 @@ class ModelRunner
    
     // New lake solver
     // Go through all the flat neighbors when originating a lake in order to deal with flat surfaces
-    void original_gathering_of_water_and_sed_from_pixel_or_flat_area(int starting_node, double& water_volume, double& sediment_volume, std::vector<double>& label_prop);
+    void original_gathering_of_water_and_sed_from_pixel_or_flat_area(int starting_node, double& water_volume, double& sediment_volume,
+     std::vector<double>& label_prop, std::vector<int>& these_nodes);
     void iterative_lake_solver();
     int fill_mah_lake(EntryPoint& entry_point, std::queue<EntryPoint>& iteralake);
     void drink_lake(int id_eater, int id_edible);
@@ -480,6 +482,11 @@ class ModelRunner
 
     std::vector<int> lake_in_order;
     std::vector<int> lake_status;
+    
+
+    xt::pytensor<int,1> get_debugint();
+
+
 
   protected:
 
@@ -544,6 +551,9 @@ class ModelRunner
 
     // Label array: because it is a systematic requirements, I need this aray to always be there
     xt::pytensor<int,1> label_array;
+
+    xt::pytensor<int,1> debugint;
+
 
     // Discretisation of sediment height
     std::vector<bool> is_there_sed_here;

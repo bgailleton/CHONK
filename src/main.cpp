@@ -96,6 +96,7 @@ PYBIND11_MODULE(CHONK_cpp, m)
       .def("get_flat_mask", &ModelRunner::get_flat_mask)
       .def("get_sed_prop_by_label", &ModelRunner::get_sed_prop_by_label)
       .def("get_sed_prop_by_label_matrice", &ModelRunner::get_sed_prop_by_label_matrice)
+      .def("get_debugint", &ModelRunner::get_debugint)
 
     ;
     m.def("set_DEBUG_switch_nodegraph",set_DEBUG_switch_nodegraph);
