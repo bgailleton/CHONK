@@ -459,7 +459,28 @@ void ModelRunner::reprocess_nodes_from_lake_outlet(int current_lake, int outlet,
     if(motherlake(this->node_in_lake[ttnode]) == current_lake)
       ignore_some.push_back(ttnode);
   }
+
+  // THIS IS THE PROBLEM!!!!!!c
+  // THIS IS THE PROBLEM!!!!!!c
+  // THIS IS THE PROBLEM!!!!!!c
+  // THIS IS THE PROBLEM!!!!!!c
+  // THIS IS THE PROBLEM!!!!!!c
+  // THIS IS THE PROBLEM!!!!!!c
+  // THIS IS d PROBLEM!!!!!!c
   tchonk.split_and_merge_in_receiving_chonks_ignore_some(this->chonk_network, this->graph, this->timestep, ignore_some);
+
+//       ^
+//     / T \
+//      |||
+//      |||
+//      |||
+//      |||
+//      |||
+//      |||
+//      |||
+//      |||
+// ERROR TO CHECK:: IT DOES NOT LIKE REDUNDANCY, WITH IT: MASS BALANCE RIGHT AT FIRST BUT SCREWED AT OUTFLOWING MULTIPLE LAKE
+// WITHOUT IT: BETTER BALANCE OVERALL BUT MEH FOR THE REST
 
 
   tchonk.reset();
