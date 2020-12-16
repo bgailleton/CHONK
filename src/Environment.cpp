@@ -243,6 +243,7 @@ void ModelRunner::iterative_lake_solver()
 
   // reinitialising the lakes
   this->lakes = std::vector<LakeLite>();
+  this->this->has_been_outlet = std::vector<char>(this->io_int["n_elements"],'n');
 
 
   // Initialising the queue with the first lakes. Also I am preprocessing the flat surfaces
@@ -451,37 +452,40 @@ void ModelRunner::reprocess_nodes_from_lake_outlet(int current_lake, int outlet,
   // Reprocessing the outlet here!
   chonk& tchonk = this->chonk_network[this->lakes[current_lake].outlet];
   // Saving the part of the fluxes going in the not-lake direction first
-
-  std::vector<int> ignore_some; 
-  for(auto ttnode: tchonk.get_chonk_receivers_copy())
+  
+  if(this->has_been_outlet[this->lakes[current_lake].outlet] == 'y')
   {
-    if(this->node_in_lake[ttnode] >= 0)
-    if(motherlake(this->node_in_lake[ttnode]) == current_lake)
-      ignore_some.push_back(ttnode);
+    std::vector<int> ignore_some; 
+    for(auto ttnode: tchonk.get_chonk_receivers_copy())
+    {
+      if(this->node_in_lake[ttnode] >= 0)
+      if(motherlake(this->node_in_lake[ttnode]) == current_lake)
+        ignore_some.push_back(ttnode);
+    }
+
+    // THIS IS THE PROBLEM!!!!!!c
+    // THIS IS THE PROBLEM!!!!!!c
+    // THIS IS THE PROBLEM!!!!!!c
+    // THIS IS THE PROBLEM!!!!!!c
+    // THIS IS THE PROBLEM!!!!!!c
+    // THIS IS THE PROBLEM!!!!!!c
+    // THIS IS d PROBLEM!!!!!!c
+    tchonk.split_and_merge_in_receiving_chonks_ignore_some(this->chonk_network, this->graph, this->timestep, ignore_some);
+    has_been_outlet[this->lakes[current_lake].outlet] = 'y';
+
+    //       ^
+    //     / T \
+    //      |||
+    //      |||
+    //      |||
+    //      |||
+    //      |||
+    //      |||
+    //      |||
+    //      |||
+    // ERROR TO CHECK:: IT DOES NOT LIKE REDUNDANCY, WITH IT: MASS BALANCE RIGHT AT FIRST BUT SCREWED AT OUTFLOWING MULTIPLE LAKE
+    // WITHOUT IT: BETTER BALANCE OVERALL BUT MEH FOR THE REST
   }
-
-  // THIS IS THE PROBLEM!!!!!!c
-  // THIS IS THE PROBLEM!!!!!!c
-  // THIS IS THE PROBLEM!!!!!!c
-  // THIS IS THE PROBLEM!!!!!!c
-  // THIS IS THE PROBLEM!!!!!!c
-  // THIS IS THE PROBLEM!!!!!!c
-  // THIS IS d PROBLEM!!!!!!c
-  tchonk.split_and_merge_in_receiving_chonks_ignore_some(this->chonk_network, this->graph, this->timestep, ignore_some);
-
-//       ^
-//     / T \
-//      |||
-//      |||
-//      |||
-//      |||
-//      |||
-//      |||
-//      |||
-//      |||
-// ERROR TO CHECK:: IT DOES NOT LIKE REDUNDANCY, WITH IT: MASS BALANCE RIGHT AT FIRST BUT SCREWED AT OUTFLOWING MULTIPLE LAKE
-// WITHOUT IT: BETTER BALANCE OVERALL BUT MEH FOR THE REST
-
 
   tchonk.reset();
 

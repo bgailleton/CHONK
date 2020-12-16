@@ -528,6 +528,7 @@ class ModelRunner
     std::vector<Lake> lake_network;
     //# Vetor containing the lake ID for each nodes of the landscape. -1 -> NAL node: Not A Lake
     std::vector<int> node_in_lake;
+    std::vector<char> has_been_outlet;
 
     std::vector<double> gave_to_lake_water;
     std::vector<double> gave_to_lake_sed;
