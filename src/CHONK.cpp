@@ -525,7 +525,7 @@ void chonk::move_MF_from_fastscapelib_threshold_SF(NodeGraphV2& graph, double th
       }
 
       // Important checker to avoid slope == 0
-      if(double_equals(this_slope,0,1e-8) || this_slope < 0)
+      if( this_slope < 1e-6)
         this_slope = 1e-6;
 
       // Powerslope starts by being the slope
