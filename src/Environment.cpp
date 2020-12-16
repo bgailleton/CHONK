@@ -406,19 +406,6 @@ void ModelRunner::reprocess_nodes_from_lake_outlet(int current_lake, int outlet,
   }
 
 
-  // std::vector<char> to_check_givenness(this->io_int["n_elements"], 'n');
-  // for(auto tnode:node_to_deltaise_to_lake)
-  // {
-  //   std::vector<int> neightbors; std::vector<double> dummy ; graph.get_D8_neighbors(tnode, active_nodes, neightbors, dummy);
-  //   for(auto ttnode:neightbors)
-  //   {
-  //     if(this->node_in_lake[ttnode] >= 0)
-  //       continue;
-  //     if(is_in_queue[ttnode] != 'n')
-  //       to_check_givenness[ttnode] = 'y';
-  //   }
-  // }
-
   // Adding the donors to the PQ
   for(int i =0; i<this->io_int["n_elements"]; i++)
   {
@@ -552,17 +539,17 @@ void ModelRunner::reprocess_nodes_from_lake_outlet(int current_lake, int outlet,
   
   double cellarea = this->io_double["dx"] * this->io_double["dy"];
 
-  // Last step: reprocess donors to outlet, jsut for the outlet
-  for(auto tnode:donors_to_outlet)
-  {
-    std::vector<int> ignore_some; 
-    for(auto ttnode: this->chonk_network[tnode].get_chonk_receivers_copy())
-    {
-      if(ttnode != outlet)
-        ignore_some.push_back(ttnode);
-    }
-    this->chonk_network[tnode].split_and_merge_in_receiving_chonks_ignore_some(this->chonk_network, this->graph, this->timestep, ignore_some);
-  }
+  // // Last step: reprocess donors to outlet, jsut for the outlet
+  // for(auto tnode:donors_to_outlet)
+  // {
+  //   std::vector<int> ignore_some; 
+  //   for(auto ttnode: this->chonk_network[tnode].get_chonk_receivers_copy())
+  //   {
+  //     if(ttnode != outlet)
+  //       ignore_some.push_back(ttnode);
+  //   }
+  //   this->chonk_network[tnode].split_and_merge_in_receiving_chonks_ignore_some(this->chonk_network, this->graph, this->timestep, ignore_some);
+  // }
 
 
 
@@ -616,7 +603,7 @@ void ModelRunner::reprocess_nodes_from_lake_outlet(int current_lake, int outlet,
     if (is_in_queue[tnode] == 'd')
       continue;
 
-    
+
     std::vector<int> these_lakid; std::vector<double> twat; std::vector<double> tsed; std::vector<std::vector<double> > tlab; std::vector<int> bulug;
     this->check_what_gives_to_lake(tnode, these_lakid, twat, tsed, tlab, bulug, current_lake);
 
@@ -649,7 +636,7 @@ void ModelRunner::reprocess_nodes_from_lake_outlet(int current_lake, int outlet,
     double dwat = delta_water[i] - pre_water[i];
     double dsed = delta_sed[i] - pre_sed[i];
     
-    if(dwat == 0 && dsed == 0)
+    if(dwat <= 0 && dsed <= 0)
       continue;
 
     std::cout << "DWAT = " << dwat  << " TO " << pre_entry_node[i] << std::endl;
@@ -693,9 +680,6 @@ void ModelRunner::check_what_gives_to_lake(int entry_node, std::vector<int>& the
       continue;
     int this_lakid = this->motherlake(tapo);
     if(this_lakid == lake_to_ignore)
-      continue;
-
-    if(this_lakid < 0)
       continue;
 
     const bool is_not_here = std::find(these_lakid.begin(), these_lakid.end(), this_lakid) == these_lakid.end();
