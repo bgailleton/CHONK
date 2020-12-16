@@ -243,7 +243,7 @@ void ModelRunner::iterative_lake_solver()
 
   // reinitialising the lakes
   this->lakes = std::vector<LakeLite>();
-  this->this->has_been_outlet = std::vector<char>(this->io_int["n_elements"],'n');
+  this->has_been_outlet = std::vector<char>(this->io_int["n_elements"],'n');
 
 
   // Initialising the queue with the first lakes. Also I am preprocessing the flat surfaces
@@ -337,12 +337,16 @@ void ModelRunner::reprocess_nodes_from_lake_outlet(int current_lake, int outlet,
     is_in_queue[tnode] = 'y';
   }
 
+
+    // I will also reprocess a bunch of donors, but I cannot be sure they will be to reprocess before the end
+  std::vector<int> node_to_deltaise_to_lake;
+
   // Initiating the transec with the outlet, but not putting it the 
   transec.emplace(outlet);
   is_in_queue[outlet] = 'y';
+  if(this->node_in_lake[outlet] >= 0)
+    node_to_deltaise_to_lake.push_back(outlet);
 
-  // I will also reprocess a bunch of donors, but I cannot be sure they will be to reprocess before the end
-  std::vector<int> node_to_deltaise_to_lake;
 
   while(transec.empty() == false)
   {
@@ -402,11 +406,28 @@ void ModelRunner::reprocess_nodes_from_lake_outlet(int current_lake, int outlet,
   }
 
 
+  // std::vector<char> to_check_givenness(this->io_int["n_elements"], 'n');
+  // for(auto tnode:node_to_deltaise_to_lake)
+  // {
+  //   std::vector<int> neightbors; std::vector<double> dummy ; graph.get_D8_neighbors(tnode, active_nodes, neightbors, dummy);
+  //   for(auto ttnode:neightbors)
+  //   {
+  //     if(this->node_in_lake[ttnode] >= 0)
+  //       continue;
+  //     if(is_in_queue[ttnode] != 'n')
+  //       to_check_givenness[ttnode] = 'y';
+  //   }
+  // }
+
   // Adding the donors to the PQ
   for(int i =0; i<this->io_int["n_elements"]; i++)
   {
     if (is_in_queue[i] == 'd')
     {
+
+      // if(has_been_outlet[i] == 'y')
+      //   throw std::runtime_error("UH?");
+
       ORDEEEEEER.emplace(node_to_reproc(i,this->graph.get_index_MF_stack_at_i(i)));
     }
   }
@@ -435,67 +456,6 @@ void ModelRunner::reprocess_nodes_from_lake_outlet(int current_lake, int outlet,
 
   // Final size OK
 
-  // Now deprocessing the receivers in potential lake while saving their contribution to lakes in order to calculate the delta
-  for(auto tnode : node_to_deltaise_to_lake)
-  {
-    // Current lake
-    int tlakid = motherlake(this->node_in_lake[tnode]);
-    // mixing the proportions
-    label_prop_of_pre[tlakid] = mix_two_proportions(pre_sed[tlakid],label_prop_of_pre[tlakid],this->chonk_network[tnode].get_sediment_flux(),this->chonk_network[tnode].get_other_attribute_array("label_tracker"));
-    // Adding all the shits
-    pre_sed[tlakid] += this->chonk_network[tnode].get_sediment_flux();
-    pre_water[tlakid] += this->chonk_network[tnode].get_water_flux();
-    // Setting the entry point, it does not really matter where the thingy comes from, as long as it is in the lake
-    pre_entry_node[tlakid] = tnode;
-  }
-
-  // Reprocessing the outlet here!
-  chonk& tchonk = this->chonk_network[this->lakes[current_lake].outlet];
-  // Saving the part of the fluxes going in the not-lake direction first
-  
-  if(this->has_been_outlet[this->lakes[current_lake].outlet] == 'y')
-  {
-    std::vector<int> ignore_some; 
-    for(auto ttnode: tchonk.get_chonk_receivers_copy())
-    {
-      if(this->node_in_lake[ttnode] >= 0)
-      if(motherlake(this->node_in_lake[ttnode]) == current_lake)
-        ignore_some.push_back(ttnode);
-    }
-
-    // THIS IS THE PROBLEM!!!!!!c
-    // THIS IS THE PROBLEM!!!!!!c
-    // THIS IS THE PROBLEM!!!!!!c
-    // THIS IS THE PROBLEM!!!!!!c
-    // THIS IS THE PROBLEM!!!!!!c
-    // THIS IS THE PROBLEM!!!!!!c
-    // THIS IS d PROBLEM!!!!!!c
-    tchonk.split_and_merge_in_receiving_chonks_ignore_some(this->chonk_network, this->graph, this->timestep, ignore_some);
-    has_been_outlet[this->lakes[current_lake].outlet] = 'y';
-
-    //       ^
-    //     / T \
-    //      |||
-    //      |||
-    //      |||
-    //      |||
-    //      |||
-    //      |||
-    //      |||
-    //      |||
-    // ERROR TO CHECK:: IT DOES NOT LIKE REDUNDANCY, WITH IT: MASS BALANCE RIGHT AT FIRST BUT SCREWED AT OUTFLOWING MULTIPLE LAKE
-    // WITHOUT IT: BETTER BALANCE OVERALL BUT MEH FOR THE REST
-  }
-
-  tchonk.reset();
-
-  double water_rate = entry_point.volume_water / this->timestep + this->lakes[current_lake].sum_outrate;
-  this->lakes[current_lake].sum_outrate += entry_point.volume_water / this->timestep;
-  double sed_rate = entry_point.volume_sed;
-  std::vector<double> labprop = entry_point.label_prop;
-  tchonk.set_water_flux(water_rate);
-  tchonk.set_sediment_flux(sed_rate, labprop);
-
   std::vector<int> neightbors; std::vector<double> dist ; graph.get_D8_neighbors(this->lakes[current_lake].outlet, active_nodes, neightbors, dist);
   std::vector<int> donors_to_outlet;
   double maxslope = 0;
@@ -519,21 +479,90 @@ void ModelRunner::reprocess_nodes_from_lake_outlet(int current_lake, int outlet,
     if(topography[this->lakes[current_lake].outlet] < topography[neigh])
       donors_to_outlet.push_back(neigh);
   }
+  if(this->node_in_lake[ID] >= 0)
+    node_to_deltaise_to_lake.push_back(ID);
 
-  std::cout << " ------> " << ID << " [" << water_rate << "]" << std::endl;
+
+  // Now deprocessing the receivers in potential lake while saving their contribution to lakes in order to calculate the delta
+  for(auto tnode : local_mstack)
+  {
+    if (is_in_queue[tnode] == 'd')
+      continue;
+
+    std::vector<int> these_lakid; std::vector<double> twat; std::vector<double> tsed; std::vector<std::vector<double> > tlab; std::vector<int> bulug;
+    this->check_what_gives_to_lake(tnode, these_lakid, twat, tsed, tlab, bulug, current_lake);
+
+    for(int i = 0; i < int(these_lakid.size()); i++)
+    {
+      int tlakid = these_lakid[i];
+      label_prop_of_pre[tlakid] = mix_two_proportions(pre_sed[tlakid],label_prop_of_pre[tlakid],tsed[i],tlab[i]);
+      pre_sed[tlakid] += tsed[i];
+      pre_water[tlakid] += twat[i];
+      pre_entry_node[tlakid] = bulug[i];
+    }
+
+  }
+
+  // Reprocessing the outlet here!
+  chonk& tchonk = this->chonk_network[this->lakes[current_lake].outlet];
+  // Saving the part of the fluxes going in the not-lake direction first
+  
+  if(this->has_been_outlet[this->lakes[current_lake].outlet] == 'n')
+  {
+    std::vector<int> ignore_some; 
+    for(auto ttnode: tchonk.get_chonk_receivers_copy())
+    {
+      if(this->node_in_lake[ttnode] >= 0)
+      if(motherlake(this->node_in_lake[ttnode]) == current_lake)
+        ignore_some.push_back(ttnode);
+    }
+
+    tchonk.split_and_merge_in_receiving_chonks_ignore_some(this->chonk_network, this->graph, this->timestep, ignore_some);
+    has_been_outlet[this->lakes[current_lake].outlet] = 'y';
+
+  }
+  std::cout << " ---------> [" <<tchonk.get_water_flux() << "] ";
+
+  if(true)
+  {
+    std::vector<int> these_lakid; std::vector<double> twat; std::vector<double> tsed; std::vector<std::vector<double> > tlab; std::vector<int> bulug;
+    this->check_what_gives_to_lake(this->lakes[current_lake].outlet, these_lakid, twat, tsed, tlab, bulug,current_lake);
+
+    for(int i = 0; i < int(these_lakid.size()); i++)
+    {
+      int tlakid = these_lakid[i];
+      label_prop_of_pre[tlakid] = mix_two_proportions(pre_sed[tlakid],label_prop_of_pre[tlakid],tsed[i],tlab[i]);
+      pre_sed[tlakid] += tsed[i];
+      pre_water[tlakid] += twat[i];
+      pre_entry_node[tlakid] = bulug[i];
+    }
+  }
+
+  tchonk.reset();
+
+
+  double water_rate = entry_point.volume_water / this->timestep + this->lakes[current_lake].sum_outrate;
+  this->lakes[current_lake].sum_outrate += entry_point.volume_water / this->timestep;
+  double sed_rate = entry_point.volume_sed;
+  std::vector<double> labprop = entry_point.label_prop;
+  tchonk.set_water_flux(water_rate);
+  tchonk.set_sediment_flux(sed_rate, labprop);
+  std::cout << ID << " [" << water_rate << "]" << std::endl;
+
+  
   double cellarea = this->io_double["dx"] * this->io_double["dy"];
 
-  // // Last step: reprocess donors to outlet, jsut for the outlet
-  // for(auto tnode:donors_to_outlet)
-  // {
-  //   std::vector<int> ignore_some; 
-  //   for(auto ttnode: this->chonk_network[tnode].get_chonk_receivers_copy())
-  //   {
-  //     if(ttnode != outlet)
-  //       ignore_some.push_back(ttnode);
-  //   }
-  //   this->chonk_network[tnode].split_and_merge_in_receiving_chonks_ignore_some(this->chonk_network, this->graph, this->timestep, ignore_some);
-  // }
+  // Last step: reprocess donors to outlet, jsut for the outlet
+  for(auto tnode:donors_to_outlet)
+  {
+    std::vector<int> ignore_some; 
+    for(auto ttnode: this->chonk_network[tnode].get_chonk_receivers_copy())
+    {
+      if(ttnode != outlet)
+        ignore_some.push_back(ttnode);
+    }
+    this->chonk_network[tnode].split_and_merge_in_receiving_chonks_ignore_some(this->chonk_network, this->graph, this->timestep, ignore_some);
+  }
 
 
 
@@ -544,7 +573,6 @@ void ModelRunner::reprocess_nodes_from_lake_outlet(int current_lake, int outlet,
   // I am now ready to reprocess all the node from upstream to downstream, and then rechek the delat for me lakes
   for(auto tnode:local_mstack)
   {
-    // std::cout << "REPROCESSING::" << tnode << " --> " << is_in_queue[tnode] << " || lake ID : " << this->node_in_lake[tnode] << std::endl;
 
     if(is_in_queue[tnode] == 'd')
     {
@@ -565,7 +593,6 @@ void ModelRunner::reprocess_nodes_from_lake_outlet(int current_lake, int outlet,
             continue;
           }
 
-        // std::cout << "WILL REC " << ttnode << " and is " << is_in_queue[ttnode] << std::endl;
 
       }
 
@@ -574,7 +601,6 @@ void ModelRunner::reprocess_nodes_from_lake_outlet(int current_lake, int outlet,
     }
     else
     {
-      std::cout << "reproc::" <<tnode << std::endl;
       this->process_node_nolake_for_sure(tnode, is_processed, active_nodes, 
         cellarea,topography, true, true);
     }
@@ -583,15 +609,39 @@ void ModelRunner::reprocess_nodes_from_lake_outlet(int current_lake, int outlet,
 
   // I have reprocessed my stuff, lets calculate the delta by lakes to add entry points to the queue
 
-  for(auto tnode : node_to_deltaise_to_lake)
+  // Now deprocessing the receivers in potential lake while saving their contribution to lakes in order to calculate the delta
+  for(auto tnode : local_mstack)
   {
-    // Current lake
-    int tlakid = motherlake(this->node_in_lake[tnode]);
-    // mixing the proportions
-    label_prop_of_delta[tlakid] = mix_two_proportions(delta_sed[tlakid],label_prop_of_pre[tlakid],this->chonk_network[tnode].get_sediment_flux(),this->chonk_network[tnode].get_other_attribute_array("label_tracker"));
-    // Adding all the shits
-    delta_sed[tlakid] += this->chonk_network[tnode].get_sediment_flux();
-    delta_water[tlakid] += this->chonk_network[tnode].get_water_flux();
+
+    if (is_in_queue[tnode] == 'd')
+      continue;
+
+    
+    std::vector<int> these_lakid; std::vector<double> twat; std::vector<double> tsed; std::vector<std::vector<double> > tlab; std::vector<int> bulug;
+    this->check_what_gives_to_lake(tnode, these_lakid, twat, tsed, tlab, bulug, current_lake);
+
+    for(int i = 0; i < int(these_lakid.size()); i++)
+    {
+      int tlakid = these_lakid[i];
+      label_prop_of_delta[tlakid] = mix_two_proportions(delta_sed[tlakid],label_prop_of_delta[tlakid],tsed[i],tlab[i]);
+      delta_sed[tlakid] += tsed[i];
+      delta_water[tlakid] += twat[i];
+    }
+
+  }
+
+  if(true)
+  {
+    std::vector<int> these_lakid; std::vector<double> twat; std::vector<double> tsed; std::vector<std::vector<double> > tlab; std::vector<int> bulug;
+    this->check_what_gives_to_lake(this->lakes[current_lake].outlet, these_lakid, twat, tsed, tlab, bulug, current_lake);
+
+    for(int i = 0; i < int(these_lakid.size()); i++)
+    {
+      int tlakid = these_lakid[i];
+      label_prop_of_pre[tlakid] = mix_two_proportions(delta_sed[tlakid],label_prop_of_delta[tlakid],tsed[i],tlab[i]);
+      delta_sed[tlakid] += tsed[i];
+      delta_water[tlakid] += twat[i];
+    }
   }
 
   for(size_t i=0; i < this->lakes.size(); i++ )
@@ -619,6 +669,63 @@ void ModelRunner::reprocess_nodes_from_lake_outlet(int current_lake, int outlet,
     debugint[i] = val;
   }
   // Doen
+}
+
+void ModelRunner::check_what_gives_to_lake(int entry_node, std::vector<int>& these_lakid , std::vector<double>& twat, std::vector<double>& tsed,
+ std::vector<std::vector<double> >& tlab, std::vector<int>& these_ET, int lake_to_ignore)
+{
+  these_lakid = std::vector<int>();
+  twat = std::vector<double>();
+  tsed = std::vector<double>();
+  tlab = std::vector<std::vector<double> >();
+  these_ET = std::vector<int>();
+  // int idx_rec = -1;
+  auto WWC = this->chonk_network[entry_node].get_chonk_water_weight_copy();
+  auto WWS = this->chonk_network[entry_node].get_chonk_sediment_weight_copy();
+  std::vector<int> recs = this->chonk_network[entry_node].get_chonk_receivers_copy();
+
+  for(int idx_rec = 0; idx_rec < int(recs.size()); idx_rec++)
+  {
+
+    int rec = recs[idx_rec];
+    int tapo = this->node_in_lake[rec];
+    if(tapo < 0)
+      continue;
+    int this_lakid = this->motherlake(tapo);
+    if(this_lakid == lake_to_ignore)
+      continue;
+
+    if(this_lakid < 0)
+      continue;
+
+    const bool is_not_here = std::find(these_lakid.begin(), these_lakid.end(), this_lakid) == these_lakid.end();
+
+    int index;
+    
+    if(is_not_here)
+    {
+    
+      index = int(these_lakid.size());
+      these_lakid.push_back(this_lakid);
+      twat.push_back(this->chonk_network[entry_node].get_water_flux() * WWC[idx_rec]);
+      tsed.push_back(this->chonk_network[entry_node].get_sediment_flux() * WWS[idx_rec]);
+      tlab.push_back(this->chonk_network[entry_node].get_other_attribute_array("label_tracker"));
+      these_ET.push_back(recs[idx_rec]);
+
+    }
+    else
+    {
+      auto it = std::find(these_lakid.begin(), these_lakid.end(), this_lakid);
+      index = std::distance(these_lakid.begin(), it);
+
+      tlab[index] = mix_two_proportions(tsed[index], tlab[index], this->chonk_network[entry_node].get_sediment_flux() * WWS[idx_rec],this->chonk_network[entry_node].get_other_attribute_array("label_tracker"));
+      twat[index] += this->chonk_network[entry_node].get_water_flux() * WWC[idx_rec];
+      tsed[index] += this->chonk_network[entry_node].get_sediment_flux() * WWS[idx_rec];
+      these_ET[index] = recs[idx_rec];
+    }
+  }
+
+
 }
 
 int ModelRunner::fill_mah_lake(EntryPoint& entry_point, std::queue<EntryPoint>& iteralake)
@@ -725,9 +832,10 @@ int ModelRunner::fill_mah_lake(EntryPoint& entry_point, std::queue<EntryPoint>& 
     // going to the next part of the loop or stopping
   }
 
-  // std::cout << "DEUBUG::NODES IN LAKE  (watelev = " << this->lakes[current_lake].water_elevation << ")::";
-  // for (auto tnode:this->lakes[current_lake].nodes)
-  //   std::cout << tnode << std::endl;
+  std::cout << "DEUBUG::NODES IN LAKE  (watelev = " << this->lakes[current_lake].water_elevation << ")::";
+  for (auto tnode:this->lakes[current_lake].nodes)
+    std::cout << tnode << "|";
+  std::cout << std::endl;
 
 
   std::cout << "STORED " << this->lakes[current_lake].volume_water/this->timestep << " IN THE LAKE (rate)" << std::endl;

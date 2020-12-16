@@ -483,6 +483,10 @@ class ModelRunner
     int motherlake(int this_lake_id);
     void reprocess_nodes_from_lake_outlet(int current_lake, int outlet, std::vector<bool>& is_processed, std::queue<EntryPoint>& iteralake, EntryPoint& entry_point);
     void drape_deposition_flux_to_chonks();
+    void check_what_gives_to_lake(int entry_node, std::vector<int>& these_lakid , std::vector<double>& twat, std::vector<double>& tsed, 
+        std::vector<std::vector<double> >& tlab,  std::vector<int>& these_ET, int lake_to_ignore);
+
+
 
     std::vector<int> lake_in_order;
     std::vector<int> lake_status;
