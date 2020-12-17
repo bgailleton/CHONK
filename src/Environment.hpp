@@ -578,6 +578,11 @@ class ModelRunner
 
     std::vector<LakeLite> lakes;
 
+    std::unordered_map<int, std::vector<int> > original_outlet_giver;
+    std::unordered_map<int, std::vector<double> > original_outlet_giver_water;
+    std::unordered_map<int, std::vector<double> > original_outlet_giver_sed;
+    std::unordered_map<int, std::vector<double> > original_outlet_giver_sedlab;
+
 
   private:
     // mirror of the constructors
