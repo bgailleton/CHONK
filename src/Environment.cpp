@@ -218,7 +218,6 @@ void ModelRunner::run()
   if(this->lake_solver)
   {
     std::cout << "Iterative lake pass..." << std::endl;
-    std::cout << "DEBUG::PREWATF::440 = " << this->chonk_network[440].get_water_flux() << std::endl;
     this->iterative_lake_solver();
     std::cout << "Iterative lake pass... done" << std::endl;
   }
@@ -285,9 +284,6 @@ void ModelRunner::iterative_lake_solver()
   while(iteralake.empty() == false)
   {
 
-    std::cout << "DEBUG::PREWATF::440 = " << this->chonk_network[440].get_water_flux() << std::endl;
-
-
     // this is a FIFO queue, First in, first out
     EntryPoint entry_point = iteralake.front();
     // removing the thingy
@@ -314,7 +310,7 @@ void ModelRunner::iterative_lake_solver()
     // If there is an outlet detected in the current lake solver
     if(this->lakes[current_lake].outlet >= 0)
     {
-      std::cout << "Lake " << current_lake << " -> " << this->lakes[current_lake].outlet;
+      // std::cout << "Lake " << current_lake << " -> " << this->lakes[current_lake].outlet;
       this->reprocess_nodes_from_lake_outlet(current_lake, this->lakes[current_lake].outlet, is_processed, iteralake, entry_point);
     }
   }
@@ -449,31 +445,6 @@ void ModelRunner::reprocess_nodes_from_lake_outlet(int current_lake, int outlet,
 
   // Final size OK
 
-  std::vector<int> neightbors; std::vector<double> dist ; graph.get_D8_neighbors(this->lakes[current_lake].outlet, active_nodes, neightbors, dist);
-
-  // GETTING THE STEEPES SLOPE ID OF THE OUTLET
-  double maxslope = 0;
-  int ID = -9999;
-  int __ = -1;
-  for(auto neigh:neightbors)
-  {
-    __++;
-    
-    if(this->node_in_lake[neigh] > -1)
-    if(motherlake(this->node_in_lake[neigh]) == current_lake)
-      continue;
-
-    double tslope = (topography[this->lakes[current_lake].outlet] - topography[neigh])/dist[__];
-    if(tslope>maxslope)
-    {
-      ID = neigh;
-      maxslope = tslope;
-    }
-  }
-
-  // IF THIS STEEPEST DESCENT from  OUTLET is a lake, I am keeping it in memory
-  if(this->node_in_lake[ID] >= 0)
-    node_to_deltaise_to_lake.push_back(ID);
 
   //----------------------------------------------------
   //--------- STARTING THE OUTLET PROCESSING -----------
@@ -522,7 +493,7 @@ void ModelRunner::reprocess_nodes_from_lake_outlet(int current_lake, int outlet,
     {
       id++;
       original_outlet_giver[this->lakes[current_lake].outlet].push_back(ttnode);
-      std::cout <<  this->lakes[current_lake].outlet << " Ogives " << WWC[id] * tchonk.get_water_flux() << " to " << ttnode <<std::endl;
+      // std::cout <<  this->lakes[current_lake].outlet << " Ogives " << WWC[id] * tchonk.get_water_flux() << " to " << ttnode <<std::endl;
       original_outlet_giver_water[this->lakes[current_lake].outlet].push_back(WWC[id] * tchonk.get_water_flux());
       original_outlet_giver_sed[this->lakes[current_lake].outlet].push_back(WWS[id] * tchonk.get_sediment_flux());
     }
@@ -530,7 +501,70 @@ void ModelRunner::reprocess_nodes_from_lake_outlet(int current_lake, int outlet,
     
   }
 
-  std::cout << "::SSID is " << ID << " [" <<this->chonk_network[ID].get_water_flux() << "] ";
+  // reprocessing receivers
+  std::vector<int> ID_recs;
+  std::vector<double> slope_recs;
+  std::vector<double> weight_water_recs, weight_sed_recs;
+  double sumW = 0;
+  double sumS = 0;
+  for(size_t i = 0; i < original_outlet_giver[this->lakes[current_lake].outlet].size(); i++)
+  {
+    int this_rec = original_outlet_giver[this->lakes[current_lake].outlet][i];
+    int this_lake_id = this->node_in_lake[this_rec];
+    if(this_lake_id >= 0)
+    {
+      this_lake_id = motherlake(this_lake_id);
+      if(this_lake_id == current_lake)
+        continue;
+    }
+    ID_recs.push_back(this_rec);
+    double dz = topography[this->lakes[current_lake].outlet] - topography[this_rec];
+    slope_recs.push_back(dz / this->io_double["dx"]);
+    weight_water_recs.push_back(original_outlet_giver_water[this->lakes[current_lake].outlet][i]);
+    weight_sed_recs.push_back(original_outlet_giver_sed[this->lakes[current_lake].outlet][i]);
+    sumW += original_outlet_giver_water[this->lakes[current_lake].outlet][i];
+    sumS += original_outlet_giver_sed[this->lakes[current_lake].outlet][i];
+  }
+  for(auto& Ugh:weight_water_recs)
+    Ugh = Ugh/sumW;
+  for(auto& Ugh:weight_sed_recs)
+    Ugh = Ugh/sumS;
+
+
+
+  // std::vector<int> neightbors; std::vector<double> dist ; graph.get_D8_neighbors(this->lakes[current_lake].outlet, active_nodes, neightbors, dist);
+
+
+
+  // // getting the new receivers of the id
+  // double maxslope = 0;
+  // std::vector<int> ID;
+  // int __ = -1;
+  // for(auto neigh:neightbors)
+  // {
+  //   __++;
+    
+  //   if(this->node_in_lake[neigh] > -1)
+  //   if(motherlake(this->node_in_lake[neigh]) == current_lake)
+  //     continue;
+
+  //   double tslope = (topography[this->lakes[current_lake].outlet] - topography[neigh])/dist[__];
+  //   if(tslope>maxslope)
+  //   {
+  //     ID = neigh;
+  //     maxslope = tslope;
+  //   }
+  // }
+
+  // IF THIS STEEPEST DESCENT from  OUTLET is a lake, I am keeping it in memory
+  for(auto ID:ID_recs)
+  {
+    if(this->node_in_lake[ID] >= 0)
+      node_to_deltaise_to_lake.push_back(ID);
+  }
+
+
+  // std::cout << "::SSID is " << ID << " [" <<this->chonk_network[ID].get_water_flux() << "] ";
 
   // Now deprocessing the receivers in potential lake while saving their contribution to lakes in order to calculate the delta
   for(auto tnode : local_mstack)
@@ -606,7 +640,7 @@ void ModelRunner::reprocess_nodes_from_lake_outlet(int current_lake, int outlet,
       if(this->motherlake(this_lake_id) == current_lake)
         continue;
     
-    std::cout <<  this->lakes[current_lake].outlet << " PPgives " << original_outlet_giver_water[outlet][i] << " to " << this_node <<std::endl;
+    // std::cout <<  this->lakes[current_lake].outlet << " PPgives " << original_outlet_giver_water[outlet][i] << " to " << this_node <<std::endl;
     sumwat += original_outlet_giver_water[outlet][i];
     sumsed += original_outlet_giver_sed[outlet][i];
 
@@ -618,7 +652,7 @@ void ModelRunner::reprocess_nodes_from_lake_outlet(int current_lake, int outlet,
   water_rate += sumwat;
   sed_rate += sumsed;
 
-  std::cout << " --------->  outlet giving [" << water_rate << "] to SSID and [" << sumwat << "] was from original outlet giving." << std::endl;;
+  // std::cout << " --------->  outlet giving [" << water_rate << "] to SSID and [" << sumwat << "] was from original outlet giving." << std::endl;;
 
 
   tchonk.set_water_flux(water_rate);
@@ -629,8 +663,9 @@ void ModelRunner::reprocess_nodes_from_lake_outlet(int current_lake, int outlet,
   double cellarea = this->io_double["dx"] * this->io_double["dy"];
 
 
-  std::cout << "Reproc::" << ID << "|";
-  tchonk.external_moving_prep({ID},{1.},{1.},{maxslope});
+  
+  tchonk.external_moving_prep(ID_recs,weight_water_recs,weight_sed_recs,slope_recs);
+
   this->process_node_nolake_for_sure(this->lakes[current_lake].outlet, is_processed, active_nodes, 
       cellarea,topography, false, false);
 
@@ -638,7 +673,7 @@ void ModelRunner::reprocess_nodes_from_lake_outlet(int current_lake, int outlet,
   // I am now ready to reprocess all the node from upstream to downstream, and then rechek the delat for me lake_status
   for(auto tnode:local_mstack)
   {
-    std::cout << tnode << "-" << is_in_queue[tnode] << "|";
+    // std::cout << tnode << "-" << is_in_queue[tnode] << "|";
     if(is_in_queue[tnode] == 'd')
     {
       // this->chonk_network[tnode].reinitialise_moving_prep();
@@ -722,7 +757,7 @@ void ModelRunner::reprocess_nodes_from_lake_outlet(int current_lake, int outlet,
     if(dwat == 0 && dsed == 0)
       continue;
 
-    std::cout << "DWAT = " << dwat  << " TO " << pre_entry_node[i] << " | post: " << delta_water[i] << " | pre:" << pre_water[i] << " IS IN " << this->node_in_lake[pre_entry_node[i]] << std::endl;
+    // std::cout << "DWAT = " << dwat  << " TO " << pre_entry_node[i] << " | post: " << delta_water[i] << " | pre:" << pre_water[i] << " IS IN " << this->node_in_lake[pre_entry_node[i]] << std::endl;
     iteralake.emplace(EntryPoint(dwat * this->timestep, dsed, pre_entry_node[i], label_prop_of_delta[i]));
     
     if(pre_entry_node[i] == -9999)
@@ -743,7 +778,7 @@ void ModelRunner::reprocess_nodes_from_lake_outlet(int current_lake, int outlet,
     debugint[i] = val;
   }
 
-  std::cout << "DONE WITH reprocess_nodes_from_lake_outlet " << outlet << std::endl;
+  // std::cout << "DONE WITH reprocess_nodes_from_lake_outlet " << outlet << std::endl;
   // Doen
 }
 
@@ -812,7 +847,7 @@ int ModelRunner::fill_mah_lake(EntryPoint& entry_point, std::queue<EntryPoint>& 
   depressionfiller.emplace(nodium(entry_point.node, topography[entry_point.node]));
 
   //DEBUG STATEMENT
-  std::cout << "Filling lake at node " << entry_point.node << " with rate of  " << entry_point.volume_water/this->timestep << std::endl;
+  // std::cout << "Filling lake at node " << entry_point.node << " with rate of  " << entry_point.volume_water/this->timestep << std::endl;
   double save_entry_water = entry_point.volume_water;
 
   int current_lake = this->lake_incrementor;
@@ -907,13 +942,13 @@ int ModelRunner::fill_mah_lake(EntryPoint& entry_point, std::queue<EntryPoint>& 
     // going to the next part of the loop or stopping
   }
 
-  std::cout << "DEUBUG::NODES IN LAKE  (watelev = " << this->lakes[current_lake].water_elevation << ")::";
-  for (auto tnode:this->lakes[current_lake].nodes)
-    std::cout << tnode << "|";
-  std::cout << std::endl;
+  // std::cout << "DEUBUG::NODES IN LAKE  (watelev = " << this->lakes[current_lake].water_elevation << ")::";
+  // for (auto tnode:this->lakes[current_lake].nodes)
+  //   std::cout << tnode << "|";
+  // std::cout << std::endl;
 
 
-  std::cout << "STORED " << this->lakes[current_lake].volume_water/this->timestep << " IN THE LAKE (rate)" << std::endl;
+  // std::cout << "STORED " << this->lakes[current_lake].volume_water/this->timestep << " IN THE LAKE (rate)" << std::endl;
 
   // if there is an outlet 
   if(outlet >= 0)
@@ -932,7 +967,7 @@ int ModelRunner::fill_mah_lake(EntryPoint& entry_point, std::queue<EntryPoint>& 
 
       if( tested != against)
       {
-        std::cout << tested << " SHOULD BE DIFFERENT THAN " << against << " IF THIS MESSAGE IS DISPLAYED" << std::endl;
+        // std::cout << tested << " SHOULD BE DIFFERENT THAN " << against << " IF THIS MESSAGE IS DISPLAYED" << std::endl;
         this->drink_lake(this->lakes[current_lake].id, this->motherlake(this->node_in_lake[tnode]));
       }
     }
@@ -973,7 +1008,7 @@ void ModelRunner::drink_lake(int id_eater, int id_edible)
 
   if (this->lakes[id_eater].outlet == this->lakes[id_edible].outlet)
   {
-    std::cout << "LAKE TRANSMIT ITS SUMOUTRATE :: " << this->lakes[id_edible].sum_outrate << std::endl;
+    // std::cout << "LAKE TRANSMIT ITS SUMOUTRATE :: " << this->lakes[id_edible].sum_outrate << std::endl;
     this->lakes[id_eater].sum_outrate += this->lakes[id_edible].sum_outrate;
   }
   // Merging sediment volumes
