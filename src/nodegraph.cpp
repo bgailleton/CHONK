@@ -79,8 +79,17 @@ NodeGraphV2::NodeGraphV2(
   this->neightbourer.push_back({-ncols - 1, - ncols, - ncols + 1, -1,1,ncols - 1, ncols, ncols + 1 }); // internal node 0
   this->neightbourer.push_back({(nrows - 1) * ncols - 1, (nrows - 1) * ncols, (nrows - 1) * ncols + 1, -1,1,ncols - 1, ncols, ncols + 1 });// periodic_first_row 1
   this->neightbourer.push_back({-ncols - 1, - ncols, - ncols + 1, -1,1,- (nrows - 1) * ncols - 1, - (nrows - 1) * ncols, - (nrows - 1) * ncols + 1 });// periodic_last_row 2
-  this->neightbourer.push_back({- 1, - ncols, - ncols + 1, (ncols - 1),1, 2 * ncols - 1, ncols, ncols + 1 });// periodic_first_col 3
-  this->neightbourer.push_back({-ncols - 1, - ncols, - 2 * ncols + 1, -1,-ncols + 1, ncols - 1, ncols, 1 }); //periodic last_col 4
+  this->neightbourer.push_back({- 1, - ncols, - ncols + 1, (ncols - 1),1, 2 * ncols - 1, ncols, ncols + 1 }); // periodic_first_col 3
+  this->neightbourer.push_back({-ncols - 1, - ncols, - 2 * ncols + 1, -1,-ncols + 1, ncols - 1, ncols, 1 }); //p eriodic last_col 4
+  this->neightbourer.push_back({ -1,1,ncols - 1, ncols, ncols + 1 }); // normal_first_row 5
+  this->neightbourer.push_back({-ncols - 1, - ncols, - ncols + 1, -1,1}); // normal_last_row 6
+  this->neightbourer.push_back({ - ncols, - ncols + 1, 1,  ncols, ncols + 1 }); // normal_first_col 7
+  this->neightbourer.push_back({-ncols - 1, - ncols, -1,, ncols - 1, ncols }); // normal_last_col 8
+  this->neightbourer.push_back({1, ncols, ncols + 1 }); // normal_top_left 9
+  this->neightbourer.push_back({ -1,ncols - 1, ncols}); // normal_top_right 10
+  this->neightbourer.push_back({ - ncols, - ncols + 1, 1}); // normal_bottom_left 11
+  this->neightbourer.push_back({-ncols - 1, - ncols, -1}); // normal_bottom_right 12
+
 
   this->is_border = std::vector<char>(this->un_element,'y');
   for(size_t i=0; i <this->un_element; i++)
@@ -981,17 +990,32 @@ void NodeGraphV2::get_D8_neighbors(int i, xt::pytensor<bool,1>& active_nodes, st
   // if(active_nodes[i] == false)
   //   return;
 
+  bool isa = active_nodes[i];
+
   int checker;
   if(i<ncols)
-    checker = 1;
+  {
+    if(isa)
+      checker = 1;
+    else
+      checker = 5;
+  }
   else if (i >= this->n_element - ncols)
+  {
     checker = 2;
+  }
   else if(i % ncols == 0 || i == 0)
+  {
     checker = 3;
+  }
   else if((i + 1) % (ncols) == 0 )
+  {
     checker = 4;
+  }
   else
+  {
     checker = 0;
+  }
 
   int idL = -1;
   for(auto& adder:this->neightbourer[checker])

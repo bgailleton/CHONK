@@ -314,14 +314,11 @@ void ModelRunner::iterative_lake_solver()
 
 void ModelRunner::reprocess_nodes_from_lake_outlet(int current_lake, int outlet, std::vector<bool>& is_processed, std::queue<EntryPoint>& iteralake, EntryPoint& entry_point)
 {
+  // i will need these aliases from the global maps
   xt::pytensor<double,1>& topography = this->io_double_array["topography"];
   xt::pytensor<int,1>& active_nodes = this->io_int_array["active_nodes"];
 
-  // gave_to_lake_water = std::vector<double>(this->io_int["n_elements"],0.);
-  // gave_to_lake_sed = std::vector<double>(this->io_int["n_elements"],0.);
-
-
-  // initialising a priority queue sorting the nodes to reprocess by their id in the Mstack. the smallest Ids should come first
+  // Initialising a priority queue sorting the nodes to reprocess by their id in the Mstack. the smallest Ids should come first
   // Because I am only processing nodes in between 2 discrete lakes, it should not be a problem
   std::priority_queue< node_to_reproc, std::vector<node_to_reproc>, std::greater<node_to_reproc> > ORDEEEEEER;
   
@@ -332,35 +329,43 @@ void ModelRunner::reprocess_nodes_from_lake_outlet(int current_lake, int outlet,
   std::vector<char> is_in_queue(this->io_int["n_elements"],'n');
 
   //keeping track of the delta sed/all contributing to potential lakes to add
+  // These containers are important when reprocesseing nodes leads to a downstream depression
   std::vector<double> pre_sed(this->lakes.size(),0), pre_water(this->lakes.size(),0);
   std::vector<int> pre_entry_node(this->lakes.size(),-9999);
   std::vector<std::vector<double> > label_prop_of_pre(this->lakes.size(), std::vector<double>(this->n_labels,0.) );
   std::vector<double> delta_sed(this->lakes.size(),0), delta_water(this->lakes.size(),0);
   std::vector<std::vector<double> > label_prop_of_delta(this->lakes.size(), std::vector<double>(this->n_labels,0.) );
 
-  // avoinding nodes in the lakes
+  // Before starting to gather the nodes downstream of me outlet, let's gather mark the node in me lake as not available (as if already in the queue)
+  // Avoinding nodes in the lakes
   for(auto tnode:this->lakes[current_lake].nodes)
   {
     is_in_queue[tnode] = 'y';
   }
 
 
-    // I will also reprocess a bunch of donors, but I cannot be sure they will be to reprocess before the end
+  // I will also reprocess a bunch of donors, but I cannot be sure they will be to reprocess before the end
+  // Deprecated???
   std::vector<int> node_to_deltaise_to_lake;
 
   // Initiating the transec with the outlet, but not putting it the 
   transec.emplace(outlet);
   is_in_queue[outlet] = 'y';
+
+  // hmmmm deprecated?
   if(this->node_in_lake[outlet] >= 0)
     node_to_deltaise_to_lake.push_back(outlet);
 
 
+  // this is the loop gathering downstream nodes
   while(transec.empty() == false)
   {
+    // Getting the next node in the FIFO structure (first = outlet)
     int next_node = transec.front();
+    // Getting rid of it
     transec.pop();
 
-    // if this is not the outlet and if it is an active node, I add it in the PQ to reproc
+    // if this is not the outlet, I add it in the PQ to reproc
     if(next_node != outlet )
     {
       ORDEEEEEER.emplace(node_to_reproc(next_node,this->graph.get_index_MF_stack_at_i(next_node)));
@@ -504,11 +509,15 @@ void ModelRunner::reprocess_nodes_from_lake_outlet(int current_lake, int outlet,
   // Reprocessing the outlet here!
   chonk& tchonk = this->chonk_network[this->lakes[current_lake].outlet];
   // Saving the part of the fluxes going in the not-lake direction first
+
+
+  //THING TO CHECK
+ 
   std::vector<double> geve_W_to_ID_SS_out = std::vector<double>(this->lakes.size(),0);
   std::vector<double> geve_S_to_ID_SS_out = std::vector<double>(this->lakes.size(),0);
 
 
-  if(this->has_been_outlet[this->lakes[current_lake].outlet] == 'n')
+  if(true)
   {
     std::vector<int> ignore_some;
     int id = -1;
@@ -539,9 +548,11 @@ void ModelRunner::reprocess_nodes_from_lake_outlet(int current_lake, int outlet,
       geve_S_to_ID_SS_out[galid] += WWS[id] * tchonk.get_sediment_flux(); 
     }
 
-    tchonk.split_and_merge_in_receiving_chonks_ignore_some(this->chonk_network, this->graph, this->timestep, ignore_some);
-    has_been_outlet[this->lakes[current_lake].outlet] = 'y';
-
+    if(this->has_been_outlet[this->lakes[current_lake].outlet] == 'n')
+    {
+      tchonk.split_and_merge_in_receiving_chonks_ignore_some(this->chonk_network, this->graph, this->timestep, ignore_some);
+      has_been_outlet[this->lakes[current_lake].outlet] = 'y';
+    }
   }
   std::cout << " --------->  Prewater_fluxes::[" <<tchonk.get_water_flux() << "] ";
 
