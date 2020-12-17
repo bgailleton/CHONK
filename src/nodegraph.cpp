@@ -84,7 +84,7 @@ NodeGraphV2::NodeGraphV2(
   this->neightbourer.push_back({ -1,1,ncols - 1, ncols, ncols + 1 }); // normal_first_row 5
   this->neightbourer.push_back({-ncols - 1, - ncols, - ncols + 1, -1,1}); // normal_last_row 6
   this->neightbourer.push_back({ - ncols, - ncols + 1, 1,  ncols, ncols + 1 }); // normal_first_col 7
-  this->neightbourer.push_back({-ncols - 1, - ncols, -1,, ncols - 1, ncols }); // normal_last_col 8
+  this->neightbourer.push_back({-ncols - 1, - ncols, -1, ncols - 1, ncols }); // normal_last_col 8
   this->neightbourer.push_back({1, ncols, ncols + 1 }); // normal_top_left 9
   this->neightbourer.push_back({ -1,ncols - 1, ncols}); // normal_top_right 10
   this->neightbourer.push_back({ - ncols, - ncols + 1, 1}); // normal_bottom_left 11
@@ -987,30 +987,72 @@ void NodeGraphV2::get_D8_neighbors(int i, xt::pytensor<bool,1>& active_nodes, st
   neightbouring_nodes = std::vector<int>();
   length2neigh = std::vector<double>();
 
-  // if(active_nodes[i] == false)
-  //   return;
 
+  // is my node active or not
+  // An active node at a boundary means periodic
   bool isa = active_nodes[i];
 
+  // To find the neighbours, code utilises premade looper with the value to add to the indice to get the valid neighbours
+  // Neighbourer indices
+  // internal node 0
+  // periodic_first_row 1
+  // periodic_last_row 2
+  // periodic_first_col 3
+  // periodic last_col 4
+  // normal_first_row 5
+  // normal_last_row 6
+  // normal_first_col 7
+  // normal_last_col 8
+  // normal_top_left 9
+  // normal_top_right 10
+  // normal_bottom_left 11
+  // normal_bottom_right 12
+
+  // NOTE THAT ELEMENT ARE VECTORISED
+
   int checker;
+
+  // first row
   if(i<ncols)
   {
     if(isa)
       checker = 1;
     else
-      checker = 5;
+    {
+      if(i > 0 && i < ncols - 1 )
+        checker = 5;
+      else if (i == 0)
+        checker = 9;
+      else
+        checker = 10;
+    }
   }
+  // last row
   else if (i >= this->n_element - ncols)
   {
-    checker = 2;
+    if(isa)
+      checker = 2;
+    else if(i > this->n_element - ncols && i < this->n_element - 1)
+      checker = 6;
+    else if (i == this->n_element - ncols)
+      checker = 11;
+    else
+      checker = 12;
   }
-  else if(i % ncols == 0 || i == 0)
+  // first col corners excluded
+  else if(i % ncols == 0)
   {
-    checker = 3;
+    if(isa)
+      checker = 3;
+    else
+      checker = 7;
   }
   else if((i + 1) % (ncols) == 0 )
   {
-    checker = 4;
+    if(isa)
+      checker = 4;
+    else
+      checker = 8;
   }
   else
   {
