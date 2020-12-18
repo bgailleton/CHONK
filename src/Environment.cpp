@@ -482,25 +482,6 @@ void ModelRunner::reprocess_nodes_from_lake_outlet(int current_lake, int outlet,
     auto WWC =  tchonk.get_chonk_water_weight_copy();
     auto WWS =  tchonk.get_chonk_sediment_weight_copy();
 
-    // DEPRECATED???
-    // std::vector<int> ignore_some;
-    // for(auto ttnode: tchonk.get_chonk_receivers_copy())
-    // {
-    //   id++;
-    //   int galid = this->node_in_lake[ttnode];
-
-    //   if(galid < 0)
-    //     continue;
-
-    //   galid = motherlake(this->node_in_lake[ttnode]);
-
-    //   if(galid == current_lake)
-    //   {
-    //     ignore_some.push_back(ttnode);
-    //     continue;
-    //   }
-    // }
-    // // tchonk.split_and_merge_in_receiving_chonks_ignore_some(this->chonk_network, this->graph, this->timestep, ignore_some);
 
     // Marking this node as being an outlet at least once
     has_been_outlet[this->lakes[current_lake].outlet] = 'y';
