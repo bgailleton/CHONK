@@ -25,6 +25,17 @@
 
 #include "nodegraph.hpp"
 
+#pragma once
+template<typename T>
+void print_vector(std::string mahstring , std::vector<T>& mahvec)
+{
+    std::cout << mahstring << std::endl;
+    for(auto t:mahvec)
+        std::cout << t << "||";
+    std::cout << std::endl;
+}
+bool double_equals(double a, double b, double epsilon = 0.0001);
+
 
 
 class chonk
@@ -137,6 +148,30 @@ class chonk
     // Tracking and labelling functions
     void initialise_local_label_tracker_in_sediment_flux(int n_labels){other_attributes_arrays["label_tracker"] = std::vector<double>(n_labels,0.);}
 
+    void print_status()
+    {
+        std::cout << "CHONK_ID::" << chonkID << std::endl;
+        std::cout << "water_flux::" << water_flux << std::endl;
+        std::cout << "erosion_flux_undifferentiated::" << erosion_flux_undifferentiated << std::endl;
+        std::cout << "erosion_flux_only_sediments::" << erosion_flux_only_sediments << std::endl;
+        std::cout << "erosion_flux_only_bedrock::" << erosion_flux_only_bedrock << std::endl;
+        std::cout << "n_rec::" << receivers.size() << std::endl;
+        print_vector("weigth_water_fluxes",weigth_water_fluxes);
+        print_vector("weigth_sediment_fluxes",weigth_sediment_fluxes);
+        print_vector("slope_to_rec",slope_to_rec);
+    }
+    void check_sums()
+    {
+        double tsum = 0;
+        for (auto tig:weigth_water_fluxes)
+            tsum += tig;
+        if(double_equals(tsum,0,1e-3) == false && double_equals(tsum,1,1e-3) == false)
+        {
+            print_status();
+            throw std::runtime_error("WaterSumProblem");
+        }
+    }
+
   protected:
     // Administration attributes
     // The ID of the chonk
@@ -186,7 +221,6 @@ class chonk
 };
 
 std::vector<double> mix_two_proportions(double prop1, std::vector<double> labprop1, double prop2, std::vector<double> labprop2);
-bool double_equals(double a, double b, double epsilon = 0.0001);
 
 
 #endif

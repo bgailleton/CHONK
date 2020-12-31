@@ -287,12 +287,14 @@ class EntryPoint
 
 public:
     EntryPoint(){this->volume_water = 0;this->volume_sed = 0;this->node = 0;}
+    EntryPoint(int node){this->volume_water = 0;this->volume_sed = 0;this->node = node;}
     EntryPoint(double volume_water, double volume_sed, int node, std::vector<double> label_prop)
         {this->volume_water = volume_water;this->volume_sed = volume_sed;this->node = node;this->label_prop = label_prop;}
     double volume_water;
     double volume_sed;
     int node;
     std::vector<double> label_prop;
+    void ingestNkill(EntryPoint& other);
 };
 
 
@@ -478,10 +480,10 @@ class ModelRunner
     void original_gathering_of_water_and_sed_from_pixel_or_flat_area(int starting_node, double& water_volume, double& sediment_volume,
      std::vector<double>& label_prop, std::vector<int>& these_nodes);
     void iterative_lake_solver();
-    int fill_mah_lake(EntryPoint& entry_point, std::queue<EntryPoint>& iteralake);
-    void drink_lake(int id_eater, int id_edible);
+    int fill_mah_lake(EntryPoint& entry_point, std::queue<int>& iteralake);
+    void drink_lake(int id_eater, int id_edible,EntryPoint& entry_point, std::queue<int>& iteralake);
     int motherlake(int this_lake_id);
-    void reprocess_nodes_from_lake_outlet(int current_lake, int outlet, std::vector<bool>& is_processed, std::queue<EntryPoint>& iteralake, EntryPoint& entry_point);
+    void reprocess_nodes_from_lake_outlet(int current_lake, int outlet, std::vector<bool>& is_processed, std::queue<int>& iteralake, EntryPoint& entry_point);
     void drape_deposition_flux_to_chonks();
     void check_what_gives_to_lake(int entry_node, std::vector<int>& these_lakid , std::vector<double>& twat, std::vector<double>& tsed, 
         std::vector<std::vector<double> >& tlab,  std::vector<int>& these_ET, int lake_to_ignore);

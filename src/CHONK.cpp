@@ -150,7 +150,8 @@ void chonk::split_and_merge_in_receiving_chonks(std::vector<chonk>& chonkscape, 
     for (auto rec : this->receivers)
       std::cout << rec << "!";
     std::cout << std::endl;
-    if(this->receivers.size()>0)
+    this->print_status();
+    if(this->receivers.size() > 0)
       throw std::runtime_error("WaterFluxError::Some water is lost in the splitting process");
     // std::cout << "GULUUUUUUUUUB::::::::::" << this->water_flux - sum_outwat << std::endl;
   }
@@ -867,7 +868,7 @@ void chonk::charlie_I(double n, double m, double K_r, double K_s,
   int zone_label, std::vector<double> sed_label_prop, double dt, double Xres, double Yres)
 {
    // I am recording the current sediment fluxes in the model distributed for each receivers
-  std::vector<double> pre_sedfluxes = get_preexisting_sediment_flux_by_receivers();
+  std::vector<double> pre_sedfluxes = this->get_preexisting_sediment_flux_by_receivers();
 
 
   double Er_tot = 0;
