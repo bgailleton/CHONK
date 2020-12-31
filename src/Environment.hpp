@@ -577,11 +577,16 @@ class ModelRunner
     std::vector<bool> is_processed;
 
     std::vector<LakeLite> lakes;
+    std::vector<char> lake_is_in_queue_for_reproc;
+    std::vector<EntryPoint> queue_adder_for_lake;
 
     std::unordered_map<int, std::vector<int> > original_outlet_giver;
     std::unordered_map<int, std::vector<double> > original_outlet_giver_water;
     std::unordered_map<int, std::vector<double> > original_outlet_giver_sed;
     std::unordered_map<int, std::vector<double> > original_outlet_giver_sedlab;
+    std::unordered_map<int, chonk > original_chonk;
+
+    double DEBUG_GLOBDELT;
 
 
   private:

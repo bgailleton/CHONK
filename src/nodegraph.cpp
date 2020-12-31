@@ -1079,9 +1079,9 @@ std::vector<int> NodeGraphV2::get_all_flat_from_node(int i, xt::pytensor<double,
   {
     std::vector<int> neightbouring_nodes; std::vector<double> length2neigh;
     int next_node = baal.front();
-    output.push_back(next_node);
     baal.pop();
     this->get_D8_neighbors(next_node,  active_nodes,  neightbouring_nodes,  length2neigh);
+    bool is_there_lower = false;
     for(auto tnode:neightbouring_nodes)
     {
       if(is_in_queue[tnode] == 'y')
@@ -1091,7 +1091,13 @@ std::vector<int> NodeGraphV2::get_all_flat_from_node(int i, xt::pytensor<double,
         is_in_queue[tnode] = 'y';
         baal.emplace(tnode);
       }
+      else if (topography[i] > topography[tnode])
+        is_there_lower = true;
     }
+
+    if(is_there_lower == false)
+      output.push_back(next_node);
+
   }
   return output;
 

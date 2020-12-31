@@ -145,7 +145,7 @@ void chonk::split_and_merge_in_receiving_chonks(std::vector<chonk>& chonkscape, 
 
   if(double_equals(this->water_flux, sum_outwat, 1e-3) == false && graph.is_border[this->current_node] == 'n')
   {
-    std::cout << this->water_flux<< " to start with, but " << sum_outwat << " got out. NodeID == " << this->chonkID << std::endl;
+    std::cout << "WARNING::OOOOOOOOOOOOOOOOOOOOOOOO " << this->water_flux<< " to start with, but " << sum_outwat << " got out. NodeID == " << this->chonkID << std::endl;
     std::cout << "I had " <<  this->receivers.size() << " receivers:" << std::endl;
     for (auto rec : this->receivers)
       std::cout << rec << "!";
