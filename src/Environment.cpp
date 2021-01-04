@@ -356,7 +356,7 @@ void ModelRunner::iterative_lake_solver()
         n_volwat_neg += entry_point.volume_water ;
         // std::cout << "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB" << entry_point.volume_water << std::endl;
       }
-      continue;
+      // continue;
       // entry_point.volume_water = std::abs(entry_point.volume_water);
       // entry_point.volume_sed = std::abs(entry_point.volume_sed);
     }
@@ -728,12 +728,7 @@ void ModelRunner::reprocess_nodes_from_lake_outlet(int current_lake, int outlet,
   // # sum_outrate - > the amount of water that came out of this very same outlet before
   // # Will be 0 the first time this node outlets, and it stacks the water value each time
   double water_rate = entry_point.volume_water / this->timestep + this->lakes[current_lake].sum_outrate;
-  if(double_equals(entry_point.volume_water, 0, 1e-3))
-  {
-    if( std::abs(this->lakes[current_lake].sum_outrate) > 0)
-      std::cout << "LKSDJFLKSJDFJKSDKLFJLSKDJFLKSJDKLFJSKLDJFKLSDJFKLJSLKDJFKLSJDKLFJ -----> " << this->lakes[current_lake].sum_outrate << std::endl;
 
-  }
   // # stacking water in this value
   this->lakes[current_lake].sum_outrate += entry_point.volume_water / this->timestep;
 
@@ -777,7 +772,6 @@ void ModelRunner::reprocess_nodes_from_lake_outlet(int current_lake, int outlet,
   water_rate += sumwat;
   sed_rate += sumsed;
 
-
   std::cout << " --------->  outlet giving [" << water_rate << "] to outlet_receivers and [" << sumwat << "] was from original outlet giving." << std::endl;;
 
   // # and setting them to the outlet chonk
@@ -790,6 +784,15 @@ void ModelRunner::reprocess_nodes_from_lake_outlet(int current_lake, int outlet,
   
   // Setting manually the new receivers to the outlet chonk and all the relatedweights  
   tchonk.external_moving_prep(ID_recs,weight_water_recs,weight_sed_recs,slope_recs);
+
+  // CHECEKD THAT THE WEIGHT WERE ALWAYS 1
+  // double gabgab = 0;
+  // for (auto gab : weight_water_recs )
+  //   gabgab += gab;
+
+  // if(gabgab != 1)
+  //   std::runtime_error("GABGABERROR::" + std::to_string(gabgab) );
+
   if(ID_recs.size() == 0 && active_nodes[outlet]>0)
     throw std::runtime_error("NoRecsError::outlet has no recs...");
 
@@ -827,11 +830,11 @@ void ModelRunner::reprocess_nodes_from_lake_outlet(int current_lake, int outlet,
         // I also ignore the nodes in the current lake (they have a 'y' signature)
         else if (this->node_in_lake[ttnode] >= 0)
         {
-          if(motherlake(this->node_in_lake[ttnode]) == current_lake)
-          {
+          // if(motherlake(this->node_in_lake[ttnode]) == current_lake)
+          // {
             ignore_some.push_back(ttnode);
             continue;
-          }
+          // }
         }
       }
 
@@ -852,6 +855,7 @@ void ModelRunner::reprocess_nodes_from_lake_outlet(int current_lake, int outlet,
         this->chonk_network[tnode].print_status();
         throw std::runtime_error("NoRecsError::reproconode has no recs...");
       }
+      
     }
 
     // std::cout << tnode << "-" << is_in_queue[tnode] << "[" << this->chonk_network[tnode].get_water_flux() <<"] " << "|";
