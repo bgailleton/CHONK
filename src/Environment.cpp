@@ -344,20 +344,23 @@ void ModelRunner::iterative_lake_solver()
       current_lake = this->motherlake(current_lake);
 
     int cometal = current_lake;
-    EntryPoint entry_point = queue_adder_for_lake[cometal];
+    EntryPoint entry_point = this->queue_adder_for_lake[cometal];
+    this->queue_adder_for_lake[current_lake] = EntryPoint(entry_node);
+
     // ignoring empty lakes
-    if(entry_point.volume_water <= 0 && entry_point.volume_sed <= 0)
+    if(entry_point.volume_water <= 0)
     {
       if(entry_point.volume_water < 0)
       {
         n_neg++;
         n_volwat_neg += entry_point.volume_water ;
+        // std::cout << "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB" << entry_point.volume_water << std::endl;
       }
       continue;
+      // entry_point.volume_water = std::abs(entry_point.volume_water);
+      // entry_point.volume_sed = std::abs(entry_point.volume_sed);
     }
 
-    queue_adder_for_lake[current_lake] = EntryPoint();
-    queue_adder_for_lake[current_lake].node = entry_node;
 
     if(entry_point.volume_water > 0)
       current_lake = this->fill_mah_lake(entry_point, iteralake);
@@ -374,7 +377,13 @@ void ModelRunner::iterative_lake_solver()
 
   }
 
-  std::cout << "had " << n_neg << "negative lakes Summing " << n_volwat_neg / this->timestep << " (rate)" << std::endl;
+  std::cout << "had " << n_neg << "  snegative lakes Summing " << n_volwat_neg / this->timestep << " (rate)" << std::endl;
+
+  for(auto te : this->queue_adder_for_lake)
+  {
+    if(double_equals(te.volume_water,0,1e-3) == false)
+      throw std::runtime_error("NotAllLakesProcessedError");
+  }
 }
 
 void ModelRunner::reprocess_nodes_from_lake_outlet(int current_lake, int outlet, std::vector<bool>& is_processed, std::queue<int>& iteralake, EntryPoint& entry_point)
@@ -494,6 +503,7 @@ void ModelRunner::reprocess_nodes_from_lake_outlet(int current_lake, int outlet,
 
       ORDEEEEEER.emplace(node_to_reproc(i,this->graph.get_index_MF_stack_at_i(i)));
     }
+
   }
 
   // Formatting the iteratorer, whatever the name this thing is. not iterator. is something else. I guess. I think. why would you care anyway as I'd be surprised anyone ever reads this code.
@@ -614,7 +624,7 @@ void ModelRunner::reprocess_nodes_from_lake_outlet(int current_lake, int outlet,
     for(auto& Ugh:weight_water_recs)
     {
       // std::cout << Ugh << std::endl;
-      Ugh = Ugh/sumW;
+      Ugh = std::abs(Ugh/sumW);
     }
   }
   else if (weight_water_recs.size() > 0)
@@ -630,7 +640,7 @@ void ModelRunner::reprocess_nodes_from_lake_outlet(int current_lake, int outlet,
     for(auto& Ugh:weight_sed_recs)
     {
       // std::cout << Ugh << std::endl;
-      Ugh = Ugh/sumW;
+      Ugh = std::abs(Ugh/sumW);
     }
   }
   else if (weight_sed_recs.size() > 0)
@@ -711,6 +721,7 @@ void ModelRunner::reprocess_nodes_from_lake_outlet(int current_lake, int outlet,
 
   // Finally resetting the outlet
   tchonk.reset();
+  double corrector = this->lakes[current_lake].sum_outrate;
 
   // Giving it its new fluxes and receiver status
   // # Adding the water rate.
@@ -740,11 +751,15 @@ void ModelRunner::reprocess_nodes_from_lake_outlet(int current_lake, int outlet,
     int this_lake_id = this->node_in_lake[this_node];
     // ## If is lake, is it the current lake
     if(this_lake_id >= 0)
-      if(this->motherlake(this_lake_id) == current_lake)
-        continue;
+      continue;
+      // Use to be:
+    // if(this_lake_id >= 0)
+      // if(this->motherlake(this_lake_id) == current_lake)
+        // continue;
     
     // ## If not current lake, water to be added.
     sumwat += original_outlet_giver_water[outlet][i];
+    corrector += original_outlet_giver_water[outlet][i];
     sumsed += original_outlet_giver_sed[outlet][i];
   }
 
@@ -833,7 +848,7 @@ void ModelRunner::reprocess_nodes_from_lake_outlet(int current_lake, int outlet,
       }
     }
 
-    std::cout << tnode << "-" << is_in_queue[tnode] << "[" << this->chonk_network[tnode].get_water_flux() <<"] " << "|";
+    // std::cout << tnode << "-" << is_in_queue[tnode] << "[" << this->chonk_network[tnode].get_water_flux() <<"] " << "|";
   }
 
   //----------------------------------------------------
@@ -861,6 +876,8 @@ void ModelRunner::reprocess_nodes_from_lake_outlet(int current_lake, int outlet,
       label_prop_of_delta[tlakid] = mix_two_proportions(delta_sed[tlakid],label_prop_of_delta[tlakid],tsed[i],tlab[i]);
       delta_sed[tlakid] += tsed[i];
       delta_water[tlakid] += twat[i];
+      // if(twat[i] < 0)
+        // std::cout << "regnode NEG DELTA::" << this->lakes[current_lake].outlet << " -> " << twat[i] << std::endl;
       pre_entry_node[tlakid] = bulug[i];
     }
   }
@@ -877,6 +894,8 @@ void ModelRunner::reprocess_nodes_from_lake_outlet(int current_lake, int outlet,
       label_prop_of_pre[tlakid] = mix_two_proportions(delta_sed[tlakid],label_prop_of_delta[tlakid],tsed[i],tlab[i]);
       delta_sed[tlakid] += tsed[i];
       delta_water[tlakid] += twat[i];
+      // if(twat[i] < 0)
+      //   std::cout << "OUTLET NEG DELTA::" << this->lakes[current_lake].outlet << " -> " << twat[i] << std::endl;
       pre_entry_node[tlakid] = bulug[i];
 
     }
@@ -921,7 +940,7 @@ void ModelRunner::reprocess_nodes_from_lake_outlet(int current_lake, int outlet,
   double DELTA_DWAT = debug_saverW - sum_dwats;
   if(double_equals(DELTA_DWAT,0,1e2) == false && double_equals(DELTA_DWAT,debug_saverW,1e2) == false )
   {
-    std::cout << "DELTA_DWAT::" << DELTA_DWAT << std::endl;
+    std::cout << "OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO DELTA_DWAT::" << DELTA_DWAT << " Corrector is " << corrector << std::endl;
     DEBUG_GLOBDELT += DELTA_DWAT;
     // TO SORT:: in that case I am adding the delta water missing. This is not a good thing...
     // std::cout << "WARNING:: " << DELTA_DWAT << " water is missing... (rate) and I am adding it to the different entry points!" << std::endl;
@@ -952,6 +971,8 @@ void ModelRunner::reprocess_nodes_from_lake_outlet(int current_lake, int outlet,
       val = 0;
     if(is_in_queue[i] == 'y')
       val = 1;
+    if(has_been_outlet[i] == 'y')
+      val = 2;
 
     debugint[i] = val;
   }
@@ -1000,7 +1021,7 @@ void ModelRunner::check_what_gives_to_lake(int entry_node, std::vector<int>& the
       twat.push_back(this->chonk_network[entry_node].get_water_flux() * WWC[idx_rec]);
       tsed.push_back(this->chonk_network[entry_node].get_sediment_flux() * WWS[idx_rec]);
       tlab.push_back(this->chonk_network[entry_node].get_other_attribute_array("label_tracker"));
-      these_ET.push_back(recs[idx_rec]);
+      these_ET.push_back(rec);
 
     }
     else
