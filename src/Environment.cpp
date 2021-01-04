@@ -728,6 +728,12 @@ void ModelRunner::reprocess_nodes_from_lake_outlet(int current_lake, int outlet,
   // # sum_outrate - > the amount of water that came out of this very same outlet before
   // # Will be 0 the first time this node outlets, and it stacks the water value each time
   double water_rate = entry_point.volume_water / this->timestep + this->lakes[current_lake].sum_outrate;
+  if(double_equals(entry_point.volume_water, 0, 1e-3))
+  {
+    if( std::abs(this->lakes[current_lake].sum_outrate) > 0)
+      std::cout << "LKSDJFLKSJDFJKSDKLFJLSKDJFLKSJDKLFJSKLDJFKLSDJFKLJSLKDJFKLSJDKLFJ -----> " << this->lakes[current_lake].sum_outrate << std::endl;
+
+  }
   // # stacking water in this value
   this->lakes[current_lake].sum_outrate += entry_point.volume_water / this->timestep;
 
@@ -750,12 +756,12 @@ void ModelRunner::reprocess_nodes_from_lake_outlet(int current_lake, int outlet,
     int this_node = original_outlet_giver[outlet][i];
     int this_lake_id = this->node_in_lake[this_node];
     // ## If is lake, is it the current lake
-    if(this_lake_id >= 0)
-      continue;
-      // Use to be:
     // if(this_lake_id >= 0)
-      // if(this->motherlake(this_lake_id) == current_lake)
-        // continue;
+    //   continue;
+      // Use to be:
+    if(this_lake_id >= 0)
+      if(this->motherlake(this_lake_id) == current_lake)
+        continue;
     
     // ## If not current lake, water to be added.
     sumwat += original_outlet_giver_water[outlet][i];
