@@ -486,11 +486,11 @@ void ModelRunner::reprocess_nodes_from_lake_outlet(int current_lake, int outlet,
     {
 
       // if(has_been_outlet[i] == 'y')
-      if(this->node_in_lake[i] >= 0)
-      {
-        std::cout << std::endl << i << " is donor but is a lake. lake_id = " << this->node_in_lake[i] << " and wat is "<<  this->chonk_network[i].get_water_flux() << std::endl;
-        throw std::runtime_error("has_been_outlet? yes.");
-      }
+      // if(this->node_in_lake[i] >= 0)
+      // {
+      //   std::cout << std::endl << i << " is donor but is a lake. lake_id = " << this->node_in_lake[i] << " and wat is "<<  this->chonk_network[i].get_water_flux() << std::endl;
+      //   throw std::runtime_error("has_been_outlet? yes.");
+      // }
 
       ORDEEEEEER.emplace(node_to_reproc(i,this->graph.get_index_MF_stack_at_i(i)));
     }
@@ -608,7 +608,7 @@ void ModelRunner::reprocess_nodes_from_lake_outlet(int current_lake, int outlet,
   }
 
   // # Step 3: Normalisation to the new sum of weights
-  std::cout<< std::endl << "NORMALISATOR::" <<  sumW << "||" << weight_water_recs.size()<< std::endl;
+  // std::cout<< std::endl << "NORMALISATOR::" <<  sumW << "||" << weight_water_recs.size()<< std::endl;
   if(sumW != 0)
   {
     for(auto& Ugh:weight_water_recs)
@@ -620,7 +620,7 @@ void ModelRunner::reprocess_nodes_from_lake_outlet(int current_lake, int outlet,
   else if (weight_water_recs.size() > 0)
   {
     weight_water_recs = std::vector<double>(weight_water_recs.size(),double(1./int(weight_water_recs.size())));
-    print_vector("GABULON:::P:::PDFSD:FKLDKSJFLKSDJFLKJSDF:",weight_water_recs);
+    // print_vector("GABULON:::P:::PDFSD:FKLDKSJFLKSDJFLKJSDF:",weight_water_recs);
   }
   else
     std::cout << "CRASH WARNING::weight_water_recs size is 0??" << std::endl;

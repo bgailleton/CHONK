@@ -80,7 +80,7 @@ NodeGraphV2::NodeGraphV2(
   this->neightbourer.push_back({(nrows - 1) * ncols - 1, (nrows - 1) * ncols, (nrows - 1) * ncols + 1, -1,1,ncols - 1, ncols, ncols + 1 });// periodic_first_row 1
   this->neightbourer.push_back({-ncols - 1, - ncols, - ncols + 1, -1,1,- (nrows - 1) * ncols - 1, - (nrows - 1) * ncols, - (nrows - 1) * ncols + 1 });// periodic_last_row 2
   this->neightbourer.push_back({- 1, - ncols, - ncols + 1, (ncols - 1),1, 2 * ncols - 1, ncols, ncols + 1 }); // periodic_first_col 3
-  this->neightbourer.push_back({-ncols - 1, - ncols, - 2 * ncols + 1, -1,-ncols + 1, ncols - 1, ncols, 1 }); //p eriodic last_col 4
+  this->neightbourer.push_back({-ncols - 1, - ncols, - 2 * ncols + 1, -1,-ncols + 1, ncols - 1, ncols, 1 }); // periodic last_col 4
   this->neightbourer.push_back({ -1,1,ncols - 1, ncols, ncols + 1 }); // normal_first_row 5
   this->neightbourer.push_back({-ncols - 1, - ncols, - ncols + 1, -1,1}); // normal_last_row 6
   this->neightbourer.push_back({ - ncols, - ncols + 1, 1,  ncols, ncols + 1 }); // normal_first_col 7
@@ -476,7 +476,7 @@ void NodeGraphV2::compute_receveivers_and_donors(xt::pytensor<bool,1>& active_no
     // std::vector<int> receivers,donors;
     // std::vector<double> length2rec,length2don;
 
-    int checker = this->get_checker(int(i));
+    int checker = this->get_checker(int(i), active_nodes[i]);
 
 
     double this_elev = elevation[i];
@@ -529,140 +529,141 @@ void NodeGraphV2::compute_receveivers_and_donors(xt::pytensor<bool,1>& active_no
     }
     else
     {
+      // DEPRECATED
+      // // In this cases I am first checking if I need to resolve flat surfaces
+      // if(false)
+      // // if(potential_flat && this->graph[i].receivers.size() == 0 && is_processed_for_flats[i] == false)
+      // {
+      //   // flat solver here
+      //   flat_indenter++;
 
-      // In this cases I am first checking if I need to resolve flat surfaces
-      if(false)
-      // if(potential_flat && this->graph[i].receivers.size() == 0 && is_processed_for_flats[i] == false)
-      {
-        // flat solver here
-        flat_indenter++;
+      //   std::queue<int> HighEdge,LowEdge;
+      //   std::vector<char> is_high_edge,is_low_edge;
+      //   std::map<int,int>  this_flat_surface_node_index;
+      //   bool aretherelow = true;
+      //   int bottomcounter = 0;
 
-        std::queue<int> HighEdge,LowEdge;
-        std::vector<char> is_high_edge,is_low_edge;
-        std::map<int,int>  this_flat_surface_node_index;
-        bool aretherelow = true;
-        int bottomcounter = 0;
-
-        std::vector<int> this_flat_surface_node = this->Barnes2014_identify_flat(int(i), elevation, active_nodes, checker, HighEdge, LowEdge, 
-          is_high_edge, is_low_edge, this_flat_surface_node_index);
-        std::vector<int> this_flat_mask(this_flat_surface_node.size(),0);
+      //   std::vector<int> this_flat_surface_node = this->Barnes2014_identify_flat(int(i), elevation, active_nodes, checker, HighEdge, LowEdge, 
+      //     is_high_edge, is_low_edge, this_flat_surface_node_index);
+      //   std::vector<int> this_flat_mask(this_flat_surface_node.size(),0);
         
-        // std::cout << "IDENTIFIED::" << this_flat_mask.size() << "::" << LowEdge.size() << "::" << HighEdge.size() << std::endl;
+      //   // std::cout << "IDENTIFIED::" << this_flat_mask.size() << "::" << LowEdge.size() << "::" << HighEdge.size() << std::endl;
 
-        int max_lab = -9999;
-        double elev_checker = elevation[int(i)];
-        for(auto node:this_flat_surface_node)
-        {
-          int index = this_flat_surface_node_index[node];
-        }
+      //   int max_lab = -9999;
+      //   double elev_checker = elevation[int(i)];
+      //   for(auto node:this_flat_surface_node)
+      //   {
+      //     int index = this_flat_surface_node_index[node];
+      //   }
         
         
-        std::vector<char> is_lower_edge_copy = is_low_edge;
+      //   std::vector<char> is_lower_edge_copy = is_low_edge;
 
-        this->Barnes2014_AwayFromHigh( this_flat_mask, this_flat_surface_node, this_flat_surface_node_index,
-          checker, HighEdge,  elevation, elev_checker, is_high_edge,  max_lab);
+      //   this->Barnes2014_AwayFromHigh( this_flat_mask, this_flat_surface_node, this_flat_surface_node_index,
+      //     checker, HighEdge,  elevation, elev_checker, is_high_edge,  max_lab);
       
-        if(LowEdge.size()>0)
-        {
-          this->Barnes2014_TowardsLower( this_flat_mask, this_flat_surface_node, this_flat_surface_node_index,
-              checker, LowEdge, elevation, elev_checker, is_low_edge,  max_lab);
-        }
-        else
-        {
-          aretherelow = false;
-          for(auto& val:this_flat_mask)
-            val = std::abs(val - max_lab);
-        }
+      //   if(LowEdge.size()>0)
+      //   {
+      //     this->Barnes2014_TowardsLower( this_flat_mask, this_flat_surface_node, this_flat_surface_node_index,
+      //         checker, LowEdge, elevation, elev_checker, is_low_edge,  max_lab);
+      //   }
+      //   else
+      //   {
+      //     aretherelow = false;
+      //     for(auto& val:this_flat_mask)
+      //       val = std::abs(val - max_lab);
+      //   }
 
 
-        for(size_t j = 0 ; j < this_flat_surface_node.size() ; j++)
-        {
-          int node = this_flat_surface_node[j];
-          checker = this->get_checker(node);
+      //   for(size_t j = 0 ; j < this_flat_surface_node.size() ; j++)
+      //   {
+      //     int node = this_flat_surface_node[j];
+      //     checker = this->get_checker(node, active_nodes[node]);
 
-          bool SS_done = false;
-          int idL = -1;
-          double S_max = -1;
-          double S_length = -1;
-          int S_id = -1;
-          this->flat_mask[node] = this_flat_mask[this_flat_surface_node_index[node]];
-          // if(this_flat_mask[this_flat_surface_node_index[node]]<0)
-          //   throw std::runtime_error("Argh, nef flat mask yo");
+      //     bool SS_done = false;
+      //     int idL = -1;
+      //     double S_max = -1;
+      //     double S_length = -1;
+      //     int S_id = -1;
+      //     this->flat_mask[node] = this_flat_mask[this_flat_surface_node_index[node]];
+      //     // if(this_flat_mask[this_flat_surface_node_index[node]]<0)
+      //     //   throw std::runtime_error("Argh, nef flat mask yo");
 
-          if(active_nodes[node] == false)
-            continue;
+      //     if(active_nodes[node] == false)
+      //       continue;
 
-          if(is_lower_edge_copy[this_flat_surface_node_index[node]] == 't' && active_nodes[node])
-            continue;
+      //     if(is_lower_edge_copy[this_flat_surface_node_index[node]] == 't' && active_nodes[node])
+      //       continue;
 
-          is_processed_for_flats[node] = true;
+      //     is_processed_for_flats[node] = true;
 
-          bool all_flat = true;
+      //     bool all_flat = true;
 
 
-          for(auto adder:this->neightbourer[checker])
-          {
-            int next = node + adder;
-            idL ++;
-            if(elevation[next] != elevation[int(i)])
-              continue;
+      //     for(auto adder:this->neightbourer[checker])
+      //     {
+      //       int next = node + adder;
+      //       idL ++;
+      //       if(elevation[next] != elevation[int(i)])
+      //         continue;
 
-            if(this_flat_mask[this_flat_surface_node_index[node]] > this_flat_mask[this_flat_surface_node_index[next]] )
-            {
-              all_flat = false;
-              this->graph[node].receivers.push_back(next);
-              this->graph[node].length2rec.push_back(this->lengthener[idL]);
-              double this_slope = this_flat_mask[this_flat_surface_node_index[node]] - this_flat_mask[this_flat_surface_node_index[next]];
-              this_slope = this_slope / this->lengthener[idL];
+      //       if(this_flat_mask[this_flat_surface_node_index[node]] > this_flat_mask[this_flat_surface_node_index[next]] )
+      //       {
+      //         all_flat = false;
+      //         this->graph[node].receivers.push_back(next);
+      //         this->graph[node].length2rec.push_back(this->lengthener[idL]);
+      //         double this_slope = this_flat_mask[this_flat_surface_node_index[node]] - this_flat_mask[this_flat_surface_node_index[next]];
+      //         this_slope = this_slope / this->lengthener[idL];
 
-              if(this_slope > S_max)
-              {
-                S_max = this_slope;
-                S_id = next;
-                S_length = this->lengthener[idL];
-              }
-              // if(SS_done == false)
-              // {
-              //   SS_done = true;
-              //   this->graph[node].Sreceivers = next;
-              //   this->graph[node].length2Srec = this->lengthener[idL];
-              //   this->graph[next].Sdonors.push_back(node);
-              // }
+      //         if(this_slope > S_max)
+      //         {
+      //           S_max = this_slope;
+      //           S_id = next;
+      //           S_length = this->lengthener[idL];
+      //         }
+      //         // if(SS_done == false)
+      //         // {
+      //         //   SS_done = true;
+      //         //   this->graph[node].Sreceivers = next;
+      //         //   this->graph[node].length2Srec = this->lengthener[idL];
+      //         //   this->graph[next].Sdonors.push_back(node);
+      //         // }
 
-            }
-            else if(this_flat_mask[this_flat_surface_node_index[node]] < this_flat_mask[this_flat_surface_node_index[next]] )
-            {
-              // all_flat = false;
-              this->graph[node].donors.push_back(next);
-              this->graph[node].length2don.push_back(this->lengthener[idL]);
-            }
-          }
+      //       }
+      //       else if(this_flat_mask[this_flat_surface_node_index[node]] < this_flat_mask[this_flat_surface_node_index[next]] )
+      //       {
+      //         // all_flat = false;
+      //         this->graph[node].donors.push_back(next);
+      //         this->graph[node].length2don.push_back(this->lengthener[idL]);
+      //       }
+      //     }
 
-          if(S_id>=0)
-          {
-            if(processed[node] == true || (flat_ID[node] >= 0))
-            {
-              std::cout << "5.12:" << std::endl;
-              throw std::runtime_error("flat_resolver::SS_ID assigned multiple times");
-            }
+      //     if(S_id>=0)
+      //     {
+      //       if(processed[node] == true || (flat_ID[node] >= 0))
+      //       {
+      //         std::cout << "5.12:" << std::endl;
+      //         throw std::runtime_error("flat_resolver::SS_ID assigned multiple times");
+      //       }
 
-            processed[node] = true;
-            this->graph[node].Sreceivers = S_id;
-            this->graph[node].length2Srec = S_length;
-            this->graph[S_id].Sdonors.push_back(node);
-          }
+      //       processed[node] = true;
+      //       this->graph[node].Sreceivers = S_id;
+      //       this->graph[node].length2Srec = S_length;
+      //       this->graph[S_id].Sdonors.push_back(node);
+      //     }
 
-          if(all_flat)
-          {
-            node_to_check_after_flat.push_back(node);
-          }
+      //     if(all_flat)
+      //     {
+      //       node_to_check_after_flat.push_back(node);
+      //     }
 
-          flat_ID[node] = flat_indenter;
+      //     flat_ID[node] = flat_indenter;
 
-        }
+      //   }
 
-      }
-      else if (this->graph[i].receivers.size() == 0)
+      // }
+      // else 
+      if (this->graph[i].receivers.size() == 0)
       {
         this->graph[i].Sreceivers = i;
       }
@@ -682,7 +683,7 @@ void NodeGraphV2::compute_receveivers_and_donors(xt::pytensor<bool,1>& active_no
       // Attempted to sort stuff here
       if(this->graph[i].receivers.size() == 0)
       {
-        int checker = this->get_checker(i);
+        int checker = this->get_checker(i, active_nodes[i]);
         int idL =-1;
         for(auto adder:this->neightbourer[checker])
         {
@@ -727,204 +728,209 @@ void NodeGraphV2::compute_receveivers_and_donors(xt::pytensor<bool,1>& active_no
 
 }
 
+// DEPRECATED
+// std::vector<int> NodeGraphV2::Barnes2014_identify_flat(int starting_node, xt::pytensor<double,1>& elevation,xt::pytensor<bool,1>& active_nodes, int checker,  
+//   std::queue<int>& HighEdge, std::queue<int>& LowEdge, std::vector<char>& is_high_edge, std::vector<char>& is_low_edge, std::map<int,int>&  this_flat_surface_node_index)
+// {
+//   std::vector<int> output;
+//   std::set<int> is_queued;
 
-std::vector<int> NodeGraphV2::Barnes2014_identify_flat(int starting_node, xt::pytensor<double,1>& elevation,xt::pytensor<bool,1>& active_nodes, int checker,  
-  std::queue<int>& HighEdge, std::queue<int>& LowEdge, std::vector<char>& is_high_edge, std::vector<char>& is_low_edge, std::map<int,int>&  this_flat_surface_node_index)
-{
-  std::vector<int> output;
-  std::set<int> is_queued;
+//   std::queue<int> Quack;Quack.push(starting_node);
 
-  std::queue<int> Quack;Quack.push(starting_node);
+//   is_queued.insert(starting_node);
+//   output.push_back(starting_node);
+//   char lefalse = 'f', letrue = 't';
 
-  is_queued.insert(starting_node);
-  output.push_back(starting_node);
-  char lefalse = 'f', letrue = 't';
+//   is_low_edge.push_back(lefalse);
+//   is_high_edge.push_back(lefalse);
+//   this_flat_surface_node_index[starting_node] = 0;
 
-  is_low_edge.push_back(lefalse);
-  is_high_edge.push_back(lefalse);
-  this_flat_surface_node_index[starting_node] = 0;
+//   double checkelev = elevation[starting_node];
+//   bool is_LE = false, is_HE = false;
+//   int index = 1;
 
-  double checkelev = elevation[starting_node];
-  bool is_LE = false, is_HE = false;
-  int index = 1;
+//   while(Quack.size() >0)
+//   {
+//     int next_node = Quack.front();
+//     Quack.pop();
 
-  while(Quack.size() >0)
-  {
-    int next_node = Quack.front();
-    Quack.pop();
+//     checker = this->get_checker(next_node, active_nodes[next_node]);
 
-    checker = this->get_checker(next_node);
+//     is_LE = false, is_HE = false;
 
-    is_LE = false, is_HE = false;
-
-    if(active_nodes[next_node])
-    {      
-      for(auto adder:this->neightbourer[checker])
-      {
-        int node = next_node + adder;
-        if(node<0 || node >= this->n_element)
-        {
-          throw std::runtime_error("neightbourer problem flat");
-        }
+//     if(active_nodes[next_node])
+//     {      
+//       for(auto adder:this->neightbourer[checker])
+//       {
+//         int node = next_node + adder;
+//         if(node<0 || node >= this->n_element)
+//         {
+//           throw std::runtime_error("neightbourer problem flat");
+//         }
         
 
-        if(elevation[node]>checkelev)
-          is_HE = true;
+//         if(elevation[node]>checkelev)
+//           is_HE = true;
         
-        else if(elevation[node]<checkelev)
-          is_LE = true;
+//         else if(elevation[node]<checkelev)
+//           is_LE = true;
 
-        if(elevation[node] != checkelev)
-          continue;
+//         if(elevation[node] != checkelev)
+//           continue;
 
-        if(is_queued.find(node) != is_queued.end())
-          continue;
+//         if(is_queued.find(node) != is_queued.end())
+//           continue;
 
-        Quack.push(node);
-        is_queued.insert(node);
-        output.push_back(node);
-        is_low_edge.push_back(lefalse);
-        is_high_edge.push_back(lefalse);
-        this_flat_surface_node_index[node] = index;
-        index++;
+//         Quack.push(node);
+//         is_queued.insert(node);
+//         output.push_back(node);
+//         is_low_edge.push_back(lefalse);
+//         is_high_edge.push_back(lefalse);
+//         this_flat_surface_node_index[node] = index;
+//         index++;
 
-      }
-    }
-    else
-      is_LE = true;
+//       }
+//     }
+//     else
+//       is_LE = true;
 
-    if(is_LE)
-    {
-      LowEdge.push(next_node);
-      is_low_edge[this_flat_surface_node_index[next_node]] = letrue;
-    }
-    else if(is_HE)
-    {
-      HighEdge.push(next_node);
-      is_high_edge[this_flat_surface_node_index[next_node]] = letrue;
-    }
+//     if(is_LE)
+//     {
+//       LowEdge.push(next_node);
+//       is_low_edge[this_flat_surface_node_index[next_node]] = letrue;
+//     }
+//     else if(is_HE)
+//     {
+//       HighEdge.push(next_node);
+//       is_high_edge[this_flat_surface_node_index[next_node]] = letrue;
+//     }
 
-  }
-  is_low_edge.shrink_to_fit();
-  is_high_edge.shrink_to_fit();
+//   }
+//   is_low_edge.shrink_to_fit();
+//   is_high_edge.shrink_to_fit();
 
 
-  return output;
+//   return output;
     
 
-}
+// }
+// DEPRECATED
 
-void NodeGraphV2::Barnes2014_AwayFromHigh(std::vector<int>& flat_mask, std::vector<int>& this_flat_surface_node, std::map<int,int>& this_flat_surface_node_index,
- int checker, std::queue<int>& HighEdge, xt::pytensor<double,1>& elevation, double elev_check, std::vector<char>& is_high_edge, int& max_lab)
-{
+// DEPRECATED
+// void NodeGraphV2::Barnes2014_AwayFromHigh(std::vector<int>& flat_mask, std::vector<int>& this_flat_surface_node, std::map<int,int>& this_flat_surface_node_index,
+//  int checker, std::queue<int>& HighEdge, xt::pytensor<double,1>& elevation, double elev_check, std::vector<char>& is_high_edge, int& max_lab)
+// {
 
-  int score = 1;
-  int marker = -9999;
-  HighEdge.push(marker);
-  bool keep_going = true, last_one_was_marker = false;
+//   int score = 1;
+//   int marker = -9999;
+//   HighEdge.push(marker);
+//   bool keep_going = true, last_one_was_marker = false;
 
-  while(keep_going)
-  {
+//   while(keep_going)
+//   {
 
-    int next_node = HighEdge.front(); HighEdge.pop();
-    checker = this->get_checker(next_node);
-    if(next_node == marker)
-    {
-      if(last_one_was_marker)
-      {
-        keep_going = false;
-        break;
-      }
+//     int next_node = HighEdge.front(); HighEdge.pop();
+//     checker = this->get_checker(next_node,active_nodes[next_node]);
+//     if(next_node == marker)
+//     {
+//       if(last_one_was_marker)
+//       {
+//         keep_going = false;
+//         break;
+//       }
 
-      score ++;
-      last_one_was_marker = true;
-      HighEdge.push(marker);
-    }
-    else
-    {
-      last_one_was_marker = false;
-      int index = this_flat_surface_node_index[next_node];
-      flat_mask[index] = score;
-      max_lab = score;
-      for(auto adder:this->neightbourer[checker])
-      {
-        int node = next_node + adder;
+//       score ++;
+//       last_one_was_marker = true;
+//       HighEdge.push(marker);
+//     }
+//     else
+//     {
+//       last_one_was_marker = false;
+//       int index = this_flat_surface_node_index[next_node];
+//       flat_mask[index] = score;
+//       max_lab = score;
+//       for(auto adder:this->neightbourer[checker])
+//       {
+//         int node = next_node + adder;
 
-        if(elevation[node] != elev_check)
-          continue;
+//         if(elevation[node] != elev_check)
+//           continue;
 
-        index = this_flat_surface_node_index[node];
+//         index = this_flat_surface_node_index[node];
 
-        if(is_high_edge[index] == 't')
-          continue;
+//         if(is_high_edge[index] == 't')
+//           continue;
 
-        HighEdge.push(node);
-        is_high_edge[index] = 't';
-      }
-    }
-  }
-
-
-}
-
-void NodeGraphV2::Barnes2014_TowardsLower(std::vector<int>& flat_mask, std::vector<int>& this_flat_surface_node, std::map<int,int>& this_flat_surface_node_index,
- int checker, std::queue<int>& LowEdge, xt::pytensor<double,1>& elevation, double elev_check, std::vector<char>& is_low_edge, int max_lab)
-{
-  int score = 1;
-  int marker = -9999;
-  LowEdge.push(marker);
-  bool keep_going = true, last_one_was_marker = false;
-
-  for (auto& val:flat_mask)
-    val = -val;
-
-  while(keep_going)
-  {
-    int next_node = LowEdge.front(); LowEdge.pop();
-    checker = this->get_checker(next_node);
-    if(next_node == marker)
-    {
-      if(last_one_was_marker)
-      {
-        keep_going = false;
-        break;
-      }
-
-      score ++;
-      last_one_was_marker = true;
-      LowEdge.push(marker);
-    }
-    else
-    {
-      last_one_was_marker = false;
-      int index = this_flat_surface_node_index[next_node];
-      if(flat_mask[index]>0)
-        continue;
-      if(flat_mask[index] < 0)
-        flat_mask[index] = max_lab + flat_mask[index] + 2 * score;
-      else
-        flat_mask[index] = 2 * score;
-
-      for(auto& adder:this->neightbourer[checker])
-      {
-        int node = next_node + adder;
-
-        if(elevation[node] != elev_check)
-          continue;
-
-        index = this_flat_surface_node_index[node];
-
-        if(is_low_edge[index] == 't')
-          continue;
-        LowEdge.push(node);
-        is_low_edge[index] = 't';
-      }
-
-    }
-  }
+//         HighEdge.push(node);
+//         is_high_edge[index] = 't';
+//       }
+//     }
+//   }
 
 
-}
+// }
+// DEPRECATED
+
+// DEPRECATED
+// void NodeGraphV2::Barnes2014_TowardsLower(std::vector<int>& flat_mask, std::vector<int>& this_flat_surface_node, std::map<int,int>& this_flat_surface_node_index,
+//  int checker, std::queue<int>& LowEdge, xt::pytensor<double,1>& elevation, double elev_check, std::vector<char>& is_low_edge, int max_lab)
+// {
+//   int score = 1;
+//   int marker = -9999;
+//   LowEdge.push(marker);
+//   bool keep_going = true, last_one_was_marker = false;
+
+//   for (auto& val:flat_mask)
+//     val = -val;
+
+//   while(keep_going)
+//   {
+//     int next_node = LowEdge.front(); LowEdge.pop();
+//     checker = this->get_checker(next_node);
+//     if(next_node == marker)
+//     {
+//       if(last_one_was_marker)
+//       {
+//         keep_going = false;
+//         break;
+//       }
+
+//       score ++;
+//       last_one_was_marker = true;
+//       LowEdge.push(marker);
+//     }
+//     else
+//     {
+//       last_one_was_marker = false;
+//       int index = this_flat_surface_node_index[next_node];
+//       if(flat_mask[index]>0)
+//         continue;
+//       if(flat_mask[index] < 0)
+//         flat_mask[index] = max_lab + flat_mask[index] + 2 * score;
+//       else
+//         flat_mask[index] = 2 * score;
+
+//       for(auto& adder:this->neightbourer[checker])
+//       {
+//         int node = next_node + adder;
+
+//         if(elevation[node] != elev_check)
+//           continue;
+
+//         index = this_flat_surface_node_index[node];
+
+//         if(is_low_edge[index] == 't')
+//           continue;
+//         LowEdge.push(node);
+//         is_low_edge[index] = 't';
+//       }
+
+//     }
+//   }
+
+
+// }
+// DEPRECATED
 
 
 void NodeGraphV2::recompute_multi_receveivers_and_donors(xt::pytensor<bool,1>& active_nodes, xt::pytensor<double,1>& elevation, std::vector<int>& nodes_to_compute)
@@ -981,6 +987,65 @@ void NodeGraphV2::recompute_multi_receveivers_and_donors(xt::pytensor<bool,1>& a
 
 }
 
+int NodeGraphV2::get_checker(int i, bool is_active)
+{
+  // internal node 0
+  // periodic_first_row 1
+  // periodic_last_row 2
+  // periodic_first_col 3
+  // periodic last_col 4
+  // normal_first_row 5
+  // normal_last_row 6
+  // normal_first_col 7
+  // normal_last_col 8
+  // normal_top_left 9
+  // normal_top_right 10
+  // normal_bottom_left 11
+  // normal_bottom_right 12
+
+  int checker;
+  if(i < this->ncols)
+  {
+    if(is_active)
+      checker = 1;
+    else if(i == 0)
+      checker = 9;
+    else if( i == ncols-1)
+      checker = 10;
+    else
+      checker = 5;
+  }
+  else if (i >= this->n_element - this->ncols)
+  {
+    if(is_active)
+      checker = 2;
+    else if(i == this->n_element - this->ncols)
+      checker = 11;
+    else if(i == this->n_element - 1)
+      checker = 12;
+    else
+      checker = 6;
+  }
+  else if(i % this->ncols == 0 || i == 0)
+  {
+    if(is_active)
+      checker = 3;
+    else
+      checker = 7;
+  }
+  else if((i + 1) % (this->ncols) == 0 )
+  {
+    if(is_active)
+      checker = 4;
+    else
+      checker = 8;
+  }
+  else
+    checker = 0;
+  
+  return checker;
+}
+
 void NodeGraphV2::get_D8_neighbors(int i, xt::pytensor<bool,1>& active_nodes, std::vector<int>& neightbouring_nodes, std::vector<double>& length2neigh)
 {
   // these vectors are additioned to the node indice to test the neighbors
@@ -1010,54 +1075,54 @@ void NodeGraphV2::get_D8_neighbors(int i, xt::pytensor<bool,1>& active_nodes, st
 
   // NOTE THAT ELEMENT ARE VECTORISED
 
-  int checker;
+  int checker = this->get_checker(i,isa);
 
-  // first row
-  if(i<ncols)
-  {
-    if(isa)
-      checker = 1;
-    else
-    {
-      if(i > 0 && i < ncols - 1 )
-        checker = 5;
-      else if (i == 0)
-        checker = 9;
-      else
-        checker = 10;
-    }
-  }
-  // last row
-  else if (i >= this->n_element - ncols)
-  {
-    if(isa)
-      checker = 2;
-    else if(i > this->n_element - ncols && i < this->n_element - 1)
-      checker = 6;
-    else if (i == this->n_element - ncols)
-      checker = 11;
-    else
-      checker = 12;
-  }
-  // first col corners excluded
-  else if(i % ncols == 0)
-  {
-    if(isa)
-      checker = 3;
-    else
-      checker = 7;
-  }
-  else if((i + 1) % (ncols) == 0 )
-  {
-    if(isa)
-      checker = 4;
-    else
-      checker = 8;
-  }
-  else
-  {
-    checker = 0;
-  }
+  // // first row
+  // if(i<ncols)
+  // {
+  //   if(isa)
+  //     checker = 1;
+  //   else
+  //   {
+  //     if(i > 0 && i < ncols - 1 )
+  //       checker = 5;
+  //     else if (i == 0)
+  //       checker = 9;
+  //     else
+  //       checker = 10;
+  //   }
+  // }
+  // // last row
+  // else if (i >= this->n_element - ncols)
+  // {
+  //   if(isa)
+  //     checker = 2;
+  //   else if(i > this->n_element - ncols && i < this->n_element - 1)
+  //     checker = 6;
+  //   else if (i == this->n_element - ncols)
+  //     checker = 11;
+  //   else
+  //     checker = 12;
+  // }
+  // // first col corners excluded
+  // else if(i % ncols == 0)
+  // {
+  //   if(isa)
+  //     checker = 3;
+  //   else
+  //     checker = 7;
+  // }
+  // else if((i + 1) % (ncols) == 0 )
+  // {
+  //   if(isa)
+  //     checker = 4;
+  //   else
+  //     checker = 8;
+  // }
+  // else
+  // {
+  //   checker = 0;
+  // }
 
   int idL = -1;
   for(auto& adder:this->neightbourer[checker])
@@ -1112,18 +1177,8 @@ void NodeGraphV2::get_D8_neighbors(int i, xt::pytensor<int,1>& active_nodes, std
   // if(active_nodes[i] == 0)
   //   return;
 
-  int checker;
-  if(i<ncols)
-    checker = 1;
-  else if (i >= this->n_element - ncols)
-    checker = 2;
-  else if(i % ncols == 0 || i == 0)
-    checker = 3;
-  else if((i + 1) % (ncols) == 0 )
-    checker = 4;
-  else
-    checker = 0;
-
+  int checker = this->get_checker(i,active_nodes[i]);
+ 
   int idL = -1;
   for(auto& adder:this->neightbourer[checker])
   {

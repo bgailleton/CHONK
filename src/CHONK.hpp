@@ -34,6 +34,8 @@ void print_vector(std::string mahstring , std::vector<T>& mahvec)
         std::cout << t << "||";
     std::cout << std::endl;
 }
+
+
 bool double_equals(double a, double b, double epsilon = 0.0001);
 
 

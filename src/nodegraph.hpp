@@ -189,34 +189,23 @@ std::vector<std::vector<int> > get_mstree_translated(){return this->mstree_trans
 
 void recompute_multi_receveivers_and_donors(xt::pytensor<bool,1>& active_nodes, xt::pytensor<double,1>& elevation, std::vector<int>& nodes_to_compute);
 
-// Flat surface resolver
-std::vector<int> Barnes2014_identify_flat(int starting_node, xt::pytensor<double,1>& elevation,xt::pytensor<bool,1>& active_nodes, int checker,  
-  std::queue<int>& HighEdge, std::queue<int>& LowEdge, std::vector<char>& is_high_edge, std::vector<char>& is_low_edge, std::map<int,int>&  this_flat_surface_node_index);
+// // Flat surface resolver
+// std::vector<int> Barnes2014_identify_flat(int starting_node, xt::pytensor<double,1>& elevation,xt::pytensor<bool,1>& active_nodes, int checker,  
+//   std::queue<int>& HighEdge, std::queue<int>& LowEdge, std::vector<char>& is_high_edge, std::vector<char>& is_low_edge, std::map<int,int>&  this_flat_surface_node_index);
 
-void Barnes2014_AwayFromHigh(std::vector<int>& flat_mask, std::vector<int>& this_flat_surface_node, std::map<int,int>& this_flat_surface_node_index,
- int checker, std::queue<int>& HighEdge, xt::pytensor<double,1>& elevation, double elev_check, std::vector<char>& is_high_edge, int& max_lab);
+// void Barnes2014_AwayFromHigh(std::vector<int>& flat_mask, std::vector<int>& this_flat_surface_node, std::map<int,int>& this_flat_surface_node_index,
+//  int checker, std::queue<int>& HighEdge, xt::pytensor<double,1>& elevation, double elev_check, std::vector<char>& is_high_edge, int& max_lab);
 
-void Barnes2014_TowardsLower(std::vector<int>& flat_mask, std::vector<int>& this_flat_surface_node, std::map<int,int>& this_flat_surface_node_index,
- int checker, std::queue<int>& LowEdge, xt::pytensor<double,1>& elevation, double elev_check, std::vector<char>& is_low_edge, int max_lab);
+// void Barnes2014_TowardsLower(std::vector<int>& flat_mask, std::vector<int>& this_flat_surface_node, std::map<int,int>& this_flat_surface_node_index,
+//  int checker, std::queue<int>& LowEdge, xt::pytensor<double,1>& elevation, double elev_check, std::vector<char>& is_low_edge, int max_lab);
 
 
 xt::pytensor<int,1> get_flat_mask(){return flat_mask;};
 
-int get_checker(int i)
-{
-  int checker;
-  if(i<this->ncols)
-    checker = 1;
-  else if (i >= this->n_element - this->ncols)
-    checker = 2;
-  else if(i % this->ncols == 0 || i == 0)
-    checker = 3;
-  else if((i + 1) % (this->ncols) == 0 )
-    checker = 4;
-  else
-    checker = 0;
-  return checker;
-}
+int get_checker(int i, bool is_active);
+
+
+// Return the upstream to downstream order of depressionns to solve according to Cordonnier et al., 2019
 std::vector<int> get_Cordonnier_order();
 
 protected:
