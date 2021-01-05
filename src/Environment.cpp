@@ -515,6 +515,9 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
   this->unpack_entry_points_from_delta_maps(iteralake, label_prop_of_delta, delta_sed,delta_water, pre_entry_node, 
      label_prop_of_pre, pre_sed,pre_water);
   // Doen
+  //   _      _      _
+  // >(.)__ <(.)__ =(.)__
+  //  (___/  (___/  (___/  quack
 }
 
 void ModelRunner::unpack_entry_points_from_delta_maps(std::queue<int>& iteralake, std::vector<std::vector<double> >& label_prop_of_delta,
