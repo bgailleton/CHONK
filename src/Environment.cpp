@@ -403,6 +403,8 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
   //----------------- INITIALISATION -------------------
   //----------------------------------------------------
 
+  std::cout << "1" << std::endl;
+
   // First, saivng some values for debugging and water balance purposes
   double debug_saverW = entry_point.volume_water / this->timestep;
   double outlet_water_saver = this->chonk_network[outlet].get_water_flux();
@@ -449,10 +451,15 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
   {
     is_in_queue[tnode] = 'l';
   }
+
+
+  std::cout << "2" << std::endl;
+
   this->gather_nodes_to_reproc(local_mstack,  ORDEEEEEER,  is_in_queue,  outlet);
 
   // Final size OK
   // I have a stack of nodes to reprocess. 
+  std::cout << "3" << std::endl;
 
   //----------------------------------------------------
   //------- STARTING THE OUTLET PREPROCESSING ----------
@@ -470,6 +477,7 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
   // >(.)__ <(.)__ =(.)__
   //  (___/  (___/  (___/  quack
 
+  std::cout << "4" << std::endl;
 
   //----------------------------------------------------
   //---------- DEPROCESSING THE LOCAL STACK ------------
@@ -723,8 +731,9 @@ void ModelRunner::preprocess_outletting_chonk(chonk& tchonk, EntryPoint& entry_p
   int nrecs = 0;
   // copying the weights from the current 
   tchonk.copy_moving_prep(tchonk_recs,tchonk_slope_recs,tchonk_weight_water_recs,tchonk_weight_sed_recs);
+  std::cout << "3.1" << std::endl;
 
-  for(size_t i =0; i, tchonk_recs.size(); i++)
+  for(size_t i =0; i< tchonk_recs.size(); i++)
   {
     // node indice of the receiver
     int tnode = tchonk_recs[i];
@@ -741,7 +750,7 @@ void ModelRunner::preprocess_outletting_chonk(chonk& tchonk, EntryPoint& entry_p
     }
     else
     {
-      water_rate -= weight_water_recs[i] * tchonk.get_water_flux();
+      water_rate -= tchonk_weight_water_recs[i] * tchonk.get_water_flux();
       label_prop = mix_two_proportions(sedrate,label_prop, -1 * tchonk_weight_sed_recs[i]* tchonk.get_sediment_flux(), tchonk.get_other_attribute_array("label_tracker"));
       sedrate -= tchonk_weight_sed_recs[i]* tchonk.get_sediment_flux();
     }
@@ -770,12 +779,14 @@ void ModelRunner::preprocess_outletting_chonk(chonk& tchonk, EntryPoint& entry_p
       {
         label_prop_of_pre[lakid] = mix_two_proportions(pre_sed[lakid],label_prop_of_pre[lakid], tchonk_weight_sed_recs[i]* tchonk.get_sediment_flux(), tchonk.get_other_attribute_array("label_tracker"));
         pre_sed[lakid] += tchonk_weight_sed_recs[i]* tchonk.get_sediment_flux();
-        pre_water[lakid] += weight_water_recs[i] * tchonk.get_water_flux();
+        pre_water[lakid] += tchonk_weight_water_recs[i] * tchonk.get_water_flux();
         pre_entry_node[lakid] = tnode;
       }
     }
 
   }
+  std::cout << "3.2" << std::endl;
+
   // Normalising the thingies
   for(auto& Ugh:weight_water_recs)
     Ugh/sumW;
