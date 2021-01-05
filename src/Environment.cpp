@@ -549,6 +549,12 @@ void ModelRunner::reprocess_local_stack(std::vector<int>& local_mstack, std::vec
   std::map<int,double>& WF_corrector, std::map<int,double>& SF_corrector, 
   std::map<int,std::vector<double> >& SL_corrector)
 {
+  // I will need that
+  double cellarea = this->io_double["dx"] * this->io_double["dy"];
+  // I will need these aliases from the global maps
+  xt::pytensor<double,1>& topography = this->io_double_array["topography"];
+  xt::pytensor<int,1>& active_nodes = this->io_int_array["active_nodes"];
+  
   // Iterating through the local stack
   for(auto tnode:local_mstack)
   {
