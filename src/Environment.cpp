@@ -498,7 +498,7 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
   //------------ LOCAL STACK REPROCESSING --------------
   //----------------------------------------------------
   // this section reprocess all nodes affected by the routletting of the lake nodes from upstream to donwstreamå
-  this->reprocess_local_stack(local_mstack, is_in_queue, outlet,WF_corrector, SF_corrector, SL_corrector);
+  this->reprocess_local_stack(local_mstack, is_in_queue, outlet, current_lake, WF_corrector, SF_corrector, SL_corrector);
 
   //----------------------------------------------------
   //------------ PROCESSING ENTRY POINTS ---------------
@@ -545,7 +545,7 @@ std::vector<double>& pre_sed, std::vector<double>& pre_water)
   }
 }
 
-void ModelRunner::reprocess_local_stack(std::vector<int>& local_mstack, std::vector<char>& is_in_queue, int outlet,
+void ModelRunner::reprocess_local_stack(std::vector<int>& local_mstack, std::vector<char>& is_in_queue, int outlet, int current lake,
   std::map<int,double>& WF_corrector, std::map<int,double>& SF_corrector, 
   std::map<int,std::vector<double> >& SL_corrector)
 {
