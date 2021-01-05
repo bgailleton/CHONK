@@ -489,6 +489,12 @@ class ModelRunner
         std::vector<std::vector<double> >& tlab,  std::vector<int>& these_ET, int lake_to_ignore);
     void check_what_give_to_existing_outlets(std::map<int,double>& map_to_update, std::vector<int>& nodes_to_check, std::vector<char>& has_recs_in_local_stack, bool add_water_flux_to_itself);
 
+    void reprocess_nodes_from_lake_outlet_v2(int current_lake, int outlet, std::vector<bool>& is_processed, std::queue<int>& iteralake, EntryPoint& entry_point);
+
+    void gather_nodes_to_reproc(std::vector<int>& local_mstack, 
+  std::priority_queue< node_to_reproc, std::vector<node_to_reproc>, std::greater<node_to_reproc> >& ORDEEEEEER,
+   std::vector<char>& is_in_queue, int outlet);
+
 
 
     std::vector<int> lake_in_order;
