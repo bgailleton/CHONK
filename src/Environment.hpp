@@ -487,6 +487,7 @@ class ModelRunner
     void drape_deposition_flux_to_chonks();
     void check_what_gives_to_lake(int entry_node, std::vector<int>& these_lakid , std::vector<double>& twat, std::vector<double>& tsed, 
         std::vector<std::vector<double> >& tlab,  std::vector<int>& these_ET, int lake_to_ignore);
+    void check_what_give_to_existing_outlets(std::map<int,double>& map_to_update, std::vector<int>& nodes_to_check, std::vector<char>& has_recs_in_local_stack, bool add_water_flux_to_itself);
 
 
 
@@ -589,6 +590,7 @@ class ModelRunner
     std::unordered_map<int, chonk > original_chonk;
 
     double DEBUG_GLOBDELT;
+    double GLOB_GABUL;
 
 
   private:
