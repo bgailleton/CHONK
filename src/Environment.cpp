@@ -497,67 +497,20 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
   //----------------------------------------------------
   //------------ LOCAL STACK REPROCESSING --------------
   //----------------------------------------------------
-  // this section reprocess all nodes affected by the routletting of the lake nodes from upstream to donwstream
-
-  this->reprocess_local_stack(std::vector<int>& local_mstack, std::vector<char>& is_in_queue, int outlet,
-  std::map<int,double>& WF_corrector, std::map<int,double>& SF_corrector, 
-  std::map<int,std::vector<double> >& SL_corrector);
-  
-
-
-  // TO SORT LATER
-  // if(double_equals(local_sum,water_rate,1e-3) == false && was_0)
-  //   throw std::runtime_error("WaterFluxError::Balance is not respected in the reproc by " + std::to_string(local_sum) + " water rate was " + std::to_string(water_rate));
+  // this section reprocess all nodes affected by the routletting of the lake nodes from upstream to donwstreamå
+  this->reprocess_local_stack(local_mstack, is_in_queue, outlet,WF_corrector, SF_corrector, SL_corrector);
 
   //----------------------------------------------------
   //------------ PROCESSING ENTRY POINTS ---------------
   //----------------------------------------------------
   // I need now to calculate what my reprocessing nodes are giving to the different lakes, and calculate the delta
+  // preprocessing the quantity given to existing lakes (to later calculate the delta)
+  this->check_what_give_to_existing_lakes(local_mstack, outlet, current_lake, delta_sed,
+    delta_water, pre_entry_node, label_prop_of_delta);
+  std::vector<int> toutletstack = {outlet};
+  this->check_what_give_to_existing_lakes(toutletstack, outlet, current_lake, delta_sed,
+    delta_water, pre_entry_node, label_prop_of_delta);
 
-
-  // iterating through the local stack
-  for(auto tnode : local_mstack)
-  {
-
-    // # If is a donor, I ignore (it already gave to the lake anyway)
-    if (is_in_queue[tnode] == 'd')
-      continue;
-
-    // Calling the fucntion checking that
-    std::vector<int> these_lakid; std::vector<double> twat; std::vector<double> tsed; std::vector<std::vector<double> > tlab; std::vector<int> bulug;
-    this->check_what_gives_to_lake(tnode, these_lakid, twat, tsed, tlab, bulug, current_lake);
-
-    // harvbesting the results in the delta vector. The delta will simply be delta - pre
-    for(int i = 0; i < int(these_lakid.size()); i++)
-    {
-      int tlakid = these_lakid[i];
-      label_prop_of_delta[tlakid] = mix_two_proportions(delta_sed[tlakid],label_prop_of_delta[tlakid],tsed[i],tlab[i]);
-      delta_sed[tlakid] += tsed[i];
-      delta_water[tlakid] += twat[i];
-      // if(twat[i] < 0)
-        // std::cout << "regnode NEG DELTA::" << this->lakes[current_lake].outlet << " -> " << twat[i] << std::endl;
-      pre_entry_node[tlakid] = bulug[i];
-    }
-  }
-
-  // Not forgetting to check the outlet reprocessing
-  if(true)
-  {
-    std::vector<int> these_lakid; std::vector<double> twat; std::vector<double> tsed; std::vector<std::vector<double> > tlab; std::vector<int> bulug;
-    this->check_what_gives_to_lake(this->lakes[current_lake].outlet, these_lakid, twat, tsed, tlab, bulug, current_lake);
-
-    for(int i = 0; i < int(these_lakid.size()); i++)
-    {
-      int tlakid = these_lakid[i];
-      label_prop_of_pre[tlakid] = mix_two_proportions(delta_sed[tlakid],label_prop_of_delta[tlakid],tsed[i],tlab[i]);
-      delta_sed[tlakid] += tsed[i];
-      delta_water[tlakid] += twat[i];
-      // if(twat[i] < 0)
-      //   std::cout << "OUTLET NEG DELTA::" << this->lakes[current_lake].outlet << " -> " << twat[i] << std::endl;
-      pre_entry_node[tlakid] = bulug[i];
-
-    }
-  }
 
   double sum_dwats = 0;
   // Now I can go through my delta and pre vector to calculate and apply my new entry points
@@ -571,29 +524,13 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
     if(double_equals(dwat,0,1e-3) && double_equals(dsed,0,1e-3))
       continue;
 
-    std::cout << "DWAT = " << dwat  << " TO " << pre_entry_node[i] << " | post: " << delta_water[i] << " | pre:" << pre_water[i] << " IS IN " << this->node_in_lake[pre_entry_node[i]] << std::endl;
-    // if(dwat<0)
-    //   continue;
-    if(was_0)
-    {
-      GLOB_GABUL += dwat;
-      std::cout << "WARNING WATER CREATED IN RECPROC:: WIll need sorting at some points #2" << std::endl;
-      // continue;
-    }
-
-
-
     sum_dwats += dwat;
 
     int target_lake = this->node_in_lake[pre_entry_node[i]];
     target_lake = motherlake(target_lake);
-    // if(target_lake >= this->queue_adder_for_lake.size())
-      // queue_adder_for_lake.push_back(EntryPoint(dwat * this->timestep, dsed, pre_entry_node[i], label_prop_of_delta[i]));
-    // else
-    // {
-      EntryPoint other(dwat * this->timestep, dsed, pre_entry_node[i], label_prop_of_delta[i]);
-      queue_adder_for_lake[target_lake].ingestNkill( other);
-    // }
+    EntryPoint other(dwat * this->timestep, dsed, pre_entry_node[i], label_prop_of_delta[i]);
+    queue_adder_for_lake[target_lake].ingestNkill( other);
+
 
     // Emplacing the next lake entry in the queue
     iteralake.emplace(pre_entry_node[i]);
@@ -602,48 +539,6 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
     if(pre_entry_node[i] == -9999)
       throw std::runtime_error("EntryPointError::Invalid at check_outlets " + std::to_string(pre_entry_node[i]) + " with water " + std::to_string(dwat * this->timestep) + " at lake " + std::to_string(i));
   }
-  
-  double DELTA_DWAT = debug_saverW - sum_dwats;
-  if(double_equals(DELTA_DWAT,0,1e2) == false && double_equals(DELTA_DWAT,debug_saverW,1e2) == false )
-  {
-    std::cout << "OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO DELTA_DWAT::" << DELTA_DWAT << " Corrector is " << corrector << std::endl;
-    DEBUG_GLOBDELT += DELTA_DWAT;
-    // TO SORT:: in that case I am adding the delta water missing. This is not a good thing...
-    // std::cout << "WARNING:: " << DELTA_DWAT << " water is missing... (rate) and I am adding it to the different entry points!" << std::endl;
-    // double taddwat_per_ = DELTA_DWAT/n_entries * this->timestep;
-    
-    std::cout << "From node " << outlet << " Missing " << DELTA_DWAT << " (in rate) I had " << debug_saverW << std::endl;;
-
-
-    // throw std::runtime_error("Some water loss in the reproc_nodes_explicit_lake processes");
-
-    // for(auto& tep: temptrypoints)
-    //   tep.volume_water +=  taddwat_per_;
-  }
-
-  // for (auto tep:temptrypoints)
-  //   iteralake.emplace(tep);
-
-
-
-
-  // DEBUGGING HARVERSTER PROCESS TO IGNORE
-  debugint = xt::zeros<int>({this->io_int["n_elements"]});
-  for(int i = 0; i < this->io_int["n_elements"]; i++)
-  {
-    int val = -1;
-
-    if(is_in_queue[i] == 'd')
-      val = 0;
-    if(is_in_queue[i] == 'y')
-      val = 1;
-    if(has_been_outlet[i] == 'y')
-      val = 2;
-
-    debugint[i] = val;
-  }
-
-
 
   std::cout << "DONE WITH reprocess_nodes_from_lake_outlet " << outlet << std::endl;
   // Doen
