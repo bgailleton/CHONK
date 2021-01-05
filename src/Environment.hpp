@@ -504,6 +504,9 @@ class ModelRunner
     void reprocess_local_stack(std::vector<int>& local_mstack, std::vector<char>& is_in_queue, int outlet,
   std::map<int,double>& WF_corrector, std::map<int,double>& SF_corrector, 
   std::map<int,std::vector<double> >& SL_corrector);
+    void unpack_entry_points_from_delta_maps(std::queue<int>& iteralake, std::vector<std::vector<double> >& label_prop_of_delta,
+std::vector<double>& delta_sed, std::vector<double>& delta_water, std::vector<int>& pre_entry_node, std::vector<std::vector<double> >& label_prop_of_pre,
+std::vector<double>& pre_sed, std::vector<double>& pre_water);
 
     std::vector<int> lake_in_order;
     std::vector<int> lake_status;

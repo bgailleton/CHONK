@@ -512,6 +512,15 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
     delta_water, pre_entry_node, label_prop_of_delta);
 
 
+  this->unpack_entry_points_from_delta_maps(iteralake, label_prop_of_delta, delta_sed,delta_water, pre_entry_node, 
+     label_prop_of_pre, pre_sed,pre_water);
+  // Doen
+}
+
+void ModelRunner::unpack_entry_points_from_delta_maps(std::queue<int>& iteralake, std::vector<std::vector<double> >& label_prop_of_delta,
+std::vector<double>& delta_sed, std::vector<double>& delta_water, std::vector<int>& pre_entry_node, std::vector<std::vector<double> >& label_prop_of_pre,
+std::vector<double>& pre_sed, std::vector<double>& pre_water)
+{
   double sum_dwats = 0;
   // Now I can go through my delta and pre vector to calculate and apply my new entry points
   for(size_t i=0; i < this->lakes.size(); i++ )
@@ -531,17 +540,9 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
     EntryPoint other(dwat * this->timestep, dsed, pre_entry_node[i], label_prop_of_delta[i]);
     queue_adder_for_lake[target_lake].ingestNkill( other);
 
-
     // Emplacing the next lake entry in the queue
     iteralake.emplace(pre_entry_node[i]);
-    
-    // Old safety check to probably remove
-    if(pre_entry_node[i] == -9999)
-      throw std::runtime_error("EntryPointError::Invalid at check_outlets " + std::to_string(pre_entry_node[i]) + " with water " + std::to_string(dwat * this->timestep) + " at lake " + std::to_string(i));
   }
-
-  std::cout << "DONE WITH reprocess_nodes_from_lake_outlet " << outlet << std::endl;
-  // Doen
 }
 
 void ModelRunner::reprocess_local_stack(std::vector<int>& local_mstack, std::vector<char>& is_in_queue, int outlet,
