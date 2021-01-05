@@ -487,8 +487,6 @@ class ModelRunner
     void drape_deposition_flux_to_chonks();
     void check_what_gives_to_lake(int entry_node, std::vector<int>& these_lakid , std::vector<double>& twat, std::vector<double>& tsed, 
         std::vector<std::vector<double> >& tlab,  std::vector<int>& these_ET, int lake_to_ignore);
-    void check_what_give_to_existing_outlets(std::map<int,double>& map_to_update, std::vector<int>& nodes_to_check, std::vector<char>& has_recs_in_local_stack, bool add_water_flux_to_itself);
-
     void reprocess_nodes_from_lake_outlet_v2(int current_lake, int outlet, std::vector<bool>& is_processed, std::queue<int>& iteralake, EntryPoint& entry_point);
 
     void gather_nodes_to_reproc(std::vector<int>& local_mstack, 
@@ -496,7 +494,8 @@ class ModelRunner
    std::vector<char>& is_in_queue, int outlet);
     void preprocess_outletting_chonk(chonk& tchonk, EntryPoint& entry_point, int current_lake, int outlet,
  std::map<int,double>& WF_corrector, std::map<int,double>& SF_corrector, std::map<int,std::vector<double> >& SL_corrector);
-
+    void check_what_give_to_existing_outlets(std::map<int,double>& WF_corrector,  std::map<int,double>& SF_corrector, 
+  std::map<int,std::vector<double> >&  SL_corrector, std::vector<int>& local_mstack);
     bool is_this_node_in_this_lake(int node, int tlake){bool out = false; int lakid = this->node_in_lake[node]; if(lakid>=0)lakid = this->motherlake(lakid);if(lakid==tlake)out = true;return out;}
 
 

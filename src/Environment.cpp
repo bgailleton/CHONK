@@ -470,48 +470,13 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
   //  (___/  (___/  (___/  quack
 
 
-  // // DEBUG PROCESS TO CHECK IF WATER IS CREATED WHEN REPROCESSING A LAKE WITH 0 WATER
-  // for(auto tnode : local_mstack)
-  // {
-  //   // # If my node is just a donor, I am not resetting it
-  //   if (is_in_queue[tnode] == 'd')
-  //     continue;
-  //   has_recs_in_local_stack[tnode] = 'p';
-  // }
-  // for(auto tnode : local_mstack)
-  // {
-  //   // # If my node is just a donor, I am not resetting it
-  //   if (has_recs_in_local_stack[tnode] == 'p')
-  //   {
-  //     std::vector<int> neightbors; std::vector<double> dummy ; graph.get_D8_neighbors(tnode, active_nodes, neightbors, dummy);
-  //     for(auto ttnode: neightbors)
-  //     {
-  //       if(this->node_in_lake[ttnode] >=0 )
-  //         continue;
-  //       if(topography[ttnode] >= topography[tnode])
-  //         continue;
-
-  //       has_recs_in_local_stack[ttnode] = 'y';
-  //     }
-  //     if(has_recs_in_local_stack[tnode] == 'p')
-  //       has_recs_in_local_stack[tnode] = 'n';
-
-  //   }
-    
-  // }
-
-  // Removed here: single receiver ID, the outlet needs multiple receiver memory to be correct
-
   //----------------------------------------------------
   //---------- DEPROCESSING THE LOCAL STACK ------------
   //----------------------------------------------------
   
   // DEBUG VARIABLE TO CHECK IF WATER IS CREATED WHEN REPROCESSING A LAKE WITH 0 WATER
   double local_sum = 0;
-  std::map<int,double> corrector_HBO;
-  this->check_what_give_to_existing_outlets(corrector_HBO, local_mstack, has_recs_in_local_stack, true);
-  std::vector<int> temp_outvec = {outlet};
-  this->check_what_give_to_existing_outlets(corrector_HBO, temp_outvec, has_recs_in_local_stack, false);
+  this->check_what_give_to_existing_outlets(WF_corrector,  SF_corrector,  SL_corrector, local_mstack, true);
 
   // Now deprocessing the receivers in potential lake while saving their contribution to lakes in order to calculate the delta
   for(auto tnode : local_mstack)
@@ -887,6 +852,46 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
   std::cout << "DONE WITH reprocess_nodes_from_lake_outlet " << outlet << std::endl;
   // Doen
 }
+
+void ModelRunner::check_what_give_to_existing_outlets(std::map<int,double>& WF_corrector,  std::map<int,double>& SF_corrector, 
+  std::map<int,std::vector<double> >&  SL_corrector, std::vector<int>& local_mstack)
+{
+  for( auto node : local_mstack)
+  {
+    chonk& tchonk = this->chonk_network[node];
+
+    //getting the weights
+    // # Initialising a bunch of intermediate containers and variable
+    std::vector<int> tchonk_recs;
+    std::vector<double> tchonk_slope_recs;
+    std::vector<double> tchonk_weight_water_recs, tchonk_weight_sed_recs;
+
+    // copying the weights from the current 
+    tchonk.copy_moving_prep(tchonk_recs,tchonk_slope_recs,tchonk_weight_water_recs,tchonk_weight_sed_recs);
+
+    for(size_t i =0; i < tchonk_recs.size(); i++)
+    {
+      // node indice of the receiver
+      int tnode = tchonk_rec[i];
+      // Now checking if the rec is an outlet:
+      if(this->has_been_outlet[tnode] == 'y')
+      {
+        if(WF_corrector.count(tnode) == 0)
+        {
+          WF_corrector[tnode] = 0;
+          SF_corrector[tnode] = 0;
+          SL_corrector[tnode] = {};
+        }
+
+        WF_corrector[tnode] -= weight_water_recs[i] * tchonk.get_water_flux();
+        SL_corrector[tnode] = mix_two_proportions(SF_corrector[tnode],SL_corrector[tnode], -1 * tchonk_weight_sed_recs[i]* tchonk.get_sediment_flux(), tchonk.get_other_attribute_array("label_tracker"));
+        SF_corrector[tnode] -= tchonk_weight_sed_recs[i]* tchonk.get_sediment_flux();
+      }
+
+    }
+  }
+}
+
 
 void ModelRunner::preprocess_outletting_chonk(chonk& tchonk, EntryPoint& entry_point, int current_lake, int outlet,
  std::map<int,double>& WF_corrector, std::map<int,double>& SF_corrector, std::map<int,std::vector<double> >& SL_corrector)
@@ -1756,44 +1761,7 @@ void ModelRunner::reprocess_nodes_from_lake_outlet(int current_lake, int outlet,
   // Doen
 }
 
-void ModelRunner::check_what_give_to_existing_outlets(std::map<int,double>& map_to_update, std::vector<int>& nodes_to_check,
- std::vector<char>& has_recs_in_local_stack, bool add_water_flux_to_itself)
-{
-  for(auto tnode:nodes_to_check)
-  {
-    if(has_recs_in_local_stack[tnode] != 'y')
-      continue;
 
-    if(has_been_outlet[tnode] == 'y' && add_water_flux_to_itself)
-    {
-      if(map_to_update.count(tnode) == 0)
-        map_to_update[tnode] = 0;
-      map_to_update[tnode] += this->chonk_network[tnode].get_water_flux();
-    }
-
-    std::vector<int> neightbors = this->chonk_network[tnode].get_chonk_receivers_copy();
-    std::vector<double> WW = this->chonk_network[tnode].get_chonk_water_weight();
-    double water_rate = this->chonk_network[tnode].get_water_flux();
-
-    for(size_t i=0; i< neightbors.size();i++)
-    {
-      int ttnode = neightbors[i];
-      if(this->has_been_outlet[ttnode] != 'y')
-        continue;
-
-      if(map_to_update.count(ttnode) == 0)
-        map_to_update[ttnode] = 0;
-
-      map_to_update[ttnode] -= WW[i] * water_rate;
-    }
-
-  }
-
-  for (auto el:map_to_update)
-  {
-      std::cout << "REGISTERED " << el.first << " with " << el.second << std::endl;
-  }
-}
 
 void ModelRunner::check_what_gives_to_lake(int entry_node, std::vector<int>& these_lakid , std::vector<double>& twat, std::vector<double>& tsed,
  std::vector<std::vector<double> >& tlab, std::vector<int>& these_ET, int lake_to_ignore)
