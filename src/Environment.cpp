@@ -499,7 +499,9 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
   //----------------------------------------------------
   // this section reprocess all nodes affected by the routletting of the lake nodes from upstream to donwstream
 
-  this->reprocess_local_stack();
+  this->reprocess_local_stack(std::vector<int>& local_mstack, std::vector<char>& is_in_queue, int outlet,
+  std::map<int,double>& WF_corrector, std::map<int,double>& SF_corrector, 
+  std::map<int,std::vector<double> >& SL_corrector);
   
 
 
@@ -647,7 +649,7 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
   // Doen
 }
 
-void ModelRunner::reprocess_local_stack(std::vector,int>& local_mstack, std::vector<char>& is_in_queue, int outlet,
+void ModelRunner::reprocess_local_stack(std::vector<int>& local_mstack, std::vector<char>& is_in_queue, int outlet,
   std::map<int,double>& WF_corrector, std::map<int,double>& SF_corrector, 
   std::map<int,std::vector<double> >& SL_corrector)
 {
@@ -696,7 +698,7 @@ void ModelRunner::reprocess_local_stack(std::vector,int>& local_mstack, std::vec
   }
 }
 
-void ModelRunner::deprocess_local_stack(std::vector,int>& local_mstack, std::vector<char>& is_in_queue)
+void ModelRunner::deprocess_local_stack(std::vector<int>& local_mstack, std::vector<char>& is_in_queue)
 {
   // Now deprocessing the receivers in potential lake while saving their contribution to lakes in order to calculate the delta
   for(auto tnode : local_mstack)
