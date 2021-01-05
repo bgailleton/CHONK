@@ -490,91 +490,18 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
   //---------------- OUTLET PROCESSING -----------------
   //----------------------------------------------------
 
-  
-  // Setting manually the new receivers to the outlet chonk and all the relatedweights  
-  tchonk.external_moving_prep(ID_recs,weight_water_recs,weight_sed_recs,slope_recs);
-
-  // CHECEKD THAT THE WEIGHT WERE ALWAYS 1
-  // double gabgab = 0;
-  // for (auto gab : weight_water_recs )
-  //   gabgab += gab;
-
-  // if(gabgab != 1)
-  //   std::runtime_error("GABGABERROR::" + std::to_string(gabgab) );
-
-  if(ID_recs.size() == 0 && active_nodes[outlet]>0)
-    throw std::runtime_error("NoRecsError::outlet has no recs...");
-
-  // std::cout << "starting the reproc" << std::endl;
   // Process the outlet, whithout preparing the move (Already done) and readding the precipitation-like fluxes (already taken into account).
   this->process_node_nolake_for_sure(this->lakes[current_lake].outlet, is_processed, active_nodes, 
       cellarea,topography, false, false);
-  // std::cout << "ending the reproc" << std::endl;
-
-
 
   //----------------------------------------------------
   //------------ LOCAL STACK REPROCESSING --------------
   //----------------------------------------------------
   // this section reprocess all nodes affected by the routletting of the lake nodes from upstream to donwstream
 
-  // Iterating through the local stack
-  for(auto tnode:local_mstack)
-  {
+  this->reprocess_local_stack();
+  
 
-    // Discriminating between the donors and the receivers
-    if(is_in_queue[tnode] == 'd')
-    {
-      // # I am a donor, I just need to regive the sed/water without other reproc
-      // # Let me just just check which of my receivers I need to give fluxes (I shall not regive to the nodes not in my local stack)
-      std::vector<int> ignore_some; 
-      for(auto ttnode: this->chonk_network[tnode].get_chonk_receivers_copy())
-      {
-        // if the node is the outlet, or not a 'y', I ignore it
-        if(is_in_queue[ttnode] != 'y' || ttnode == this->lakes[current_lake].outlet || this->has_been_outlet[ttnode] == 'y')
-        {          
-          ignore_some.push_back(ttnode);
-          continue;
-        }
-        // I also ignore the nodes in the current lake (they have a 'y' signature)
-        else if (this->node_in_lake[ttnode] >= 0)
-        {
-          // if(motherlake(this->node_in_lake[ttnode]) == current_lake)
-          // {
-            ignore_some.push_back(ttnode);
-            continue;
-          // }
-        }
-      }
-      if(tnode == 660)
-        std::cout << "660 FOUND HERE IN DONDON AND IS " << this->chonk_network[660].get_water_flux() << std::endl;
-
-      // # Ignore_some has the node i so not want
-      // # So I transmit my fluxes to the nodes I do not ignore
-      this->chonk_network[tnode].split_and_merge_in_receiving_chonks_ignore_some(this->chonk_network, this->graph, this->timestep, ignore_some);
-    }
-    else
-    {
-      // # I am not a nodor:
-      if ( this->has_been_outlet[tnode] == 'y' )
-      {
-        // std::cout << "IMPORTANT REMINDER!!!: the correction process correctorHBO needs to be added to sediment fluxes Boris" << std::endl;
-        this->chonk_network[tnode].add_to_water_flux( corrector_HBO[tnode]);
-        // if(tnode == 660)
-          std::cout << "Adding " << corrector_HBO[tnode] << " to water flux with corrector_HBO" << std::endl;
-      }
-      // # So I need full reproc yaaay
-      this->process_node_nolake_for_sure(tnode, is_processed, active_nodes, 
-        cellarea,topography, true, true);
-      if(tnode == 660)
-        std::cout << "660 FOUND HERE IN REPROC AND IS NOW " << this->chonk_network[660].get_water_flux() << std::endl;
-    
-      if(has_recs_in_local_stack[tnode] != 'y') 
-        local_sum += this->chonk_network[tnode].get_water_flux();
-    }
-
-    // std::cout << tnode << "-" << is_in_queue[tnode] << "[" << this->chonk_network[tnode].get_water_flux() <<"] " << "|";
-  }
 
   // TO SORT LATER
   // if(double_equals(local_sum,water_rate,1e-3) == false && was_0)
@@ -718,6 +645,55 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
 
   std::cout << "DONE WITH reprocess_nodes_from_lake_outlet " << outlet << std::endl;
   // Doen
+}
+
+void ModelRunner::reprocess_local_stack(std::vector,int>& local_mstack, std::vector<char>& is_in_queue, int outlet,
+  std::map<int,double>& WF_corrector, std::map<int,double>& SF_corrector, 
+  std::map<int,std::vector<double> >& SL_corrector)
+{
+  // Iterating through the local stack
+  for(auto tnode:local_mstack)
+  {
+
+    // Discriminating between the donors and the receivers
+    if(is_in_queue[tnode] == 'd')
+    {
+      // # I am a donor, I just need to regive the sed/water without other reproc
+      // # Let me just just check which of my receivers I need to give fluxes (I shall not regive to the nodes not in my local stack)
+      std::vector<int> ignore_some; 
+      for(auto ttnode: this->chonk_network[tnode].get_chonk_receivers_copy())
+      {
+        // if the node is the outlet, or not a 'y', I ignore it
+        if(is_in_queue[ttnode] != 'y' || ttnode == this->lakes[current_lake].outlet || this->has_been_outlet[ttnode] == 'y')
+        {          
+          ignore_some.push_back(ttnode);
+          continue;
+        }
+        // I also ignore the nodes in the current lake (they have a 'y' signature)
+        else if (this->node_in_lake[ttnode] >= 0)
+        {
+          ignore_some.push_back(ttnode);
+          continue;
+        }
+      }
+
+      // # Ignore_some has the node i so not want
+      // # So I transmit my fluxes to the nodes I do not ignore
+      this->chonk_network[tnode].split_and_merge_in_receiving_chonks_ignore_some(this->chonk_network, this->graph, this->timestep, ignore_some);
+    }
+    else
+    {
+      // # I am not a nodor:
+      if ( this->has_been_outlet[tnode] == 'y' )
+      {
+        this->chonk_network[tnode].add_to_water_flux( WF_corrector[tnode]);
+        this->chonk_network[tnode].add_to_sediment_flux( SF_corrector[tnode], SL_corrector[tnode]);
+      }
+      // # So I need full reproc yaaay
+      this->process_node_nolake_for_sure(tnode, is_processed, active_nodes, 
+        cellarea,topography, true, true);
+    }
+  }
 }
 
 void ModelRunner::deprocess_local_stack(std::vector,int>& local_mstack, std::vector<char>& is_in_queue)
