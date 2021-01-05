@@ -451,18 +451,18 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
 
   // Final size OK
   // I have a stack of nodes to reprocess. 
-  // It is composed of donors (is_in_queue[] == 'd')
-  // which will be reprocessed but not reset
-  // and receivers (is_in_queue[] == 'y')
-  // which will be reproc. and reset
-
 
   //----------------------------------------------------
   //------- STARTING THE OUTLET PREPROCESSING ----------
   //----------------------------------------------------
 
-  // Getting the outlet
+  // Getting the outletting chonk particule
   chonk& tchonk = this->chonk_network[this->lakes[current_lake].outlet];
+  // Now initialising the map correcting the fluxes
+  std::map<int,double> WF_corrector; std::map<int,double> SF_corrector; std::map<int,std::vector<double> > SL_corrector;
+  // Calling teh function preparing the outletting chonk processing
+  this->preprocess_outletting_chonk(tchonk, entry_point, current_lake, this->lakes[current_lake].outlet,
+ std::map<int,double>& WF_corrector, std::map<int,double>& SF_corrector, std::map<int,std::vector<double> >& SL_corrector);
 
   // Checking if this thing has already been an outlet. If not I am recording the outlet outputs
   if(this->has_been_outlet[this->lakes[current_lake].outlet] == 'n')
@@ -997,6 +997,83 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
 
   std::cout << "DONE WITH reprocess_nodes_from_lake_outlet " << outlet << std::endl;
   // Doen
+}
+
+void ModelRunner::preprocess_outletting_chonk(chonk& tchonk, EntryPoint& entry_point, int current_lake, int outlet,
+ std::map<int,double>& WF_corrector, std::map<int,double>& SF_corrector, std::map<int,std::vector<double> >& SL_corrector)
+{
+  // labelling the outlet
+  this->has_been_outlet[outlet] = 'y';
+  // Getting the additioned water rate
+  double water_rate = entry_point.volume_water / this->timestep;
+  // Summing it to the previous one
+  water_rate += tchonk.get_water_flux();
+
+  // Dealing with sediments
+  std::vector<double> label_prop = mix_two_proportions(entry_point.volume_sed,entry_point.label_prop, tchonk.get_sediment_flux(), tchonk.get_other_attribute_array("label_tracker"));
+  double sedrate = entry_point.volume_sed + tchonk.get_sediment_flux();
+
+  //getting the weights
+  // # Initialising a bunch of intermediate containers and variable
+  std::vector<int> ID_recs, tchonk_recs;
+  std::vector<double> slope_recs,tchonk_slope_recs;
+  std::vector<double> weight_water_recs, weight_sed_recs, tchonk_weight_water_recs, tchonk_weight_sed_recs;
+  double sumW = 0;
+  double sumS = 0;
+  int nrecs = 0;
+  // copying the weights from the current 
+  tchonk.copy_moving_prep(tchonk_recs,tchonk_slope_recs,tchonk_weight_water_recs,tchonk_weight_sed_recs);
+
+  for(size_t i =0; i, tchonk_recs.size(); i++)
+  {
+    // node indice of the receiver
+    int tnode = tchink_rec[i];
+    // Checking wether it is giving to the original lake or not
+    if(this->is_this_node_in_this_lake(tnode, current_lake) ==  false)
+    {
+      ID_recs.push_back(tchonk_recs[i]);
+      slope_recs.push_back(tchonk_slope_recs[i]);
+      weight_water_recs.push_back(tchonk_weight_water_recs[i]);
+      weight_sed_recs.push_back(tchonk_weight_sed_recs[i]);
+      sumW += tchonk_weight_water_recs[i];
+      sumS += tchonk_weight_sed_recs[i];
+      nrecs++;
+    }
+    else
+    {
+      water_rate -= weight_water_recs[i] * tchonk.get_water_flux();
+      label_prop = mix_two_proportions(sedrate,label_prop, -1 * tchonk_weight_sed_recs[i]* tchonk.get_sediment_flux(), tchonk.get_other_attribute_array("label_tracker"));
+      sedrate -= tchonk_weight_sed_recs[i]* tchonk.get_sediment_flux();
+    }
+
+    // Now checking if the rec is an outlet:
+    if(this->has_been_outlet[tnode] == 'y')
+    {
+      if(WF_corrector.count(tnode) == 0)
+      {
+        WF_corrector[tnode] = 0
+        SF_corrector[tnode] = 0
+        SL_corrector[tnode] = {};
+      }
+
+      WF_corrector[tnode] -= weight_water_recs[i] * tchonk.get_water_flux();
+      SL_corrector[tnode] = mix_two_proportions(SF_corrector[tnode],SL_corrector[tnode], -1 * tchonk_weight_sed_recs[i]* tchonk.get_sediment_flux(), tchonk.get_other_attribute_array("label_tracker"));
+      SF_corrector[tnode] -= tchonk_weight_sed_recs[i]* tchonk.get_sediment_flux();
+    }
+
+  }
+  // Normalising the thingies
+  for(auto& Ugh:weight_water_recs)
+    Ugh/sumW;
+  for(auto& Ugh:weight_sed_recs)
+    Ugh/sumS;
+
+  // Resetting the CHONK
+  tchonk.reset();
+  tchonk.external_moving_prep(ID_recs,slope_recs,weight_water_recs,weight_sed_recs);
+  tchonk.set_water_flux(water_rate);
+  tchonk.set_sediment_flux(sedrate,labprop);
+  // Ready to go ??!!
 }
 
 void ModelRunner::gather_nodes_to_reproc(std::vector<int>& local_mstack, 
