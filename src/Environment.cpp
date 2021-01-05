@@ -406,6 +406,8 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
   // First, saivng some values for debugging and water balance purposes
   double debug_saverW = entry_point.volume_water / this->timestep;
   double outlet_water_saver = this->chonk_network[outlet].get_water_flux();
+    // temp variable I need for the processing function
+  double cellarea = this->io_double["dx"] * this->io_double["dy"];
   bool was_0 = false;
   if(entry_point.volume_water == 0)
     was_0 = true;
@@ -475,153 +477,19 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
   
   // DEBUG VARIABLE TO CHECK IF WATER IS CREATED WHEN REPROCESSING A LAKE WITH 0 WATER
   double local_sum = 0;
+  // preprocessing the nodes on the path that are outlets
   this->check_what_give_to_existing_outlets(WF_corrector,  SF_corrector,  SL_corrector, local_mstack);
+  // preprocessing the quantity given to existing lakes (to later calculate the delta)
+  this->check_what_give_to_existing_lakes(local_mstack, outlet, current_lake, pre_sed,
+    pre_water, pre_entry_node, label_prop_of_pre);
+  // and finally deprocess the stack
+  this->deprocess_local_stack(local_mstack,is_in_queue);
 
-  // Now deprocessing the receivers in potential lake while saving their contribution to lakes in order to calculate the delta
-  for(auto tnode : local_mstack)
-  {
-    // # If my node is just a donor, I am not resetting it
-    if (is_in_queue[tnode] == 'd')
-      continue;
-
-    if(has_recs_in_local_stack[tnode] != 'y') 
-      local_sum -= this->chonk_network[tnode].get_water_flux();
-
-    if(tnode == 660)
-      std::cout << "660 FOUND HERE IN DEPROC AND IS " << this->chonk_network[660].get_water_flux() << std::endl;
-
-    // # Calling the function checking the receivers are giving fluxes to a lake
-    std::vector<int> these_lakid; std::vector<double> twat; std::vector<double> tsed; std::vector<std::vector<double> > tlab; std::vector<int> bulug;
-    this->check_what_gives_to_lake(tnode, these_lakid, twat, tsed, tlab, bulug, current_lake);
-
-    // # If they are, I am saving what they are giving to each lakes before resetting them to calculate a delta later
-    // # Going through all local rec in lakes
-    for(int i = 0; i < int(these_lakid.size()); i++)
-    {
-      // ## Getting the lake ID
-      int tlakid = these_lakid[i];
-      // ## mixing the proportions
-      label_prop_of_pre[tlakid] = mix_two_proportions(pre_sed[tlakid],label_prop_of_pre[tlakid],tsed[i],tlab[i]);
-      // ## Saving the amount of sed/water
-      pre_sed[tlakid] += tsed[i];
-      pre_water[tlakid] += twat[i];
-
-      // Safety check (can be removed soon i'd say. It's been a while it has not been triggered)
-      if(bulug[i] == -9999)
-        throw std::runtime_error("EntryPointError::Invalid Node after check A");
-
-      // ## Getting the location of the future lake entry (it does not matter where I am adding water in the lake, as long as it is in the lake)
-      pre_entry_node[tlakid] = bulug[i];  
-    }
-
-    // # Cancelling the fluxes before moving prep (i.e. the precipitation, infiltrations, ...)
-    // # This is not for water purposes as it gets reproc anyway, but for mass balance calculation
-    this->cancel_fluxes_before_moving_prep(this->chonk_network[tnode], tnode);
-    // # resetting the node (All fluxes and modifyers to 0)
-    this->chonk_network[tnode].reset();
-    this->chonk_network[tnode].set_other_attribute_array("label_tracker", std::vector<double>(this->n_labels,0));
-  }
-
-  // Repeatting the above process for the outlet
-  if(true) // Very bad coding practice. there used to be a real condition here, but I kind of need a local scope to avoid variable redeclaration
-  {
-    // See above for explanations
-    std::vector<int> these_lakid; std::vector<double> twat; std::vector<double> tsed; std::vector<std::vector<double> > tlab; std::vector<int> bulug;
-    this->check_what_gives_to_lake(this->lakes[current_lake].outlet, these_lakid, twat, tsed, tlab, bulug,current_lake);
-    for(int i = 0; i < int(these_lakid.size()); i++)
-    {
-      int tlakid = these_lakid[i];
-      label_prop_of_pre[tlakid] = mix_two_proportions(pre_sed[tlakid],label_prop_of_pre[tlakid],tsed[i],tlab[i]);
-      pre_sed[tlakid] += tsed[i];
-      pre_water[tlakid] += twat[i];
-      pre_entry_node[tlakid] = bulug[i];
-    }
-  }
 
   //----------------------------------------------------
   //---------------- OUTLET PROCESSING -----------------
   //----------------------------------------------------
 
-  // Finally resetting the outlet
-  tchonk.reset();
-  double corrector = this->lakes[current_lake].sum_outrate;
-
-  // Giving it its new fluxes and receiver status
-  // # Adding the water rate.
-  // # sum_outrate - > the amount of water that came out of this very same outlet before
-  // # Will be 0 the first time this node outlets, and it stacks the water value each time
-  double water_rate = entry_point.volume_water / this->timestep + this->lakes[current_lake].sum_outrate;
-  double presumoutrate = this->lakes[current_lake].sum_outrate;
-  // # stacking water in this value
-  std::cout << "sumoutrate was " << this->lakes[current_lake].sum_outrate;
-  this->lakes[current_lake].sum_outrate += entry_point.volume_water / this->timestep;
-  std::cout << " is now " << this->lakes[current_lake].sum_outrate << std::endl;
-
-  if(was_0 && entry_point.volume_water != 0)
-    throw std::runtime_error("SpecificError#542::" + std::to_string(entry_point.volume_water));
-
-  entry_point.volume_water = 0;
-
-  // # Same with sediments (TODO add the sumoutrate for sed)
-  double sed_rate = entry_point.volume_sed;
-  std::vector<double> labprop = entry_point.label_prop;
-
-  entry_point.volume_sed = 0;
-
-  // # Now readding what these outlets receivers
-  // # and adding them to the outlet water flux
-  double sumwat = 0;
-  double sumsed = 0;
-  // # going through the recs and gathering water not in current lake (cause it is already taken into account by the sumoutrate)
-  for(size_t i = 0; i < original_outlet_giver[outlet].size(); i++)
-  {
-    // ## Checking the node and its lake id
-    int this_node = original_outlet_giver[outlet][i];
-    int this_lake_id = this->node_in_lake[this_node];
-    // ## If is lake, is it the current lake
-    // if(this_lake_id >= 0)
-    //   continue;
-      // Use to be:
-    if(this_lake_id >= 0)
-      if(this->motherlake(this_lake_id) == current_lake)
-        continue;
-    
-    // ## If not current lake, water to be added.
-    sumwat += original_outlet_giver_water[outlet][i];
-    corrector += original_outlet_giver_water[outlet][i];
-    sumsed += original_outlet_giver_sed[outlet][i];
-  }
-
-  // # Before adding the fluxes to the outlet one,
-  // # Mixing the previous and new proportion of labels.
-  labprop = mix_two_proportions(sed_rate, labprop, sumsed, original_outlet_giver_sedlab[outlet]);
-  
-  // # Finally adding the full water and sediments to the recs
-  water_rate += sumwat;
-  sed_rate += sumsed;
-
-  std::cout << " --------->  outlet giving [" << water_rate << "] to outlet_receivers and [" << sumwat << "] was from original outlet giving." << std::endl;;
-
-  if(was_0 && water_rate != outlet_water_saver)
-  {
-    std::cout << "WARNING WATER CREATED IN RECPROC:: WIll need sorting at some points" << std::endl;
-    // water_rate = outlet_water_saver;
-  }
-
-  // # and setting them to the outlet chonk
-  tchonk.set_water_flux(water_rate);
-  tchonk.set_sediment_flux(sed_rate, labprop);
-
-  if(water_rate != outlet_water_saver && was_0)
-    throw std::runtime_error("NoWaterAdded, was " + std::to_string(outlet_water_saver) + " Now is " + std::to_string(water_rate) 
-      +  " is it better like that: " + std::to_string(water_rate + sumwat)
-      +  " or like that: " + std::to_string(water_rate - presumoutrate) );
-    // std::cout << "NoWaterAdded, was " + std::to_string(outlet_water_saver) + " Now is " + std::to_string(water_rate) 
-    //   +  " is it better like that: " + std::to_string(water_rate - sumwat)
-    //   +  " or like that: " + std::to_string(water_rate - presumoutrate) << std::endl;
-
-  // temp variable I need for the processing function
-  double cellarea = this->io_double["dx"] * this->io_double["dy"];
   
   // Setting manually the new receivers to the outlet chonk and all the relatedweights  
   tchonk.external_moving_prep(ID_recs,weight_water_recs,weight_sed_recs,slope_recs);
@@ -850,6 +718,24 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
 
   std::cout << "DONE WITH reprocess_nodes_from_lake_outlet " << outlet << std::endl;
   // Doen
+}
+
+void ModelRunner::deprocess_local_stack(std::vector,int>& local_mstack, std::vector<char>& is_in_queue)
+{
+  // Now deprocessing the receivers in potential lake while saving their contribution to lakes in order to calculate the delta
+  for(auto tnode : local_mstack)
+  {
+    // # If my node is just a donor, I am not resetting it
+    if (is_in_queue[tnode] == 'd')
+      continue;
+
+    // # Cancelling the fluxes before moving prep (i.e. the precipitation, infiltrations, ...)
+    // # This is not for water purposes as it gets reproc anyway, but for mass balance calculation
+    this->cancel_fluxes_before_moving_prep(this->chonk_network[tnode], tnode);
+    // # resetting the node (All fluxes and modifyers to 0)
+    this->chonk_network[tnode].reset();
+    this->chonk_network[tnode].set_other_attribute_array("label_tracker", std::vector<double>(this->n_labels,0));
+  }
 }
 
 void ModelRunner::check_what_give_to_existing_outlets(std::map<int,double>& WF_corrector,  std::map<int,double>& SF_corrector, 

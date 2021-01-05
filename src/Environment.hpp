@@ -500,7 +500,7 @@ class ModelRunner
     bool is_this_node_in_this_lake(int node, int tlake){bool out = false; int lakid = this->node_in_lake[node]; if(lakid>=0)lakid = this->motherlake(lakid);if(lakid==tlake)out = true;return out;}
     void check_what_give_to_existing_lakes(std::vector<int>& local_mstack, int outlet, int current_lake, std::vector<double>& this_sed,
    std::vector<double>& this_water, std::vector<int>& this_entry_node, std::vector<std::vector<double> >& label_prop_of_this);
-
+    void deprocess_local_stack(std::vector,int>& local_mstack, std::vector<char>& is_in_queue);
 
     std::vector<int> lake_in_order;
     std::vector<int> lake_status;
