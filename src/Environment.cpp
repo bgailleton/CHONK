@@ -462,154 +462,43 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
   std::map<int,double> WF_corrector; std::map<int,double> SF_corrector; std::map<int,std::vector<double> > SL_corrector;
   // Calling teh function preparing the outletting chonk processing
   this->preprocess_outletting_chonk(tchonk, entry_point, current_lake, this->lakes[current_lake].outlet,
- std::map<int,double>& WF_corrector, std::map<int,double>& SF_corrector, std::map<int,std::vector<double> >& SL_corrector);
+  WF_corrector,  SF_corrector,  SL_corrector);
 
-  // Checking if this thing has already been an outlet. If not I am recording the outlet outputs
-  if(this->has_been_outlet[this->lakes[current_lake].outlet] == 'n')
-  {
-    // gathering variables I'll need 
-    int id = -1;
-    auto WWC =  tchonk.get_chonk_water_weight_copy();
-    auto WWS =  tchonk.get_chonk_sediment_weight_copy();
-    
-    // Here, deleted at commit master 26c0ad2b
-    // I used to reprocess the CHONK before resetting it.
-    // I know save its original state in the following maps to reuse it if the outlet is utilised multiple time
-
-    // Marking this node as being an outlet at least once
-    has_been_outlet[this->lakes[current_lake].outlet] = 'y';
-    
-
-    // Gathering the original water given by this outlet before being reprocessed.
-    // I will reuse that water every time the outlet is utilised in a reprocessing process
-    // I will check each nodes originally affected by this process
-
-    // # First initialising it
-    original_outlet_giver[this->lakes[current_lake].outlet] = {};
-    original_outlet_giver_water[this->lakes[current_lake].outlet] = {};
-    original_outlet_giver_sed[this->lakes[current_lake].outlet] = {};
-    original_outlet_giver_sedlab[this->lakes[current_lake].outlet] = {};
-    
-
-    // # Now getting the water fluxes and sed fluxes by original receivers
-    id = -1;
-    for(auto ttnode: tchonk.get_chonk_receivers_copy())
-    {
-      id++;
-      original_outlet_giver[this->lakes[current_lake].outlet].push_back(ttnode);
-      original_outlet_giver_water[this->lakes[current_lake].outlet].push_back(WWC[id] * tchonk.get_water_flux());
-      original_outlet_giver_sed[this->lakes[current_lake].outlet].push_back(WWS[id] * tchonk.get_sediment_flux());
-    }
-    // # Note that the sed prop is the same for all receivers at the moment. It could probs be improved
-    original_outlet_giver_sedlab[this->lakes[current_lake].outlet] = tchonk.get_other_attribute_array("label_tracker");
-    original_chonk[this->lakes[current_lake].outlet] = chonk(tchonk);
-    
-  }
-
-
-  // Reprocessing outlet receivers
-  // I am going throught the current receivers of the outlet and only keeping the ones not in the current lake
-  // APPROXIMATION HERE:: I am approximating the water weight based on the original outlet
-
-  // # Initialising a bunch of intermediate containers and variable
-  std::vector<int> ID_recs;
-  std::vector<double> slope_recs;
-  std::vector<double> weight_water_recs, weight_sed_recs;
-  double sumW = 0;
-  double sumS = 0;
-
-  // # Iterating through the receivers
-  for(size_t i = 0; i < original_outlet_giver[this->lakes[current_lake].outlet].size(); i++)
-  {
-    // # step 1 checking if they are in the current lake
-    int this_rec = original_outlet_giver[this->lakes[current_lake].outlet][i];
-    int this_lake_id = this->node_in_lake[this_rec];
-    if(this_lake_id >= 0)
-    {
-      this_lake_id = motherlake(this_lake_id);
-      if(this_lake_id == current_lake)
-        continue;
-    }
-
-    // # Step 2: they are not, so I gather their info
-    // ## Their ID
-    ID_recs.push_back(this_rec);
-    // ## Approx of the current slope
-    double dz = topography[this->lakes[current_lake].outlet] - topography[this_rec];
-    slope_recs.push_back(dz / this->io_double["dx"]);
-    // ## Getting the weights
-    weight_water_recs.push_back(original_outlet_giver_water[this->lakes[current_lake].outlet][i]);
-    weight_sed_recs.push_back(original_outlet_giver_sed[this->lakes[current_lake].outlet][i]);
-    // ## Summing the weights (if an original receiver is ignored, the sum of the fluxes will not be 1 anymore)
-    sumW += original_outlet_giver_water[this->lakes[current_lake].outlet][i];
-    sumS += original_outlet_giver_sed[this->lakes[current_lake].outlet][i];
-  }
-
-  // # Step 3: Normalisation to the new sum of weights
-  // std::cout<< std::endl << "NORMALISATOR::" <<  sumW << "||" << weight_water_recs.size()<< std::endl;
-  if(sumW != 0)
-  {
-    for(auto& Ugh:weight_water_recs)
-    {
-      // std::cout << Ugh << std::endl;
-      Ugh = std::abs(Ugh/sumW);
-    }
-  }
-  else if (weight_water_recs.size() > 0)
-  {
-    weight_water_recs = std::vector<double>(weight_water_recs.size(),double(1./int(weight_water_recs.size())));
-    // print_vector("GABULON:::P:::PDFSD:FKLDKSJFLKSDJFLKJSDF:",weight_water_recs);
-  }
-  else
-    std::cout << "CRASH WARNING::weight_water_recs size is 0??" << std::endl;
-  
-  if(sumS != 0)
-  {
-    for(auto& Ugh:weight_sed_recs)
-    {
-      // std::cout << Ugh << std::endl;
-      Ugh = std::abs(Ugh/sumW);
-    }
-  }
-  else if (weight_sed_recs.size() > 0)
-    weight_sed_recs = std::vector<double>(weight_sed_recs.size(),double(1./int(weight_sed_recs.size())));
-  else
-    std::cout << "CRASH WARNING::weight_sed_recs size is 0??" << std::endl;
 
   //   _      _      _
   // >(.)__ <(.)__ =(.)__
   //  (___/  (___/  (___/  quack
 
 
-  // DEBUG PROCESS TO CHECK IF WATER IS CREATED WHEN REPROCESSING A LAKE WITH 0 WATER
-  for(auto tnode : local_mstack)
-  {
-    // # If my node is just a donor, I am not resetting it
-    if (is_in_queue[tnode] == 'd')
-      continue;
-    has_recs_in_local_stack[tnode] = 'p';
-  }
-  for(auto tnode : local_mstack)
-  {
-    // # If my node is just a donor, I am not resetting it
-    if (has_recs_in_local_stack[tnode] == 'p')
-    {
-      std::vector<int> neightbors; std::vector<double> dummy ; graph.get_D8_neighbors(tnode, active_nodes, neightbors, dummy);
-      for(auto ttnode: neightbors)
-      {
-        if(this->node_in_lake[ttnode] >=0 )
-          continue;
-        if(topography[ttnode] >= topography[tnode])
-          continue;
+  // // DEBUG PROCESS TO CHECK IF WATER IS CREATED WHEN REPROCESSING A LAKE WITH 0 WATER
+  // for(auto tnode : local_mstack)
+  // {
+  //   // # If my node is just a donor, I am not resetting it
+  //   if (is_in_queue[tnode] == 'd')
+  //     continue;
+  //   has_recs_in_local_stack[tnode] = 'p';
+  // }
+  // for(auto tnode : local_mstack)
+  // {
+  //   // # If my node is just a donor, I am not resetting it
+  //   if (has_recs_in_local_stack[tnode] == 'p')
+  //   {
+  //     std::vector<int> neightbors; std::vector<double> dummy ; graph.get_D8_neighbors(tnode, active_nodes, neightbors, dummy);
+  //     for(auto ttnode: neightbors)
+  //     {
+  //       if(this->node_in_lake[ttnode] >=0 )
+  //         continue;
+  //       if(topography[ttnode] >= topography[tnode])
+  //         continue;
 
-        has_recs_in_local_stack[ttnode] = 'y';
-      }
-      if(has_recs_in_local_stack[tnode] == 'p')
-        has_recs_in_local_stack[tnode] = 'n';
+  //       has_recs_in_local_stack[ttnode] = 'y';
+  //     }
+  //     if(has_recs_in_local_stack[tnode] == 'p')
+  //       has_recs_in_local_stack[tnode] = 'n';
 
-    }
+  //   }
     
-  }
+  // }
 
   // Removed here: single receiver ID, the outlet needs multiple receiver memory to be correct
 
@@ -1027,7 +916,7 @@ void ModelRunner::preprocess_outletting_chonk(chonk& tchonk, EntryPoint& entry_p
   for(size_t i =0; i, tchonk_recs.size(); i++)
   {
     // node indice of the receiver
-    int tnode = tchink_rec[i];
+    int tnode = tchonk_rec[i];
     // Checking wether it is giving to the original lake or not
     if(this->is_this_node_in_this_lake(tnode, current_lake) ==  false)
     {
@@ -1051,8 +940,8 @@ void ModelRunner::preprocess_outletting_chonk(chonk& tchonk, EntryPoint& entry_p
     {
       if(WF_corrector.count(tnode) == 0)
       {
-        WF_corrector[tnode] = 0
-        SF_corrector[tnode] = 0
+        WF_corrector[tnode] = 0;
+        SF_corrector[tnode] = 0;
         SL_corrector[tnode] = {};
       }
 
