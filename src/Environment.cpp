@@ -491,8 +491,10 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
   this->check_what_give_to_existing_lakes(local_mstack, outlet, current_lake, pre_sed,
     pre_water, pre_entry_node, label_prop_of_pre);
   // and finally deprocess the stack
+  std::cout << "4.5" << std::endl;
   this->deprocess_local_stack(local_mstack,is_in_queue);
 
+  std::cout << "5" << std::endl;
 
   //----------------------------------------------------
   //---------------- OUTLET PROCESSING -----------------
@@ -502,11 +504,13 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
   this->process_node_nolake_for_sure(this->lakes[current_lake].outlet, is_processed, active_nodes, 
       cellarea,topography, false, false);
 
+  std::cout << "6" << std::endl;
   //----------------------------------------------------
   //------------ LOCAL STACK REPROCESSING --------------
   //----------------------------------------------------
   // this section reprocess all nodes affected by the routletting of the lake nodes from upstream to donwstreamå
   this->reprocess_local_stack(local_mstack, is_in_queue, outlet, current_lake, WF_corrector, SF_corrector, SL_corrector);
+  std::cout << "7" << std::endl;
 
   //----------------------------------------------------
   //------------ PROCESSING ENTRY POINTS ---------------

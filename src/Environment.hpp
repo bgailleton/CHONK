@@ -497,7 +497,9 @@ class ModelRunner
  std::vector<double>& pre_sed, std::vector<double>& pre_water, std::vector<int>& pre_entry_node, std::vector<std::vector<double> >& label_prop_of_pre);
     void check_what_give_to_existing_outlets(std::map<int,double>& WF_corrector,  std::map<int,double>& SF_corrector, 
   std::map<int,std::vector<double> >&  SL_corrector, std::vector<int>& local_mstack);
+
     bool is_this_node_in_this_lake(int node, int tlake){bool out = false; int lakid = this->node_in_lake[node]; if(lakid>=0)lakid = this->motherlake(lakid);if(lakid==tlake)out = true;return out;}
+    
     void check_what_give_to_existing_lakes(std::vector<int>& local_mstack, int outlet, int current_lake, std::vector<double>& this_sed,
    std::vector<double>& this_water, std::vector<int>& this_entry_node, std::vector<std::vector<double> >& label_prop_of_this);
     void deprocess_local_stack(std::vector<int>& local_mstack, std::vector<char>& is_in_queue);
