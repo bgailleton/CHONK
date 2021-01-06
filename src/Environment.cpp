@@ -612,8 +612,6 @@ void ModelRunner::reprocess_local_stack(std::vector<int>& local_mstack, std::vec
       this->process_node_nolake_for_sure(tnode, is_processed, active_nodes, 
         cellarea,topography, true, true);
 
-      std::cout << "Reprocessing " << tnode << " and now has " << this->chonk_network[tnode].get_water_flux() << std::endl;
-
     }
   }
 }
@@ -791,14 +789,30 @@ chonk ModelRunner::preprocess_outletting_chonk(chonk tchonk, EntryPoint& entry_p
   }
 
   // Normalising the thingies
-  for(size_t i =0; i < weight_water_recs.size(); i++)
+  if(sumW > 0)
   {
-    weight_water_recs[i] = weight_water_recs[i]/sumW;
+    for(size_t i =0; i < weight_water_recs.size(); i++)
+    {
+      weight_water_recs[i] = weight_water_recs[i]/sumW;
+    }
+  }
+  else
+  {
+    weight_water_recs = std::vector<double>(weight_water_recs.size(), 1./int(weight_water_recs.size()));
   }
 
-  for(size_t i =0; i < weight_sed_recs.size(); i++)
+  if(sumS > 0)
   {
-    weight_sed_recs[i] = weight_sed_recs[i]/sumS;
+    for(size_t i =0; i < weight_sed_recs.size(); i++)
+    {
+      weight_sed_recs[i] = weight_sed_recs[i]/sumS;
+    }
+
+  }
+  else
+  {
+    weight_sed_recs = std::vector<double>(weight_sed_recs.size(), 1./int(weight_sed_recs.size()));
+
   }
 
 
