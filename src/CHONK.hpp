@@ -160,6 +160,7 @@ class chonk
         std::cout << "erosion_flux_only_sediments::" << erosion_flux_only_sediments << std::endl;
         std::cout << "erosion_flux_only_bedrock::" << erosion_flux_only_bedrock << std::endl;
         std::cout << "n_rec::" << receivers.size() << std::endl;
+        print_vector("receivers",receivers);
         print_vector("weigth_water_fluxes",weigth_water_fluxes);
         print_vector("weigth_sediment_fluxes",weigth_sediment_fluxes);
         print_vector("slope_to_rec",slope_to_rec);

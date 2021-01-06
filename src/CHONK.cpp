@@ -139,7 +139,6 @@ void chonk::split_and_merge_in_receiving_chonks(std::vector<chonk>& chonkscape, 
     sum_weight_sed += this->weigth_sediment_fluxes[i];
     // std::cout << "SEDFLUXDEBUG::" << this->sediment_flux << "||" << this->weigth_sediment_fluxes[i] << "||water::" << this->weigth_water_fluxes[i] << std::endl;
   }
-  // std::cout << sum_weight_sed << "||";
 
 
 
