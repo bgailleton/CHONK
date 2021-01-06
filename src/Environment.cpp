@@ -626,7 +626,7 @@ void ModelRunner::reprocess_local_stack(std::vector<int>& local_mstack, std::vec
       for(auto ttnode: this->chonk_network[tnode].get_chonk_receivers_copy())
       {
         // if the node is the outlet, or not a 'y', I ignore it
-        if(is_in_queue[ttnode] != 'y' || ttnode == this->lakes[current_lake].outlet || this->has_been_outlet[ttnode] == 'y')
+        if(is_in_queue[ttnode] != 'y' || ttnode == this->lakes[current_lake].outlet)
         {          
           ignore_some.push_back(ttnode);
           continue;
