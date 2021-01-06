@@ -741,6 +741,7 @@ void ModelRunner::preprocess_outletting_chonk(chonk& tchonk, EntryPoint& entry_p
   {
     // node indice of the receiver
     int tnode = tchonk_recs[i];
+    std::cout << "testing " << tnode << " which is in lake " << this->node_in_lake[tnode] << " and current lake is " << current_lake << std::endl;
     // Checking wether it is giving to the original lake or not
     if(this->is_this_node_in_this_lake(tnode, current_lake) ==  false)
     {
