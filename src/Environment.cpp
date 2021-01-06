@@ -466,13 +466,14 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
   //----------------------------------------------------
 
   // Getting the outletting chonk particule
-  chonk& tchonk = this->chonk_network[this->lakes[current_lake].outlet];
+  chonk tchonk = this->chonk_network[this->lakes[current_lake].outlet];
   // Now initialising the map correcting the fluxes
   std::map<int,double> WF_corrector; std::map<int,double> SF_corrector; std::map<int,std::vector<double> > SL_corrector;
   // Calling teh function preparing the outletting chonk processing
   this->preprocess_outletting_chonk(tchonk, entry_point, current_lake, this->lakes[current_lake].outlet,
   WF_corrector,  SF_corrector,  SL_corrector, pre_sed, pre_water, pre_entry_node, label_prop_of_pre);
 
+  this->chonk_network[this->lakes[current_lake].outlet] = tchonk;
   //   _      _      _
   // >(.)__ <(.)__ =(.)__
   //  (___/  (___/  (___/  quack
@@ -500,6 +501,10 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
   //---------------- OUTLET PROCESSING -----------------
   //----------------------------------------------------
 
+  std::cout << std::endl << std::endl << std::endl << "chonk_network"<< std::endl;
+  this->chonk_network[this->lakes[current_lake].outlet].print_status();
+  std::cout << std::endl << std::endl << std::endl << "tchonk"<< std::endl;
+  tchonk.print_status();
   // Process the outlet, whithout preparing the move (Already done) and readding the precipitation-like fluxes (already taken into account).
   this->process_node_nolake_for_sure(this->lakes[current_lake].outlet, is_processed, active_nodes, 
       cellarea,topography, false, false);
@@ -745,6 +750,7 @@ void ModelRunner::preprocess_outletting_chonk(chonk& tchonk, EntryPoint& entry_p
     // Checking wether it is giving to the original lake or not
     if(this->is_this_node_in_this_lake(tnode, current_lake) ==  false)
     {
+      std::cout << "Selecting " << tchonk_recs[i] << " for analysis" << std::endl;
       ID_recs.push_back(tchonk_recs[i]);
       slope_recs.push_back(tchonk_slope_recs[i]);
       weight_water_recs.push_back(tchonk_weight_water_recs[i]);
@@ -794,9 +800,18 @@ void ModelRunner::preprocess_outletting_chonk(chonk& tchonk, EntryPoint& entry_p
 
   // Normalising the thingies
   for(auto& Ugh:weight_water_recs)
-    Ugh/sumW;
+  {
+    Ugh = Ugh/sumW;
+    std::cout << "new weight wat is " << Ugh << std::endl;
+  }
+
   for(auto& Ugh:weight_sed_recs)
-    Ugh/sumS;
+  {
+    Ugh = Ugh/sumS;
+    std::cout << "new weight sed is " << Ugh << std::endl;
+  }
+
+  print_vector("weight_water_recs", weight_water_recs);
 
   // Resetting the CHONK
   tchonk.reset();
