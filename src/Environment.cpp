@@ -467,10 +467,10 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
   // Now initialising the map correcting the fluxes
   std::map<int,double> WF_corrector; std::map<int,double> SF_corrector; std::map<int,std::vector<double> > SL_corrector;
   // Calling teh function preparing the outletting chonk processing
-  this->chonk_network[this->lakes[current_lake].outlet] = this->preprocess_outletting_chonk(tchonk, entry_point, current_lake, this->lakes[current_lake].outlet,
-  WF_corrector,  SF_corrector,  SL_corrector, pre_sed, pre_water, pre_entry_node, label_prop_of_pre);
+  this->chonk_network[this->lakes[current_lake].outlet] = chonk(this->preprocess_outletting_chonk(tchonk, entry_point, current_lake, this->lakes[current_lake].outlet,
+    WF_corrector,  SF_corrector,  SL_corrector, pre_sed, pre_water, pre_entry_node, label_prop_of_pre));
 
-  this->chonk_network[this->lakes[current_lake].outlet] = tchonk;
+  // this->chonk_network[this->lakes[current_lake].outlet] = tchonk;
   //   _      _      _
   // >(.)__ <(.)__ =(.)__
   //  (___/  (___/  (___/  quack
@@ -493,16 +493,19 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
   //----------------------------------------------------
   //---------------- OUTLET PROCESSING -----------------
   //----------------------------------------------------
-
+  // std::cout << std::endl<< std::endl<< std::endl << "#@" << std::endl;
+  // this->chonk_network[this->lakes[current_lake].outlet].print_status();
   // Process the outlet, whithout preparing the move (Already done) and readding the precipitation-like fluxes (already taken into account).
   this->process_node_nolake_for_sure(this->lakes[current_lake].outlet, is_processed, active_nodes, 
       cellarea,topography, false, false);
+
+  // std::cout << "Node 339 has " 
 
   //----------------------------------------------------
   //------------ LOCAL STACK REPROCESSING --------------
   //----------------------------------------------------
   // this section reprocess all nodes affected by the routletting of the lake nodes from upstream to donwstreamå
-  std::cout << "Entry_point is " << entry_point.volume_water/this->timestep; << std::endl;
+  // std::cout << "Entry_point is " << entry_point.volume_water/this->timestep << std::endl;
   this->reprocess_local_stack(local_mstack, is_in_queue, outlet, current_lake, WF_corrector, SF_corrector, SL_corrector);
 
   //----------------------------------------------------
@@ -609,7 +612,7 @@ void ModelRunner::reprocess_local_stack(std::vector<int>& local_mstack, std::vec
       this->process_node_nolake_for_sure(tnode, is_processed, active_nodes, 
         cellarea,topography, true, true);
 
-      std::cout << "Reprocessing " << tnode << " and now has " << this->chonk_network.get_water_flux() << std::endl;
+      std::cout << "Reprocessing " << tnode << " and now has " << this->chonk_network[tnode].get_water_flux() << std::endl;
 
     }
   }
@@ -733,17 +736,14 @@ chonk ModelRunner::preprocess_outletting_chonk(chonk tchonk, EntryPoint& entry_p
   int nrecs = 0;
   // copying the weights from the current 
   tchonk.copy_moving_prep(tchonk_recs,tchonk_slope_recs,tchonk_weight_water_recs,tchonk_weight_sed_recs);
-  std::cout << "3.1" << std::endl;
 
   for(size_t i =0; i< tchonk_recs.size(); i++)
   {
     // node indice of the receiver
     int tnode = tchonk_recs[i];
-    std::cout << "testing " << tnode << " which is in lake " << this->node_in_lake[tnode] << " and current lake is " << current_lake << std::endl;
     // Checking wether it is giving to the original lake or not
     if(this->is_this_node_in_this_lake(tnode, current_lake) ==  false)
     {
-      std::cout << "Selecting " << tchonk_recs[i] << " for analysis" << std::endl;
       ID_recs.push_back(tchonk_recs[i]);
       slope_recs.push_back(tchonk_slope_recs[i]);
       weight_water_recs.push_back(tchonk_weight_water_recs[i]);
@@ -789,28 +789,26 @@ chonk ModelRunner::preprocess_outletting_chonk(chonk tchonk, EntryPoint& entry_p
     }
 
   }
-  std::cout << "3.2" << std::endl;
 
   // Normalising the thingies
-  for(auto& Ugh:weight_water_recs)
+  for(size_t i =0; i < weight_water_recs.size(); i++)
   {
-    Ugh = Ugh/sumW;
-    std::cout << "new weight wat is " << Ugh << std::endl;
+    weight_water_recs[i] = weight_water_recs[i]/sumW;
   }
 
-  for(auto& Ugh:weight_sed_recs)
+  for(size_t i =0; i < weight_sed_recs.size(); i++)
   {
-    Ugh = Ugh/sumS;
-    std::cout << "new weight sed is " << Ugh << std::endl;
+    weight_sed_recs[i] = weight_sed_recs[i]/sumS;
   }
 
-  print_vector("weight_water_recs", weight_water_recs);
+
 
   // Resetting the CHONK
   tchonk.reset();
-  tchonk.external_moving_prep(ID_recs,slope_recs,weight_water_recs,weight_sed_recs);
+  tchonk.external_moving_prep(ID_recs,weight_water_recs,weight_sed_recs,slope_recs);
   tchonk.set_water_flux(water_rate);
   tchonk.set_sediment_flux(sedrate,label_prop);
+
   // Ready to go ??!!
   return tchonk;
 }

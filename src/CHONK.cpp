@@ -131,7 +131,8 @@ void chonk::split_and_merge_in_receiving_chonks(std::vector<chonk>& chonkscape, 
     // }
 
 
-    // std::cout << this->current_node << "GIVING " << this->water_flux * this->weigth_water_fluxes[i] << " to " << receivers[i] << std::endl;
+    std::cout << this->current_node << "GIVING " << this->water_flux * this->weigth_water_fluxes[i] << " to " << receivers[i] << std::endl;
+    
     other_chonk.add_to_water_flux(this->water_flux * this->weigth_water_fluxes[i]);
     sum_outwat += this->water_flux * this->weigth_water_fluxes[i];
     // So far the tracker gives equal proportion of its tracking downstream
