@@ -528,7 +528,7 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
     if(has_recs_in_local_stack[node] == 'p')
       local_sum += this->chonk_network[node].get_water_flux();
   }
-  if(double_equals(local_sum,0,1) == false)
+  if(double_equals(local_sum,debug_saverW,1) == false)
   {
     std::cout << debug_saverW << " got added to this local system but there is a delta of " << local_sum << std::endl;
     throw std::runtime_error("WaterDeltaWhileReprocError"); 
