@@ -518,7 +518,11 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
 
   this->unpack_entry_points_from_delta_maps(iteralake, label_prop_of_delta, delta_sed,delta_water, pre_entry_node, 
      label_prop_of_pre, pre_sed,pre_water);
-  // Doen
+
+  // labelling the outlet
+  this->has_been_outlet[outlet] = 'y';
+
+  // Done
   //   _      _      _
   // >(.)__ <(.)__ =(.)__
   //  (___/  (___/  (___/  quack
@@ -600,6 +604,7 @@ void ModelRunner::reprocess_local_stack(std::vector<int>& local_mstack, std::vec
         this->chonk_network[tnode].add_to_water_flux( WF_corrector[tnode]);
         this->chonk_network[tnode].add_to_sediment_flux( SF_corrector[tnode], SL_corrector[tnode]);
       }
+      std::cout << "Reprocessing " << tnode << std::endl;
       // # So I need full reproc yaaay
       this->process_node_nolake_for_sure(tnode, is_processed, active_nodes, 
         cellarea,topography, true, true);
@@ -706,8 +711,6 @@ chonk ModelRunner::preprocess_outletting_chonk(chonk tchonk, EntryPoint& entry_p
  std::map<int,double>& WF_corrector, std::map<int,double>& SF_corrector, std::map<int,std::vector<double> >& SL_corrector,
  std::vector<double>& pre_sed, std::vector<double>& pre_water, std::vector<int>& pre_entry_node, std::vector<std::vector<double> >& label_prop_of_pre)
 {
-  // labelling the outlet
-  this->has_been_outlet[outlet] = 'y';
   // Getting the additioned water rate
   double water_rate = entry_point.volume_water / this->timestep;
   // Summing it to the previous one
