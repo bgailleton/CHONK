@@ -1796,7 +1796,7 @@ int ModelRunner::fill_mah_lake(EntryPoint& entry_point, std::queue<int>& iterala
   // std::cout << std::endl;
 
 
-  std::cout << "STORED " << this->lakes[current_lake].volume_water/this->timestep << " IN THE LAKE (rate)" << std::endl;
+  // std::cout << "STORED " << this->lakes[current_lake].volume_water/this->timestep << " IN THE LAKE (rate)" << std::endl;
 
   // if there is an outlet 
   if(outlet >= 0)
@@ -1815,7 +1815,6 @@ int ModelRunner::fill_mah_lake(EntryPoint& entry_point, std::queue<int>& iterala
 
       if( tested != against)
       {
-        std::cout << tested << " SHOULD BE DIFFERENT THAN " << against << " IF THIS MESSAGE IS DISPLAYED" << std::endl;
         this->drink_lake(this->lakes[current_lake].id, this->motherlake(this->node_in_lake[tnode]), entry_point, iteralake);
       }
     }
@@ -1884,10 +1883,9 @@ void ModelRunner::drink_lake(int id_eater, int id_edible, EntryPoint& entry_poin
 
   if (this->lakes[id_eater].water_elevation == this->lakes[id_edible].water_elevation)
   {
-    std::cout << "LAKE TRANSMIT ITS SUMOUTRATE :: " << this->lakes[id_edible].sum_outrate << " OUTLET IS " <<  this->lakes[id_eater].outlet << " VS " << this->lakes[id_edible].outlet<< std::endl;
+    // std::cout << "LAKE TRANSMIT ITS SUMOUTRATE :: " << this->lakes[id_edible].sum_outrate << " OUTLET IS " <<  this->lakes[id_eater].outlet << " VS " << this->lakes[id_edible].outlet<< std::endl;
     if(this->lakes[id_eater].outlet != this->lakes[id_edible].outlet && this->lakes[id_edible].outlet > 0)
     {
-      std::cout << "1" << std::endl;
 
       // std::cout << "OUTLET " << this->lakes[id_eater].outlet << " BECAME " << this->lakes[id_edible].outlet << " ["<< this->node_in_lake[this->lakes[id_edible].outlet] << "] In Drinking Process " << std::endl;
       
@@ -1912,33 +1910,12 @@ void ModelRunner::drink_lake(int id_eater, int id_edible, EntryPoint& entry_poin
       {  
         this->lakes[id_eater].outlet = this->lakes[id_edible].outlet;
         this->lakes[id_eater].sum_outrate += this->lakes[id_edible].sum_outrate;
-        // std::cout << "BABALLUUFF2" << std::endl<< std::endl<< std::endl<< std::endl;
-        std::cout << "3" << std::endl;
-
       }
-      // else
-        // std::cout << "BABALLUUFF" << std::endl<< std::endl<< std::endl<< std::endl;
-
-      // graph.get_D8_neighbors(this->lakes[id_eater].outlet, this-> io_int_array["active_nodes"], neightbors, dummy);
-      // for(auto tnode:neightbors)
-      // {
-      //   if(this->io_double_array["topography"][tnode] < this->io_double_array["topography"][this->lakes[id_eater].outlet])
-      //     n_DS_o ++;
-      // }
-
-      // if(n_DS_o==0 && n_DS_n==0)
-      //   throw std::runtime_error("GAARG");
-      // int outlet_to_reboot = this->lakes[id_edible].outlet;
-      // this->chonk_network[outlet_to_reboot] = original_chonk[outlet_to_reboot];
 
     }
     else
-    {
-      // std::cout << "BABALLUUFF3" << std::endl<< std::endl<< std::endl<< std::endl;
-      std::cout << "2" << std::endl;
-      
+    {      
       this->lakes[id_eater].sum_outrate += this->lakes[id_edible].sum_outrate;
-
     }
 
 
