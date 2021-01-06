@@ -502,6 +502,7 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
   //------------ LOCAL STACK REPROCESSING --------------
   //----------------------------------------------------
   // this section reprocess all nodes affected by the routletting of the lake nodes from upstream to donwstreamå
+  std::cout << "Entry_point is " << entry_point.volume_water/this->timestep; << std::endl;
   this->reprocess_local_stack(local_mstack, is_in_queue, outlet, current_lake, WF_corrector, SF_corrector, SL_corrector);
 
   //----------------------------------------------------
@@ -604,10 +605,12 @@ void ModelRunner::reprocess_local_stack(std::vector<int>& local_mstack, std::vec
         this->chonk_network[tnode].add_to_water_flux( WF_corrector[tnode]);
         this->chonk_network[tnode].add_to_sediment_flux( SF_corrector[tnode], SL_corrector[tnode]);
       }
-      std::cout << "Reprocessing " << tnode << std::endl;
       // # So I need full reproc yaaay
       this->process_node_nolake_for_sure(tnode, is_processed, active_nodes, 
         cellarea,topography, true, true);
+
+      std::cout << "Reprocessing " << tnode << " and now has " << this->chonk_network.get_water_flux() << std::endl;
+
     }
   }
 }
