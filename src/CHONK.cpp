@@ -132,7 +132,7 @@ void chonk::split_and_merge_in_receiving_chonks(std::vector<chonk>& chonkscape, 
 
 
     // std::cout << this->current_node << "GIVING " << this->water_flux * this->weigth_water_fluxes[i] << " to " << receivers[i] << std::endl;
-    
+
     other_chonk.add_to_water_flux(this->water_flux * this->weigth_water_fluxes[i]);
     sum_outwat += this->water_flux * this->weigth_water_fluxes[i];
     // So far the tracker gives equal proportion of its tracking downstream
@@ -307,8 +307,9 @@ void chonk::move_to_steepest_descent(NodeGraphV2& graph, double dt, xt::pytensor
 
   if(all_minus_1 && graph.get_Srec(this->current_node) != this->current_node)
   {
-    steepest_rec = graph.get_Srec(this->current_node);
-    steepest_S = 0.;
+    // steepest_rec = graph.get_Srec(this->current_node);
+    // steepest_S = 0.;
+    return;
   }
 
 

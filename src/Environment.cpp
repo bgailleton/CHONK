@@ -223,6 +223,7 @@ void ModelRunner::run()
   // Iterating though all the nodes
   for(int i=0; i<io_int["n_elements"]; i++)
   {
+
     // Getting the current node in the Us->DS stack order
     int node = this->graph.get_MF_stack_at_i(i);
     if(this->graph.get_MF_receivers_at_node(node).size() == 0 && this->io_int_array["active_nodes"][node]>0 && this->graph.is_depression(node) == false)
@@ -316,6 +317,7 @@ void ModelRunner::iterative_lake_solver()
 
 
   std::cout << "DEBUG::Starting the iterative process..." << std::endl;
+  this->chonk_network[440].print_water_status();
   int n_neg = 0;
   double n_volwat_neg = 0;
 
@@ -410,6 +412,8 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
   //----------------------------------------------------
   //----------------- INITIALISATION -------------------
   //----------------------------------------------------
+
+  this->chonk_network[this->lakes[current_lake].outlet].print_water_status();
 
 
   // First, saivng some values for debugging and water balance purposes
@@ -812,10 +816,12 @@ chonk ModelRunner::preprocess_outletting_chonk(chonk tchonk, EntryPoint& entry_p
   xt::pytensor<double,1>& topography = this->io_double_array["topography"];
   xt::pytensor<int,1>& active_nodes = this->io_int_array["active_nodes"];
   // Getting the additioned water rate
+  std::cout << "I WATER RATE IS " << tchonk.get_water_flux() << std::endl;
   double water_rate = entry_point.volume_water / this->timestep;
+  std::cout << "II WATER RATE IS " << water_rate << std::endl;
   // Summing it to the previous one
   water_rate += tchonk.get_water_flux();
-  std::cout << "WATER RATE IS " << water_rate << std::endl;
+  std::cout << "III WATER RATE IS " << water_rate << std::endl;
 
   // Dealing with sediments
   std::vector<double> label_prop = mix_two_proportions(entry_point.volume_sed,entry_point.label_prop, tchonk.get_sediment_flux(), tchonk.get_other_attribute_array("label_tracker"));
