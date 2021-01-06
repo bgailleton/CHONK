@@ -322,7 +322,6 @@ void ModelRunner::iterative_lake_solver()
   while(iteralake.empty() == false)
   {
 
-    std::cout << " 660 is " << this->chonk_network[660].get_water_flux() << std::endl;
     // this is a FIFO queue, First in, first out
     int entry_node = iteralake.front();
     // removing the thingy
@@ -348,7 +347,12 @@ void ModelRunner::iterative_lake_solver()
 
     int cometal = current_lake;
     EntryPoint entry_point = this->queue_adder_for_lake[cometal];
+
     this->queue_adder_for_lake[current_lake] = EntryPoint(entry_node);
+
+    if(entry_point.volume_water == 0 && entry_point.volume_sed == 0)
+      continue;
+
 
     // ignoring empty lakes
     if(entry_point.volume_water <= 0)
