@@ -377,7 +377,7 @@ void ModelRunner::iterative_lake_solver()
     // If there is an outlet detected in the current lake solver
     if(this->lakes[current_lake].outlet >= 0)
     {
-      std::cout << "Lake " << current_lake << " -> " << this->lakes[current_lake].outlet;
+      std::cout << "Lake " << current_lake << " -> " << this->lakes[current_lake].outlet << std::endl;
       this->reprocess_nodes_from_lake_outlet_v2(current_lake, this->lakes[current_lake].outlet, is_processed, iteralake, entry_point);
     }
     else if (this->lakes[current_lake].sum_outrate > 0)
@@ -411,6 +411,7 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
   // First, saivng some values for debugging and water balance purposes
   double debug_saverW = entry_point.volume_water / this->timestep;
   double outlet_water_saver = this->chonk_network[outlet].get_water_flux();
+
     // temp variable I need for the processing function
   double cellarea = this->io_double["dx"] * this->io_double["dy"];
   bool was_0 = false;
@@ -493,6 +494,8 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
   // and finally deprocess the stack
   this->deprocess_local_stack(local_mstack,is_in_queue);
 
+  this->label_nodes_with_no_rec_in_local_stack(local_mstack,is_in_queue, has_recs_in_local_stack);
+
 
   //----------------------------------------------------
   //---------------- OUTLET PROCESSING -----------------
@@ -561,6 +564,21 @@ std::vector<double>& pre_sed, std::vector<double>& pre_water)
 
     // Emplacing the next lake entry in the queue
     iteralake.emplace(pre_entry_node[i]);
+  }
+}
+
+void ModelRunner::label_nodes_with_no_rec_in_local_stack(std::vector<int>& local_mstack, std::vector,char>& is_in_queue, std::vector,char>& has_recs_in_local_stack)
+{
+  for (auto node:local_mstack)
+    this->has_recs_in_local_stack[node] = 'p';
+  for (auto node:local_mstack)
+  {
+    auto recs = this->chonk_network[node].get_chonk_receivers_copy();
+    for(auto rec:recs)
+    {
+      if(has_recs_in_local_stack[rec] == 'p' || has_recs_in_local_stack[rec] == 'o')
+        has_recs_in_local_stack[node] = 'o';
+    }
   }
 }
 
