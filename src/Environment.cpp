@@ -486,6 +486,14 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
   
   // DEBUG VARIABLE TO CHECK IF WATER IS CREATED WHEN REPROCESSING A LAKE WITH 0 WATER
   double local_sum = 0;
+  this->label_nodes_with_no_rec_in_local_stack(local_mstack,is_in_queue, has_recs_in_local_stack);
+  for(auto node:local_mstack)
+  {
+    if(has_recs_in_local_stack[node] == 'p')
+      local_sum -= this->chonk_network[node].get_water_flux();
+  }
+  // end of DEBUG
+
   // preprocessing the nodes on the path that are outlets
   this->check_what_give_to_existing_outlets(WF_corrector,  SF_corrector,  SL_corrector, local_mstack);
   // preprocessing the quantity given to existing lakes (to later calculate the delta)
@@ -494,7 +502,6 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
   // and finally deprocess the stack
   this->deprocess_local_stack(local_mstack,is_in_queue);
 
-  this->label_nodes_with_no_rec_in_local_stack(local_mstack,is_in_queue, has_recs_in_local_stack);
 
 
   //----------------------------------------------------
@@ -514,6 +521,20 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
   // this section reprocess all nodes affected by the routletting of the lake nodes from upstream to donwstreamå
   // std::cout << "Entry_point is " << entry_point.volume_water/this->timestep << std::endl;
   this->reprocess_local_stack(local_mstack, is_in_queue, outlet, current_lake, WF_corrector, SF_corrector, SL_corrector);
+
+  // DEBUG FOR WATER BALANCE
+  for(auto node:local_mstack)
+  {
+    if(has_recs_in_local_stack[node] == 'p')
+      local_sum += this->chonk_network[node].get_water_flux();
+  }
+  if(double_equals(local_sum,0,1) == false)
+  {
+    std::cout << debug_saverW << " got added to this local system but there is a delta of " << local_sum << std::endl;
+    throw std::runtime_error("WaterDeltaWhileReprocError"); 
+  }
+
+
 
   //----------------------------------------------------
   //------------ PROCESSING ENTRY POINTS ---------------
