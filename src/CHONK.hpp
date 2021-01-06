@@ -169,7 +169,7 @@ class chonk
     void print_water_status()
     {
 
-        std::cout << this->CHONK_ID << " water_flux::" << water_flux << " gave to: ";
+        std::cout << this->chonkID << " water_flux::" << water_flux << " gave to: ";
         for (size_t i = 0 ; i< receivers.size() ; i++)
         {
             std::cout << receivers[i] << " [" << water_flux * weigth_water_fluxes[i] << "] || ";
