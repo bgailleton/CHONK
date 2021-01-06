@@ -486,12 +486,25 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
   
   // DEBUG VARIABLE TO CHECK IF WATER IS CREATED WHEN REPROCESSING A LAKE WITH 0 WATER
   double local_sum = 0;
-  this->label_nodes_with_no_rec_in_local_stack(local_mstack,is_in_queue, has_recs_in_local_stack);
-  for(auto node:local_mstack)
+  std::vector<double> deltas;
+  std::vector<int> nodes;
+  std::vector<int> local_stack_checker = std::vector<int>(local_mstack);
+  local_stack_checker.push_back(outlet);
+  this->label_nodes_with_no_rec_in_local_stack(local_stack_checker,is_in_queue, has_recs_in_local_stack);
+  std::cout << "Is considered for mass balance check:"; 
+  for(auto node:local_stack_checker)
   {
     if(has_recs_in_local_stack[node] == 'p')
+    {
+      std::cout << "|" << node << "[" << this->chonk_network[node].get_water_flux() << "]";
       local_sum -= this->chonk_network[node].get_water_flux();
+      deltas.push_back(-1 * this->chonk_network[node].get_water_flux());
+      nodes.push_back(node);
+    }
   }
+
+  std::cout << std::endl;
+  std::cout << debug_saverW << "||||" << outlet_water_saver << "||||" << this->chonk_network[this->lakes[current_lake].outlet].get_water_flux() << std::endl;
   // end of DEBUG
 
   // preprocessing the nodes on the path that are outlets
@@ -523,15 +536,25 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
   this->reprocess_local_stack(local_mstack, is_in_queue, outlet, current_lake, WF_corrector, SF_corrector, SL_corrector);
 
   // DEBUG FOR WATER BALANCE
-  for(auto node:local_mstack)
+  std::cout << "Is considered for mass balance check:";
+  int balf = 0;
+  for(auto node:local_stack_checker)
   {
     if(has_recs_in_local_stack[node] == 'p')
+    {
       local_sum += this->chonk_network[node].get_water_flux();
+      deltas[balf] += this->chonk_network[node].get_water_flux();
+      std::cout << "|" << nodes[balf] << "[" << deltas[balf] << "]";
+      balf++;
+
+    }
   }
+  std::cout << std::endl;
+
   if(double_equals(local_sum,debug_saverW,1) == false)
   {
-    std::cout << debug_saverW << " got added to this local system but there is a delta of " << local_sum << std::endl;
-    throw std::runtime_error("WaterDeltaWhileReprocError"); 
+    std::cout << debug_saverW << " got added to this local system but there is a delta of " << local_sum - debug_saverW << std::endl;
+    // throw std::runtime_error("WaterDeltaWhileReprocError"); 
   }
 
 
@@ -600,6 +623,8 @@ void ModelRunner::label_nodes_with_no_rec_in_local_stack(std::vector<int>& local
       if(has_recs_in_local_stack[rec] == 'p' || has_recs_in_local_stack[rec] == 'o')
         has_recs_in_local_stack[node] = 'o';
     }
+    if(this->io_int_array["active_nodes"][node] == 0)
+      has_recs_in_local_stack[node] = 'p';
   }
 }
 
@@ -759,6 +784,8 @@ chonk ModelRunner::preprocess_outletting_chonk(chonk tchonk, EntryPoint& entry_p
  std::map<int,double>& WF_corrector, std::map<int,double>& SF_corrector, std::map<int,std::vector<double> >& SL_corrector,
  std::vector<double>& pre_sed, std::vector<double>& pre_water, std::vector<int>& pre_entry_node, std::vector<std::vector<double> >& label_prop_of_pre)
 {
+  xt::pytensor<double,1>& topography = this->io_double_array["topography"];
+  xt::pytensor<int,1>& active_nodes = this->io_int_array["active_nodes"];
   // Getting the additioned water rate
   double water_rate = entry_point.volume_water / this->timestep;
   // Summing it to the previous one
@@ -779,20 +806,38 @@ chonk ModelRunner::preprocess_outletting_chonk(chonk tchonk, EntryPoint& entry_p
   // copying the weights from the current 
   tchonk.copy_moving_prep(tchonk_recs,tchonk_slope_recs,tchonk_weight_water_recs,tchonk_weight_sed_recs);
 
-  for(size_t i =0; i< tchonk_recs.size(); i++)
+  std::vector<int> neightbors; std::vector<double> dummy ; graph.get_D8_neighbors(next_node, active_nodes, neightbors, dummy);
+
+  double SS = -9999;
+  int SS_ID = -9999;
+  for(size_t i =0; i< neightbors.size(); i++)
   {
     // node indice of the receiver
-    int tnode = tchonk_recs[i];
+    int tnode = neightbors[i];
+
+    if(topography[tnode] >= topography[outlet])
+      continue;
+
     // Checking wether it is giving to the original lake or not
     if(this->is_this_node_in_this_lake(tnode, current_lake) ==  false)
     {
-      ID_recs.push_back(tchonk_recs[i]);
-      slope_recs.push_back(tchonk_slope_recs[i]);
-      weight_water_recs.push_back(tchonk_weight_water_recs[i]);
-      weight_sed_recs.push_back(tchonk_weight_sed_recs[i]);
-      sumW += tchonk_weight_water_recs[i];
-      sumS += tchonk_weight_sed_recs[i];
-      nrecs++;
+      if(tS > SS )
+      {
+        ID_recs.push_back(tnode);
+        
+        double tS = topography[outlet] - topography[tnode];
+        tS = tS / dummy[i];
+        slope_recs.push_back(tS);
+      
+        SS_ID = tnode;
+        SS = tS;
+        weight_water_recs.push_back(tchonk_weight_water_recs[i]);
+        weight_sed_recs.push_back(tchonk_weight_sed_recs[i]);
+        sumW += tchonk_weight_water_recs[i];
+        sumS += tchonk_weight_sed_recs[i];
+        nrecs++;
+      }
+
     }
     else
     {
