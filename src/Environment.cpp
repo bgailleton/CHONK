@@ -491,19 +491,16 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
   std::vector<int> local_stack_checker = std::vector<int>(local_mstack);
   local_stack_checker.push_back(outlet);
   this->label_nodes_with_no_rec_in_local_stack(local_stack_checker,is_in_queue, has_recs_in_local_stack);
-  std::cout << "Is considered for mass balance check:"; 
   for(auto node:local_stack_checker)
   {
     if(has_recs_in_local_stack[node] == 'p')
     {
-      std::cout << "|" << node << "[" << this->chonk_network[node].get_water_flux() << "]";
       local_sum -= this->chonk_network[node].get_water_flux();
       deltas.push_back(-1 * this->chonk_network[node].get_water_flux());
       nodes.push_back(node);
     }
   }
 
-  std::cout << std::endl;
   std::cout << debug_saverW << "||||" << outlet_water_saver << "||||" << this->chonk_network[this->lakes[current_lake].outlet].get_water_flux() << std::endl;
   // end of DEBUG
 
@@ -632,6 +629,7 @@ void ModelRunner::reprocess_local_stack(std::vector<int>& local_mstack, std::vec
   std::map<int,double>& WF_corrector, std::map<int,double>& SF_corrector, 
   std::map<int,std::vector<double> >& SL_corrector)
 {
+  std::cout << "STARTING THE REPROCESSING" << std::endl;
   // I will need that
   double cellarea = this->io_double["dx"] * this->io_double["dy"];
   // I will need these aliases from the global maps
@@ -681,8 +679,13 @@ void ModelRunner::reprocess_local_stack(std::vector<int>& local_mstack, std::vec
       this->process_node_nolake_for_sure(tnode, is_processed, active_nodes, 
         cellarea,topography, true, true);
 
+      this->chonk_network[tnode].print_status();
+
+
     }
   }
+  std::cout << "ENDING THE REPROCESSING" << std::endl;
+
 }
 
 void ModelRunner::deprocess_local_stack(std::vector<int>& local_mstack, std::vector<char>& is_in_queue)
@@ -806,7 +809,7 @@ chonk ModelRunner::preprocess_outletting_chonk(chonk tchonk, EntryPoint& entry_p
   // copying the weights from the current 
   tchonk.copy_moving_prep(tchonk_recs,tchonk_slope_recs,tchonk_weight_water_recs,tchonk_weight_sed_recs);
 
-  std::vector<int> neightbors; std::vector<double> dummy ; graph.get_D8_neighbors(next_node, active_nodes, neightbors, dummy);
+  std::vector<int> neightbors; std::vector<double> dummy ; graph.get_D8_neighbors(outlet, active_nodes, neightbors, dummy);
 
   double SS = -9999;
   int SS_ID = -9999;
@@ -821,11 +824,11 @@ chonk ModelRunner::preprocess_outletting_chonk(chonk tchonk, EntryPoint& entry_p
     // Checking wether it is giving to the original lake or not
     if(this->is_this_node_in_this_lake(tnode, current_lake) ==  false)
     {
+      double tS = topography[outlet] - topography[tnode];
       if(tS > SS )
       {
         ID_recs.push_back(tnode);
-        
-        double tS = topography[outlet] - topography[tnode];
+
         tS = tS / dummy[i];
         slope_recs.push_back(tS);
       
