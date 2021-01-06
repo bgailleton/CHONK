@@ -380,9 +380,9 @@ class ModelRunner
   xt::pytensor<int,1>& inctive_nodes, double& cellarea, xt::pytensor<double,1>& surface_elevation, bool need_move_prep);
 
     // Avoid recursion by having this relatively small function processing node that I am sure won't need lake management
-    void process_node_nolake_for_sure(int& node, std::vector<bool>& is_processed,
+    void process_node_nolake_for_sure(int node, std::vector<bool>& is_processed,
   xt::pytensor<int,1>& inctive_nodes, double& cellarea, xt::pytensor<double,1>& surface_elevation, bool need_move_prep , bool need_flux_before_move);
-    void process_node_nolake_for_sure(int& node, std::vector<bool>& is_processed,
+    void process_node_nolake_for_sure(int node, std::vector<bool>& is_processed,
   xt::pytensor<int,1>& inctive_nodes, double& cellarea, xt::pytensor<double,1>& surface_elevation, bool need_move_prep, bool need_flux_before_move, std::vector<int>& ignore_some);
 
     // Accessing functions (so far only works when memory mode is normal)
@@ -492,7 +492,7 @@ class ModelRunner
     void gather_nodes_to_reproc(std::vector<int>& local_mstack, 
   std::priority_queue< node_to_reproc, std::vector<node_to_reproc>, std::greater<node_to_reproc> >& ORDEEEEEER,
    std::vector<char>& is_in_queue, int outlet);
-    void preprocess_outletting_chonk(chonk& tchonk, EntryPoint& entry_point, int current_lake, int outlet,
+    chonk preprocess_outletting_chonk(chonk tchonk, EntryPoint& entry_point, int current_lake, int outlet,
  std::map<int,double>& WF_corrector, std::map<int,double>& SF_corrector, std::map<int,std::vector<double> >& SL_corrector,
  std::vector<double>& pre_sed, std::vector<double>& pre_water, std::vector<int>& pre_entry_node, std::vector<std::vector<double> >& label_prop_of_pre);
     void check_what_give_to_existing_outlets(std::map<int,double>& WF_corrector,  std::map<int,double>& SF_corrector, 

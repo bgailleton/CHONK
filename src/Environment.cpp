@@ -403,7 +403,6 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
   //----------------- INITIALISATION -------------------
   //----------------------------------------------------
 
-  std::cout << "1" << std::endl;
 
   // First, saivng some values for debugging and water balance purposes
   double debug_saverW = entry_point.volume_water / this->timestep;
@@ -453,13 +452,11 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
   }
 
 
-  std::cout << "2" << std::endl;
 
   this->gather_nodes_to_reproc(local_mstack,  ORDEEEEEER,  is_in_queue,  outlet);
 
   // Final size OK
   // I have a stack of nodes to reprocess. 
-  std::cout << "3" << std::endl;
 
   //----------------------------------------------------
   //------- STARTING THE OUTLET PREPROCESSING ----------
@@ -470,15 +467,13 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
   // Now initialising the map correcting the fluxes
   std::map<int,double> WF_corrector; std::map<int,double> SF_corrector; std::map<int,std::vector<double> > SL_corrector;
   // Calling teh function preparing the outletting chonk processing
-  this->preprocess_outletting_chonk(tchonk, entry_point, current_lake, this->lakes[current_lake].outlet,
+  this->chonk_network[this->lakes[current_lake].outlet] = this->preprocess_outletting_chonk(tchonk, entry_point, current_lake, this->lakes[current_lake].outlet,
   WF_corrector,  SF_corrector,  SL_corrector, pre_sed, pre_water, pre_entry_node, label_prop_of_pre);
 
   this->chonk_network[this->lakes[current_lake].outlet] = tchonk;
   //   _      _      _
   // >(.)__ <(.)__ =(.)__
   //  (___/  (___/  (___/  quack
-
-  std::cout << "4" << std::endl;
 
   //----------------------------------------------------
   //---------- DEPROCESSING THE LOCAL STACK ------------
@@ -492,30 +487,22 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
   this->check_what_give_to_existing_lakes(local_mstack, outlet, current_lake, pre_sed,
     pre_water, pre_entry_node, label_prop_of_pre);
   // and finally deprocess the stack
-  std::cout << "4.5" << std::endl;
   this->deprocess_local_stack(local_mstack,is_in_queue);
 
-  std::cout << "5" << std::endl;
 
   //----------------------------------------------------
   //---------------- OUTLET PROCESSING -----------------
   //----------------------------------------------------
 
-  std::cout << std::endl << std::endl << std::endl << "chonk_network"<< std::endl;
-  this->chonk_network[this->lakes[current_lake].outlet].print_status();
-  std::cout << std::endl << std::endl << std::endl << "tchonk"<< std::endl;
-  tchonk.print_status();
   // Process the outlet, whithout preparing the move (Already done) and readding the precipitation-like fluxes (already taken into account).
   this->process_node_nolake_for_sure(this->lakes[current_lake].outlet, is_processed, active_nodes, 
       cellarea,topography, false, false);
 
-  std::cout << "6" << std::endl;
   //----------------------------------------------------
   //------------ LOCAL STACK REPROCESSING --------------
   //----------------------------------------------------
   // this section reprocess all nodes affected by the routletting of the lake nodes from upstream to donwstreamå
   this->reprocess_local_stack(local_mstack, is_in_queue, outlet, current_lake, WF_corrector, SF_corrector, SL_corrector);
-  std::cout << "7" << std::endl;
 
   //----------------------------------------------------
   //------------ PROCESSING ENTRY POINTS ---------------
@@ -715,7 +702,7 @@ void ModelRunner::check_what_give_to_existing_lakes(std::vector<int>& local_msta
 }
 
 
-void ModelRunner::preprocess_outletting_chonk(chonk& tchonk, EntryPoint& entry_point, int current_lake, int outlet,
+chonk ModelRunner::preprocess_outletting_chonk(chonk tchonk, EntryPoint& entry_point, int current_lake, int outlet,
  std::map<int,double>& WF_corrector, std::map<int,double>& SF_corrector, std::map<int,std::vector<double> >& SL_corrector,
  std::vector<double>& pre_sed, std::vector<double>& pre_water, std::vector<int>& pre_entry_node, std::vector<std::vector<double> >& label_prop_of_pre)
 {
@@ -819,6 +806,7 @@ void ModelRunner::preprocess_outletting_chonk(chonk& tchonk, EntryPoint& entry_p
   tchonk.set_water_flux(water_rate);
   tchonk.set_sediment_flux(sedrate,label_prop);
   // Ready to go ??!!
+  return tchonk;
 }
 
 void ModelRunner::gather_nodes_to_reproc(std::vector<int>& local_mstack, 
@@ -2085,9 +2073,10 @@ void ModelRunner::process_node(int& node, std::vector<bool>& is_processed, int& 
     this->chonk_network[node].split_and_merge_in_receiving_chonks(this->chonk_network, this->graph, this->io_double_array["surface_elevation_tp1"], io_double_array["sed_height_tp1"], this->timestep);
 }
 
-void ModelRunner::process_node_nolake_for_sure(int& node, std::vector<bool>& is_processed,
+void ModelRunner::process_node_nolake_for_sure(int node, std::vector<bool>& is_processed,
   xt::pytensor<int,1>& inctive_nodes, double& cellarea, xt::pytensor<double,1>& surface_elevation, bool need_move_prep, bool need_flux_before_move)
 {
+
   is_processed[node] = true;
   if(need_flux_before_move)
     this->manage_fluxes_before_moving_prep(this->chonk_network[node], this->label_array[node]);
@@ -2104,7 +2093,7 @@ void ModelRunner::process_node_nolake_for_sure(int& node, std::vector<bool>& is_
   this->chonk_network[node].split_and_merge_in_receiving_chonks(this->chonk_network, this->graph, this->io_double_array["surface_elevation_tp1"], io_double_array["sed_height_tp1"], this->timestep);
 }
 
-void ModelRunner::process_node_nolake_for_sure(int& node, std::vector<bool>& is_processed,
+void ModelRunner::process_node_nolake_for_sure(int node, std::vector<bool>& is_processed,
   xt::pytensor<int,1>& inctive_nodes, double& cellarea, xt::pytensor<double,1>& surface_elevation, bool need_move_prep, bool need_flux_before_move, std::vector<int>& ignore_some)
 {
     is_processed[node] = true;
