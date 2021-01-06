@@ -679,7 +679,7 @@ void ModelRunner::reprocess_local_stack(std::vector<int>& local_mstack, std::vec
       this->process_node_nolake_for_sure(tnode, is_processed, active_nodes, 
         cellarea,topography, true, true);
 
-      this->chonk_network[tnode].print_status();
+      this->chonk_network[tnode].print_water_status();
 
 
     }

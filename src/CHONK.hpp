@@ -165,6 +165,19 @@ class chonk
         print_vector("weigth_sediment_fluxes",weigth_sediment_fluxes);
         print_vector("slope_to_rec",slope_to_rec);
     }
+
+    void print_water_status()
+    {
+
+        std::cout << this->CHONK_ID << " water_flux::" << water_flux << " gave to: ";
+        for (size_t i = 0 ; i< receivers.size() ; i++)
+        {
+            std::cout << receivers[i] << " [" << water_flux * weigth_water_fluxes[i] << "] || ";
+        }
+        std::cout << std::endl;
+    }
+
+
     void check_sums()
     {
         double tsum = 0;
