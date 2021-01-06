@@ -510,7 +510,7 @@ class ModelRunner
 std::vector<double>& delta_sed, std::vector<double>& delta_water, std::vector<int>& pre_entry_node, std::vector<std::vector<double> >& label_prop_of_pre,
 std::vector<double>& pre_sed, std::vector<double>& pre_water);
 
-    void label_nodes_with_no_rec_in_local_stack(std::vector<int>& local_mstack, std::vector,char>& is_in_queue, std::vector,char>& has_recs_in_local_stack);
+    void label_nodes_with_no_rec_in_local_stack(std::vector<int>& local_mstack, std::vector<char>& is_in_queue, std::vector<char>& has_recs_in_local_stack);
 
 
     std::vector<int> lake_in_order;

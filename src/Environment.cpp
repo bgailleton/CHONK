@@ -588,10 +588,10 @@ std::vector<double>& pre_sed, std::vector<double>& pre_water)
   }
 }
 
-void ModelRunner::label_nodes_with_no_rec_in_local_stack(std::vector<int>& local_mstack, std::vector,char>& is_in_queue, std::vector,char>& has_recs_in_local_stack)
+void ModelRunner::label_nodes_with_no_rec_in_local_stack(std::vector<int>& local_mstack, std::vector<char>& is_in_queue, std::vector<char>& has_recs_in_local_stack)
 {
   for (auto node:local_mstack)
-    this->has_recs_in_local_stack[node] = 'p';
+    has_recs_in_local_stack[node] = 'p';
   for (auto node:local_mstack)
   {
     auto recs = this->chonk_network[node].get_chonk_receivers_copy();
@@ -648,6 +648,7 @@ void ModelRunner::reprocess_local_stack(std::vector<int>& local_mstack, std::vec
       // # I am not a nodor:
       if ( this->has_been_outlet[tnode] == 'y' )
       {
+        std::cout << "Has been an outlet during the reproc hapense" << std::endl;
         this->chonk_network[tnode].add_to_water_flux( WF_corrector[tnode]);
         this->chonk_network[tnode].add_to_sediment_flux( SF_corrector[tnode], SL_corrector[tnode]);
       }
@@ -665,7 +666,7 @@ void ModelRunner::deprocess_local_stack(std::vector<int>& local_mstack, std::vec
   for(auto tnode : local_mstack)
   {
     // # If my node is just a donor, I am not resetting it
-    if (is_in_queue[tnode] == 'd')
+    if (is_in_queue[tnode] != 'y')
       continue;
 
     // # Cancelling the fluxes before moving prep (i.e. the precipitation, infiltrations, ...)
