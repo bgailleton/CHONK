@@ -319,7 +319,6 @@ void ModelRunner::iterative_lake_solver()
 
 
   std::cout << "DEBUG::Starting the iterative process..." << std::endl;
-  this->chonk_network[440].print_water_status();
   int n_neg = 0;
   double n_volwat_neg = 0;
 
@@ -419,7 +418,9 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
   //----------------- INITIALISATION -------------------
   //----------------------------------------------------
 
+  std::cout << "OUTLET:" << std::endl;
   this->chonk_network[this->lakes[current_lake].outlet].print_water_status();
+  std::cout << "Entry::" << entry_point.volume_water / this->timestep << std::endl;
 
 
   // First, saivng some values for debugging and water balance purposes
@@ -548,7 +549,6 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
   // and finally deprocess the stack
   this->deprocess_local_stack(local_mstack,is_in_queue);
 
-  std::cout << "reach here 1" << std::endl;
 
 
   //----------------------------------------------------
@@ -562,7 +562,6 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
   this->chonk_network[this->lakes[current_lake].outlet].print_water_status();
   // std::cout << "Node 339 has " 
 
-  std::cout << "reach here 2" << std::endl;
 
   //----------------------------------------------------
   //------------ LOCAL STACK REPROCESSING --------------
@@ -571,7 +570,6 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
   // std::cout << "Entry_point is " << entry_point.volume_water/this->timestep << std::endl;
   this->reprocess_local_stack(local_mstack, is_in_queue, outlet, current_lake, WF_corrector, SF_corrector, SL_corrector);
 
-  std::cout << "reach here 3" << std::endl;
 
   // DEBUG FOR WATER BALANCE
   for(auto node:local_stack_checker)
@@ -587,6 +585,7 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
     { 
       if(is_in_queue[rec] == 'n' || is_in_queue[rec] == 'r' || is_in_queue[rec] == 'd')
       {
+        std::cout << WW[i] << " OOOOoooOOOOoooo" << chonk_water << " --> " << node << std::endl;
         double this_water = WW[i] * chonk_water ;
 
         local_sum +=  this_water;
