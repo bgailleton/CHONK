@@ -862,7 +862,7 @@ void ModelRunner::check_what_give_to_existing_outlets(std::map<int,double>& WF_c
     std::vector<double> tchonk_weight_water_recs, tchonk_weight_sed_recs;
 
     // copying the weights from the current 
-    tchonk.copy_moving_prep(tchonk_recs,tchonk_slope_recs,tchonk_weight_water_recs,tchonk_weight_sed_recs);
+    tchonk.copy_moving_prep(tchonk_recs,tchonk_weight_water_recs,tchonk_weight_sed_recs,tchonk_slope_recs);
 
     for(size_t i =0; i < tchonk_recs.size(); i++)
     {
@@ -902,7 +902,7 @@ void ModelRunner::check_what_give_to_existing_lakes(std::vector<int>& local_msta
     std::vector<double> tchonk_weight_water_recs, tchonk_weight_sed_recs;
 
     // copying the weights from the current 
-    tchonk.copy_moving_prep(tchonk_recs,tchonk_slope_recs,tchonk_weight_water_recs,tchonk_weight_sed_recs);
+    tchonk.copy_moving_prep(tchonk_recs,tchonk_weight_water_recs,tchonk_weight_sed_recs,tchonk_slope_recs);
 
     for(size_t i =0; i < tchonk_recs.size(); i++)
     {
@@ -955,7 +955,7 @@ chonk ModelRunner::preprocess_outletting_chonk(chonk tchonk, EntryPoint& entry_p
   double sumS = 0;
   int nrecs = 0;
   // copying the weights from the current 
-  tchonk.copy_moving_prep(tchonk_recs,tchonk_slope_recs,tchonk_weight_water_recs,tchonk_weight_sed_recs);
+  tchonk.copy_moving_prep(tchonk_recs,tchonk_weight_water_recs,tchonk_weight_sed_recs,tchonk_slope_recs);
   
   // Iterating through the receivers of the outlet and removing the water given to the current lake by this outlet prior reprocessing
   // this water is already in the lake outletting thingy!
