@@ -300,6 +300,8 @@ void ModelRunner::iterative_lake_solver()
     this->lakes[lake_incrementor].nodes = these_nodes;
     // lake_is_in_queue_for_reproc.push_back('y');
     queue_adder_for_lake.push_back(EntryPoint( water_volume,  sediment_volume,  starting_node, label_prop));
+
+
     // emplce the entry point and its characteristics into the lake
     iteralake.emplace(starting_node);
 
@@ -353,6 +355,8 @@ void ModelRunner::iterative_lake_solver()
 
     int cometal = current_lake;
     EntryPoint entry_point = this->queue_adder_for_lake[cometal];
+    if(entry_point.volume_sed > 1e25)
+      throw std::runtime_error("IrregularSedFluxError1");
 
     this->queue_adder_for_lake[current_lake] = EntryPoint(entry_node);
 
@@ -379,6 +383,8 @@ void ModelRunner::iterative_lake_solver()
     if(entry_point.volume_water > 0)
       current_lake = this->fill_mah_lake(entry_point, iteralake);
 
+    if(entry_point.volume_sed > 1e25)
+      throw std::runtime_error("IrregularSedFluxError2");
 
     // If there is an outlet detected in the current lake solver
     if(this->lakes[current_lake].outlet >= 0)
@@ -542,6 +548,7 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
   // and finally deprocess the stack
   this->deprocess_local_stack(local_mstack,is_in_queue);
 
+  std::cout << "reach here 1" << std::endl;
 
 
   //----------------------------------------------------
@@ -555,12 +562,16 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
   this->chonk_network[this->lakes[current_lake].outlet].print_water_status();
   // std::cout << "Node 339 has " 
 
+  std::cout << "reach here 2" << std::endl;
+
   //----------------------------------------------------
   //------------ LOCAL STACK REPROCESSING --------------
   //----------------------------------------------------
   // this section reprocess all nodes affected by the routletting of the lake nodes from upstream to donwstreamå
   // std::cout << "Entry_point is " << entry_point.volume_water/this->timestep << std::endl;
   this->reprocess_local_stack(local_mstack, is_in_queue, outlet, current_lake, WF_corrector, SF_corrector, SL_corrector);
+
+  std::cout << "reach here 3" << std::endl;
 
   // DEBUG FOR WATER BALANCE
   for(auto node:local_stack_checker)
@@ -590,10 +601,12 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
     std::cout << v.first << "-->" << v.second << std::endl;
   std::cout << "LOCAL SUM IS NOW " << local_sum << std::endl;
 
-  if(double_equals(local_sum,debug_saverW,1) == false)
+
+
+  if(double_equals(local_sum,debug_saverW,1e5) == false)
   {
-    std::cout << debug_saverW << " got added to this local system but there is a delta of " << local_sum - debug_saverW << std::endl;
-    throw std::runtime_error("WaterDeltaWhileReprocError"); 
+    std::cout << "WARNING:: " << debug_saverW << " got added to this local system but there is a delta of " << local_sum - debug_saverW << std::endl;
+    // throw std::runtime_error("WaterDeltaWhileReprocError"); 
   }
 
 
@@ -661,6 +674,9 @@ std::vector<double>& pre_sed, std::vector<double>& pre_water)
     target_lake = motherlake(target_lake);
     EntryPoint other(dwat * this->timestep, dsed, pre_entry_node[i], label_prop_of_delta[i]);
     queue_adder_for_lake[target_lake].ingestNkill( other);
+    std::cout << "PDFOSDJFOSD::" << dsed << "|" << delta_sed[i] << "|" << pre_sed[i] << std::endl; 
+    if(queue_adder_for_lake[target_lake].volume_sed > 1e25)
+      throw std::runtime_error("IrregularSedFluxError3");
 
     // Emplacing the next lake entry in the queue
     iteralake.emplace(pre_entry_node[i]);
@@ -833,7 +849,9 @@ void ModelRunner::check_what_give_to_existing_lakes(std::vector<int>& local_msta
         if(lakid != current_lake)
         {
           label_prop_of_this[lakid] = mix_two_proportions(this_sed[lakid],label_prop_of_this[lakid], tchonk_weight_sed_recs[i]* tchonk.get_sediment_flux(), tchonk.get_other_attribute_array("label_tracker"));
+          std::cout << lakid << "|" << tchonk_weight_sed_recs[i] << "|" << tchonk.get_sediment_flux() << " PRESED_II:" << this_sed[lakid];
           this_sed[lakid] += tchonk_weight_sed_recs[i]* tchonk.get_sediment_flux();
+          std::cout << "->" << this_sed[lakid] << std::endl;
           this_water[lakid] += tchonk_weight_water_recs[i] * tchonk.get_water_flux();
           this_entry_node[lakid] = tnode;
         }
@@ -859,7 +877,10 @@ chonk ModelRunner::preprocess_outletting_chonk(chonk tchonk, EntryPoint& entry_p
 
   // Dealing with sediments
   std::vector<double> label_prop = mix_two_proportions(entry_point.volume_sed,entry_point.label_prop, tchonk.get_sediment_flux(), tchonk.get_other_attribute_array("label_tracker"));
+  
   double sedrate = entry_point.volume_sed + tchonk.get_sediment_flux();
+  std::cout << "I SED RATE IS " << entry_point.volume_sed << std::endl;
+  std::cout << "II SED RATE IS " << tchonk.get_sediment_flux() << std::endl;
 
   //getting the weights
   // # Initialising a bunch of intermediate containers and variable
@@ -949,7 +970,10 @@ chonk ModelRunner::preprocess_outletting_chonk(chonk tchonk, EntryPoint& entry_p
       if(lakid != current_lake)
       {
         label_prop_of_pre[lakid] = mix_two_proportions(pre_sed[lakid],label_prop_of_pre[lakid], tchonk_weight_sed_recs[i]* tchonk.get_sediment_flux(), tchonk.get_other_attribute_array("label_tracker"));
+        std::cout << "PRESED_I:" << pre_sed[lakid];
         pre_sed[lakid] += tchonk_weight_sed_recs[i]* tchonk.get_sediment_flux();
+        std::cout << "->" << pre_sed[lakid] << std::endl;
+        
         pre_water[lakid] += tchonk_weight_water_recs[i] * tchonk.get_water_flux();
         pre_entry_node[lakid] = tnode;
       }
@@ -991,7 +1015,7 @@ chonk ModelRunner::preprocess_outletting_chonk(chonk tchonk, EntryPoint& entry_p
   tchonk.external_moving_prep(ID_recs,weight_water_recs,weight_sed_recs,slope_recs);
   tchonk.set_water_flux(water_rate);
   tchonk.set_sediment_flux(sedrate,label_prop);
-
+  std::cout << "Set to outlet::" << water_rate << " wat and sed: " << sedrate << std::endl; 
   // Ready to go ??!!
   return tchonk;
 }
@@ -2037,6 +2061,8 @@ void ModelRunner::drink_lake(int id_eater, int id_edible, EntryPoint& entry_poin
   if(this->lakes[id_eater].outlet >= 0)
   {
     entry_point.ingestNkill(queue_adder_for_lake[id_edible]);
+    if(queue_adder_for_lake[id_edible].volume_sed > 1e25)
+      throw std::runtime_error("IrregularSedFluxError4");
   }
   else
   {
