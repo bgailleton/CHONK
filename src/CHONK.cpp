@@ -648,6 +648,8 @@ void chonk::move_MF_from_fastscapelib_threshold_SF(NodeGraphV2& graph, double th
     }
 
 
+
+
     this->receivers.push_back(this_neightbor);
     this->weigth_water_fluxes.push_back(weight);
     this->weigth_sediment_fluxes.push_back(weight);
@@ -657,7 +659,22 @@ void chonk::move_MF_from_fastscapelib_threshold_SF(NodeGraphV2& graph, double th
     // Mover to the next step
   }
 
+  for(auto node :  this->receivers)
+  {
+    int n_stiuff = 0;
+    for (auto tnode: this->receivers)
+    {
+      if(tnode == node)
+        n_stiuff++;
 
+    }
+    if(n_stiuff > 1)
+    {
+      print_vector(" this->receivers:",  this->receivers);
+      throw std::runtime_error("DUPLICATESRECINCHONKMF2D8");
+    }
+  }
+  
 }
 
 
@@ -961,7 +978,12 @@ void chonk::charlie_I(double n, double m, double K_r, double K_s,
     sumweights += s;
 
   if(double_equals(sumweights,1,1e-3) ==  false)
-    throw std::runtime_error("Sedweightserrors::" + std::to_string(sumweights));
+  {
+    // throw std::runtime_error("Sedweightserrors::" + std::to_string(sumweights));
+    for (auto& s:this->weigth_sediment_fluxes)
+      s/sumweights;
+  }
+  
 
   Ds_tot += V_param * d_star * (this->sediment_flux/ (this->water_flux * dt));
 
