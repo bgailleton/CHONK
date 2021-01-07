@@ -494,7 +494,7 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
   
   // DEBUG VARIABLE TO CHECK IF WATER IS CREATED WHEN REPROCESSING A LAKE WITH 0 WATER
   double local_sum = 0;
-  std::vector<double> deltas;
+  std::map<int,double> deltas;
   std::vector<int> nodes;
   std::vector<int> local_stack_checker = std::vector<int>(local_mstack);
   local_stack_checker.push_back(outlet);
@@ -510,19 +510,19 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
     int i = 0;
     for(auto rec : recs)
     { 
-      if(is_in_queue[rec] == 'n' || is_in_queue[rec] == 'r')
+      if(is_in_queue[rec] == 'n' || is_in_queue[rec] == 'r' || is_in_queue[rec] == 'd')
       {
         double this_water = WW[i] * chonk_water ;
 
         local_sum -=  this_water;
         if(is_done == false)
         {
-          deltas.push_back(-1 * this_water);
+          deltas[node] = (-1 * this_water);
           nodes.push_back(node);
         }
         else
         {
-          deltas[deltas.size() - 1] -= this_water;
+          deltas[node] -= this_water;
         }
       }
       i++;
@@ -574,18 +574,20 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
     int i = 0;
     for(auto rec : recs)
     { 
-      if(is_in_queue[rec] == 'n' || is_in_queue[rec] == 'r')
+      if(is_in_queue[rec] == 'n' || is_in_queue[rec] == 'r' || is_in_queue[rec] == 'd')
       {
         double this_water = WW[i] * chonk_water ;
 
         local_sum +=  this_water;
-        deltas[deltas.size() - 1] += this_water;
+        deltas[node] += this_water;
         
       }
       i++;
     }
     
   }
+  for(auto v:deltas)
+    std::cout << v.first << "-->" << v.second << std::endl;
   std::cout << "LOCAL SUM IS NOW " << local_sum << std::endl;
 
   if(double_equals(local_sum,debug_saverW,1) == false)
