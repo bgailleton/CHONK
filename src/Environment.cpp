@@ -542,6 +542,7 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
   // Now initialising the map correcting the fluxes
   std::map<int,double> WF_corrector; std::map<int,double> SF_corrector; std::map<int,std::vector<double> > SL_corrector;
   // Calling teh function preparing the outletting chonk processing
+  std::cout << "PREWATER 20::" << pre_water[20] << std::endl;
   this->chonk_network[this->lakes[current_lake].outlet] = chonk(this->preprocess_outletting_chonk(tchonk, entry_point, current_lake, this->lakes[current_lake].outlet,
     WF_corrector,  SF_corrector,  SL_corrector, pre_sed, pre_water, pre_entry_node, label_prop_of_pre));
 
@@ -556,6 +557,7 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
   
 
   // std::cout << "1288::"; this->chonk_network[1288].print_water_status(); std::cout << std::endl;
+  std::cout << "PREWATER 20::" << pre_water[20] << std::endl;
 
   // preprocessing the nodes on the path that are outlets
   this->check_what_give_to_existing_outlets(WF_corrector,  SF_corrector,  SL_corrector, local_mstack);
@@ -564,6 +566,7 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
     pre_water, pre_entry_node, label_prop_of_pre);
   // and finally deprocess the stack
   this->deprocess_local_stack(local_mstack,is_in_queue);
+  std::cout << "PREWATER 20::" << pre_water[20] << std::endl;
 
 
 
@@ -573,10 +576,21 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
   // std::cout << std::endl<< std::endl<< std::endl << "#@" << std::endl;
   // this->chonk_network[this->lakes[current_lake].outlet].print_status();
   // Process the outlet, whithout preparing the move (Already done) and readding the precipitation-like fluxes (already taken into account).
+  std::cout << "PREWATER 20::" << pre_water[20] << std::endl;
   this->process_node_nolake_for_sure(this->lakes[current_lake].outlet, is_processed, active_nodes, 
       cellarea,topography, false, false);
   this->chonk_network[this->lakes[current_lake].outlet].print_water_status();
+  std::cout << "LAKE ID::";
+  for(auto node:this->chonk_network[this->lakes[current_lake].outlet].get_chonk_receivers_copy())
+  {
+    int lakid  = this->node_in_lake[node];
+    if(lakid>=0)
+      lakid = motherlake(lakid);
+    std::cout << node << "->" << lakid << "||";
+  }
+  std::cout << std::endl;;
   // std::cout << "Node 339 has " 
+  std::cout << "PREWATER 20::" << pre_water[20] << std::endl;
 
 
   //----------------------------------------------------
@@ -589,6 +603,7 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
 
   // DEBUG FOR WATER BALANCE
   double sum_out = 0;
+  std::cout << "Is considered:";
   for(auto node:local_stack_checker)
   {
     if(is_in_queue[node] == 'd')
@@ -604,6 +619,7 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
     { 
       if(is_in_queue[rec] == 'n' || is_in_queue[rec] == 'r' || is_in_queue[rec] == 'd')
       {
+        std::cout << is_in_queue[rec] <<"(" << node << "->" << rec << ")" << "|";
         double this_water = WW[i] * chonk_water ;
         local_sum +=  this_water;
         deltas[node] += this_water;
@@ -614,11 +630,13 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
 
     if(active_nodes[node] == 0)
     {
+      std::cout << "z";
       deltas[node] += chonk_water;
       local_sum += chonk_water;
     }
     
   }
+  std::cout << std::endl;
   for(auto v:deltas)
   {
     std::cout << v.first << "-->" << v.second << std::endl;
@@ -644,11 +662,13 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
   //----------------------------------------------------
   // I need now to calculate what my reprocessing nodes are giving to the different lakes, and calculate the delta
   // preprocessing the quantity given to existing lakes (to later calculate the delta)
+  std::cout << "deltaWATER 20::" << delta_water[20] << std::endl;
   this->check_what_give_to_existing_lakes(local_mstack, outlet, current_lake, delta_sed,
     delta_water, pre_entry_node, label_prop_of_delta);
   std::vector<int> toutletstack = {outlet};
   this->check_what_give_to_existing_lakes(toutletstack, outlet, current_lake, delta_sed,
     delta_water, pre_entry_node, label_prop_of_delta);
+  std::cout << "deltaWATER 20::" << delta_water[20] << std::endl;
 
 
   this->unpack_entry_points_from_delta_maps(iteralake, label_prop_of_delta, delta_sed,delta_water, pre_entry_node, 
@@ -702,7 +722,7 @@ std::vector<double>& pre_sed, std::vector<double>& pre_water)
     target_lake = motherlake(target_lake);
     EntryPoint other(dwat * this->timestep, dsed, pre_entry_node[i], label_prop_of_delta[i]);
     queue_adder_for_lake[target_lake].ingestNkill( other);
-    std::cout << "ENTRY POINT LAKE " << target_lake << " IS NOW " << queue_adder_for_lake[target_lake].volume_water / this->timestep << std::endl;
+    std::cout << "ENTRY POINT LAKE " << target_lake << " IS NOW " << queue_adder_for_lake[target_lake].volume_water / this->timestep << " ADDED " << dwat << " (rate ofc) from " << pre_entry_node[i] << std::endl;
 
     // Emplacing the next lake entry in the queue
     iteralake.emplace(pre_entry_node[i]);
@@ -781,6 +801,15 @@ void ModelRunner::reprocess_local_stack(std::vector<int>& local_mstack, std::vec
         cellarea,topography, true, true);
 
       this->chonk_network[tnode].print_water_status();
+      std::cout << "LAKE ID::";
+      for(auto node:this->chonk_network[tnode].get_chonk_receivers_copy())
+      {
+        int lakid  = this->node_in_lake[node];
+        if(lakid>=0)
+          lakid = motherlake(lakid);
+        std::cout << node << "->" << lakid << "||";
+      }
+      std::cout << std::endl;;
 
 
     }
@@ -879,7 +908,7 @@ void ModelRunner::check_what_give_to_existing_lakes(std::vector<int>& local_msta
         if(lakid != current_lake)
         {
           label_prop_of_this[lakid] = mix_two_proportions(this_sed[lakid],label_prop_of_this[lakid], tchonk_weight_sed_recs[i]* tchonk.get_sediment_flux(), tchonk.get_other_attribute_array("label_tracker"));
-          this_sed[lakid] += tchonk_weight_sed_recs[i]* tchonk.get_sediment_flux();
+          this_sed[lakid] += tchonk_weight_sed_recs[i] * tchonk.get_sediment_flux();
           this_water[lakid] += tchonk_weight_water_recs[i] * tchonk.get_water_flux();
           this_entry_node[lakid] = tnode;
         }
