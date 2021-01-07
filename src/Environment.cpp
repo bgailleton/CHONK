@@ -676,6 +676,8 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
     delta_water, pre_entry_node, label_prop_of_delta);
   std::cout << "deltaWATER 20::" << delta_water[20] << std::endl;
 
+  std::cout << "outlet_status checekr4: " << std::endl;;
+  this->chonk_network[this->lakes[current_lake].outlet].print_water_status();
 
   this->unpack_entry_points_from_delta_maps(iteralake, label_prop_of_delta, delta_sed,delta_water, pre_entry_node, 
      label_prop_of_pre, pre_sed,pre_water);

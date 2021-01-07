@@ -172,7 +172,7 @@ class chonk
         std::cout << this->chonkID << " water_flux::" << water_flux << " gave to: ";
         for (size_t i = 0 ; i< receivers.size() ; i++)
         {
-            std::cout << receivers[i] << " [" << water_flux * weigth_water_fluxes[i] << "] || ";
+            std::cout << receivers[i] << " [" << water_flux * weigth_water_fluxes[i] << "] (" << weigth_water_fluxes[i] <<") || ";
         }
         std::cout << std::endl;
     }

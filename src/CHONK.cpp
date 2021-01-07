@@ -888,8 +888,6 @@ void chonk::charlie_I(double n, double m, double K_r, double K_s,
   if(this->receivers.size() == 0)
     return;
 
-
-
   double depodivider = 1 + (V_param * d_star * Xres * Yres / this->water_flux);
 
   for(auto& flub:pre_sedfluxes)
