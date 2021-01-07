@@ -863,19 +863,17 @@ chonk ModelRunner::preprocess_outletting_chonk(chonk tchonk, EntryPoint& entry_p
   xt::pytensor<double,1>& topography = this->io_double_array["topography"];
   xt::pytensor<int,1>& active_nodes = this->io_int_array["active_nodes"];
   // Getting the additioned water rate
-  std::cout << "I WATER RATE IS " << tchonk.get_water_flux() << std::endl;
+  // std::cout << "I WATER RATE IS " << tchonk.get_water_flux() << std::endl;
   double water_rate = entry_point.volume_water / this->timestep;
-  std::cout << "II WATER RATE IS " << water_rate << std::endl;
+  // std::cout << "II WATER RATE IS " << water_rate << std::endl;
   // Summing it to the previous one
   water_rate += tchonk.get_water_flux();
-  std::cout << "III WATER RATE IS " << water_rate << std::endl;
+  // std::cout << "III WATER RATE IS " << water_rate << std::endl;
 
   // Dealing with sediments
   std::vector<double> label_prop = mix_two_proportions(entry_point.volume_sed,entry_point.label_prop, tchonk.get_sediment_flux(), tchonk.get_other_attribute_array("label_tracker"));
   
   double sedrate = entry_point.volume_sed + tchonk.get_sediment_flux();
-  std::cout << "I SED RATE IS " << entry_point.volume_sed << std::endl;
-  std::cout << "II SED RATE IS " << tchonk.get_sediment_flux() << std::endl;
 
   //getting the weights
   // # Initialising a bunch of intermediate containers and variable
@@ -887,37 +885,47 @@ chonk ModelRunner::preprocess_outletting_chonk(chonk tchonk, EntryPoint& entry_p
   int nrecs = 0;
   // copying the weights from the current 
   tchonk.copy_moving_prep(tchonk_recs,tchonk_slope_recs,tchonk_weight_water_recs,tchonk_weight_sed_recs);
-
-  if(tchonk_recs.size() != tchonk_weight_sed_recs.size())
-    throw std::runtime_error("WeightError");
-
+  
+  // Iterating through the receivers of the outlet and removing the water given to the current lake by this outlet prior reprocessing
+  // this water is already in the lake outletting thingy!
   for(size_t i = 0; i < tchonk_recs.size(); i++)
   {
+    // Node
     int tnode = tchonk_recs[i];
+    // lake?
     int tlak = this->node_in_lake[tnode];
-    if(tlak>=0)
+    if(tlak >= 0)
       tlak = this->motherlake(tlak);
+    else
+      continue;
+
+    // Is current lake?
     if(tlak == current_lake)
     {
+      // yes, removing sed and water rate
       water_rate -= tchonk_weight_water_recs[i] * tchonk.get_water_flux();
       label_prop = mix_two_proportions(sedrate,  label_prop, -1 * tchonk_weight_water_recs[i] * tchonk.get_sediment_flux(),  tchonk.get_other_attribute_array("label_tracker"));
       sedrate -= tchonk_weight_water_recs[i] * tchonk.get_sediment_flux();
     }
-    // if(tchonk_recs[i] )
   }
 
+  // Now iterating thorugh the neighbours
   std::vector<int> neightbors; std::vector<double> dummy ; graph.get_D8_neighbors(outlet, active_nodes, neightbors, dummy);
 
+  // calculating the slope too 
   double SS = -9999;
   int SS_ID = -9999;
   for(size_t i = 0; i< neightbors.size(); i++)
   {
     // node indice of the receiver
     int tnode = neightbors[i];
+
+    // J is the indice of this specific node in the tchonk referential
     int j = -1;
     auto itj = std::find(tchonk_recs.begin(), tchonk_recs.end(), tnode);
     if(itj != tchonk_recs.end() )
       j = std::distance(tchonk_recs.begin(), itj);
+    // Note that if j is still < 0, tnode is not in the chonk
 
     if(topography[tnode] >= topography[outlet])
       continue;
@@ -925,15 +933,12 @@ chonk ModelRunner::preprocess_outletting_chonk(chonk tchonk, EntryPoint& entry_p
     // Checking wether it is giving to the original lake or not
     if(this->is_this_node_in_this_lake(tnode, current_lake) ==  false)
     {
-
-      double tS = topography[outlet] - topography[tnode];
+      // get the node
       ID_recs.push_back(tnode);
-
+      // calculate the slope
+      double tS = topography[outlet] - topography[tnode];
       tS = tS / dummy[i];
-      slope_recs.push_back(tS);
-    
-      SS_ID = tnode;
-      SS = tS;
+      // If j exists push the weights
       if(j >= 0)
       {
         weight_water_recs.push_back(tchonk_weight_water_recs[j]);
@@ -943,26 +948,18 @@ chonk ModelRunner::preprocess_outletting_chonk(chonk tchonk, EntryPoint& entry_p
       }
       else
       {
+        // else 0
         weight_water_recs.push_back(0);
         weight_sed_recs.push_back(0);
       }
-
       
-      tchonk_slope_recs.push_back(tS);
-      
+      // Slope      
+      slope_recs.push_back(tS);
       nrecs++;
 
     }
-    // else
-    // {
-    //   water_rate -= tchonk_weight_water_recs[i] * tchonk.get_water_flux();
-    //   label_prop = mix_two_proportions(sedrate,label_prop, -1 * tchonk_weight_sed_recs[i]* tchonk.get_sediment_flux(), tchonk.get_other_attribute_array("label_tracker"));
-    //   sedrate -= tchonk_weight_sed_recs[i]* tchonk.get_sediment_flux();
-    //   continue;
-    // }
-    // print_vector("WEIGHT SED", tchonk_weight_sed_recs);
 
-    // Now checking if the rec is an outlet:
+    // Now checking if the rec is an outlet and pushing the correctors:
     if(this->has_been_outlet[tnode] == 'y')
     {
       if(WF_corrector.count(tnode) == 0)
@@ -989,15 +986,13 @@ chonk ModelRunner::preprocess_outletting_chonk(chonk tchonk, EntryPoint& entry_p
       {
         label_prop_of_pre[lakid] = mix_two_proportions(pre_sed[lakid],label_prop_of_pre[lakid], tchonk_weight_sed_recs[j]* tchonk.get_sediment_flux(), tchonk.get_other_attribute_array("label_tracker"));
         pre_sed[lakid] += tchonk_weight_sed_recs[j]* tchonk_weight_sed_recs[j];
-
         pre_water[lakid] += tchonk_weight_water_recs[j] * tchonk.get_water_flux();
         pre_entry_node[lakid] = tnode;
       }
     }
-
   }
 
-  // Normalising the thingies
+  // Normalising the weights to their new states
   if(sumW > 0)
   {
     for(size_t i =0; i < weight_water_recs.size(); i++)
