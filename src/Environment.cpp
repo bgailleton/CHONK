@@ -852,6 +852,10 @@ void ModelRunner::check_what_give_to_existing_lakes(std::vector<int>& local_msta
           std::cout << lakid << "|" << tchonk_weight_sed_recs[i] << "|" << tchonk.get_sediment_flux() << " PRESED_II:" << this_sed[lakid];
           this_sed[lakid] += tchonk_weight_sed_recs[i]* tchonk.get_sediment_flux();
           std::cout << "->" << this_sed[lakid] << std::endl;
+
+          if (this_sed[lakid] > 1e25)
+            throw std::runtime_error("IrregularSedFluxError5");
+
           this_water[lakid] += tchonk_weight_water_recs[i] * tchonk.get_water_flux();
           this_entry_node[lakid] = tnode;
         }
@@ -970,10 +974,11 @@ chonk ModelRunner::preprocess_outletting_chonk(chonk tchonk, EntryPoint& entry_p
       if(lakid != current_lake)
       {
         label_prop_of_pre[lakid] = mix_two_proportions(pre_sed[lakid],label_prop_of_pre[lakid], tchonk_weight_sed_recs[i]* tchonk.get_sediment_flux(), tchonk.get_other_attribute_array("label_tracker"));
-        std::cout << "PRESED_I:" << pre_sed[lakid];
-        pre_sed[lakid] += tchonk_weight_sed_recs[i]* tchonk.get_sediment_flux();
+        std::cout << lakid << "|" << tchonk_weight_sed_recs[i] << "|" << tchonk.get_sediment_flux() << " PRESED_I:" << pre_sed[lakid];
+        pre_sed[lakid] += tchonk_weight_sed_recs[i]* tchonk_weight_sed_recs[i];
         std::cout << "->" << pre_sed[lakid] << std::endl;
-        
+        if (pre_sed[lakid] > 1e25)
+            throw std::runtime_error("IrregularSedFluxError5");
         pre_water[lakid] += tchonk_weight_water_recs[i] * tchonk.get_water_flux();
         pre_entry_node[lakid] = tnode;
       }
