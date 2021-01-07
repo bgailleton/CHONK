@@ -706,6 +706,26 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
     debugint[i] = val;
   }
 
+  for (auto node: local_mstack)
+  {
+    auto gagne2 = this->chonk_network[node].get_chonk_receivers_copy();
+    for(auto glo :  gagne2)
+    {
+      int n_stiuff = 0;
+      for (auto lolo: gagne2)
+      {
+        if(lolo == glo)
+          n_stiuff++;
+
+      }
+      if(n_stiuff > 1)
+      {
+        print_vector("III this->chonk_network[tnode].get_chonk_receivers_copy():",  gagne2);
+        throw std::runtime_error("DUPLICATESRECINBEEF");
+      }
+    }
+  }
+
 }
 
 void ModelRunner::unpack_entry_points_from_delta_maps(std::queue<int>& iteralake, std::vector<std::vector<double> >& label_prop_of_delta,
@@ -839,9 +859,43 @@ void ModelRunner::reprocess_local_stack(std::vector<int>& local_mstack, std::vec
         this->chonk_network[tnode].add_to_sediment_flux( SF_corrector[tnode], SL_corrector[tnode]);
       }
 
+      auto gagne = this->chonk_network[tnode].get_chonk_receivers_copy();
+      for(auto glo :  gagne)
+      {
+        int n_stiuff = 0;
+        for (auto lolo: gagne)
+        {
+          if(lolo == glo)
+            n_stiuff++;
+
+        }
+        if(n_stiuff > 1)
+        {
+          print_vector("III this->chonk_network[tnode].get_chonk_receivers_copy():",  gagne);
+          throw std::runtime_error("DUPLICATESRECINBEEF");
+        }
+      }
+
       // # So I need full reproc yaaay
       this->process_node_nolake_for_sure(tnode, is_processed, active_nodes, 
         cellarea,topography, true, true);
+
+      gagne = this->chonk_network[tnode].get_chonk_receivers_copy();
+      for(auto glo :  gagne)
+      {
+        int n_stiuff = 0;
+        for (auto lolo: gagne)
+        {
+          if(lolo == glo)
+            n_stiuff++;
+
+        }
+        if(n_stiuff > 1)
+        {
+          print_vector("III this->chonk_network[tnode].get_chonk_receivers_copy():",  gagne);
+          throw std::runtime_error("DUPLICATESRECINaff");
+        }
+      }
 
       // this->chonk_network[tnode].print_water_status();// Old debug statement
 
@@ -2408,12 +2462,45 @@ void ModelRunner::process_node_nolake_for_sure(int node, std::vector<bool>& is_p
 {
 
   is_processed[node] = true;
+  auto gagne = this->chonk_network[node].get_chonk_receivers_copy();
+  for(auto glo :  gagne)
+  {
+    int n_stiuff = 0;
+    for (auto lolo: gagne)
+    {
+      if(lolo == glo)
+        n_stiuff++;
+
+    }
+    if(n_stiuff > 1)
+    {
+      print_vector("PNNFS:",  gagne);
+      throw std::runtime_error("DUPLICATESRECINBEEF");
+    }
+  }
   if(need_flux_before_move)
     this->manage_fluxes_before_moving_prep(this->chonk_network[node], this->label_array[node]);
+  
   // first step is to apply the right move method, to prepare the chonk to move
   if(need_move_prep)
     this->manage_move_prep(this->chonk_network[node]);
   
+  gagne = this->chonk_network[node].get_chonk_receivers_copy();
+  for(auto glo :  gagne)
+  {
+    int n_stiuff = 0;
+    for (auto lolo: gagne)
+    {
+      if(lolo == glo)
+        n_stiuff++;
+
+    }
+    if(n_stiuff > 1)
+    {
+      print_vector("PNNFS:",  gagne);
+      throw std::runtime_error("DUPLICATESRECINaff");
+    }
+  }
   // this->chonk_network[node].print_status();
   this->manage_fluxes_after_moving_prep(this->chonk_network[node],this->label_array[node]);
   

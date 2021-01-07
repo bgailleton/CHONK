@@ -490,6 +490,7 @@ void chonk::move_MF_from_fastscapelib(NodeGraphV2& graph, xt::pytensor<double,2>
 void chonk::move_MF_from_fastscapelib_threshold_SF(NodeGraphV2& graph, double threshold_Q, double dt, xt::pytensor<double,1>& sed_height, xt::pytensor<double,1>& sed_height_tp1, 
   xt::pytensor<double,1>& surface_elevation, xt::pytensor<double,1>& surface_elevation_tp1, double Xres, double Yres, std::vector<chonk>& chonk_network)
 { 
+  std::cout << "YOYOYOYOYO1??" << std::endl;
 
   // I need the receicing neighbours and the distance to them
   std::vector<int> these_neighbors = graph.get_MF_receivers_at_node(this->current_node);
@@ -498,6 +499,7 @@ void chonk::move_MF_from_fastscapelib_threshold_SF(NodeGraphV2& graph, double th
   // No receiver? No prep
   if(these_neighbors.size() == 0)
     return;
+  std::cout << "YOYOYOYOYO2??" << std::endl;
 
   // Temporary vectors for the flow partitionning
   std::vector<double> waterweigths(these_neighbors.size());
@@ -659,8 +661,11 @@ void chonk::move_MF_from_fastscapelib_threshold_SF(NodeGraphV2& graph, double th
     // Mover to the next step
   }
 
+
+  std::cout << "YOYOYOYOYO" << std::endl;
   for(auto node :  this->receivers)
   {
+    std::cout << node << std::endl;
     int n_stiuff = 0;
     for (auto tnode: this->receivers)
     {
@@ -674,7 +679,7 @@ void chonk::move_MF_from_fastscapelib_threshold_SF(NodeGraphV2& graph, double th
       throw std::runtime_error("DUPLICATESRECINCHONKMF2D8");
     }
   }
-  
+
 }
 
 
