@@ -937,6 +937,10 @@ void ModelRunner::deprocess_local_stack(std::vector<int>& local_mstack, std::vec
       this->chonk_network[tnode].reset();
       this->chonk_network[tnode].set_other_attribute_array("label_tracker", std::vector<double>(this->n_labels,0));
     }
+    else
+    {
+      this->chonk_network[tnode].reinitialise_moving_prep();
+    }
   }
 }
 
@@ -2479,11 +2483,17 @@ void ModelRunner::process_node_nolake_for_sure(int node, std::vector<bool>& is_p
     }
   }
   if(need_flux_before_move)
+  {
+    std::cout << "KLJSDFHKJSDFHJK" << std::endl;
     this->manage_fluxes_before_moving_prep(this->chonk_network[node], this->label_array[node]);
+  }
   
   // first step is to apply the right move method, to prepare the chonk to move
   if(need_move_prep)
+  {
+    std::cout << "hjjghjghg" << std::endl;
     this->manage_move_prep(this->chonk_network[node]);
+  }
   
   gagne = this->chonk_network[node].get_chonk_receivers_copy();
   for(auto glo :  gagne)
