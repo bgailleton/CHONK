@@ -491,7 +491,6 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
   // this->label_nodes_with_no_rec_in_local_stack(local_stack_checker,is_in_queue, has_recs_in_local_stack);
   for(auto node:local_stack_checker)
   {
-    std::cout << node << std::endl;
     if(is_in_queue[node] == 'd')
       continue;
 
@@ -507,7 +506,6 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
       if(is_in_queue[rec] == 'n' || is_in_queue[rec] == 'r' || is_in_queue[rec] == 'd')
       {
         double this_water = WW[i] * chonk_water ;
-        std::cout << "W:" << this_water << std::endl;
         local_sum -=  this_water;
 
         if(is_done == false)
@@ -522,6 +520,9 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
       }
       i++;
     }
+
+    if(active_nodes[node] == 0)
+      local_sum -= chonk_water;
     
   }
   std::cout << "LOCAL SUM IS " << local_sum << std::endl;
@@ -603,6 +604,9 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
       }
       i++;
     }
+
+    if(active_nodes[node] == 0)
+      local_sum += chonk_water;
     
   }
   for(auto v:deltas)
