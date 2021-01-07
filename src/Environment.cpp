@@ -482,23 +482,6 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
   //------- STARTING THE OUTLET PREPROCESSING ----------
   //----------------------------------------------------
 
-  // Getting the outletting chonk particule
-  chonk tchonk = this->chonk_network[this->lakes[current_lake].outlet];
-  // Now initialising the map correcting the fluxes
-  std::map<int,double> WF_corrector; std::map<int,double> SF_corrector; std::map<int,std::vector<double> > SL_corrector;
-  // Calling teh function preparing the outletting chonk processing
-  this->chonk_network[this->lakes[current_lake].outlet] = chonk(this->preprocess_outletting_chonk(tchonk, entry_point, current_lake, this->lakes[current_lake].outlet,
-    WF_corrector,  SF_corrector,  SL_corrector, pre_sed, pre_water, pre_entry_node, label_prop_of_pre));
-
-  // this->chonk_network[this->lakes[current_lake].outlet] = tchonk;
-  //   _      _      _
-  // >(.)__ <(.)__ =(.)__
-  //  (___/  (___/  (___/  quack
-
-  //----------------------------------------------------
-  //---------- DEPROCESSING THE LOCAL STACK ------------
-  //----------------------------------------------------
-  
   // DEBUG VARIABLE TO CHECK IF WATER IS CREATED WHEN REPROCESSING A LAKE WITH 0 WATER
   double local_sum = 0;
   std::map<int,double> deltas;
@@ -508,6 +491,10 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
   // this->label_nodes_with_no_rec_in_local_stack(local_stack_checker,is_in_queue, has_recs_in_local_stack);
   for(auto node:local_stack_checker)
   {
+    std::cout << node << std::endl;
+    if(is_in_queue[node] == 'd')
+      continue;
+
     bool is_done = false;
     
     
@@ -520,8 +507,9 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
       if(is_in_queue[rec] == 'n' || is_in_queue[rec] == 'r' || is_in_queue[rec] == 'd')
       {
         double this_water = WW[i] * chonk_water ;
-
+        std::cout << "W:" << this_water << std::endl;
         local_sum -=  this_water;
+
         if(is_done == false)
         {
           deltas[node] = (-1 * this_water);
@@ -539,6 +527,25 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
   std::cout << "LOCAL SUM IS " << local_sum << std::endl;
   std::cout << outlet << "|||" << debug_saverW << "||||" << outlet_water_saver << "||||" << this->chonk_network[this->lakes[current_lake].outlet].get_water_flux() << std::endl;
   // end of DEBUG
+
+  // Getting the outletting chonk particule
+  chonk tchonk = this->chonk_network[this->lakes[current_lake].outlet];
+  // Now initialising the map correcting the fluxes
+  std::map<int,double> WF_corrector; std::map<int,double> SF_corrector; std::map<int,std::vector<double> > SL_corrector;
+  // Calling teh function preparing the outletting chonk processing
+  this->chonk_network[this->lakes[current_lake].outlet] = chonk(this->preprocess_outletting_chonk(tchonk, entry_point, current_lake, this->lakes[current_lake].outlet,
+    WF_corrector,  SF_corrector,  SL_corrector, pre_sed, pre_water, pre_entry_node, label_prop_of_pre));
+
+  // this->chonk_network[this->lakes[current_lake].outlet] = tchonk;
+  //   _      _      _
+  // >(.)__ <(.)__ =(.)__
+  //  (___/  (___/  (___/  quack
+
+  //----------------------------------------------------
+  //---------- DEPROCESSING THE LOCAL STACK ------------
+  //----------------------------------------------------
+  
+
   // std::cout << "1288::"; this->chonk_network[1288].print_water_status(); std::cout << std::endl;
 
   // preprocessing the nodes on the path that are outlets
@@ -574,6 +581,8 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
   // DEBUG FOR WATER BALANCE
   for(auto node:local_stack_checker)
   {
+    if(is_in_queue[node] == 'd')
+      continue;
     bool is_done = false;
     
     
