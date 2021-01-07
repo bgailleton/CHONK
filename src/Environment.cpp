@@ -897,6 +897,9 @@ chonk ModelRunner::preprocess_outletting_chonk(chonk tchonk, EntryPoint& entry_p
   // copying the weights from the current 
   tchonk.copy_moving_prep(tchonk_recs,tchonk_slope_recs,tchonk_weight_water_recs,tchonk_weight_sed_recs);
 
+  if(tchonk_recs.size() != tchonk_weight_sed_recs.size())
+    throw std::runtime_error("WeightError");
+
   for(size_t i = 0; i < tchonk_recs.size(); i++)
   {
     int tnode = tchonk_recs[i];
@@ -916,10 +919,14 @@ chonk ModelRunner::preprocess_outletting_chonk(chonk tchonk, EntryPoint& entry_p
 
   double SS = -9999;
   int SS_ID = -9999;
-  for(size_t i =0; i< neightbors.size(); i++)
+  for(size_t i = 0; i< neightbors.size(); i++)
   {
     // node indice of the receiver
     int tnode = neightbors[i];
+    int j = -1;
+    auto itj = std::find(tchonk_recs.begin(), tchonk_recs.end(), tnode);
+    if(itj != tchonk_recs.end() )
+      j = std::distance(tchonk_recs.begin(), itj);
 
     if(topography[tnode] >= topography[outlet])
       continue;
@@ -936,10 +943,22 @@ chonk ModelRunner::preprocess_outletting_chonk(chonk tchonk, EntryPoint& entry_p
     
       SS_ID = tnode;
       SS = tS;
-      weight_water_recs.push_back(tchonk_weight_water_recs[i]);
-      weight_sed_recs.push_back(tchonk_weight_sed_recs[i]);
-      sumW += tchonk_weight_water_recs[i];
-      sumS += tchonk_weight_sed_recs[i];
+      if(j >= 0)
+      {
+        weight_water_recs.push_back(tchonk_weight_water_recs[j]);
+        weight_sed_recs.push_back(tchonk_weight_sed_recs[j]);
+        sumW += tchonk_weight_water_recs[j];
+        sumS += tchonk_weight_sed_recs[j];
+      }
+      else
+      {
+        weight_water_recs.push_back(0);
+        weight_sed_recs.push_back(0);
+      }
+
+      
+      tchonk_slope_recs.push_back(tS);
+      
       nrecs++;
 
     }
@@ -950,6 +969,7 @@ chonk ModelRunner::preprocess_outletting_chonk(chonk tchonk, EntryPoint& entry_p
     //   sedrate -= tchonk_weight_sed_recs[i]* tchonk.get_sediment_flux();
     //   continue;
     // }
+    // print_vector("WEIGHT SED", tchonk_weight_sed_recs);
 
     // Now checking if the rec is an outlet:
     if(this->has_been_outlet[tnode] == 'y')
@@ -961,25 +981,30 @@ chonk ModelRunner::preprocess_outletting_chonk(chonk tchonk, EntryPoint& entry_p
         SL_corrector[tnode] = {};
       }
 
-      WF_corrector[tnode] -= tchonk_weight_water_recs[i] * tchonk.get_water_flux();
-      SL_corrector[tnode] = mix_two_proportions(SF_corrector[tnode],SL_corrector[tnode], -1 * tchonk_weight_sed_recs[i]* tchonk.get_sediment_flux(), tchonk.get_other_attribute_array("label_tracker"));
-      SF_corrector[tnode] -= tchonk_weight_sed_recs[i]* tchonk.get_sediment_flux();
+      if(j>=0)
+      {
+        WF_corrector[tnode] -= tchonk_weight_water_recs[j] * tchonk.get_water_flux();
+        SL_corrector[tnode] = mix_two_proportions(SF_corrector[tnode],SL_corrector[tnode], -1 * tchonk_weight_sed_recs[j]* tchonk.get_sediment_flux(), tchonk.get_other_attribute_array("label_tracker"));
+        SF_corrector[tnode] -= tchonk_weight_sed_recs[j]* tchonk.get_sediment_flux();
+      }
     }
 
     // And finally checking if the rec is a lake
     int lakid = this->node_in_lake[tnode];
-    if(lakid >= 0)
+    if(lakid >= 0 && j >= 0)
     {
       lakid = this->motherlake(lakid);
       if(lakid != current_lake)
       {
-        label_prop_of_pre[lakid] = mix_two_proportions(pre_sed[lakid],label_prop_of_pre[lakid], tchonk_weight_sed_recs[i]* tchonk.get_sediment_flux(), tchonk.get_other_attribute_array("label_tracker"));
-        std::cout << lakid << "|" << tchonk_weight_sed_recs[i] << "|" << tchonk.get_sediment_flux() << " PRESED_I:" << pre_sed[lakid];
-        pre_sed[lakid] += tchonk_weight_sed_recs[i]* tchonk_weight_sed_recs[i];
+        label_prop_of_pre[lakid] = mix_two_proportions(pre_sed[lakid],label_prop_of_pre[lakid], tchonk_weight_sed_recs[j]* tchonk.get_sediment_flux(), tchonk.get_other_attribute_array("label_tracker"));
+        std::cout << lakid << "|" << tchonk_weight_sed_recs[j] << "|" << tchonk.get_sediment_flux() << " PRESED_I:" << pre_sed[lakid];
+        pre_sed[lakid] += tchonk_weight_sed_recs[j]* tchonk_weight_sed_recs[j];
         std::cout << "->" << pre_sed[lakid] << std::endl;
-        if (pre_sed[lakid] > 1e25)
+        
+        if(pre_sed[lakid] > 1e25)
             throw std::runtime_error("IrregularSedFluxError5");
-        pre_water[lakid] += tchonk_weight_water_recs[i] * tchonk.get_water_flux();
+
+        pre_water[lakid] += tchonk_weight_water_recs[j] * tchonk.get_water_flux();
         pre_entry_node[lakid] = tnode;
       }
     }

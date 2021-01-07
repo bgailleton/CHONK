@@ -885,6 +885,9 @@ void chonk::charlie_I(double n, double m, double K_r, double K_s,
       return;
   }
 
+  if(this->receivers.size() == 0)
+    return;
+
 
 
   double depodivider = 1 + (V_param * d_star * Xres * Yres / this->water_flux);
@@ -953,8 +956,11 @@ void chonk::charlie_I(double n, double m, double K_r, double K_s,
   }
 
   if(double_equals(sumweights,0,1e-7) ==  true)
-    this->weigth_sediment_fluxes[i] = std::vector<double>(this->weigth_water_fluxes);
+    this->weigth_sediment_fluxes = std::vector<double>(this->weigth_water_fluxes);
 
+  sumweights = 0;
+  for (auto s:this->weigth_sediment_fluxes)
+    sumweights += s;
 
   if(double_equals(sumweights,1,1e-3) ==  false)
     throw std::runtime_error("Sedweightserrors::" + std::to_string(sumweights));
