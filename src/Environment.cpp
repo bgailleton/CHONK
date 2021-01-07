@@ -508,9 +508,10 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
       nodes.push_back(node);
     }
   }
-
-  std::cout << debug_saverW << "||||" << outlet_water_saver << "||||" << this->chonk_network[this->lakes[current_lake].outlet].get_water_flux() << std::endl;
+  std::cout << "LOCAL SUM IS " << local_sum << std::endl;
+  std::cout << outlet << "|||" << debug_saverW << "||||" << outlet_water_saver << "||||" << this->chonk_network[this->lakes[current_lake].outlet].get_water_flux() << std::endl;
   // end of DEBUG
+  // std::cout << "1288::"; this->chonk_network[1288].print_water_status(); std::cout << std::endl;
 
   // preprocessing the nodes on the path that are outlets
   this->check_what_give_to_existing_outlets(WF_corrector,  SF_corrector,  SL_corrector, local_mstack);
@@ -530,7 +531,7 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
   // Process the outlet, whithout preparing the move (Already done) and readding the precipitation-like fluxes (already taken into account).
   this->process_node_nolake_for_sure(this->lakes[current_lake].outlet, is_processed, active_nodes, 
       cellarea,topography, false, false);
-
+  this->chonk_network[this->lakes[current_lake].outlet].print_water_status();
   // std::cout << "Node 339 has " 
 
   //----------------------------------------------------
@@ -549,17 +550,18 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
     {
       local_sum += this->chonk_network[node].get_water_flux();
       deltas[balf] += this->chonk_network[node].get_water_flux();
-      std::cout << "|" << nodes[balf] << "[" << deltas[balf] << "]";
+      std::cout << "|" << nodes[balf] << "[" << deltas[balf] << "/"<< this->chonk_network[node].get_water_flux() << "]";
       balf++;
 
     }
   }
   std::cout << std::endl;
+  std::cout << "LOCAL SUM IS NOW " << local_sum << std::endl;
 
   if(double_equals(local_sum,debug_saverW,1) == false)
   {
     std::cout << debug_saverW << " got added to this local system but there is a delta of " << local_sum - debug_saverW << std::endl;
-    // throw std::runtime_error("WaterDeltaWhileReprocError"); 
+    throw std::runtime_error("WaterDeltaWhileReprocError"); 
   }
 
 
