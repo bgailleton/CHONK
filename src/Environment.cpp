@@ -579,7 +579,9 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
   std::cout << "PREWATER 20::" << pre_water[20] << std::endl;
   this->process_node_nolake_for_sure(this->lakes[current_lake].outlet, is_processed, active_nodes, 
       cellarea,topography, false, false);
+  std::cout << "outlet_status after reproc " << std::endl;;
   this->chonk_network[this->lakes[current_lake].outlet].print_water_status();
+
   std::cout << "LAKE ID::";
   for(auto node:this->chonk_network[this->lakes[current_lake].outlet].get_chonk_receivers_copy())
   {
@@ -592,7 +594,8 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
   // std::cout << "Node 339 has " 
   std::cout << "PREWATER 20::" << pre_water[20] << std::endl;
 
-
+  std::cout << "outlet_status checekr1: " << std::endl;;
+  this->chonk_network[this->lakes[current_lake].outlet].print_water_status();
   //----------------------------------------------------
   //------------ LOCAL STACK REPROCESSING --------------
   //----------------------------------------------------
@@ -600,6 +603,8 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
   // std::cout << "Entry_point is " << entry_point.volume_water/this->timestep << std::endl;
   this->reprocess_local_stack(local_mstack, is_in_queue, outlet, current_lake, WF_corrector, SF_corrector, SL_corrector);
 
+  std::cout << "outlet_status checekr2: " << std::endl;;
+  this->chonk_network[this->lakes[current_lake].outlet].print_water_status();
 
   // DEBUG FOR WATER BALANCE
   double sum_out = 0;
@@ -655,7 +660,8 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
     throw std::runtime_error("WaterDeltaWhileReprocError"); 
   }
 
-
+  std::cout << "outlet_status checekr3: " << std::endl;;
+  this->chonk_network[this->lakes[current_lake].outlet].print_water_status();
 
   //----------------------------------------------------
   //------------ PROCESSING ENTRY POINTS ---------------
@@ -907,6 +913,7 @@ void ModelRunner::check_what_give_to_existing_lakes(std::vector<int>& local_msta
         lakid = this->motherlake(lakid);
         if(lakid != current_lake)
         {
+          std::cout << "Adding " << tchonk_weight_water_recs[i] * tchonk.get_water_flux() << " to " << lakid << " from " << node << "->" << tnode << " Breakdown: " << tchonk_weight_water_recs[i] << " * " <<  tchonk.get_water_flux() << std::endl; ;
           label_prop_of_this[lakid] = mix_two_proportions(this_sed[lakid],label_prop_of_this[lakid], tchonk_weight_sed_recs[i]* tchonk.get_sediment_flux(), tchonk.get_other_attribute_array("label_tracker"));
           this_sed[lakid] += tchonk_weight_sed_recs[i] * tchonk.get_sediment_flux();
           this_water[lakid] += tchonk_weight_water_recs[i] * tchonk.get_water_flux();
