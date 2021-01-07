@@ -498,15 +498,36 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
   std::vector<int> nodes;
   std::vector<int> local_stack_checker = std::vector<int>(local_mstack);
   local_stack_checker.push_back(outlet);
-  this->label_nodes_with_no_rec_in_local_stack(local_stack_checker,is_in_queue, has_recs_in_local_stack);
+  // this->label_nodes_with_no_rec_in_local_stack(local_stack_checker,is_in_queue, has_recs_in_local_stack);
   for(auto node:local_stack_checker)
   {
-    if(has_recs_in_local_stack[node] == 'p')
-    {
-      local_sum -= this->chonk_network[node].get_water_flux();
-      deltas.push_back(-1 * this->chonk_network[node].get_water_flux());
-      nodes.push_back(node);
+    bool is_done = false;
+    
+    
+    std::vector<int> recs = this->chonk_network[node].get_chonk_receivers_copy();
+    std::vector<double> WW = this->chonk_network[node].get_chonk_water_weight_copy();
+    double chonk_water = this->chonk_network[node].get_water_flux();
+    int i = 0;
+    for(auto rec : recs)
+    { 
+      if(is_in_queue[rec] == 'n' || is_in_queue[rec] == 'r')
+      {
+        double this_water = WW[i] * chonk_water ;
+
+        local_sum -=  this_water;
+        if(is_done == false)
+        {
+          deltas.push_back(-1 * this_water);
+          nodes.push_back(node);
+        }
+        else
+        {
+          deltas[deltas.size() - 1] -= this_water;
+        }
+      }
+      i++;
     }
+    
   }
   std::cout << "LOCAL SUM IS " << local_sum << std::endl;
   std::cout << outlet << "|||" << debug_saverW << "||||" << outlet_water_saver << "||||" << this->chonk_network[this->lakes[current_lake].outlet].get_water_flux() << std::endl;
@@ -542,20 +563,29 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
   this->reprocess_local_stack(local_mstack, is_in_queue, outlet, current_lake, WF_corrector, SF_corrector, SL_corrector);
 
   // DEBUG FOR WATER BALANCE
-  std::cout << "Is considered for mass balance check:";
-  int balf = 0;
   for(auto node:local_stack_checker)
   {
-    if(has_recs_in_local_stack[node] == 'p')
-    {
-      local_sum += this->chonk_network[node].get_water_flux();
-      deltas[balf] += this->chonk_network[node].get_water_flux();
-      std::cout << "|" << nodes[balf] << "[" << deltas[balf] << "/"<< this->chonk_network[node].get_water_flux() << "]";
-      balf++;
+    bool is_done = false;
+    
+    
+    std::vector<int> recs = this->chonk_network[node].get_chonk_receivers_copy();
+    std::vector<double> WW = this->chonk_network[node].get_chonk_water_weight_copy();
+    double chonk_water = this->chonk_network[node].get_water_flux();
+    int i = 0;
+    for(auto rec : recs)
+    { 
+      if(is_in_queue[rec] == 'n' || is_in_queue[rec] == 'r')
+      {
+        double this_water = WW[i] * chonk_water ;
 
+        local_sum +=  this_water;
+        deltas[deltas.size() - 1] += this_water;
+        
+      }
+      i++;
     }
+    
   }
-  std::cout << std::endl;
   std::cout << "LOCAL SUM IS NOW " << local_sum << std::endl;
 
   if(double_equals(local_sum,debug_saverW,1) == false)
