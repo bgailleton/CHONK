@@ -154,10 +154,10 @@ void ModelRunner::initiate_nodegraph()
       active_nodes[i] = false;
   }
 
-  //Dat is the real stuff:
+  // Dat is the real stuff:
   // Initialising the graph
   this->graph = NodeGraphV2(this->io_double_array["surface_elevation"], active_nodes,this->io_double["dx"], this->io_double["dy"],
-this->io_int["n_rows"], this->io_int["n_cols"], this->lake_solver);
+                            this->io_int["n_rows"], this->io_int["n_cols"], this->lake_solver);
   
   // Chonkification: initialising chonk network
   //# clearing the chonk network
@@ -255,13 +255,23 @@ void ModelRunner::run()
 
 void ModelRunner::iterative_lake_solver()
 {
-  // Right 
+  // Right, this is a complex function. Solving lakes explicitely while retaining the dynamic adaptation of parameter (ie not solving water first, then fluvial erosion, 
+  // then deposion, then tracking,... but all at each pixel movement) ended up being a pain. But it works and is reasonnably quick so I am happy.
+
+
   // Initialising an empty queue of entry points, ie, points which will initiate a lake with a given sed and wat content
+  // Basically, each time a reprocessing ends up in a lake, I add a entry point. This is a FIFO queue processing all of them until it is done.
+  // POSSIBLE OPTIMISATION: swithc to a priority queue based on a the depression topological order. 
+  // This is already the case for the first insertion and most of the next one are subsequently sorted but potentially not all
   std::queue<int> iteralake;
-  // reinitialising the queue helper
+
+  // reinitialising the queue helpers
+  // the queue helpers just store everything that needs to go in a specific lake,  so if multiple entry points are stored for 
+  // a single lake and it comes to processing, it merges all of them rather than reprocessing multiple times
   lake_is_in_queue_for_reproc.clear();
   queue_adder_for_lake.clear();
 
+  // Debugger to ignore
   GLOB_GABUL = 0;
 
   // Initialising the lake_status array: -1 = not a lake; 0 = to be processed and 1= processed at least once
@@ -271,22 +281,31 @@ void ModelRunner::iterative_lake_solver()
 
   // reinitialising the lakes
   this->lakes = std::vector<LakeLite>();
+  // Traces which nodes of the landscape has been an outlet or not
   this->has_been_outlet = std::vector<char>(this->io_int["n_elements"],'n');
+
+  // KEEPING FOR LEGACY BUT I THINK IS DEPRECATED NOW
+  // reinitialising all the maps dealing with saving outlet original status
   original_outlet_giver.clear();
   original_outlet_giver_water.clear();
   original_outlet_giver_sed.clear();
   original_outlet_giver_sedlab.clear();
   original_chonk.clear();
+  // Best,
+  // Boris
+  
+
+  //############# First step: initialising the original lakes in the topological order
 
   // Initialising the queue with the first lakes. Also I am preprocessing the flat surfaces
   for(auto starting_node : this->lake_in_order)
   {
-    // std::cout << this->lake_status[starting_node] << " Starting node = " << starting_node << std::endl;
-    // If this depression if already incorporated into another flat surface
+
+    // Check if already incorporated into another flat surface
     if(this->lake_status[starting_node] > 0)
       continue;
 
-    // getting the full water and sed volumes to add to the lake
+    // Getting the full water and sed volumes to add to the lake
     double water_volume,sediment_volume; std::vector<double> label_prop;
 
     std::vector<int> these_nodes;
