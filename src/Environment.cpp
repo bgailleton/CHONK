@@ -815,40 +815,8 @@ void ModelRunner::reprocess_local_stack(std::vector<int>& local_mstack, std::vec
 
       // # Ignore_some has the node i so not want
       // # So I transmit my fluxes to the nodes I do not ignore
-      auto gagne = this->chonk_network[tnode].get_chonk_receivers_copy();
-      for(auto glo :  gagne)
-      {
-        int n_stiuff = 0;
-        for (auto lolo: gagne)
-        {
-          if(lolo == glo)
-            n_stiuff++;
-
-        }
-        if(n_stiuff > 1)
-        {
-          print_vector("III this->chonk_network[tnode].get_chonk_receivers_copy():",  gagne);
-          throw std::runtime_error("DUPLICATESRECINCHONKMF2D8");
-        }
-      }
-
       this->chonk_network[tnode].split_and_merge_in_receiving_chonks_ignore_some(this->chonk_network, this->graph, this->timestep, ignore_some);
-      gagne = this->chonk_network[tnode].get_chonk_receivers_copy();
-      for(auto glo :  gagne)
-      {
-        int n_stiuff = 0;
-        for (auto lolo: gagne)
-        {
-          if(lolo == glo)
-            n_stiuff++;
 
-        }
-        if(n_stiuff > 1)
-        {
-          print_vector("III this->chonk_network[tnode].get_chonk_receivers_copy():",  gagne);
-          throw std::runtime_error("DUPLICATESRECINCHONKMF2D8");
-        }
-      }
     }
     else
     {
@@ -859,59 +827,9 @@ void ModelRunner::reprocess_local_stack(std::vector<int>& local_mstack, std::vec
         this->chonk_network[tnode].add_to_sediment_flux( SF_corrector[tnode], SL_corrector[tnode]);
       }
 
-      auto gagne = this->chonk_network[tnode].get_chonk_receivers_copy();
-      for(auto glo :  gagne)
-      {
-        int n_stiuff = 0;
-        for (auto lolo: gagne)
-        {
-          if(lolo == glo)
-            n_stiuff++;
-
-        }
-        if(n_stiuff > 1)
-        {
-          print_vector("III this->chonk_network[tnode].get_chonk_receivers_copy():",  gagne);
-          throw std::runtime_error("DUPLICATESRECINBEEF");
-        }
-      }
-
       // # So I need full reproc yaaay
       this->process_node_nolake_for_sure(tnode, is_processed, active_nodes, 
         cellarea,topography, true, true);
-
-      gagne = this->chonk_network[tnode].get_chonk_receivers_copy();
-      for(auto glo :  gagne)
-      {
-        int n_stiuff = 0;
-        for (auto lolo: gagne)
-        {
-          if(lolo == glo)
-            n_stiuff++;
-
-        }
-        if(n_stiuff > 1)
-        {
-          print_vector("III this->chonk_network[tnode].get_chonk_receivers_copy():",  gagne);
-          throw std::runtime_error("DUPLICATESRECINaff");
-        }
-      }
-
-      // this->chonk_network[tnode].print_water_status();// Old debug statement
-
-      // this->chonk_network[tnode].print_water_status();
-      // Old debug statement
-      // std::cout << "LAKE ID::";
-      for(auto node:this->chonk_network[tnode].get_chonk_receivers_copy())
-      {
-        int lakid  = this->node_in_lake[node];
-        if(lakid>=0)
-          lakid = motherlake(lakid);
-        // std::cout << node << "->" << lakid << "||";
-      }
-      // std::cout << std::endl;;
-
-
     }
   }
 
