@@ -573,29 +573,12 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
   //----------------------------------------------------
   //---------------- OUTLET PROCESSING -----------------
   //----------------------------------------------------
-  // std::cout << std::endl<< std::endl<< std::endl << "#@" << std::endl;
-  // this->chonk_network[this->lakes[current_lake].outlet].print_status();
   // Process the outlet, whithout preparing the move (Already done) and readding the precipitation-like fluxes (already taken into account).
-  // std::cout << "PREWATER 20::" << pre_water[20] << std::endl;
   this->process_node_nolake_for_sure(this->lakes[current_lake].outlet, is_processed, active_nodes, 
       cellarea,topography, false, false);
   // std::cout << "outlet_status after reproc " << std::endl;;
   this->chonk_network[this->lakes[current_lake].outlet].print_water_status();
 
-  // std::cout << "LAKE ID::";
-  for(auto node:this->chonk_network[this->lakes[current_lake].outlet].get_chonk_receivers_copy())
-  {
-    int lakid  = this->node_in_lake[node];
-    if(lakid>=0)
-      lakid = motherlake(lakid);
-    // std::cout << node << "->" << lakid << "||";
-  }
-  // std::cout << std::endl;;
-  // std::cout << "Node 339 has " 
-  // std::cout << "PREWATER 20::" << pre_water[20] << std::endl;
-
-  // std::cout << "outlet_status checekr1: " << std::endl;;
-  // this->chonk_network[this->lakes[current_lake].outlet].print_water_status();
   //----------------------------------------------------
   //------------ LOCAL STACK REPROCESSING --------------
   //----------------------------------------------------
