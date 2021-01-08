@@ -297,7 +297,8 @@ void ModelRunner::iterative_lake_solver()
 
   //############# First step: initialising the original lakes in the topological order
 
-  // Initialising the queue with the first lakes. Also I am preprocessing the flat surfaces
+  // Initialising the queue with the first lakes. 
+  // Also I am preprocessing the flat surfaces: if a lake is juxtaposed by nodes with the exact same elevation, I merge all of these in the same lake
   for(auto starting_node : this->lake_in_order)
   {
 
@@ -308,32 +309,25 @@ void ModelRunner::iterative_lake_solver()
     // Getting the full water and sed volumes to add to the lake
     double water_volume,sediment_volume; std::vector<double> label_prop;
 
+    // I also plan to get the nodes of this area
     std::vector<int> these_nodes;
     // This function checks if there are flats around it and process the whole lake as a single flat
     this->original_gathering_of_water_and_sed_from_pixel_or_flat_area(starting_node, water_volume, sediment_volume, label_prop, these_nodes);
 
-    if(starting_node == -9999)
-      throw std::runtime_error("EntryPointError::Invalid at initial entry point creation " + std::to_string(starting_node) );
-
     // Also create an empty lake here
     this->lakes.push_back(LakeLite(this->lake_incrementor));
+    // and gives it its nodes
     this->lakes[lake_incrementor].nodes = these_nodes;
-    // lake_is_in_queue_for_reproc.push_back('y');
-    queue_adder_for_lake.push_back(EntryPoint( water_volume,  sediment_volume,  starting_node, label_prop));
-
-
-    // emplce the entry point and its characteristics into the lake
+    // Registering my entry point with the water and sediment content in the queu helper
+    this->queue_adder_for_lake.push_back(EntryPoint( water_volume,  sediment_volume,  starting_node, label_prop));
+    // Emplacing the node in the queue
     iteralake.emplace(starting_node);
 
-    // std::cout <<"From starting_node::Gathered in initial lake flat::";
+    // Labelling each node with their lake ID
     for(auto tnode : these_nodes)
-    {
-      // std::cout << tnode << "::";
       this->node_in_lake[tnode] = this->lake_incrementor;
-    }
-    // std::cout <<std::endl;
-
-
+    
+    // Incrementing lake ID
     this->lake_incrementor++;
   }
 
