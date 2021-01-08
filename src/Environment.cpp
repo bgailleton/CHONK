@@ -40,9 +40,17 @@
 
 #include <boost/timer/timer.hpp>
 
+//#############################################################
+//#############################################################
+//################### Custom Operators ########################
+//#############################################################
+//#############################################################
 
-// Managing the comparison operators for the fill node, to let the queue know I wanna compare it by elevation values
+// Managing the comparison operators the different small classes
+// it is required by all priority queues
 // lhs/rhs : left hand side, right hand side
+
+// nodiums are sorted by elevations for the depression filler
 bool operator>( const nodium& lhs, const nodium& rhs )
 {
   return lhs.elevation > rhs.elevation;
@@ -52,6 +60,7 @@ bool operator<( const nodium& lhs, const nodium& rhs )
   return lhs.elevation < rhs.elevation;
 }
 
+// the nodes to reprocess are sorted by their index in the stack. Smaller = upstream
 bool operator>( const node_to_reproc& lhs, const node_to_reproc& rhs )
 {
   return lhs.id_in_mstack > rhs.id_in_mstack;
@@ -61,16 +70,14 @@ bool operator<( const node_to_reproc& lhs, const node_to_reproc& rhs )
   return lhs.id_in_mstack < rhs.id_in_mstack;
 }
 
-// EntryPoint& operator+=(EntryPoint& lhs, const EntryPoint& rhs)
-// {
-//   lhs.volume_water += rhs.volume_water;
-//   lhs.label_prop = mix_two_proportions(lhs.volume_sed, lhs.label_prop, rhs.volume_sed, rhs.label_prop);
-//   lhs.volume_sed += rhs.volume_sed;
-//   lhs.node = rhs.node;
-//   return lhs;
-// }
+//#############################################################
+//#############################################################
+//################ Local Utility Functions ####################
+//#############################################################
+//#############################################################
 
 // Small function utilised into the debugging
+// return true if the vector has a duplicate
 bool chonk_utilities::has_duplicates(std::vector<int>& datvec)
 {
   std::set<int> countstuff;
@@ -84,6 +91,7 @@ bool chonk_utilities::has_duplicates(std::vector<int>& datvec)
   return false;
 }
 
+// Entry point ingesting functions (utilised in the iterative lake management)
 void EntryPoint::ingestNkill(EntryPoint& other)
 {
   int save_id = other.node;
@@ -100,6 +108,8 @@ void EntryPoint::ingestNkill(EntryPoint& other)
 // ###################### Model Runner ##################################
 // ######################################################################
 // ######################################################################
+
+// The model runner is the main object controlling the code
 
 // Initialises the model object, actually Does not do much but is required.
 void ModelRunner::create(double ttimestep, std::vector<std::string> tordered_flux_methods, std::string tmove_method)
@@ -148,8 +158,6 @@ void ModelRunner::initiate_nodegraph()
   // Initialising the graph
   this->graph = NodeGraphV2(this->io_double_array["surface_elevation"], active_nodes,this->io_double["dx"], this->io_double["dy"],
 this->io_int["n_rows"], this->io_int["n_cols"], this->lake_solver);
-
-  // std::cout << "done, sorting few stuff around ..." << std::endl;
   
   // Chonkification: initialising chonk network
   //# clearing the chonk network
@@ -174,13 +182,8 @@ this->io_int["n_rows"], this->io_int["n_cols"], this->lake_solver);
   this->Ql_in = 0;
   this->Ql_out = 0;
 
-  // Stuff
-  // I NEED TO WORK ON THAT PART YO
-  // This add previous inherited water from previous lakes
-  // Note that it "empties" the lake and reinitialise the depth. If there is still a reason to for the lake, it will form it
-  // std::cout << "wat" << std::endl;
+  // Processes preexisting water from previous time steps, so far: lakes
   this->process_inherited_water();
-  // std::cout << "er" << std::endl;
 
   // Also initialising the Lake graph
   //# incrementor reset to 0
@@ -189,64 +192,64 @@ this->io_int["n_rows"], this->io_int["n_cols"], this->lake_solver);
   //# no nodes in lakes
   node_in_lake = std::vector<int>(this->io_int["n_elements"], -1);
 
-  std::cout << "done with setting up graph stuff" <<  std::endl;
-}
-
-void ModelRunner::run()
-{
-  // Alright now I need to loop from top to bottom
-  std::cout << "Starting the run" << std::endl;
-
+  // I need the topoogical order of my depressions: which depressions will i get first
   this->lake_in_order = this->graph.get_Cordonnier_order();
-
+  // Initialising the lake status array
   this->lake_status = std::vector<int>(this->io_int["n_elements"],-1);
-  
+  // Initialising the depression pits to 0
   for(auto tn:lake_in_order)
   {
     this->lake_status[tn] = 0;
   }
 
+  // ready to run this time step!
+}
+
+// this is the main running function
+void ModelRunner::run()
+{
 
   // Keeping track of which node is processed, for debugging and lake management
   is_processed = std::vector<bool>(io_int["n_elements"],false);
 
   // Aliases for efficiency
   xt::pytensor<int,1>& inctive_nodes = this->io_int_array["active_nodes"];
-  xt::pytensor<double,1>&surface_elevation =  this->io_double_array["surface_elevation"];
-  // well area of a cell to gain time
+  xt::pytensor<double,1>& surface_elevation =  this->io_double_array["surface_elevation"];
   double cellarea = this->io_double["dx"] * this->io_double["dy"];
+
   // Debug checker
   int underfilled_lake = 0;
-  std::cout << "starting iteration" << std::endl;
-  // Iterating though all the nodes
+
+  // ########### Strating the calculation #############
+  // ## Iterating though all the nodes ##
   for(int i=0; i<io_int["n_elements"]; i++)
   {
-
     // Getting the current node in the Us->DS stack order
     int node = this->graph.get_MF_stack_at_i(i);
-    if(this->graph.get_MF_receivers_at_node(node).size() == 0 && this->io_int_array["active_nodes"][node]>0 && this->graph.is_depression(node) == false)
-      throw std::runtime_error("No rec Error");
+
     // Processing that node
     this->process_node(node, is_processed, lake_incrementor, underfilled_lake, inctive_nodes, cellarea, surface_elevation, true);   
-    // std::cout << this->chonk_network[node].get_water_flux() << std::endl; 
+
     // Switching to the next node in line
   }
-  std::cout << "First pass done" << std::endl;
 
+  // First pass is done, all my nodes have been processed once. The flux is done is lake solver is implicit and we can finalise.
+
+  // If the lake solver is explicit though, I can start the iterative process
   if(this->lake_solver)
   {
+    // Debug variable to ignore
     DEBUG_GLOBDELT = 0;
-    std::cout << "Iterative lake pass..." << std::endl;
+    // Running the iterative lake solver
     this->iterative_lake_solver();
-    std::cout << "Iterative lake pass... done" << std::endl;
-    std::cout << "DEBUG_GLOBDELT IS " << DEBUG_GLOBDELT << " and GLOB_GABUL IS " << GLOB_GABUL << std::endl;
   }
 
   // Calling the finalising function: it applies the changes in topography and I think will apply the lake sedimentation
   this->finalise();
   // Done
+
+  // Old debug statement to let the model catch its breath when there is shit ton of cout statements 
   // std::this_thread::sleep_for(std::chrono::milliseconds(2000));
-  std::cout << "done" << std::endl;
 }
 
 
