@@ -71,7 +71,7 @@ public:
 
 
 // #####################################################
-// ############# Internal Node object ##################
+// ############# Internal Node objects #################
 // #####################################################
 
 // the class nodium is just used for the priority queue struture when solving lakes.
@@ -90,6 +90,7 @@ class nodium
     int node;
 };
 
+//This class is used to sort nodes by their stack ID when reprocessing a landscape
 class node_to_reproc
 {
   public:
@@ -97,7 +98,7 @@ class node_to_reproc
     node_to_reproc(){};
     // Constructor by default
     node_to_reproc(int node,int id_in_mstack){this->node = node; this->id_in_mstack = id_in_mstack;};
-    // Elevation data
+    // Id in the stack (low = upstream)
     int id_in_mstack;
     // Node index
     int node;
@@ -107,146 +108,6 @@ class node_to_reproc
 // #####################################################
 // ############# Lake ##################################
 // #####################################################
-
-// the lake class manages dynamically the filling of actual lakes: i.e. the part of depression filled with water and sediments
-class Lake
-{
-  
-  public:
-    // Empty constructor
-    Lake() {};
-    // Default initialiser
-    Lake(int lake_id)
-    {this->lake_id = lake_id;ngested_nodes = 0; n_nodes = 0; surface = 0; volume = 0; water_elevation = 0; outlet_node = -9999; nodes = std::vector<int>(); has_been_ingeted = -9999; volume_of_sediment = 0.; }
-
-    // This functions ingest a whole existing lake into the current one *slurp*
-    void ingest_other_lake(
-       Lake& other_lake,
-       std::vector<int>& node_in_lake, 
-       std::vector<bool>& is_in_queue,
-       std::vector<Lake>& lake_network,
-       xt::pytensor<double,1>& topography
-    );
-
-    // this function add sediment volume to the lake 
-    void pour_sediment_into_lake(double sediment_volume, std::vector<double> label_prop);
-
-    // Core function of the lake dynamic: it pour water in the lake, empty or already bearing water
-    // It also detects if the lake has an outlet, and save its value if it does
-    void pour_water_in_lake(
-      double water_wolume,
-      int originode,
-      std::vector<int>& node_in_lake,
-      std::vector<bool>& is_processed,
-      xt::pytensor<int,1>& active_nodes,
-      std::vector<Lake>& lake_network,
-      xt::pytensor<double,1>& surface_elevation,
-      xt::pytensor<double,1>& topography,
-      NodeGraphV2& graph,
-      double cellarea,
-      double dt,
-      std::vector<chonk>& chonk_network,
-      double& Ql_out
-    );
-
-    // Internal function checking the neighbors of a given node to ingest them in the lake queue
-    // If an outlet is find, returns its node ID, otherwise -9999
-    int check_neighbors_for_outlet_or_existing_lakes(
-      nodium& next_node, 
-      NodeGraphV2& graph, 
-      std::vector<int>& node_in_lake, 
-      std::vector<Lake>& lake_network,
-      xt::pytensor<double,1>& surface_elevation,
-      std::vector<bool>& is_in_queue,
-      xt::pytensor<int,1>& active_nodes,
-      std::vector<chonk>& chonk_network,
-      xt::pytensor<double,1>& topography
-
-      
-    );
-
-    // Return the depth of this lake at a given node
-    double get_lake_depth_at_node(int node, std::vector<int>& node_in_lake);
-    // Set the depth of this lake at a given node
-    double set_lake_depth_at_node(int node, double value){depths[node] = value;};
-
-    // returns the lake volume
-    double get_lake_volume(){return this->volume;}
-    // set the lae voume
-    double set_lake_volume(double value){ this->volume = value;}
-
-    // returns the total volume of sediment in the lake
-    double get_volume_of_sediment(){return volume_of_sediment;}
-
-    // return a vector of all nodes currently in this lake
-    std::vector<int>& get_lake_nodes(){return nodes;}
-    // returns a vector of all nodes currently in the queue, waiting to be assessed in the lake solving routine
-    std::vector<int>& get_lake_nodes_in_queue(){return node_in_queue;}
-
-    // returns the lake depth by node object
-    std::unordered_map<int,double>& get_lake_depths(){return depths;}
-    
-    // returns the priority queue of the current lake
-    std::priority_queue< nodium, std::vector<nodium>, std::greater<nodium> >& get_lake_priority_queue(){return depressionfiller;}
-    
-    // returns the number of nodes in the lake
-    int get_n_nodes(){return n_nodes;};
-    // Returns the lake ID
-    int get_lake_id(){return lake_id;};
-    // return the ID of the lake having ingested this lake, or -9999
-    int get_parent_lake(){return has_been_ingeted;}
-    // When ingested (and reinitialised) call this function to set this lake as now ingested by X
-    int set_parent_lake(int value){has_been_ingeted = value;}
-    // returns the current lake outlet node ID or -9999 if no outlet is given
-    int get_lake_outlet(){return this->outlet_node;}
-    // returns a vector of lake ID ingested by dat lake
-    std::vector<int> get_ingested_lakes(){return ingested_lakes;}
-    // Return the representative chonk of the lake, bearing its water flux and its sediment flux
-    chonk& get_outletting_chonk(){return outlet_chonk;};
-    std::vector<double> get_lake_lab_prop(){return lake_label_prop;};
-
-    void drape_deposition_flux_to_chonks(std::vector<chonk>& chonk_network, xt::pytensor<double,1>& surface_elevation, double timestep);
-
-    double get_water_elevation(){return water_elevation;};
-
-  protected:
-    // Lake ID, i.e. the lake place in the parent environment vector of lakes
-    int lake_id;
-    // Number of nodes in the lake/underwater
-    int n_nodes;
-    // The surface area of the lake in L^2
-    double surface;
-    // the volume of the lake in L^3
-    double volume;
-    // the absolute elevation of the water surface
-    double water_elevation;
-    //Sediments
-    double volume_of_sediment;
-    // The node outletting the lake
-    int outlet_node;
-
-    // Temporary node counter
-    int ngested_nodes;
-
-    // outlet fluxes, representative particule holding lakes characteristic in order to propagate it downstream
-    chonk outlet_chonk;
-
-    std::vector<double> lake_label_prop;
-
-    // the index of the lake which ate this one
-    int has_been_ingeted;
-    // Vector of lake having been ingested by this one
-    std::vector<int> ingested_lakes; 
-    // Vector of node in the lake
-    std::vector<int> nodes;
-    // Vector of nodes that are or have been in the queue
-    std::vector<int> node_in_queue;
-    // Vector of Depths in the lake
-    std::unordered_map<int,double> depths;
-    // The priority queue containing the nodes not in the lake yet but bordering the lake
-    std::priority_queue< nodium, std::vector<nodium>, std::greater<nodium> > depressionfiller;
-
-};
 
 class LakeLite
 {
@@ -553,9 +414,6 @@ std::vector<double>& pre_sed, std::vector<double>& pre_water);
     // Lake Network
     //# This increments the lake vector
     int lake_incrementor;
-    //# The vector containing all the different lake entities. Dynamically resized to the number of lakes
-    std::vector<Lake> lake_network;
-    //# Vetor containing the lake ID for each nodes of the landscape. -1 -> NAL node: Not A Lake
     std::vector<int> node_in_lake;
     std::vector<char> has_been_outlet;
 
@@ -570,6 +428,13 @@ std::vector<double>& pre_sed, std::vector<double>& pre_water);
     std::map<std::string, xt::pytensor<int,2> > io_int_array2d;
     std::map<std::string, xt::pytensor<double,1> > io_double_array ;
     std::map<std::string, xt::pytensor<double,2> > io_double_array2d;
+
+
+    //Deprecated:
+    // //# The vector containing all the different lake entities. Dynamically resized to the number of lakes
+    // std::vector<Lake> lake_network;
+    //# Vetor containing the lake ID for each nodes of the landscape. -1 -> NAL node: Not A Lake
+
 
     //Labellisation:
     // Number of labels 
@@ -634,5 +499,152 @@ namespace chonk_utilities
 xt::pytensor<double,1> pop_elevation_to_SS_SF_SPIL(xt::pytensor<int,1>& stack, xt::pytensor<int,1>& rec,xt::pytensor<double,1>& length , xt::pytensor<double,1>& erosion, 
       xt::pytensor<double,1>& K, double n, double m, double cellarea);
 
+
+
+// #####################################################
+// ##### DEPRECATED OLD OBJECTS KEPT FOR LEGACY ########
+// #####################################################
+
+//
+
+// // the lake class manages dynamically the filling of actual lakes: i.e. the part of depression filled with water and sediments
+// class Lake
+// {
+  
+//   public:
+//     // Empty constructor
+//     Lake() {};
+//     // Default initialiser
+//     Lake(int lake_id)
+//     {this->lake_id = lake_id;ngested_nodes = 0; n_nodes = 0; surface = 0; volume = 0; water_elevation = 0; outlet_node = -9999; nodes = std::vector<int>(); has_been_ingeted = -9999; volume_of_sediment = 0.; }
+
+//     // This functions ingest a whole existing lake into the current one *slurp*
+//     void ingest_other_lake(
+//        Lake& other_lake,
+//        std::vector<int>& node_in_lake, 
+//        std::vector<bool>& is_in_queue,
+//        std::vector<Lake>& lake_network,
+//        xt::pytensor<double,1>& topography
+//     );
+
+//     // this function add sediment volume to the lake 
+//     void pour_sediment_into_lake(double sediment_volume, std::vector<double> label_prop);
+
+//     // Core function of the lake dynamic: it pour water in the lake, empty or already bearing water
+//     // It also detects if the lake has an outlet, and save its value if it does
+//     void pour_water_in_lake(
+//       double water_wolume,
+//       int originode,
+//       std::vector<int>& node_in_lake,
+//       std::vector<bool>& is_processed,
+//       xt::pytensor<int,1>& active_nodes,
+//       std::vector<Lake>& lake_network,
+//       xt::pytensor<double,1>& surface_elevation,
+//       xt::pytensor<double,1>& topography,
+//       NodeGraphV2& graph,
+//       double cellarea,
+//       double dt,
+//       std::vector<chonk>& chonk_network,
+//       double& Ql_out
+//     );
+
+//     // Internal function checking the neighbors of a given node to ingest them in the lake queue
+//     // If an outlet is find, returns its node ID, otherwise -9999
+//     int check_neighbors_for_outlet_or_existing_lakes(
+//       nodium& next_node, 
+//       NodeGraphV2& graph, 
+//       std::vector<int>& node_in_lake, 
+//       std::vector<Lake>& lake_network,
+//       xt::pytensor<double,1>& surface_elevation,
+//       std::vector<bool>& is_in_queue,
+//       xt::pytensor<int,1>& active_nodes,
+//       std::vector<chonk>& chonk_network,
+//       xt::pytensor<double,1>& topography
+
+      
+//     );
+
+//     // Return the depth of this lake at a given node
+//     double get_lake_depth_at_node(int node, std::vector<int>& node_in_lake);
+//     // Set the depth of this lake at a given node
+//     double set_lake_depth_at_node(int node, double value){depths[node] = value;};
+
+//     // returns the lake volume
+//     double get_lake_volume(){return this->volume;}
+//     // set the lae voume
+//     double set_lake_volume(double value){ this->volume = value;}
+
+//     // returns the total volume of sediment in the lake
+//     double get_volume_of_sediment(){return volume_of_sediment;}
+
+//     // return a vector of all nodes currently in this lake
+//     std::vector<int>& get_lake_nodes(){return nodes;}
+//     // returns a vector of all nodes currently in the queue, waiting to be assessed in the lake solving routine
+//     std::vector<int>& get_lake_nodes_in_queue(){return node_in_queue;}
+
+//     // returns the lake depth by node object
+//     std::unordered_map<int,double>& get_lake_depths(){return depths;}
+    
+//     // returns the priority queue of the current lake
+//     std::priority_queue< nodium, std::vector<nodium>, std::greater<nodium> >& get_lake_priority_queue(){return depressionfiller;}
+    
+//     // returns the number of nodes in the lake
+//     int get_n_nodes(){return n_nodes;};
+//     // Returns the lake ID
+//     int get_lake_id(){return lake_id;};
+//     // return the ID of the lake having ingested this lake, or -9999
+//     int get_parent_lake(){return has_been_ingeted;}
+//     // When ingested (and reinitialised) call this function to set this lake as now ingested by X
+//     int set_parent_lake(int value){has_been_ingeted = value;}
+//     // returns the current lake outlet node ID or -9999 if no outlet is given
+//     int get_lake_outlet(){return this->outlet_node;}
+//     // returns a vector of lake ID ingested by dat lake
+//     std::vector<int> get_ingested_lakes(){return ingested_lakes;}
+//     // Return the representative chonk of the lake, bearing its water flux and its sediment flux
+//     chonk& get_outletting_chonk(){return outlet_chonk;};
+//     std::vector<double> get_lake_lab_prop(){return lake_label_prop;};
+
+//     void drape_deposition_flux_to_chonks(std::vector<chonk>& chonk_network, xt::pytensor<double,1>& surface_elevation, double timestep);
+
+//     double get_water_elevation(){return water_elevation;};
+
+//   protected:
+//     // Lake ID, i.e. the lake place in the parent environment vector of lakes
+//     int lake_id;
+//     // Number of nodes in the lake/underwater
+//     int n_nodes;
+//     // The surface area of the lake in L^2
+//     double surface;
+//     // the volume of the lake in L^3
+//     double volume;
+//     // the absolute elevation of the water surface
+//     double water_elevation;
+//     //Sediments
+//     double volume_of_sediment;
+//     // The node outletting the lake
+//     int outlet_node;
+
+//     // Temporary node counter
+//     int ngested_nodes;
+
+//     // outlet fluxes, representative particule holding lakes characteristic in order to propagate it downstream
+//     chonk outlet_chonk;
+
+//     std::vector<double> lake_label_prop;
+
+//     // the index of the lake which ate this one
+//     int has_been_ingeted;
+//     // Vector of lake having been ingested by this one
+//     std::vector<int> ingested_lakes; 
+//     // Vector of node in the lake
+//     std::vector<int> nodes;
+//     // Vector of nodes that are or have been in the queue
+//     std::vector<int> node_in_queue;
+//     // Vector of Depths in the lake
+//     std::unordered_map<int,double> depths;
+//     // The priority queue containing the nodes not in the lake yet but bordering the lake
+//     std::priority_queue< nodium, std::vector<nodium>, std::greater<nodium> > depressionfiller;
+
+// };
 
 #endif
