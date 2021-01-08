@@ -145,12 +145,12 @@ void chonk::split_and_merge_in_receiving_chonks(std::vector<chonk>& chonkscape, 
 
   if(double_equals(this->water_flux, sum_outwat, 1e-3) == false && graph.is_border[this->current_node] == 'n')
   {
-    std::cout << "WARNING::OOOOOOOOOOOOOOOOOOOOOOOO " << this->water_flux<< " to start with, but " << sum_outwat << " got out. NodeID == " << this->chonkID << std::endl;
-    std::cout << "I had " <<  this->receivers.size() << " receivers:" << std::endl;
-    for (auto rec : this->receivers)
-      std::cout << rec << "!";
-    std::cout << std::endl;
-    this->print_status();
+    // std::cout << "WARNING::OOOOOOOOOOOOOOOOOOOOOOOO " << this->water_flux<< " to start with, but " << sum_outwat << " got out. NodeID == " << this->chonkID << std::endl;
+    // std::cout << "I had " <<  this->receivers.size() << " receivers:" << std::endl;
+    // for (auto rec : this->receivers)
+    //   std::cout << rec << "!";
+    // std::cout << std::endl;
+    // this->print_status();
     if(this->receivers.size() > 0)
       throw std::runtime_error("WaterFluxError::Some water is lost in the splitting process");
     // std::cout << "GULUUUUUUUUUB::::::::::" << this->water_flux - sum_outwat << std::endl;
@@ -490,7 +490,6 @@ void chonk::move_MF_from_fastscapelib(NodeGraphV2& graph, xt::pytensor<double,2>
 void chonk::move_MF_from_fastscapelib_threshold_SF(NodeGraphV2& graph, double threshold_Q, double dt, xt::pytensor<double,1>& sed_height, xt::pytensor<double,1>& sed_height_tp1, 
   xt::pytensor<double,1>& surface_elevation, xt::pytensor<double,1>& surface_elevation_tp1, double Xres, double Yres, std::vector<chonk>& chonk_network)
 { 
-  std::cout << "YOYOYOYOYO1??" << std::endl;
 
   // I need the receicing neighbours and the distance to them
   std::vector<int> these_neighbors = graph.get_MF_receivers_at_node(this->current_node);
@@ -499,7 +498,6 @@ void chonk::move_MF_from_fastscapelib_threshold_SF(NodeGraphV2& graph, double th
   // No receiver? No prep
   if(these_neighbors.size() == 0)
     return;
-  std::cout << "YOYOYOYOYO2??" << std::endl;
 
   // Temporary vectors for the flow partitionning
   std::vector<double> waterweigths(these_neighbors.size());
@@ -659,25 +657,6 @@ void chonk::move_MF_from_fastscapelib_threshold_SF(NodeGraphV2& graph, double th
 
 
     // Mover to the next step
-  }
-
-
-  std::cout << "YOYOYOYOYO" << std::endl;
-  for(auto node :  this->receivers)
-  {
-    std::cout << node << std::endl;
-    int n_stiuff = 0;
-    for (auto tnode: this->receivers)
-    {
-      if(tnode == node)
-        n_stiuff++;
-
-    }
-    if(n_stiuff > 1)
-    {
-      print_vector(" this->receivers:",  this->receivers);
-      throw std::runtime_error("DUPLICATESRECINCHONKMF2D8");
-    }
   }
 
 }

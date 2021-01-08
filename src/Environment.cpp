@@ -322,16 +322,10 @@ void ModelRunner::iterative_lake_solver()
   int n_neg = 0;
   double n_volwat_neg = 0;
 
-  // std::cout << "BEFORE STARTING, 339 is " << std::endl;
-  // this->chonk_network[339].print_water_status();
 
   // I am iterating while I still have some lakes to fill
   while(iteralake.empty() == false)
   {
-    std::cout << std::endl;
-    this->chonk_network[421].print_water_status();
-    std::cout << std::endl;
-
     // this is a FIFO queue, First in, first out
     int entry_node = iteralake.front();
     // removing the thingy
@@ -357,41 +351,19 @@ void ModelRunner::iterative_lake_solver()
 
     int cometal = current_lake;
     EntryPoint entry_point = this->queue_adder_for_lake[cometal];
-    if(entry_point.volume_sed > 1e25)
-      throw std::runtime_error("IrregularSedFluxError1");
 
     this->queue_adder_for_lake[current_lake] = EntryPoint(entry_node);
 
     if(entry_point.volume_water == 0 && entry_point.volume_sed == 0)
       continue;
 
-
-    // ignoring empty lakes
-    if(entry_point.volume_water <= 0)
-    {
-      if(entry_point.volume_water < 0)
-      {
-        n_neg++;
-        n_volwat_neg += entry_point.volume_water ;
-        // throw std::runtime_error("is < 0 :: " + std::to_string(n_volwat_neg) );
-        // std::cout << "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB" << entry_point.volume_water << std::endl;
-      }
-      // continue;
-      // entry_point.volume_water = std::abs(entry_point.volume_water);
-      // entry_point.volume_sed = std::abs(entry_point.volume_sed);
-    }
-
-
     if(entry_point.volume_water > 0)
       current_lake = this->fill_mah_lake(entry_point, iteralake);
-
-    if(entry_point.volume_sed > 1e25)
-      throw std::runtime_error("IrregularSedFluxError2");
 
     // If there is an outlet detected in the current lake solver
     if(this->lakes[current_lake].outlet >= 0)
     {
-      std::cout << "Lake " << current_lake << " -> " << this->lakes[current_lake].outlet << std::endl;
+      // std::cout << "Lake " << current_lake << " -> " << this->lakes[current_lake].outlet << std::endl;
       this->reprocess_nodes_from_lake_outlet_v2(current_lake, this->lakes[current_lake].outlet, is_processed, iteralake, entry_point);
     }
     else if (this->lakes[current_lake].sum_outrate > 0)
@@ -422,9 +394,9 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
   //----------------- INITIALISATION -------------------
   //----------------------------------------------------
 
-  std::cout << "OUTLET:" << std::endl;
-  this->chonk_network[this->lakes[current_lake].outlet].print_water_status();
-  std::cout << "Entry LAKE " << current_lake <<  " ::" << entry_point.volume_water / this->timestep << std::endl;
+  // std::cout << "OUTLET:" << std::endl;
+  // this->chonk_network[this->lakes[current_lake].outlet].print_water_status();
+  // std::cout << "Entry LAKE " << current_lake <<  " ::" << entry_point.volume_water / this->timestep << std::endl;
 
 
   // First, saivng some values for debugging and water balance purposes
@@ -555,10 +527,6 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
   //---------- DEPROCESSING THE LOCAL STACK ------------
   //----------------------------------------------------
   
-
-  // std::cout << "1288::"; this->chonk_network[1288].print_water_status(); std::cout << std::endl;
-  // std::cout << "PREWATER 20::" << pre_water[20] << std::endl;
-
   // preprocessing the nodes on the path that are outlets
   this->check_what_give_to_existing_outlets(WF_corrector,  SF_corrector,  SL_corrector, local_mstack);
   // preprocessing the quantity given to existing lakes (to later calculate the delta)
@@ -576,18 +544,14 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
   // Process the outlet, whithout preparing the move (Already done) and readding the precipitation-like fluxes (already taken into account).
   this->process_node_nolake_for_sure(this->lakes[current_lake].outlet, is_processed, active_nodes, 
       cellarea,topography, false, false);
-  // std::cout << "outlet_status after reproc " << std::endl;;
-  this->chonk_network[this->lakes[current_lake].outlet].print_water_status();
+
 
   //----------------------------------------------------
   //------------ LOCAL STACK REPROCESSING --------------
   //----------------------------------------------------
   // this section reprocess all nodes affected by the routletting of the lake nodes from upstream to donwstreamå
-  // std::cout << "Entry_point is " << entry_point.volume_water/this->timestep << std::endl;
   this->reprocess_local_stack(local_mstack, is_in_queue, outlet, current_lake, WF_corrector, SF_corrector, SL_corrector);
 
-  // std::cout << "outlet_status checekr2: " << std::endl;;
-  // this->chonk_network[this->lakes[current_lake].outlet].print_water_status();
 
   // DEBUG FOR WATER BALANCE
   double sum_out = 0;
@@ -643,24 +607,17 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
     // throw std::runtime_error("WaterDeltaWhileReprocError"); 
   }
 
-  // std::cout << "outlet_status checekr3: " << std::endl;;
-  // this->chonk_network[this->lakes[current_lake].outlet].print_water_status();
 
   //----------------------------------------------------
   //------------ PROCESSING ENTRY POINTS ---------------
   //----------------------------------------------------
   // I need now to calculate what my reprocessing nodes are giving to the different lakes, and calculate the delta
   // preprocessing the quantity given to existing lakes (to later calculate the delta)
-  // std::cout << "deltaWATER 20::" << delta_water[20] << std::endl;
   this->check_what_give_to_existing_lakes(local_mstack, outlet, current_lake, delta_sed,
     delta_water, pre_entry_node, label_prop_of_delta);
   std::vector<int> toutletstack = {outlet};
   this->check_what_give_to_existing_lakes(toutletstack, outlet, current_lake, delta_sed,
     delta_water, pre_entry_node, label_prop_of_delta);
-  // std::cout << "deltaWATER 20::" << delta_water[20] << std::endl;
-
-  // std::cout << "outlet_status checekr4: " << std::endl;;
-  // this->chonk_network[this->lakes[current_lake].outlet].print_water_status();
 
   this->unpack_entry_points_from_delta_maps(iteralake, label_prop_of_delta, delta_sed,delta_water, pre_entry_node, 
      label_prop_of_pre, pre_sed,pre_water);
@@ -689,25 +646,6 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
     debugint[i] = val;
   }
 
-  for (auto node: local_mstack)
-  {
-    auto gagne2 = this->chonk_network[node].get_chonk_receivers_copy();
-    for(auto glo :  gagne2)
-    {
-      int n_stiuff = 0;
-      for (auto lolo: gagne2)
-      {
-        if(lolo == glo)
-          n_stiuff++;
-
-      }
-      if(n_stiuff > 1)
-      {
-        print_vector("III this->chonk_network[tnode].get_chonk_receivers_copy():",  gagne2);
-        throw std::runtime_error("DUPLICATESRECINBEEF");
-      }
-    }
-  }
 
 }
 
@@ -763,7 +701,6 @@ void ModelRunner::reprocess_local_stack(std::vector<int>& local_mstack, std::vec
   std::map<int,double>& WF_corrector, std::map<int,double>& SF_corrector, 
   std::map<int,std::vector<double> >& SL_corrector)
 {
-  std::cout << "STARTING THE REPROCESSING" << std::endl;
   // I will need that
   double cellarea = this->io_double["dx"] * this->io_double["dy"];
   // I will need these aliases from the global maps
@@ -816,7 +753,6 @@ void ModelRunner::reprocess_local_stack(std::vector<int>& local_mstack, std::vec
     }
   }
 
-  std::cout << "ENDING THE REPROCESSING" << std::endl;
 
 }
 
@@ -1086,22 +1022,6 @@ chonk ModelRunner::preprocess_outletting_chonk(chonk tchonk, EntryPoint& entry_p
   {
     weight_sed_recs = std::vector<double>(weight_sed_recs.size(), 1./int(weight_sed_recs.size()));
 
-  }
-
-  for(auto node : ID_recs)
-  {
-    int n_stiuff = 0;
-    for (auto tnode:ID_recs)
-    {
-      if(tnode == node)
-        n_stiuff++;
-
-    }
-    if(n_stiuff > 1)
-    {
-      print_vector("ID_recs:", ID_recs);
-      throw std::runtime_error("DUPLICATESREC");
-    }
   }
 
   // Resetting the CHONK
@@ -2367,51 +2287,18 @@ void ModelRunner::process_node_nolake_for_sure(int node, std::vector<bool>& is_p
 {
 
   is_processed[node] = true;
-  auto gagne = this->chonk_network[node].get_chonk_receivers_copy();
-  for(auto glo :  gagne)
-  {
-    int n_stiuff = 0;
-    for (auto lolo: gagne)
-    {
-      if(lolo == glo)
-        n_stiuff++;
-
-    }
-    if(n_stiuff > 1)
-    {
-      print_vector("PNNFS:",  gagne);
-      throw std::runtime_error("DUPLICATESRECINBEEF");
-    }
-  }
   if(need_flux_before_move)
   {
-    std::cout << "KLJSDFHKJSDFHJK" << std::endl;
     this->manage_fluxes_before_moving_prep(this->chonk_network[node], this->label_array[node]);
   }
   
   // first step is to apply the right move method, to prepare the chonk to move
   if(need_move_prep)
   {
-    std::cout << "hjjghjghg" << std::endl;
     this->manage_move_prep(this->chonk_network[node]);
   }
   
-  gagne = this->chonk_network[node].get_chonk_receivers_copy();
-  for(auto glo :  gagne)
-  {
-    int n_stiuff = 0;
-    for (auto lolo: gagne)
-    {
-      if(lolo == glo)
-        n_stiuff++;
 
-    }
-    if(n_stiuff > 1)
-    {
-      print_vector("PNNFS:",  gagne);
-      throw std::runtime_error("DUPLICATESRECINaff");
-    }
-  }
   // this->chonk_network[node].print_status();
   this->manage_fluxes_after_moving_prep(this->chonk_network[node],this->label_array[node]);
   
