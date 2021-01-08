@@ -326,52 +326,61 @@ void ModelRunner::iterative_lake_solver()
     // Labelling each node with their lake ID
     for(auto tnode : these_nodes)
       this->node_in_lake[tnode] = this->lake_incrementor;
-    
+
     // Incrementing lake ID
     this->lake_incrementor++;
   }
 
-
-  std::cout << "DEBUG::Starting the iterative process..." << std::endl;
+  // Debugging tramp variable to ignore
   int n_neg = 0;
   double n_volwat_neg = 0;
+  
 
+  //############# Second step: add fluxes to the system while there are still some to add
 
-  // I am iterating while I still have some lakes to fill
+  // I am iterating while my queue of entry points is not emptied
+  // Each time a new lake outflows into other lakes, it will add an entry point in the queue
+  // This process is repeated untilall fluxes have reached their final state and escaped the system
   while(iteralake.empty() == false)
   {
-    // this is a FIFO queue, First in, first out
+
+    // This is a FIFO queue, First in, first out
+    // front gives me the next elemetn in line
     int entry_node = iteralake.front();
     // removing the thingy
     iteralake.pop();
-//        
-// POP!       
-//     * []
-//        *  *
-//   * '*' *'
-//      \*'/
-//       ||
-//      |* |
-//      |__|
-//      | *|
-//      |__|
+    // Lol
+    //        
+    // POP!       
+    //     * []
+    //        *  *
+    //   * '*' *'
+    //      \*'/
+    //       ||
+    //      |* |
+    //      |__|
+    //      | *|
+    //      |__|
 
 
-
-    // Function that fills and updates the topography, also checks for an outlet
+    // Get the lake ID of the current node
     int current_lake = this->node_in_lake[entry_node];
+    // # Checks if the lake has been drunk by another one
     if(current_lake >= 0 )
       current_lake = this->motherlake(current_lake);
 
-    int cometal = current_lake;
-    EntryPoint entry_point = this->queue_adder_for_lake[cometal];
-
+    // Getting the amount of sediment and water to add
+    EntryPoint entry_point = this->queue_adder_for_lake[current_lake];
+    // reinitialising the queue
     this->queue_adder_for_lake[current_lake] = EntryPoint(entry_node);
 
+    // If my entry point is empty, it will happen if my lake has been processed by another entry point, I skip to the next node
     if(entry_point.volume_water == 0 && entry_point.volume_sed == 0)
       continue;
 
-    if(entry_point.volume_water > 0)
+    //############# Third important task (even if still in step 2): if I have something to put in me lake, I add the content to it
+
+    if(entry_point.volume_water != 0 || entry_point.volume_sed != 0)
       current_lake = this->fill_mah_lake(entry_point, iteralake);
 
     // If there is an outlet detected in the current lake solver
