@@ -253,7 +253,7 @@ class CoreModel:
 	Ql_in = xs.on_demand()
 	Ql_out = xs.on_demand()
 	water_balance_checker = xs.on_demand()
-	
+	Qs_mass_balance_checker = xs.on_demand()
 
 	def initialize(self):
 		self.n_depths_recorded = np.arange(0,self.depths_res_sed_proportions * self.n_depth_sed_tracking,self.depths_res_sed_proportions)
@@ -415,6 +415,9 @@ class CoreModel:
 		# z[0] = temp
 		# return z
 
+	@Qs_mass_balance_checker.compute
+	def _Qs_mass_balance_checker(self):
+		return self.model.get_Qs_mass_balance_checker()
 
 
 
