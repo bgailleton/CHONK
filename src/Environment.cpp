@@ -181,6 +181,8 @@ void ModelRunner::initiate_nodegraph()
   this->Qw_out = 0;
   this->Ql_in = 0;
   this->Ql_out = 0;
+  // And the sediment one
+  this->Qs_mass_balance = 0;
 
   // Processes preexisting water from previous time steps, so far: lakes
   this->process_inherited_water();
@@ -378,30 +380,25 @@ void ModelRunner::iterative_lake_solver()
     if(entry_point.volume_water == 0 && entry_point.volume_sed == 0)
       continue;
 
-    //############# Third important task (even if still in step 2): if I have something to put in me lake, I add the content to it
+    //############# Third important task (even if still in step 2): 
+    // if I have something to put in me lake, I add the content to it
 
     if(entry_point.volume_water != 0 || entry_point.volume_sed != 0)
       current_lake = this->fill_mah_lake(entry_point, iteralake);
 
-    // If there is an outlet detected in the current lake solver
+
+    //############# Fourth important task (even if still in step 2): 
+    // if my lake outlets, I need to reprocess the affected downstream nodes
+    // this is by far the most complicated part of the code
     if(this->lakes[current_lake].outlet >= 0)
     {
-      // std::cout << "Lake " << current_lake << " -> " << this->lakes[current_lake].outlet << std::endl;
       this->reprocess_nodes_from_lake_outlet_v2(current_lake, this->lakes[current_lake].outlet, is_processed, iteralake, entry_point);
     }
-    else if (this->lakes[current_lake].sum_outrate > 0)
-      throw std::runtime_error("NO OUTLET BUT WATER TO SPARE???");
 
+    // skiping to the next entry node
   }
 
-  // std::cout << "had " << n_neg << "  snegative lakes Summing " << n_volwat_neg / this->timestep << " (rate)" << std::endl;
-
-  for(auto te : this->queue_adder_for_lake)
-  {
-    // std::cout << te.volume_water << std::endl;
-    if(double_equals(te.volume_water,0,1e-3) == false)
-      throw std::runtime_error("NotAllLakesProcessedError");
-  }
+  // And I am done with the iterative solver!
 }
 
 
@@ -426,8 +423,10 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
   double debug_saverW = entry_point.volume_water / this->timestep;
   double outlet_water_saver = this->chonk_network[outlet].get_water_flux();
 
-    // temp variable I need for the processing function
+  // temp variable I need for the processing function
   double cellarea = this->io_double["dx"] * this->io_double["dy"];
+
+  // Debug tracker to check wether this specific iteration was adding water (needed it during the (very painful) mass balance checks)
   bool was_0 = false;
   if(entry_point.volume_water == 0)
     was_0 = true;
@@ -438,13 +437,12 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
 
   // Initialising a priority queue sorting the nodes to reprocess by their id in the Mstack. the smallest Ids should come first
   // Because I am only processing nodes in between 2 discrete lakes, it should not be a problem
-  std::priority_queue< node_to_reproc, std::vector<node_to_reproc>, std::greater<node_to_reproc> > ORDEEEEEER;
+  std::priority_queue< node_to_reproc, std::vector<node_to_reproc>, std::greater<node_to_reproc> > ORDEEEEEER; // I am not politically aligned with John Bercow, this is jsut for the joke haha
   
-  // Temporary queue gathering nodes to transmit
+  // This FIFO queue gathers nodes to reprocess to build up the local stack of node to work on
   std::queue<int> transec;
   
-
-  //keeping track of the delta sed/all contributing to potential lakes to add
+  // Keeping track of the delta sed/all contributing to potential lakes to add
   // These containers are important when reprocesseing nodes leads to a downstream depression
   std::vector<double> pre_sed(this->lakes.size(),0), pre_water(this->lakes.size(),0);
   std::vector<int> pre_entry_node(this->lakes.size(),-9999);
@@ -471,7 +469,7 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
   }
 
 
-
+  // This function gathers all the nodesto be reprocessed. Including their donor which will be partially reprocessed
   this->gather_nodes_to_reproc(local_mstack,  ORDEEEEEER,  is_in_queue,  outlet);
 
   // Final size OK

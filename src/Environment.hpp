@@ -463,6 +463,7 @@ std::vector<double>& pre_sed, std::vector<double>& pre_water);
 
     // Parameters dealing with mass balance checks
     double Qw_in, Qw_out, Ql_in, Ql_out;
+    double Qs_mass_balance;
 
     std::vector<bool> is_processed;
 
