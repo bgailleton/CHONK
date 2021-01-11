@@ -2049,7 +2049,7 @@ int ModelRunner::fill_mah_lake(EntryPoint& entry_point, std::queue<int>& iterala
     sedrate_to_deduce -= this->chonk_network[tnode].get_sediment_creation_flux() * this->timestep;
     this->chonk_network[tnode].reinitialise_static_fluxes();
   }
-  // applying the sediment flux
+  // applying the sediment flux deducer
   entry_point.volume_sed -= sedrate_to_deduce;
 
   // Finally adding the sediments
@@ -2363,8 +2363,10 @@ void ModelRunner::finalise()
   xt::pytensor<double,1>& surface_elevation = this->io_double_array["surface_elevation"];
   xt::pytensor<double,1>& topography = this->io_double_array["topography"];
   xt::pytensor<double,1>& sed_height_tp1 = this->io_double_array["sed_height_tp1"];
+  xt::pytensor<double,1>& sed_height = this->io_double_array["sed_height"];
   // xt::pytensor<double,1> tlake_depth = xt::zeros<double>({size_t(this->io_int["n_elements"])});
   xt::pytensor<int,1>& active_nodes = this->io_int_array["active_nodes"];
+  double cellarea = this->io_double["dx"] * this->io_double["dy"];
 
   // First dealing with lake deposition:
   this->drape_deposition_flux_to_chonks();
@@ -2434,6 +2436,8 @@ void ModelRunner::finalise()
       }
     }
 
+    this->Qs_mass_balance -= sedcrea * cellarea;
+
     //Dealing now with "undifferentiated" Erosion rates
     double tadd = tchonk.get_erosion_flux_undifferentiated() * timestep;
 
@@ -2489,7 +2493,9 @@ void ModelRunner::finalise()
     if(active_nodes[i] == 0)
     {
       this->Qw_out += this->chonk_network[i].get_water_flux();
+      this->Qs_mass_balance += this->chonk_network[i].get_sediment_flux();
     }
+    this->Qs_mass_balance += sed_height_tp1[i] - sed_height[i];
   }
 }
 
