@@ -417,7 +417,7 @@ class CoreModel:
 
 	@Qs_mass_balance_checker.compute
 	def _Qs_mass_balance_checker(self):
-		return self.model.get_Qs_mass_balance_checker()
+		return self.model.get_Qs_mass_balance()
 
 
 
