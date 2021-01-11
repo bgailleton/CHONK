@@ -1916,8 +1916,6 @@ int ModelRunner::fill_mah_lake(EntryPoint& entry_point, std::queue<int>& iterala
 
   depressionfiller.emplace(nodium(entry_point.node, topography[entry_point.node]));
 
-  //DEBUG STATEMENT
-  // std::cout << "Filling lake at node " << entry_point.node << " with rate of  " << entry_point.volume_water/this->timestep << std::endl;
   double save_entry_water = entry_point.volume_water;
 
   // Creating a new lake
@@ -2028,7 +2026,8 @@ int ModelRunner::fill_mah_lake(EntryPoint& entry_point, std::queue<int>& iterala
   if(outlet >= 0)
     this->lakes[current_lake].outlet = outlet;
 
-  // Now merging with lakes below adn updating the topography
+  // Now merging with lakes below adn updating the topography, and backcalculating the erosion/deposition fluxes fluxes
+  double sedrate_to_deduce = 0;
   for(auto tnode: this->lakes[current_lake].nodes)
   {
     // updating topography
@@ -2045,7 +2044,13 @@ int ModelRunner::fill_mah_lake(EntryPoint& entry_point, std::queue<int>& iterala
       }
     }
     this->node_in_lake[tnode] = current_lake;
+
+    // I also need to cancel erosion/deposition that could have been done in this lake
+    sedrate_to_deduce -= this->chonk_network[tnode].get_sediment_creation_flux() * this->timestep;
+    this->chonk_network[tnode].reinitialise_static_fluxes();
   }
+  // applying the sediment flux
+  entry_point.volume_sed -= sedrate_to_deduce;
 
   // Finally adding the sediments
   this->lakes[current_lake].label_prop = mix_two_proportions(entry_point.volume_sed, entry_point.label_prop,
@@ -2340,9 +2345,6 @@ void ModelRunner::process_node_nolake_for_sure(int node, std::vector<bool>& is_p
       this->manage_move_prep(this->chonk_network[node]);
     
     this->manage_fluxes_after_moving_prep(this->chonk_network[node],this->label_array[node]);
-    
-    // if(this->chonk_network[node].get_chonk_receivers().size() == 0 && inctive_nodes[node] > 0)
-    //   throw std::runtime_error("NoRecError::internal flux broken");
     
     this->chonk_network[node].split_and_merge_in_receiving_chonks_ignore_some(this->chonk_network, this->graph, this->timestep, ignore_some);
 }

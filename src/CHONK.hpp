@@ -152,6 +152,11 @@ class chonk
     // Tracking and labelling functions
     void initialise_local_label_tracker_in_sediment_flux(int n_labels){other_attributes_arrays["label_tracker"] = std::vector<double>(n_labels,0.);}
 
+    // REinitialises all the "static" fluxes (erosion, deposition, ...)
+    void reinitialise_static_fluxes(){erosion_flux_undifferentiated = 0;erosion_flux_only_sediments = 0;erosion_flux_only_bedrock = 0;deposition_flux = 0;sediment_creation_flux = 0;};
+
+    //###############################
+    // DEBUG HELPERS
     void print_status()
     {
         std::cout << "CHONK_ID::" << chonkID << std::endl;
