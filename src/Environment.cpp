@@ -343,6 +343,9 @@ void ModelRunner::iterative_lake_solver()
   // I am iterating while my queue of entry points is not emptied
   // Each time a new lake outflows into other lakes, it will add an entry point in the queue
   // This process is repeated untilall fluxes have reached their final state and escaped the system
+    int has_outlet = 0;
+    int no_has_outlet = 0;
+  double negsumsed = 0, negsumwat = 0;
   while(iteralake.empty() == false)
   {
 
@@ -382,10 +385,32 @@ void ModelRunner::iterative_lake_solver()
 
     //############# Third important task (even if still in step 2): 
     // if I have something to put in me lake, I add the content to it
+    if(entry_point.volume_water >= 0 && entry_point.volume_sed >= 0)
+    {
+      if(entry_point.volume_water > 0 || entry_point.volume_sed > 0)
+        current_lake = this->fill_mah_lake(entry_point, iteralake);
+    }
+    else
+    {
+      negsumsed += entry_point.volume_sed;
 
-    if(entry_point.volume_water != 0 || entry_point.volume_sed != 0)
-      current_lake = this->fill_mah_lake(entry_point, iteralake);
 
+      if(entry_point.volume_water > 0)
+      {
+        entry_point.volume_sed = 0;
+        current_lake = this->fill_mah_lake(entry_point, iteralake);
+      }
+      else
+      {
+
+        negsumwat += entry_point.volume_water;
+        if(this->has_valid_outlet(current_lake))
+          has_outlet++;
+        else
+          no_has_outlet++;
+      }
+
+    }
 
     //############# Fourth important task (even if still in step 2): 
     // if my lake outlets, I need to reprocess the affected downstream nodes
@@ -397,6 +422,7 @@ void ModelRunner::iterative_lake_solver()
 
     // skiping to the next entry node
   }
+  std::cout << "I had " << negsumsed << " Sediments and " << negsumwat/this->timestep << " Water uncared of with " << has_outlet << "/" << no_has_outlet << " with valid outlet" << std::endl;
 
   // And I am done with the iterative solver!
 }
@@ -1147,6 +1173,28 @@ void ModelRunner::gather_nodes_to_reproc(std::vector<int>& local_mstack,
     local_mstack.emplace_back(tnode);
 
   }
+}
+
+bool ModelRunner::has_valid_outlet(int lakeid)
+{
+  int outlet = this->lakes[lakeid].outlet;
+  if(outlet<0)
+    return false;
+
+  std::vector<int> neightbors; std::vector<double> dummy ; graph.get_D8_neighbors(outlet, this->io_int_array["active_nodes"], neightbors, dummy);
+  for(auto node:neightbors)
+  {
+    if(this->io_double_array["topography"][node] < outlet)
+    {
+      int tlid = this->node_in_lake[node];
+      if(tlid >= 0) tlid = this->motherlake(tlid);
+      if(tlid != lakeid)
+        return true;
+
+    }
+  }
+  return false;
+
 }
 
 
@@ -2402,7 +2450,12 @@ void ModelRunner::finalise()
 
     // NANINF DEBUG CHECKER
     if(std::isfinite(sedcrea) == false)
+    {
+      std::cout << sedcrea << "||" << this->node_in_lake[i] << "||" << \
+      this->lakes[this->node_in_lake[i]].volume_sed/this->lakes[this->node_in_lake[i]].volume_water \
+      << "||" <<this->lakes[this->node_in_lake[i]].volume_sed << "||" << this->lakes[this->node_in_lake[i]].volume_water << std::endl;
       throw std::runtime_error("NAN sedcrea finalisation not possible yo");
+    }
 
 
     // std::cout << "0.2" << std::endl;

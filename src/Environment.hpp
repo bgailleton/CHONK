@@ -374,6 +374,7 @@ std::vector<double>& pre_sed, std::vector<double>& pre_water);
 
     void label_nodes_with_no_rec_in_local_stack(std::vector<int>& local_mstack, std::vector<char>& is_in_queue, std::vector<char>& has_recs_in_local_stack);
 
+    bool has_valid_outlet(int lakeid);
 
     std::vector<int> lake_in_order;
     std::vector<int> lake_status;
