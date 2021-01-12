@@ -2060,7 +2060,7 @@ int ModelRunner::fill_mah_lake(EntryPoint& entry_point, std::queue<int>& iterala
   }
   else
   {
-    this->lakes[current_lake].volume_sed = entry_point.volume_sed;
+    this->lakes[current_lake].volume_sed += entry_point.volume_sed;
     entry_point.volume_sed = 0;
 
   }
