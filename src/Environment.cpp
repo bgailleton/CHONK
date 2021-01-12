@@ -2014,14 +2014,6 @@ int ModelRunner::fill_mah_lake(EntryPoint& entry_point, std::queue<int>& iterala
     // going to the next part of the loop or stopping
   }
 
-  // std::cout << "DEUBUG::NODES IN LAKE  (watelev = " << this->lakes[current_lake].water_elevation << ")::";
-  // for (auto tnode:this->lakes[current_lake].nodes)
-  //   std::cout << tnode << "|";
-  // std::cout << std::endl;
-
-
-  // std::cout << "STORED " << this->lakes[current_lake].volume_water/this->timestep << " IN THE LAKE (rate)" << std::endl;
-
   // if there is an outlet 
   if(outlet >= 0)
     this->lakes[current_lake].outlet = outlet;
@@ -3155,17 +3147,6 @@ xt::pytensor<int,1> ModelRunner::get_lake_ID_array_raw()
 xt::pytensor<int,1> ModelRunner::get_lake_ID_array()
 {
   throw std::runtime_error("ModelRunner::get_lake_ID_array is deprecated");
-  // xt::pytensor<int,1> output = xt::zeros<int>({this->io_int["n_elements"]}) -1;
-
-  // for(int i=0; i< this->io_int["n_elements"]; i++)
-  // {
-  //   if(node_in_lake[i] >= 0)
-  //   {
-  //     if(this->lake_network[node_in_lake[i]].get_parent_lake() >= 0)
-  //       output[i] = this->lake_network[node_in_lake[i]].get_parent_lake();
-  //   }
-  // }
-  // return output;
 }
 
 
