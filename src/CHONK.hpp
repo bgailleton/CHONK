@@ -106,6 +106,8 @@ class chonk
     double get_deposition_flux(){return deposition_flux;}
     void set_deposition_flux(double value){deposition_flux = value;}
     void add_deposition_flux(double value){deposition_flux += value;}
+    double sed_flux_given_to_node(int tnode);
+
     // # sediment_creation flux
     double get_sediment_creation_flux(){return sediment_creation_flux;}
     void set_sediment_creation_flux(double value){sediment_creation_flux = value;}

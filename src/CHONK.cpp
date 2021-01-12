@@ -1017,6 +1017,20 @@ void chonk::charlie_I(double n, double m, double K_r, double K_s,
   return;
 }
 
+double chonk::sed_flux_given_to_node(int tnode)
+{
+  double res = 0;
+   // J is the indice of this specific node in the tchonk referential
+  int j = -1;
+  auto itj = std::find(this->receivers.begin(), this->receivers.end(), tnode);
+  if(itj != this->receivers.end() )
+  {
+    j = std::distance(this->receivers.begin(), itj);
+    res = this->weigth_sediment_fluxes[j] * this->sediment_flux;
+  }
+
+}
+
 
 // Mixe two proportions
 std::vector<double> mix_two_proportions(double prop1, std::vector<double> labprop1, double prop2, std::vector<double> labprop2)

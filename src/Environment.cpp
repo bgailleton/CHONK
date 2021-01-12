@@ -417,6 +417,8 @@ void ModelRunner::iterative_lake_solver()
     {
       this->reprocess_nodes_from_lake_outlet_v2(current_lake, this->lakes[current_lake].outlet, is_processed, iteralake, entry_point);
     }
+    if(entry_point.volume_sed != 0)
+      std::cout << "STILL SED HERE??? " << entry_point.volume_sed << std::endl;
 
     // skiping to the next entry node
   }
@@ -924,7 +926,7 @@ chonk ModelRunner::preprocess_outletting_chonk(chonk tchonk, EntryPoint& entry_p
   // std::cout << "III WATER RATE IS " << water_rate << std::endl;
 
   // Dealing with sediments
-  std::vector<double> label_prop = mix_two_proportions(entry_point.volume_sed,entry_point.label_prop, tchonk.get_sediment_flux(), tchonk.get_other_attribute_array("label_tracker"));
+  std::vector<double> label_prop = entry_point.label_prop;//mix_two_proportions(entry_point.volume_sed,entry_point.label_prop, tchonk.get_sediment_flux(), tchonk.get_other_attribute_array("label_tracker"));
   
   double sedrate = entry_point.volume_sed + tchonk.get_sediment_flux();
 
@@ -958,7 +960,7 @@ chonk ModelRunner::preprocess_outletting_chonk(chonk tchonk, EntryPoint& entry_p
       // yes, removing sed and water rate
       water_rate -= tchonk_weight_water_recs[i] * tchonk.get_water_flux();
       label_prop = mix_two_proportions(sedrate,  label_prop, -1 * tchonk_weight_water_recs[i] * tchonk.get_sediment_flux(),  tchonk.get_other_attribute_array("label_tracker"));
-      sedrate -= tchonk_weight_water_recs[i] * tchonk.get_sediment_flux();
+      sedrate -= tchonk_weight_sed_recs[i] * tchonk.get_sediment_flux();
     }
   }
 
@@ -981,7 +983,12 @@ chonk ModelRunner::preprocess_outletting_chonk(chonk tchonk, EntryPoint& entry_p
     // Note that if j is still < 0, tnode is not in the chonk
 
     if(topography[tnode] >= topography[outlet])
+    {
+      // double tsedfromdon = this->chonk_network[tnode].sed_flux_given_to_node(outlet);
+      // label_prop = mix_two_proportions(tsedfromdon, this->chonk_network[tnode].get_other_attribute_array("label_tracker"), sedrate, label_prop);
+      // sedrate += tsedfromdon;
       continue;
+    }
 
     // Checking wether it is giving to the original lake or not
     if(this->is_this_node_in_this_lake(tnode, current_lake) ==  false)
@@ -1071,6 +1078,9 @@ chonk ModelRunner::preprocess_outletting_chonk(chonk tchonk, EntryPoint& entry_p
     weight_sed_recs = std::vector<double>(weight_sed_recs.size(), 1./int(weight_sed_recs.size()));
 
   }
+
+
+  std::cout << "outlet was " << tchonk.get_sediment_flux() << " and is now " << sedrate << std::endl;;
 
   // Resetting the CHONK
   tchonk.reset();
@@ -1962,12 +1972,16 @@ int ModelRunner::fill_mah_lake(EntryPoint& entry_point, std::queue<int>& iterala
   xt::pytensor<int,1>& active_nodes = this->io_int_array["active_nodes"];
   double cellarea = this->io_double["dx"] * this->io_double["dy"];
 
+
   depressionfiller.emplace(nodium(entry_point.node, topography[entry_point.node]));
 
   double save_entry_water = entry_point.volume_water;
 
   // Creating a new lake
   int current_lake = this->lake_incrementor;
+
+  std::cout << "Filling lake " << current_lake << " with sed " << entry_point.volume_sed << std::endl;
+
   this->lakes.push_back(LakeLite(this->lake_incrementor));
   // creating an empty entry-point for the lake
   this->queue_adder_for_lake.push_back(EntryPoint(entry_point.node));
@@ -2062,12 +2076,15 @@ int ModelRunner::fill_mah_lake(EntryPoint& entry_point, std::queue<int>& iterala
     // going to the next part of the loop or stopping
   }
 
+  std::cout << "Lake volume predrink is " << this->lakes[current_lake].volume_water << " and sedEP is " << entry_point.volume_sed << std::endl;
+
   // if there is an outlet 
   if(outlet >= 0)
     this->lakes[current_lake].outlet = outlet;
 
   // Now merging with lakes below adn updating the topography, and backcalculating the erosion/deposition fluxes fluxes
   double sedrate_modifuer = 0;
+  std::vector<int> lakes_ingested;
   for(auto tnode: this->lakes[current_lake].nodes)
   {
     // updating topography
@@ -2081,6 +2098,7 @@ int ModelRunner::fill_mah_lake(EntryPoint& entry_point, std::queue<int>& iterala
       if( tested != against)
       {
         this->drink_lake(this->lakes[current_lake].id, this->motherlake(this->node_in_lake[tnode]), entry_point, iteralake);
+        lakes_ingested.push_back(this->motherlake(this->node_in_lake[tnode]));
       }
     }
     this->node_in_lake[tnode] = current_lake;
@@ -2093,6 +2111,28 @@ int ModelRunner::fill_mah_lake(EntryPoint& entry_point, std::queue<int>& iterala
   }
   // applying the sediment flux deducer
   entry_point.volume_sed += sedrate_modifuer;
+
+  // adding all the nodes of the ingested lakes
+  if(lakes_ingested.size()>0)
+  {
+    std::vector<char> is_in_dat_lake(this->io_int["n_elements"], 'n');
+    for(auto tn: this->lakes[current_lake].nodes)
+      is_in_dat_lake[tn] = 'y';
+    for( auto tl:lakes_ingested)
+    {
+      for(auto tn:this->lakes[tl])
+      {
+        if(is_in_dat_lake[tn] == 'n')
+        {
+          is_in_dat_lake[tn] = 'y';
+          this->lakes[current_lake].nodes.push_back(tn);
+        }
+      }
+    }
+  }
+
+  std::cout << "Lake volume post drink is " << this->lakes[current_lake].volume_water << " and sedEP is " << entry_point.volume_sed << std::endl;
+
 
   // Finally adding the sediments
   this->lakes[current_lake].label_prop = mix_two_proportions(entry_point.volume_sed, entry_point.label_prop,
@@ -2111,6 +2151,8 @@ int ModelRunner::fill_mah_lake(EntryPoint& entry_point, std::queue<int>& iterala
     entry_point.volume_sed = 0;
 
   }
+
+  std::cout << entry_point.volume_sed << " will be transmitted to an outlet while " << this->lakes[current_lake].volume_sed << " is stored in the lake" << std::endl;
 
 
   // DEBUGGING TEST
@@ -3153,6 +3195,7 @@ void ModelRunner::drape_deposition_flux_to_chonks()
   xt::pytensor<double,1>& topography = this->io_double_array["topography"];
   xt::pytensor<double,1>& surface_elevation = this->io_double_array["surface_elevation"];
 
+  double cellarea = this->io_double["dx"] * this->io_double["dy"];
 
   for(auto& loch:this->lakes)
   { 
@@ -3166,17 +3209,23 @@ void ModelRunner::drape_deposition_flux_to_chonks()
 
     // NEED TO DEAL WITH THAT BOBO
     if(ratio_of_dep > 1)
+    {
+      std::cout << "POSSIBLY MISSING " << loch.volume_sed * (ratio_of_dep - 1) << std::endl;
       ratio_of_dep = 1;
+    }
 
+    double total = loch.volume_sed;
     for(auto no:loch.nodes)
     {
-
+      total -= ratio_of_dep * (topography[no] - surface_elevation[no]) * cellarea;
       double slangh = ratio_of_dep * (topography[no] - surface_elevation[no]) / timestep;
       chonk_network[no].add_sediment_creation_flux(slangh);
       chonk_network[no].add_deposition_flux(slangh); // <--- This is solely for balance calculation
       chonk_network[no].set_other_attribute_array("label_tracker", loch.label_prop);
 
     }
+    // Seems fine here...
+    // std::cout << "BALANCE LAKE = " << total << std::endl;
   }
 
 }
