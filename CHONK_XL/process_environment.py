@@ -307,6 +307,15 @@ class CoreModel:
 		self.topolake = tempolake.reshape(self.ny,self.nx)
 		self.model.add_external_to_double_array("surface_elevation_tp1",self.uplift * dt)
 
+
+
+
+	######################################################################
+	######################################################################
+	############################ Accessors ###############################
+	######################################################################
+	######################################################################
+
 	@topo.compute
 	def _topo(self):
 		return self.model.get_array_double_param("surface_elevation").reshape(self.ny,self.nx)

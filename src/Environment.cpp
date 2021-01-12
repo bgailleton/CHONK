@@ -2379,6 +2379,11 @@ void ModelRunner::finalise()
     {
       throw std::runtime_error("NAN IN ELEV WHILE FINIlIISAFJ");
     }
+    double sedcrea = this->chonk_network[i].get_sediment_creation_flux() * timestep;
+    this->Qs_mass_balance -= this->chonk_network[i].get_erosion_flux_only_bedrock() * cellarea * timestep;
+    this->Qs_mass_balance -= this->chonk_network[i].get_erosion_flux_only_sediments() * cellarea * timestep;
+    this->Qs_mass_balance += this->chonk_network[i].get_deposition_flux() * cellarea * timestep;
+
 
     if(active_nodes[i] == 0)
       continue;
@@ -2399,7 +2404,6 @@ void ModelRunner::finalise()
 
     // Applying elevation changes from the sediments
     // Reminder: sediment creation flux is the absolute rate of removal/creation of sediments
-    double sedcrea = tchonk.get_sediment_creation_flux() * timestep;
 
     // NANINF DEBUG CHECKER
     if(std::isfinite(sedcrea) == false)
@@ -2413,7 +2417,7 @@ void ModelRunner::finalise()
     if(sedcrea + sed_height_tp1[i] < 0)
     {
       // IT STILL HAPPENS
-      // std::cout << "happens??" << sedcrea << "||" << sed_height_tp1[i] << "||" << this->node_in_lake[i] << std::endl;
+      std::cout << "happens??" << sedcrea << "||" << sed_height_tp1[i] << "||" << this->node_in_lake[i] << std::endl;
       surface_elevation_tp1[i] -= sed_height_tp1[i];
       sed_height_tp1[i] = 0.;
       sed_prop_by_label[i] = std::vector<std::vector<double> >();
@@ -2436,7 +2440,6 @@ void ModelRunner::finalise()
       }
     }
 
-    this->Qs_mass_balance -= sedcrea * cellarea;
 
     //Dealing now with "undifferentiated" Erosion rates
     double tadd = tchonk.get_erosion_flux_undifferentiated() * timestep;
@@ -2495,7 +2498,11 @@ void ModelRunner::finalise()
       this->Qw_out += this->chonk_network[i].get_water_flux();
       this->Qs_mass_balance += this->chonk_network[i].get_sediment_flux();
     }
-    this->Qs_mass_balance += sed_height_tp1[i] - sed_height[i];
+    // double delta_sed = (sed_height_tp1[i] - sed_height[i]);
+    // double delta_elev = surface_elevation_tp1[i] - surface_elevation[i];
+    // double delta_delta = delta_elev - delta_sed;
+    // this->Qs_mass_balance += (delta_elev) * cellarea * this->timestep;
+    // this->Qs_mass_balance -= (delta_delta) * cellarea * this->timestep;
   }
 }
 
@@ -3111,21 +3118,16 @@ void ModelRunner::drape_deposition_flux_to_chonks()
     double ratio_of_dep = loch.volume_sed/loch.volume_water;
 
     // NEED TO DEAL WITH THAT BOBO
-    if(ratio_of_dep>1)
+    if(ratio_of_dep > 1)
       ratio_of_dep = 1;
-
 
     for(auto no:loch.nodes)
     {
 
       double slangh = ratio_of_dep * (topography[no] - surface_elevation[no]) / timestep;
       chonk_network[no].add_sediment_creation_flux(slangh);
+      chonk_network[no].add_deposition_flux(slangh); // <--- This is solely for balance calculation
       chonk_network[no].set_other_attribute_array("label_tracker", loch.label_prop);
-      if(std::isfinite(slangh) == false)
-      {
-        std::cout << "ERROR::Cannot drape? " << slangh << " || " << ratio_of_dep << " || " << loch.volume_sed << " || " << loch.volume_water << std::endl;
-        throw std::runtime_error("LakeDrapeError::Nan in the process");
-      }
 
     }
   }
@@ -3135,131 +3137,7 @@ void ModelRunner::drape_deposition_flux_to_chonks()
 void  ModelRunner::find_underfilled_lakes_already_processed_and_give_water(int SS_ID, std::vector<bool>& is_processed )
 {
   throw std::runtime_error("ModelRunner::find_underfilled_lakes_already_processed_and_give_water is fully deprecated");
-  // // Legaciatisation
-  // xt::pytensor<double,1>& surface_elevation = this->io_double_array["surface_elevation"];
-  // xt::pytensor<int,1>& active_nodes = this->io_int_array["active_nodes"];
-  // double& dt = timestep;
-  // double cellarea = this->io_double["dx"] * this->io_double["dy"] ;
-
-  // int& n_elements = this->io_int["n_elements"];
-  // // Using an already processed vector to not readd
-  // std::vector<bool> to_reprocessed(n_elements,false);
-  // std::vector<int> traversal(n_elements,-9999); // -9999 is nodata
-  // std::unordered_map<int,double> to_add_in_lakes, to_add_in_lakes_sed_edition;
-  // std::unordered_map<int, std::vector<double> >to_add_in_lakes_sed_edition_but_label_tracker;
-  // traversal[0] = SS_ID;
-  // to_reprocessed[SS_ID] = true;
-  // // basically here I wneed to reprocess all nodes dowstream of that one!
-  // // if processed and not in lake -> reprocess
-  // // else: stop
-  // // First: graph traversal
-  // int n_reprocessed = 0;
-  // int next_test = traversal[0];
-  // int reading_ID = 1, writing_ID = 1;
-  // while(next_test != -9999)
-  // {
-  //   // feeding the queues with the receivers
-  //   std::vector<int> recs = graph.get_MF_receivers_at_node_no_rerouting(next_test);
-  //   for (auto node:recs)
-  //   {
-  //     // if not preprocessed globally or jsut already in the queue yet: boom
-  //     if(to_reprocessed[node] || is_processed[node] == false || node_in_lake[node] >= 0)
-  //       continue;
-
-  //     to_reprocessed[node] = true;
-  //     traversal[writing_ID] = node;
-  //     writing_ID++;
-  //   }
-
-  //   // Reading the next node in list
-  //   next_test = traversal[reading_ID];
-  //   reading_ID++;
-  //   // will break here if next node is -9999
-  // }
-  // // std::cout << writing_ID << "||";
-
-
-  // //Reinitialising all the concerned nodes but the outlet to repropagate correctly the thingies 
-  // for(size_t i=1; i<writing_ID; i++)
-  //   chonk_network[traversal[i]] = chonk(traversal[i],traversal[i],false);
-
-
-  // // reprocessing nodes
-  // for(int i=0; i<n_elements; i++)
-  // {
-
- 
-  //   int node = graph.get_MF_stack_at_i(i);
-
-  //   if(to_reprocessed[node] == false)
-  //     continue;
-
-
-  //   this->manage_fluxes_before_moving_prep(chonk_network[node], this->label_array[node] );
-
-
-  //   this->manage_move_prep(chonk_network[node]);
-  //   // std::cout << "call from reproc" << std::endl;
-  //   // std::cout << "call from reproc" << std::endl;
-  //   this->manage_fluxes_after_moving_prep(chonk_network[node], this->label_array[node]);
-  //   // std::cout << "called from reproc" << std::endl;
-
-  //   // need to check if some nodes give in lake
-  //   std::vector<int> to_ignore;
-  //   std::vector<int>& crec = chonk_network[node].get_chonk_receivers();
-  //   std::vector<double>& cwawe = chonk_network[node].get_chonk_water_weight();
-  //   std::vector<double>& csedw = chonk_network[node].get_chonk_sediment_weight();
-  //   for(size_t i=0; i<crec.size(); i++)
-  //   {
-  //     if(node_in_lake[crec[i]]>=0)
-  //     {
-  //       to_ignore.push_back(crec[i]);
-  //       int lake_to_consider = node_in_lake[crec[i]];
-  //       to_add_in_lakes[lake_to_consider] += cwawe[i] * chonk_network[crec[i]].get_water_flux() * dt;
-  //       to_add_in_lakes_sed_edition[lake_to_consider] += chonk_network[crec[i]].get_sediment_flux() * csedw[i];
-  //       if(to_add_in_lakes_sed_edition_but_label_tracker.count(lake_to_consider) == 0)
-  //       {
-  //         to_add_in_lakes_sed_edition_but_label_tracker[lake_to_consider] = chonk_network[crec[i]].get_other_attribute_array("label_tracker");
-  //       }
-  //       else
-  //       {
-  //   std::cout << "ka";
-  //         to_add_in_lakes_sed_edition_but_label_tracker[lake_to_consider] = mix_two_proportions(to_add_in_lakes_sed_edition[lake_to_consider],
-  //           to_add_in_lakes_sed_edition_but_label_tracker[lake_to_consider]
-  //           ,chonk_network[crec[i]].get_sediment_flux() * csedw[i], chonk_network[crec[i]].get_other_attribute_array("label_tracker"));
-  //   std::cout << "ren";
-  //       }
-  //     }
-  //   }
-
-  //   chonk_network[node].split_and_merge_in_receiving_chonks_ignore_some(chonk_network, graph, timestep, to_ignore);
-  // }
-
-  // for(auto x:to_add_in_lakes)
-  // {
-  //   int lake_to_fill = x.first;
-  //   if(lake_network[lake_to_fill].get_parent_lake()>=0)
-  //     lake_to_fill = lake_network[lake_to_fill].get_parent_lake();
-  //   double water_volume = x.second;
-  //   std::cout << "dar";
-
-  //   this->lake_network[lake_to_fill].pour_sediment_into_lake(to_add_in_lakes_sed_edition[lake_to_fill], to_add_in_lakes_sed_edition_but_label_tracker[lake_to_fill]);
-  //   std::cout << "de";
-
-  //   this->lake_network[lake_to_fill].pour_water_in_lake(water_volume,lake_network[lake_to_fill].get_lake_nodes()[0], // pouring water in a random nodfe in the lake, it does not matter
-  // node_in_lake, is_processed, active_nodes,lake_network, surface_elevation, this->io_double_array["topography"],graph, cellarea, timestep,chonk_network,this->Ql_out);
-  
-  // }
-
 }
-
-
-// DEPRECATED
-// double Lake::get_lake_depth_at_node(int node, std::vector<int>& node_in_lake)
-// {
-//   return this->depths[node];
-// }
-
 
 xt::pytensor<int,1> ModelRunner::get_lake_ID_array_raw()
 {
