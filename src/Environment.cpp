@@ -133,7 +133,7 @@ void ModelRunner::create(double ttimestep, std::vector<std::string> tordered_flu
 void ModelRunner::initiate_nodegraph()
 {
 
-  std::cout << "initiating nodegraph..." <<std::endl;
+  // std::cout << "initiating nodegraph..." <<std::endl;
   // Creating the nodegraph and preprocessing the depression nodes
   this->io_double_array["topography"] = xt::pytensor<double,1>(this->io_double_array["surface_elevation"]);
 
@@ -392,12 +392,10 @@ void ModelRunner::iterative_lake_solver()
     }
     else
     {
-      negsumsed += entry_point.volume_sed;
-
 
       if(entry_point.volume_water > 0)
       {
-        entry_point.volume_sed = 0;
+        // entry_point.volume_sed = 0;
         current_lake = this->fill_mah_lake(entry_point, iteralake);
       }
       else
@@ -422,7 +420,10 @@ void ModelRunner::iterative_lake_solver()
 
     // skiping to the next entry node
   }
-  std::cout << "I had " << negsumsed << " Sediments and " << negsumwat/this->timestep << " Water uncared of with " << has_outlet << "/" << no_has_outlet << " with valid outlet" << std::endl;
+  // std::cout << "I had " << negsumsed << " Sediments and " << negsumwat/this->timestep << " Water uncared of with " << has_outlet << "/" << no_has_outlet << " with valid outlet" << std::endl;
+
+  if(no_has_outlet > 0)
+    std::cout << " Caught one lake who could have lost water" << std::endl;
 
   // And I am done with the iterative solver!
 }
@@ -1184,13 +1185,11 @@ bool ModelRunner::has_valid_outlet(int lakeid)
   std::vector<int> neightbors; std::vector<double> dummy ; graph.get_D8_neighbors(outlet, this->io_int_array["active_nodes"], neightbors, dummy);
   for(auto node:neightbors)
   {
-    if(this->io_double_array["topography"][node] < outlet)
+    if(this->io_double_array["topography"][node] < this->io_double_array["topography"][outlet])
     {
       int tlid = this->node_in_lake[node];
       if(tlid >= 0) tlid = this->motherlake(tlid);
-      if(tlid != lakeid)
-        return true;
-
+      if(tlid != lakeid) return true;
     }
   }
   return false;
