@@ -609,7 +609,7 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
     }
     
   }
-  std::cout << std::endl;
+  // std::cout << std::endl;
   for(auto v:deltas)
   {
     // std::cout << v.first << "-->" << v.second << std::endl;
@@ -1913,6 +1913,7 @@ int ModelRunner::fill_mah_lake(EntryPoint& entry_point, std::queue<int>& iterala
   std::priority_queue< nodium, std::vector<nodium>, std::greater<nodium> > depressionfiller;
   xt::pytensor<double,1>& topography = this->io_double_array["topography"];
   xt::pytensor<int,1>& active_nodes = this->io_int_array["active_nodes"];
+  double cellarea = this->io_double["dx"] * this->io_double["dy"];
 
   depressionfiller.emplace(nodium(entry_point.node, topography[entry_point.node]));
 
@@ -2019,7 +2020,7 @@ int ModelRunner::fill_mah_lake(EntryPoint& entry_point, std::queue<int>& iterala
     this->lakes[current_lake].outlet = outlet;
 
   // Now merging with lakes below adn updating the topography, and backcalculating the erosion/deposition fluxes fluxes
-  double sedrate_to_deduce = 0;
+  double sedrate_modifuer = 0;
   for(auto tnode: this->lakes[current_lake].nodes)
   {
     // updating topography
@@ -2038,11 +2039,13 @@ int ModelRunner::fill_mah_lake(EntryPoint& entry_point, std::queue<int>& iterala
     this->node_in_lake[tnode] = current_lake;
 
     // I also need to cancel erosion/deposition that could have been done in this lake
-    sedrate_to_deduce -= this->chonk_network[tnode].get_sediment_creation_flux() * this->timestep;
+    sedrate_modifuer -= this->chonk_network[tnode].get_erosion_flux_only_bedrock() * this->timestep * cellarea;
+    sedrate_modifuer -= this->chonk_network[tnode].get_erosion_flux_only_sediments() * this->timestep * cellarea;
+    sedrate_modifuer += this->chonk_network[tnode].get_deposition_flux() * this->timestep * cellarea;
     this->chonk_network[tnode].reinitialise_static_fluxes();
   }
   // applying the sediment flux deducer
-  entry_point.volume_sed -= sedrate_to_deduce;
+  entry_point.volume_sed += sedrate_modifuer;
 
   // Finally adding the sediments
   this->lakes[current_lake].label_prop = mix_two_proportions(entry_point.volume_sed, entry_point.label_prop,
