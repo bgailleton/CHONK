@@ -465,7 +465,7 @@ std::vector<double>& pre_sed, std::vector<double>& pre_water);
 
     // Parameters dealing with mass balance checks
     double Qw_in, Qw_out, Ql_in, Ql_out;
-    double Qs_mass_balance;
+    double Qs_mass_balance, Qs_outlake_modyfier;
 
     std::vector<bool> is_processed;
 
@@ -478,6 +478,7 @@ std::vector<double>& pre_sed, std::vector<double>& pre_water);
     std::unordered_map<int, std::vector<double> > original_outlet_giver_sed;
     std::unordered_map<int, std::vector<double> > original_outlet_giver_sedlab;
     std::unordered_map<int, chonk > original_chonk;
+    std::vector<double> local_Qs_production_for_lakes;
 
     double DEBUG_GLOBDELT;
     double GLOB_GABUL;

@@ -213,6 +213,7 @@ void ModelRunner::run()
 
   // Keeping track of which node is processed, for debugging and lake management
   is_processed = std::vector<bool>(io_int["n_elements"],false);
+  local_Qs_production_for_lakes = std::vector<double>(this->io_int["n_elements"],0);
 
   // Aliases for efficiency
   xt::pytensor<int,1>& inctive_nodes = this->io_int_array["active_nodes"];
@@ -230,7 +231,9 @@ void ModelRunner::run()
     int node = this->graph.get_MF_stack_at_i(i);
 
     // Processing that node
+    double templocalQS = this->chonk_network[node].get_sediment_flux(); 
     this->process_node(node, is_processed, lake_incrementor, underfilled_lake, inctive_nodes, cellarea, surface_elevation, true);   
+    local_Qs_production_for_lakes[node] = this->chonk_network[node].get_sediment_flux() - templocalQS; 
 
     // Switching to the next node in line
   }
@@ -272,6 +275,7 @@ void ModelRunner::iterative_lake_solver()
   // a single lake and it comes to processing, it merges all of them rather than reprocessing multiple times
   lake_is_in_queue_for_reproc.clear();
   queue_adder_for_lake.clear();
+
 
   // Debugger to ignore
   GLOB_GABUL = 0;
@@ -796,10 +800,10 @@ void ModelRunner::reprocess_local_stack(std::vector<int>& local_mstack, std::vec
         this->chonk_network[tnode].add_to_water_flux( WF_corrector[tnode]);
         this->chonk_network[tnode].add_to_sediment_flux( SF_corrector[tnode], SL_corrector[tnode]);
       }
-
       // # So I need full reproc yaaay
       this->process_node_nolake_for_sure(tnode, is_processed, active_nodes, 
         cellarea,topography, true, true);
+      this->chonk_network[tnode].check_sums();
     }
   }
 
@@ -917,6 +921,7 @@ chonk ModelRunner::preprocess_outletting_chonk(chonk tchonk, EntryPoint& entry_p
 {
   xt::pytensor<double,1>& topography = this->io_double_array["topography"];
   xt::pytensor<int,1>& active_nodes = this->io_int_array["active_nodes"];
+  double cellarea = this->io_double["dx"] * this->io_double["dy"];
   // Getting the additioned water rate
   // std::cout << "I WATER RATE IS " << tchonk.get_water_flux() << std::endl;
   double water_rate = entry_point.volume_water / this->timestep;
@@ -928,7 +933,8 @@ chonk ModelRunner::preprocess_outletting_chonk(chonk tchonk, EntryPoint& entry_p
   // Dealing with sediments
   std::vector<double> label_prop = entry_point.label_prop;//mix_two_proportions(entry_point.volume_sed,entry_point.label_prop, tchonk.get_sediment_flux(), tchonk.get_other_attribute_array("label_tracker"));
   
-  double sedrate = entry_point.volume_sed + tchonk.get_sediment_flux();
+  double sedrate = entry_point.volume_sed + tchonk.get_sediment_flux() - local_Qs_production_for_lakes[outlet];
+  std::cout << "Subtracting "  << local_Qs_production_for_lakes[outlet] << " to outlet " << std::endl;
 
   //getting the weights
   // # Initialising a bunch of intermediate containers and variable
@@ -959,8 +965,9 @@ chonk ModelRunner::preprocess_outletting_chonk(chonk tchonk, EntryPoint& entry_p
     {
       // yes, removing sed and water rate
       water_rate -= tchonk_weight_water_recs[i] * tchonk.get_water_flux();
-      label_prop = mix_two_proportions(sedrate,  label_prop, -1 * tchonk_weight_water_recs[i] * tchonk.get_sediment_flux(),  tchonk.get_other_attribute_array("label_tracker"));
-      sedrate -= tchonk_weight_sed_recs[i] * tchonk.get_sediment_flux();
+      // label_prop = mix_two_proportions(sedrate,  label_prop, -1 * tchonk_weight_water_recs[i] * tchonk.get_sediment_flux(),  tchonk.get_other_attribute_array("label_tracker"));
+      // sedrate -= tchonk_weight_sed_recs[i] * tchonk.get_sediment_flux();
+      // std::cout << "Subtracting II " << tchonk_weight_sed_recs[i] * tchonk.get_sediment_flux() << std::endl;; 
     }
   }
 
@@ -1018,6 +1025,13 @@ chonk ModelRunner::preprocess_outletting_chonk(chonk tchonk, EntryPoint& entry_p
       nrecs++;
 
     }
+    else
+    {
+      if(j >= 0)
+      {
+        this->Qs_mass_balance -= tchonk_weight_sed_recs[j] * tchonk.get_sediment_flux();
+      }
+    }
 
     // Now checking if the rec is an outlet and pushing the correctors:
     if(this->has_been_outlet[tnode] == 'y')
@@ -1065,23 +1079,25 @@ chonk ModelRunner::preprocess_outletting_chonk(chonk tchonk, EntryPoint& entry_p
     weight_water_recs = std::vector<double>(weight_water_recs.size(), 1./int(weight_water_recs.size()));
   }
 
-  if(sumS > 0)
-  {
-    for(size_t i =0; i < weight_sed_recs.size(); i++)
-    {
-      weight_sed_recs[i] = weight_sed_recs[i]/sumS;
-    }
+  // if(sumS > 0)
+  // {
+  //   for(size_t i =0; i < weight_sed_recs.size(); i++)
+  //   {
+  //     weight_sed_recs[i] = weight_sed_recs[i]/sumS;
+  //   }
 
-  }
-  else
-  {
-    weight_sed_recs = std::vector<double>(weight_sed_recs.size(), 1./int(weight_sed_recs.size()));
+  // }
+  // else
+  // {
+  //   weight_sed_recs = std::vector<double>(weight_sed_recs.size(), 1./int(weight_sed_recs.size()));
 
-  }
-
+  // }
+  weight_sed_recs = std::vector<double>(weight_water_recs);
 
   std::cout << "outlet was " << tchonk.get_sediment_flux() << " and is now " << sedrate << std::endl;;
 
+  // this->Qs_mass_balance -= tchonk.get_erosion_flux_only_bedrock() * this->timestep * cellarea;
+  // this->Qs_mass_balance -= tchonk.get_erosion_flux_only_sediments() * this->timestep * cellarea;
   // Resetting the CHONK
   tchonk.reset();
   tchonk.external_moving_prep(ID_recs,weight_water_recs,weight_sed_recs,slope_recs);
@@ -1416,6 +1432,7 @@ int ModelRunner::fill_mah_lake(EntryPoint& entry_point, std::queue<int>& iterala
   }
   // applying the sediment flux deducer
   entry_point.volume_sed += sedrate_modifuer;
+
 
   // adding all the nodes of the ingested lakes
   if(lakes_ingested.size()>0)

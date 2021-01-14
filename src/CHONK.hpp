@@ -195,6 +195,14 @@ class chonk
             print_status();
             throw std::runtime_error("WaterSumProblem");
         }
+        tsum = 0;
+        for (auto tig:weigth_sediment_fluxes)
+            tsum += tig;
+        if(double_equals(tsum,0,1e-3) == false && double_equals(tsum,1,1e-3) == false)
+        {
+            print_status();
+            throw std::runtime_error("SEDSumProblem");
+        }
     }
 
   protected:
