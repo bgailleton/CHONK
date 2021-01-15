@@ -163,6 +163,7 @@ class chonk
     {
         std::cout << "CHONK_ID::" << chonkID << std::endl;
         std::cout << "water_flux::" << water_flux << std::endl;
+        std::cout << "sed_flux::" << sediment_flux << std::endl;
         std::cout << "erosion_flux_undifferentiated::" << erosion_flux_undifferentiated << std::endl;
         std::cout << "erosion_flux_only_sediments::" << erosion_flux_only_sediments << std::endl;
         std::cout << "erosion_flux_only_bedrock::" << erosion_flux_only_bedrock << std::endl;

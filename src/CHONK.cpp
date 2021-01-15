@@ -87,6 +87,7 @@ void chonk::reset()
   this->erosion_flux_undifferentiated = 0;
   this->erosion_flux_only_bedrock = 0;
   this->erosion_flux_only_sediments = 0;
+  this->deposition_flux = 0;
   this->sediment_creation_flux = 0;
   this->sediment_flux = 0;
   this->other_attributes["height_lake_sediments_tp1"] = 0;
@@ -249,7 +250,7 @@ void chonk::split_and_merge_in_receiving_chonks_ignore_some(std::vector<chonk>& 
 //############ MOVE FUCTIONs ##########################
 //####################################################
 //####################################################
-//
+
 
 
 // Simplest function we can think of: move the thingy to 

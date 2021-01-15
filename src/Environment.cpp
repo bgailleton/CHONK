@@ -273,7 +273,7 @@ void ModelRunner::iterative_lake_solver()
   // reinitialising the queue helpers
   // the queue helpers just store everything that needs to go in a specific lake,  so if multiple entry points are stored for 
   // a single lake and it comes to processing, it merges all of them rather than reprocessing multiple times
-  lake_is_in_queue_for_reproc.clear();
+  lake_is_in_queue_for_reproc.clear(); 
   queue_adder_for_lake.clear();
 
 
@@ -443,7 +443,7 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
   // I am writing it as a big script to make it correct. Writing functions when I am sure I keep a feature, but so far I am still working on it a lot
 
 
-  //----------------------------------------------------
+  //-------------------------------1---------------------
   //----------------- INITIALISATION -------------------
   //----------------------------------------------------
 
@@ -568,9 +568,11 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
   // Now initialising the map correcting the fluxes
   std::map<int,double> WF_corrector; std::map<int,double> SF_corrector; std::map<int,std::vector<double> > SL_corrector;
   // Calling teh function preparing the outletting chonk processing
-  // std::cout << "PREWATER 20::" << pre_water[20] << std::endl;
+  std::cout << "PRESEDOUT::" << this->chonk_network[this->lakes[current_lake].outlet].get_sediment_flux() << std::endl;
   this->chonk_network[this->lakes[current_lake].outlet] = chonk(this->preprocess_outletting_chonk(tchonk, entry_point, current_lake, this->lakes[current_lake].outlet,
     WF_corrector,  SF_corrector,  SL_corrector, pre_sed, pre_water, pre_entry_node, label_prop_of_pre));
+
+  std::cout << "POSTSEDOUT::" << this->chonk_network[this->lakes[current_lake].outlet].get_sediment_flux() << std::endl;
 
   // this->chonk_network[this->lakes[current_lake].outlet] = tchonk;
   //   _      _      _
@@ -586,11 +588,18 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
   // preprocessing the quantity given to existing lakes (to later calculate the delta)
   this->check_what_give_to_existing_lakes(local_mstack, outlet, current_lake, pre_sed,
     pre_water, pre_entry_node, label_prop_of_pre);
+  double delta_sedsed = 0;
+  for(auto tnode:local_mstack)
+  {
+    if(is_in_queue[tnode] == 'd')
+    delta_sedsed -= this->chonk_network[tnode].get_erosion_flux_only_bedrock() + this->chonk_network[tnode].get_erosion_flux_only_sediments() - this->chonk_network[tnode].get_deposition_flux();
+  }
   // and finally deprocess the stack
   this->deprocess_local_stack(local_mstack,is_in_queue);
   // std::cout << "PREWATER 20::" << pre_water[20] << std::endl;
-
-
+  std::cout << "BITE::" << std::endl;
+  for(auto tnode:local_mstack)
+    std::cout << "["<< is_in_queue[tnode] <<"]" << this->chonk_network[tnode].get_deposition_flux() << "|";
 
   //----------------------------------------------------
   //---------------- OUTLET PROCESSING -----------------
@@ -599,6 +608,7 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
   this->process_node_nolake_for_sure(this->lakes[current_lake].outlet, is_processed, active_nodes, 
       cellarea,topography, false, false);
 
+  this->chonk_network[this->lakes[current_lake].outlet].print_status();
 
   //----------------------------------------------------
   //------------ LOCAL STACK REPROCESSING --------------
@@ -606,6 +616,13 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
   // this section reprocess all nodes affected by the routletting of the lake nodes from upstream to donwstreamå
   this->reprocess_local_stack(local_mstack, is_in_queue, outlet, current_lake, WF_corrector, SF_corrector, SL_corrector);
 
+  for(auto tnode:local_mstack)
+  {
+    if(is_in_queue[tnode] == 'd')
+     delta_sedsed += this->chonk_network[tnode].get_erosion_flux_only_bedrock() + this->chonk_network[tnode].get_erosion_flux_only_sediments() - this->chonk_network[tnode].get_deposition_flux();;
+  }
+
+  std::cout << "real delta is " << delta_sedsed * cellarea * this->timestep << std::endl;
 
   // DEBUG FOR WATER BALANCE
   double sum_out = 0;
@@ -761,10 +778,12 @@ void ModelRunner::reprocess_local_stack(std::vector<int>& local_mstack, std::vec
   xt::pytensor<double,1>& topography = this->io_double_array["topography"];
   xt::pytensor<int,1>& active_nodes = this->io_int_array["active_nodes"];
   
+  double full_delta = 0;
+
   // Iterating through the local stack
   for(auto tnode:local_mstack)
   {
-
+    // std::cout << "Was " << this->chonk_network[tnode].get_sediment_flux();
     // Discriminating between the donors and the receivers
     if(is_in_queue[tnode] == 'd')
     {
@@ -794,6 +813,7 @@ void ModelRunner::reprocess_local_stack(std::vector<int>& local_mstack, std::vec
     }
     else
     {
+      full_delta -= this->chonk_network[tnode].get_sediment_flux();
       // # I am not a nodor:
       if ( this->has_been_outlet[tnode] == 'y' )
       {
@@ -804,9 +824,16 @@ void ModelRunner::reprocess_local_stack(std::vector<int>& local_mstack, std::vec
       this->process_node_nolake_for_sure(tnode, is_processed, active_nodes, 
         cellarea,topography, true, true);
       this->chonk_network[tnode].check_sums();
+      full_delta += this->chonk_network[tnode].get_sediment_flux();
+
     }
+
+    // std::cout << " Now is " << this->chonk_network[tnode].get_sediment_flux() << std::endl;;
+    // this->chonk_network[tnode].print_status();
+
   }
 
+    // std::cout << " Full delta is " << full_delta << std::endl;;
 
 }
 
@@ -1025,13 +1052,13 @@ chonk ModelRunner::preprocess_outletting_chonk(chonk tchonk, EntryPoint& entry_p
       nrecs++;
 
     }
-    else
-    {
-      if(j >= 0)
-      {
-        this->Qs_mass_balance -= tchonk_weight_sed_recs[j] * tchonk.get_sediment_flux();
-      }
-    }
+    // else
+    // {
+    //   if(j >= 0)
+    //   {
+    //     this->Qs_mass_balance -= tchonk_weight_sed_recs[j] * tchonk.get_sediment_flux();
+    //   }
+    // }
 
     // Now checking if the rec is an outlet and pushing the correctors:
     if(this->has_been_outlet[tnode] == 'y')
@@ -1096,8 +1123,6 @@ chonk ModelRunner::preprocess_outletting_chonk(chonk tchonk, EntryPoint& entry_p
 
   std::cout << "outlet was " << tchonk.get_sediment_flux() << " and is now " << sedrate << std::endl;;
 
-  // this->Qs_mass_balance -= tchonk.get_erosion_flux_only_bedrock() * this->timestep * cellarea;
-  // this->Qs_mass_balance -= tchonk.get_erosion_flux_only_sediments() * this->timestep * cellarea;
   // Resetting the CHONK
   tchonk.reset();
   tchonk.external_moving_prep(ID_recs,weight_water_recs,weight_sed_recs,slope_recs);
@@ -1429,9 +1454,10 @@ int ModelRunner::fill_mah_lake(EntryPoint& entry_point, std::queue<int>& iterala
     sedrate_modifuer -= this->chonk_network[tnode].get_erosion_flux_only_sediments() * this->timestep * cellarea;
     sedrate_modifuer += this->chonk_network[tnode].get_deposition_flux() * this->timestep * cellarea;
     this->chonk_network[tnode].reinitialise_static_fluxes();
+    // this->chonk_network[tnode].reset();
   }
-  // applying the sediment flux deducer
-  entry_point.volume_sed += sedrate_modifuer;
+
+
 
 
   // adding all the nodes of the ingested lakes
@@ -1452,6 +1478,28 @@ int ModelRunner::fill_mah_lake(EntryPoint& entry_point, std::queue<int>& iterala
       }
     }
   }
+
+  // Cancelling the sediment flux of the outlet that were giving to the lake
+  std::vector<int> rec; std::vector<double> wwf;std::vector<double> wws; std::vector<double> strec;
+  this->chonk_network[outlet].copy_moving_prep( rec, wwf, wws,  strec);
+  for ( size_t u=0; u<rec.size(); u++)
+  {
+    int ulak = this->node_in_lake[rec[u]];
+    if(ulak >= 0)
+    {
+      ulak = this->motherlake(ulak);
+      if(ulak == current_lake)
+      {
+        sedrate_modifuer -= wws[u] * this->chonk_network[outlet].get_sediment_flux();
+      }
+    }
+  }
+  this->chonk_network[outlet].reinitialise_static_fluxes();
+
+
+    // applying the sediment flux deducer
+  entry_point.volume_sed += sedrate_modifuer;
+
 
   std::cout << "Lake volume post drink is " << this->lakes[current_lake].volume_water << " and sedEP is " << entry_point.volume_sed << std::endl;
 
@@ -1477,18 +1525,18 @@ int ModelRunner::fill_mah_lake(EntryPoint& entry_point, std::queue<int>& iterala
   std::cout << entry_point.volume_sed << " will be transmitted to an outlet while " << this->lakes[current_lake].volume_sed << " is stored in the lake" << std::endl;
 
 
-  // DEBUGGING TEST
+  // // DEBUGGING TEST
 
-  for(auto tnode:this->lakes[current_lake].nodes)
-  {
-    std::vector<int> neightbors; std::vector<double> dummy ; graph.get_D8_neighbors(tnode, active_nodes, neightbors, dummy);
-    for(auto ttnode:neightbors)
-    {
-      if(topography[ttnode] < topography[tnode])
-        throw std::runtime_error("Should not happen");
-    }
+  // for(auto tnode:this->lakes[current_lake].nodes)
+  // {
+  //   std::vector<int> neightbors; std::vector<double> dummy ; graph.get_D8_neighbors(tnode, active_nodes, neightbors, dummy);
+  //   for(auto ttnode:neightbors)
+  //   {
+  //     if(topography[ttnode] < topography[tnode])
+  //       throw std::runtime_error("Should not happen");
+  //   }
 
-  }
+  // }
   
 
 
@@ -1586,6 +1634,7 @@ void ModelRunner::original_gathering_of_water_and_sed_from_pixel_or_flat_area(in
   water_volume =  this->chonk_network[starting_node].get_water_flux() * this->timestep;
   sediment_volume = this->chonk_network[starting_node].get_sediment_flux();
   label_prop = this->chonk_network[starting_node].get_other_attribute_array("label_tracker");
+  std::cout << "Originnal entry point is " << sediment_volume << std::endl;
   
   // return;
   xt::pytensor<int,1>& active_nodes = this->io_int_array["active_nodes"];
@@ -1631,6 +1680,8 @@ void ModelRunner::original_gathering_of_water_and_sed_from_pixel_or_flat_area(in
       }
     }
   }  
+  std::cout << "AfterFlatGathering entry point is " << sediment_volume << std::endl;
+
 
 }
 
@@ -1717,6 +1768,7 @@ void ModelRunner::process_node(int& node, std::vector<bool>& is_processed, int& 
 void ModelRunner::process_node_nolake_for_sure(int node, std::vector<bool>& is_processed,
   xt::pytensor<int,1>& inctive_nodes, double& cellarea, xt::pytensor<double,1>& surface_elevation, bool need_move_prep, bool need_flux_before_move)
 {
+  local_Qs_production_for_lakes[node] = -1 * this->chonk_network[node].get_sediment_flux() ;
 
   is_processed[node] = true;
   if(need_flux_before_move)
@@ -1738,11 +1790,14 @@ void ModelRunner::process_node_nolake_for_sure(int node, std::vector<bool>& is_p
   //   throw std::runtime_error("NoRecError::internal flux broken");
   
   this->chonk_network[node].split_and_merge_in_receiving_chonks(this->chonk_network, this->graph, this->io_double_array["surface_elevation_tp1"], io_double_array["sed_height_tp1"], this->timestep);
+  local_Qs_production_for_lakes[node] +=  this->chonk_network[node].get_sediment_flux() ;
 }
 
 void ModelRunner::process_node_nolake_for_sure(int node, std::vector<bool>& is_processed,
   xt::pytensor<int,1>& inctive_nodes, double& cellarea, xt::pytensor<double,1>& surface_elevation, bool need_move_prep, bool need_flux_before_move, std::vector<int>& ignore_some)
 {
+  local_Qs_production_for_lakes[node] = -1 * this->chonk_network[node].get_sediment_flux() ;
+
     is_processed[node] = true;
     if(need_flux_before_move)
       this->manage_fluxes_before_moving_prep(this->chonk_network[node], this->label_array[node]);
@@ -1753,6 +1808,7 @@ void ModelRunner::process_node_nolake_for_sure(int node, std::vector<bool>& is_p
     this->manage_fluxes_after_moving_prep(this->chonk_network[node],this->label_array[node]);
     
     this->chonk_network[node].split_and_merge_in_receiving_chonks_ignore_some(this->chonk_network, this->graph, this->timestep, ignore_some);
+    local_Qs_production_for_lakes[node] +=  this->chonk_network[node].get_sediment_flux() ;
 }
 
 void ModelRunner::increment_new_lake(int& lakeid)
@@ -2518,6 +2574,8 @@ void ModelRunner::drape_deposition_flux_to_chonks()
   xt::pytensor<double,1>& surface_elevation = this->io_double_array["surface_elevation"];
 
   double cellarea = this->io_double["dx"] * this->io_double["dy"];
+  std::vector<char> isinhere(this->io_int["n_elements"],'n');
+
 
   for(auto& loch:this->lakes)
   { 
@@ -2539,6 +2597,10 @@ void ModelRunner::drape_deposition_flux_to_chonks()
     double total = loch.volume_sed;
     for(auto no:loch.nodes)
     {
+      if(isinhere[no] == 'y')
+        throw std::runtime_error("Double lakecognition");
+      isinhere[no] = 'y';
+
       total -= ratio_of_dep * (topography[no] - surface_elevation[no]) * cellarea;
       double slangh = ratio_of_dep * (topography[no] - surface_elevation[no]) / timestep;
       chonk_network[no].add_sediment_creation_flux(slangh);
@@ -2547,7 +2609,7 @@ void ModelRunner::drape_deposition_flux_to_chonks()
 
     }
     // Seems fine here...
-    // std::cout << "BALANCE LAKE = " << total << std::endl;
+    std::cout << "BALANCE LAKE = " << total << " out of " << loch.volume_sed << std::endl;
   }
 
 }
