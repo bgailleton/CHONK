@@ -385,7 +385,9 @@ void ModelRunner::iterative_lake_solver()
 
     // If my entry point is empty, it will happen if my lake has been processed by another entry point, I skip to the next node
     if(entry_point.volume_water == 0 && entry_point.volume_sed == 0)
+    {
       continue;
+    }
 
     //############# Third important task (even if still in step 2): 
     // if I have something to put in me lake, I add the content to it
@@ -568,11 +570,11 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
   // Now initialising the map correcting the fluxes
   std::map<int,double> WF_corrector; std::map<int,double> SF_corrector; std::map<int,std::vector<double> > SL_corrector;
   // Calling teh function preparing the outletting chonk processing
-  std::cout << "PRESEDOUT::" << this->chonk_network[this->lakes[current_lake].outlet].get_sediment_flux() << std::endl;
+  // std::cout << "PRESEDOUT::" << this->chonk_network[this->lakes[current_lake].outlet].get_sediment_flux() << std::endl;
   this->chonk_network[this->lakes[current_lake].outlet] = chonk(this->preprocess_outletting_chonk(tchonk, entry_point, current_lake, this->lakes[current_lake].outlet,
     WF_corrector,  SF_corrector,  SL_corrector, pre_sed, pre_water, pre_entry_node, label_prop_of_pre));
 
-  std::cout << "POSTSEDOUT::" << this->chonk_network[this->lakes[current_lake].outlet].get_sediment_flux() << std::endl;
+  // std::cout << "POSTSEDOUT::" << this->chonk_network[this->lakes[current_lake].outlet].get_sediment_flux() << std::endl;
 
   // this->chonk_network[this->lakes[current_lake].outlet] = tchonk;
   //   _      _      _
@@ -597,9 +599,9 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
   // and finally deprocess the stack
   this->deprocess_local_stack(local_mstack,is_in_queue);
   // std::cout << "PREWATER 20::" << pre_water[20] << std::endl;
-  std::cout << "BITE::" << std::endl;
-  for(auto tnode:local_mstack)
-    std::cout << "["<< is_in_queue[tnode] <<"]" << this->chonk_network[tnode].get_deposition_flux() << "|";
+  // std::cout << "BITE::" << std::endl;
+  // for(auto tnode:local_mstack)
+  //   std::cout << "["<< is_in_queue[tnode] <<"]" << this->chonk_network[tnode].get_deposition_flux() << "|";
 
   //----------------------------------------------------
   //---------------- OUTLET PROCESSING -----------------
@@ -622,7 +624,7 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
      delta_sedsed += this->chonk_network[tnode].get_erosion_flux_only_bedrock() + this->chonk_network[tnode].get_erosion_flux_only_sediments() - this->chonk_network[tnode].get_deposition_flux();;
   }
 
-  std::cout << "real delta is " << delta_sedsed * cellarea * this->timestep << std::endl;
+  // std::cout << "real delta is " << delta_sedsed * cellarea * this->timestep << std::endl;
 
   // DEBUG FOR WATER BALANCE
   double sum_out = 0;
