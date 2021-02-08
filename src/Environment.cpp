@@ -997,8 +997,8 @@ chonk ModelRunner::preprocess_outletting_chonk(chonk tchonk, EntryPoint& entry_p
     {
       // yes, removing sed and water rate
       water_rate -= tchonk_weight_water_recs[i] * tchonk.get_water_flux();
-      label_prop = mix_two_proportions(sedrate,  label_prop, -1 * tchonk_weight_water_recs[i] * tchonk.get_sediment_flux(),  tchonk.get_other_attribute_array("label_tracker"));
-      sedrate -= tchonk_weight_sed_recs[i] * tchonk.get_sediment_flux();
+      // label_prop = mix_two_proportions(sedrate,  label_prop, -1 * tchonk_weight_water_recs[i] * tchonk.get_sediment_flux(),  tchonk.get_other_attribute_array("label_tracker"));
+      // sedrate -= tchonk_weight_sed_recs[i] * tchonk.get_sediment_flux();
       // std::cout << "Subtracting II " << tchonk_weight_sed_recs[i] * tchonk.get_sediment_flux() << std::endl;; 
     }
   }
@@ -1316,7 +1316,7 @@ void ModelRunner::check_what_gives_to_lake(int entry_node, std::vector<int>& the
 
 }
 
-int ModelRunner::fill_mah_lake(EntryPoint& entry_point, std::queue<int>& iteralake)
+int ModelRunner::`_lake(EntryPoint& entry_point, std::queue<int>& iteralake)
 {
   std::priority_queue< nodium, std::vector<nodium>, std::greater<nodium> > depressionfiller;
   xt::pytensor<double,1>& topography = this->io_double_array["topography"];
@@ -1484,9 +1484,10 @@ int ModelRunner::fill_mah_lake(EntryPoint& entry_point, std::queue<int>& iterala
     }
   }
 
-  // Cancelling the sediment flux of the outlet that were giving to the lake
+  // Cancelling the sediment flux of the outlet that were given to the lake
   std::vector<int> rec; std::vector<double> wwf;std::vector<double> wws; std::vector<double> strec;
   this->chonk_network[outlet].copy_moving_prep( rec, wwf, wws,  strec);
+  double sed_flux_corrector = 0;
   for ( size_t u=0; u<rec.size(); u++)
   {
     int ulak = this->node_in_lake[rec[u]];
@@ -1495,7 +1496,9 @@ int ModelRunner::fill_mah_lake(EntryPoint& entry_point, std::queue<int>& iterala
       ulak = this->motherlake(ulak);
       if(ulak == current_lake)
       {
-        sedrate_modifuer -= wws[u] * this->chonk_network[outlet].get_sediment_flux();
+        double tsed = wws[u] * this->chonk_network[outlet].get_sediment_flux();
+        sedrate_modifuer -= tsed;
+        sed_flux_corrector += tsed;
       }
     }
   }
