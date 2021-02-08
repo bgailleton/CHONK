@@ -118,6 +118,8 @@ class chonk
     void set_sediment_flux(double value,std::vector<double> label_proportions);
     void add_to_sediment_flux_no_tracking(double value){sediment_flux += value;}
     void add_to_sediment_flux(double value, std::vector<double> label_proportions);
+    void add_to_sediment_flux(double value);
+
     //# check emptyness 
     bool check_if_empty(){return is_empty;};
     //# Check if depression solved

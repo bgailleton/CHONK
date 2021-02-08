@@ -792,6 +792,11 @@ void chonk::set_sediment_flux(double value, std::vector<double> label_proportion
   }
 }
 
+void chonk::add_to_sediment_flux(double value)
+{
+  this->add_to_sediment_flux(value, this->other_attributes_arrays["label_tracker"]);
+}
+
 // Add a certain amount to the sediment flux
 void chonk::add_to_sediment_flux(double value, std::vector<double> label_proportions)
 {

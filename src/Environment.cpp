@@ -1498,12 +1498,12 @@ int ModelRunner::fill_mah_lake(EntryPoint& entry_point, std::queue<int>& iterala
       {
         double tsed = wws[u] * this->chonk_network[outlet].get_sediment_flux();
         sedrate_modifuer -= tsed;
-        sed_flux_corrector += tsed;
+        sed_flux_corrector -= tsed;
       }
     }
   }
   this->chonk_network[outlet].reinitialise_static_fluxes();
-
+  this->chonk_network[outlet].add_to_sediment_flux(sed_flux_corrector);
 
     // applying the sediment flux deducer
   entry_point.volume_sed += sedrate_modifuer;
