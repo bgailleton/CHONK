@@ -1316,7 +1316,7 @@ void ModelRunner::check_what_gives_to_lake(int entry_node, std::vector<int>& the
 
 }
 
-int ModelRunner::`_lake(EntryPoint& entry_point, std::queue<int>& iteralake)
+int ModelRunner::fill_mah_lake(EntryPoint& entry_point, std::queue<int>& iteralake)
 {
   std::priority_queue< nodium, std::vector<nodium>, std::greater<nodium> > depressionfiller;
   xt::pytensor<double,1>& topography = this->io_double_array["topography"];
