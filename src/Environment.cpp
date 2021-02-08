@@ -570,11 +570,12 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
   // Now initialising the map correcting the fluxes
   std::map<int,double> WF_corrector; std::map<int,double> SF_corrector; std::map<int,std::vector<double> > SL_corrector;
   // Calling teh function preparing the outletting chonk processing
-  // std::cout << "PRESEDOUT::" << this->chonk_network[this->lakes[current_lake].outlet].get_sediment_flux() << std::endl;
-  this->chonk_network[this->lakes[current_lake].outlet] = chonk(this->preprocess_outletting_chonk(tchonk, entry_point, current_lake, this->lakes[current_lake].outlet,
-    WF_corrector,  SF_corrector,  SL_corrector, pre_sed, pre_water, pre_entry_node, label_prop_of_pre));
+  std::cout << "PRESEDOUT::" << this->chonk_network[this->lakes[current_lake].outlet].get_sediment_flux() << std::endl;
+  this->chonk_network[this->lakes[current_lake].outlet] = chonk(this->preprocess_outletting_chonk(tchonk, entry_point, current_lake, 
+    this->lakes[current_lake].outlet, WF_corrector,  SF_corrector,  SL_corrector, 
+    pre_sed, pre_water, pre_entry_node, label_prop_of_pre));
 
-  // std::cout << "POSTSEDOUT::" << this->chonk_network[this->lakes[current_lake].outlet].get_sediment_flux() << std::endl;
+  std::cout << "POSTSEDOUT::" << this->chonk_network[this->lakes[current_lake].outlet].get_sediment_flux() << std::endl;
 
   // this->chonk_network[this->lakes[current_lake].outlet] = tchonk;
   //   _      _      _
