@@ -98,7 +98,7 @@ void EntryPoint::ingestNkill(EntryPoint& other)
   this->volume_water += other.volume_water;
   this->label_prop = mix_two_proportions(this->volume_sed, this->label_prop, other.volume_sed, other.label_prop);
   this->volume_sed += other.volume_sed;
-  this->node = other.node;
+  // this->node = other.node;
   other = EntryPoint(save_id);
 }
 
@@ -391,7 +391,7 @@ void ModelRunner::iterative_lake_solver()
 
     //############# Third important task (even if still in step 2): 
     // if I have something to put in me lake, I add the content to it
-    if(entry_point.volume_water >= 0 && entry_point.volume_sed >= 0)
+    if(entry_point.volume_water > 0 || entry_point.volume_sed > 0)
     {
       if(entry_point.volume_water > 0 || entry_point.volume_sed > 0)
         current_lake = this->fill_mah_lake(entry_point, iteralake);
@@ -607,10 +607,13 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
   //---------------- OUTLET PROCESSING -----------------
   //----------------------------------------------------
   // Process the outlet, whithout preparing the move (Already done) and readding the precipitation-like fluxes (already taken into account).
+  local_Qs_production_for_lakes[this->lakes[current_lake].outlet] = -1 * this->chonk_network[this->lakes[current_lake].outlet].get_sediment_flux();
   this->process_node_nolake_for_sure(this->lakes[current_lake].outlet, is_processed, active_nodes, 
       cellarea,topography, false, false);
+  local_Qs_production_for_lakes[this->lakes[current_lake].outlet] += this->chonk_network[this->lakes[current_lake].outlet].get_sediment_flux();
 
-  this->chonk_network[this->lakes[current_lake].outlet].print_status();
+
+  // this->chonk_network[this->lakes[current_lake].outlet].print_status();
 
   //----------------------------------------------------
   //------------ LOCAL STACK REPROCESSING --------------
@@ -745,7 +748,7 @@ std::vector<double>& pre_sed, std::vector<double>& pre_water)
     EntryPoint other(dwat * this->timestep, dsed, pre_entry_node[i], label_prop_of_delta[i]);
     queue_adder_for_lake[target_lake].ingestNkill( other);
     
-    // std::cout << "ENTRY POINT LAKE " << target_lake << " IS NOW " << queue_adder_for_lake[target_lake].volume_water / this->timestep << " ADDED " << dwat << " (rate ofc) from " << pre_entry_node[i] << std::endl;
+    std::cout << "ENTRY POINT LAKE " << target_lake << " IS NOW " << queue_adder_for_lake[target_lake].volume_sed << " ADDED " << dsed << " (rate ofc) from " << pre_entry_node[i] << std::endl;
 
     // Emplacing the next lake entry in the queue
     iteralake.emplace(pre_entry_node[i]);
@@ -962,8 +965,8 @@ chonk ModelRunner::preprocess_outletting_chonk(chonk tchonk, EntryPoint& entry_p
   // Dealing with sediments
   std::vector<double> label_prop = entry_point.label_prop;//mix_two_proportions(entry_point.volume_sed,entry_point.label_prop, tchonk.get_sediment_flux(), tchonk.get_other_attribute_array("label_tracker"));
   
-  double sedrate = entry_point.volume_sed + tchonk.get_sediment_flux() - local_Qs_production_for_lakes[outlet];
-  std::cout << "Subtracting "  << local_Qs_production_for_lakes[outlet] << " to outlet " << std::endl;
+  double sedrate = entry_point.volume_sed + tchonk.get_sediment_flux(); // - local_Qs_production_for_lakes[outlet];
+  // std::cout << "Subtracting "  << local_Qs_production_for_lakes[outlet] << " to outlet " << std::endl;
 
   //getting the weights
   // # Initialising a bunch of intermediate containers and variable
@@ -994,8 +997,8 @@ chonk ModelRunner::preprocess_outletting_chonk(chonk tchonk, EntryPoint& entry_p
     {
       // yes, removing sed and water rate
       water_rate -= tchonk_weight_water_recs[i] * tchonk.get_water_flux();
-      // label_prop = mix_two_proportions(sedrate,  label_prop, -1 * tchonk_weight_water_recs[i] * tchonk.get_sediment_flux(),  tchonk.get_other_attribute_array("label_tracker"));
-      // sedrate -= tchonk_weight_sed_recs[i] * tchonk.get_sediment_flux();
+      label_prop = mix_two_proportions(sedrate,  label_prop, -1 * tchonk_weight_water_recs[i] * tchonk.get_sediment_flux(),  tchonk.get_other_attribute_array("label_tracker"));
+      sedrate -= tchonk_weight_sed_recs[i] * tchonk.get_sediment_flux();
       // std::cout << "Subtracting II " << tchonk_weight_sed_recs[i] * tchonk.get_sediment_flux() << std::endl;; 
     }
   }
@@ -1683,6 +1686,10 @@ void ModelRunner::original_gathering_of_water_and_sed_from_pixel_or_flat_area(in
     }
   }  
   std::cout << "AfterFlatGathering entry point is " << sediment_volume << std::endl;
+  std::cout << " Nodes are:";
+  for(auto nn : these_nodes)
+    std::cout << nn << "|";
+  std::cout << std::endl;
 
 
 }
