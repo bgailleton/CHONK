@@ -395,7 +395,7 @@ void ModelRunner::iterative_lake_solver()
     // if I have something to put in me lake, I add the content to it
     if(entry_point.volume_water > 0 || entry_point.volume_sed > 0)
     {
-      // FIlling the lake
+      // Filling the lake
       current_lake = this->fill_mah_lake(entry_point, iteralake);
     }
     else
@@ -1620,37 +1620,36 @@ int ModelRunner::fill_mah_lake(EntryPoint& entry_point, std::queue<int>& iterala
 /// function eating a lake from another
 void ModelRunner::drink_lake(int id_eater, int id_edible, EntryPoint& entry_point, std::queue<int>& iteralake)
 { 
-  // if(this->lakes[id_edible].is_now >= 0)
-  //   throw std::runtime_error("FatalLakeErrorIngestedTwice");
+
   // Updating the id of the new lake
   this->lakes[id_edible].is_now = id_eater;
-
-  // Old debug statement
-  // std::cout << "LAKE " << id_edible << " Is Now " << id_eater << std::endl;
 
   // merging water volumes
   this->lakes[id_eater].volume_water += this->lakes[id_edible].volume_water;
 
+  // if the current lake has an outlet:
   if(this->lakes[id_eater].outlet >= 0)
   {
+    // Removing its entry point
     entry_point.ingestNkill(this->queue_adder_for_lake[id_edible]);
   }
   else
   {
+    // Readding an entry point to complete the fill of this lake
     this->queue_adder_for_lake[id_eater].ingestNkill(this->queue_adder_for_lake[id_edible]);
     iteralake.emplace(entry_point.node);
   }
 
+  // Cancelling all entry points ingested. (clean the queue of entry points to a dead lake)
   this->queue_adder_for_lake[id_edible] = EntryPoint(this->queue_adder_for_lake[id_edible].node);
 
+  // Now if they have the same water elevation, there is something to do
   if (this->lakes[id_eater].water_elevation == this->lakes[id_edible].water_elevation)
   {
     // std::cout << "LAKE TRANSMIT ITS SUMOUTRATE :: " << this->lakes[id_edible].sum_outrate << " OUTLET IS " <<  this->lakes[id_eater].outlet << " VS " << this->lakes[id_edible].outlet<< std::endl;
+    // if the outlets are different: I check wheter it is a valid outlet and integrates it
     if(this->lakes[id_eater].outlet != this->lakes[id_edible].outlet && this->lakes[id_edible].outlet > 0)
-    {
-
-      // std::cout << "OUTLET " << this->lakes[id_eater].outlet << " BECAME " << this->lakes[id_edible].outlet << " ["<< this->node_in_lake[this->lakes[id_edible].outlet] << "] In Drinking Process " << std::endl;
-      
+    {      
       int n_DS_n = 0;
       int n_DS_o = 0;
       std::vector<int> neightbors; std::vector<double> dummy ; graph.get_D8_neighbors(this->lakes[id_edible].outlet, this-> io_int_array["active_nodes"], neightbors, dummy);
@@ -1677,33 +1676,23 @@ void ModelRunner::drink_lake(int id_eater, int id_edible, EntryPoint& entry_poin
 
     }
     else
-    {      
+    {   
+    // DEPRECATED   
       this->lakes[id_eater].sum_outrate += this->lakes[id_edible].sum_outrate;
     }
 
 
   }
+
+
   // Merging sediment volumes
   entry_point.label_prop = mix_two_proportions(entry_point.volume_sed,entry_point.label_prop,
     this->lakes[id_edible].volume_sed,this->lakes[id_edible].label_prop);
   entry_point.volume_sed += this->lakes[id_edible].volume_sed;
-
-
-
-
-  // // PROBS USELESS TO REOVE
-  // DONT DO THAT!!! -> inside an auto loop it invalidates the iterators
-  // for(auto tn:this->lakes[id_edible].nodes)
-  // {
-  //   if(std::find( this->lakes[id_eater].nodes.begin(), this->lakes[id_eater].nodes.end(), tn) == this->lakes[id_eater].nodes.end())
-  //   {
-  //     this->lakes[id_eater].nodes.push_back(tn);
-  //     std::cout << "BASJGDJADFKLHJSDFJKLHJKLSDFHLJKSDFLHJKDSLHJKFLHJKDFHLJKDSF" << std::endl;
-  //   }
-  // }
-
 }
 
+
+// Function checking the active lake id of a node (ie, the top-level one)
 int ModelRunner::motherlake(int this_lake_id)
 {
   int output = this_lake_id;
