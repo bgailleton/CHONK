@@ -1589,58 +1589,29 @@ int ModelRunner::fill_mah_lake(EntryPoint& entry_point, std::queue<int>& iterala
 
   //# Calculating the remaining space available in that lake
   double lake_capacity = this->lakes[current_lake].volume_water - this->lakes[current_lake].volume_sed;
+  // Case 1: I have enough volume to ingest the whole sedload
   if(lake_capacity >= entry_point.volume_sed)
   {
+    // I calcul the proportions
     this->lakes[current_lake].label_prop = mix_two_proportions(entry_point.volume_sed, entry_point.label_prop,
         this->lakes[current_lake].volume_sed, this->lakes[current_lake].label_prop);
+    // And correct the volumes
     this->lakes[current_lake].volume_sed += entry_point.volume_sed;
+    // removing all sediments 
     entry_point.volume_sed = 0;
   }
   else
   {
-
+    // CASE 2: I am filling up the lake and transmitting sediments to the outlet
     this->lakes[current_lake].label_prop = mix_two_proportions(lake_capacity, entry_point.label_prop,
         this->lakes[current_lake].volume_sed, this->lakes[current_lake].label_prop);
     this->lakes[current_lake].volume_sed += lake_capacity;
     entry_point.volume_sed -= lake_capacity;
   }
 
-
-
-  // this->lakes[current_lake].label_prop = mix_two_proportions(entry_point.volume_sed, entry_point.label_prop,
-  //   this->lakes[current_lake].volume_sed, this->lakes[current_lake].label_prop);
-
-  // if(this->lakes[current_lake].volume_water - this->lakes[current_lake].volume_sed <= entry_point.volume_sed )
-  // {
-   
-  //  this->lakes[current_lake].volume_sed = this->lakes[current_lake].volume_water;
-  //  entry_point.volume_sed -= this->lakes[current_lake].volume_water - this->lakes[current_lake].volume_sed;
-
-  // }
-  // else
-  // {
-  //   this->lakes[current_lake].volume_sed += entry_point.volume_sed;
-  //   entry_point.volume_sed = 0;
-
-  // }
-
   std::cout << entry_point.volume_sed << " will be transmitted to an outlet while " << this->lakes[current_lake].volume_sed << " is stored in the lake" << std::endl;
 
-
-  // // DEBUGGING TEST
-
-  // for(auto tnode:this->lakes[current_lake].nodes)
-  // {
-  //   std::vector<int> neightbors; std::vector<double> dummy ; graph.get_D8_neighbors(tnode, active_nodes, neightbors, dummy);
-  //   for(auto ttnode:neightbors)
-  //   {
-  //     if(topography[ttnode] < topography[tnode])
-  //       throw std::runtime_error("Should not happen");
-  //   }
-
-  // }
-  
-
+  // Transmission to the outlet has been moved to another function. The remaining amount of sediment is known by the entry_point
 
   return current_lake;
 
