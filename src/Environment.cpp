@@ -400,26 +400,20 @@ void ModelRunner::iterative_lake_solver()
     }
     else
     {
-
-      if(entry_point.volume_water > 0)
-      {
-        // entry_point.volume_sed = 0;
-        current_lake = this->fill_mah_lake(entry_point, iteralake);
-      }
+      // DEBUG CHECEKRS
+      negsumwat += entry_point.volume_water;
+      if(this->has_valid_outlet(current_lake))
+        has_outlet++;
       else
-      {
-
-        negsumwat += entry_point.volume_water;
-        if(this->has_valid_outlet(current_lake))
-          has_outlet++;
-        else
-          no_has_outlet++;
-      }
+        no_has_outlet++;
 
     }
 
-    //############# Fourth important task (even if still in step 2): 
-    // if my lake outlets, I need to reprocess the affected downstream nodes
+    // At that point in the code I have an entry_point corrected for lakes:
+    // It has (or not anymore) sediments and/or water to transmit to the outlet.
+    // Anything that was supposed to go in the lake, is in the lake.
+
+    // If my lake outlets, I need to reprocess the affected downstream nodes
     // this is by far the most complicated part of the code
     if(this->lakes[current_lake].outlet >= 0)
     {
@@ -444,7 +438,7 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
 {
 
   // This function is a mastodon dealing with the reprocessing of nodes following a newly outletting lake
-  // My current objective is to keep it clear. Optimisation will come later
+  // My current objective is to keep it (as) clear (as I can). Optimisation will come later. 
   // I am writing it as a big script to make it correct. Writing functions when I am sure I keep a feature, but so far I am still working on it a lot
 
 
@@ -507,7 +501,8 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
   }
 
 
-  // This function gathers all the nodesto be reprocessed. Including their donor which will be partially reprocessed
+  // This function gathers all the nodes to be reprocessed. Including their donor which will be partially reprocessed
+  // This function is only geometrical, it does not assume any existing transfer of sed/water
   this->gather_nodes_to_reproc(local_mstack,  ORDEEEEEER,  is_in_queue,  outlet);
 
   // Final size OK
