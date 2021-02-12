@@ -120,6 +120,7 @@ public:
                 outlet = -1;
                 id = -1;
                 this->sum_outrate = 0;
+                nodes = std::vector<int>();
             };
     LakeLite(int id){
                 water_elevation = 0;
@@ -129,6 +130,7 @@ public:
                 outlet = -1;
                 this->id = id;
                 this->sum_outrate = 0;
+                nodes = std::vector<int>();
             };
 
 
