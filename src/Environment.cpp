@@ -519,55 +519,55 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
 
 
   // /\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\
-      // DEBUG VARIABLE TO CHECK IF WATER IS CREATED WHEN REPROCESSING A LAKE WITH 0 WATER
-      double local_sum = 0;
-      std::map<int,double> deltas;
-      std::vector<int> nodes;
-      std::vector<int> local_stack_checker = std::vector<int>(local_mstack);
-      local_stack_checker.push_back(outlet);
-      // this->label_nodes_with_no_rec_in_local_stack(local_stack_checker,is_in_queue, has_recs_in_local_stack);
-      for(auto node:local_stack_checker)
-      {
-        if(is_in_queue[node] == 'd')
-          continue;
+      // // DEBUG VARIABLE TO CHECK IF WATER IS CREATED WHEN REPROCESSING A LAKE WITH 0 WATER
+      // double local_sum = 0;
+      // std::map<int,double> deltas;
+      // std::vector<int> nodes;
+      // std::vector<int> local_stack_checker = std::vector<int>(local_mstack);
+      // local_stack_checker.push_back(outlet);
+      // // this->label_nodes_with_no_rec_in_local_stack(local_stack_checker,is_in_queue, has_recs_in_local_stack);
+      // for(auto node:local_stack_checker)
+      // {
+      //   if(is_in_queue[node] == 'd')
+      //     continue;
 
-        bool is_done = false;
+      //   bool is_done = false;
         
         
-        std::vector<int> recs = this->chonk_network[node].get_chonk_receivers_copy();
-        std::vector<double> WW = this->chonk_network[node].get_chonk_water_weight_copy();
-        double chonk_water = this->chonk_network[node].get_water_flux();
-        int i = 0;
-        for(auto rec : recs)
-        { 
-          if(is_in_queue[rec] == 'n' || is_in_queue[rec] == 'r' || is_in_queue[rec] == 'd')
-          {
-            double this_water = WW[i] * chonk_water ;
-            local_sum -=  this_water;
+      //   std::vector<int> recs = this->chonk_network[node].get_chonk_receivers_copy();
+      //   std::vector<double> WW = this->chonk_network[node].get_chonk_water_weight_copy();
+      //   double chonk_water = this->chonk_network[node].get_water_flux();
+      //   int i = 0;
+      //   for(auto rec : recs)
+      //   { 
+      //     if(is_in_queue[rec] == 'n' || is_in_queue[rec] == 'r' || is_in_queue[rec] == 'd')
+      //     {
+      //       double this_water = WW[i] * chonk_water ;
+      //       local_sum -=  this_water;
 
-            if(is_done == false)
-            {
-              deltas[node] = (-1 * this_water);
-              nodes.push_back(node);
-            }
-            else
-            {
-              deltas[node] -= this_water;
-            }
-          }
-          i++;
-        }
+      //       if(is_done == false)
+      //       {
+      //         deltas[node] = (-1 * this_water);
+      //         nodes.push_back(node);
+      //       }
+      //       else
+      //       {
+      //         deltas[node] -= this_water;
+      //       }
+      //     }
+      //     i++;
+      //   }
 
-        if(active_nodes[node] == 0)
-        {
-          deltas[node] -= chonk_water;
+      //   if(active_nodes[node] == 0)
+      //   {
+      //     deltas[node] -= chonk_water;
 
-          local_sum -= chonk_water;
-        }
+      //     local_sum -= chonk_water;
+      //   }
         
-      }
-      // std::cout << "LOCAL SUM IS " << local_sum << std::endl;
-      // std::cout << outlet << "|||" << debug_saverW << "||||" << outlet_water_saver << "||||" << this->chonk_network[this->lakes[current_lake].outlet].get_water_flux() << std::endl;
+      // }
+      // // std::cout << "LOCAL SUM IS " << local_sum << std::endl;
+      // // std::cout << outlet << "|||" << debug_saverW << "||||" << outlet_water_saver << "||||" << this->chonk_network[this->lakes[current_lake].outlet].get_water_flux() << std::endl;
   // end of DEBUG
   // /\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\
 
@@ -640,58 +640,58 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
   // std::cout << "real delta is " << delta_sedsed * cellarea * this->timestep << std::endl;
 
   // DEBUG FOR WATER BALANCE
-  double sum_out = 0;
-  // std::cout << "Is considered:";
-  for(auto node:local_stack_checker)
-  {
-    if(is_in_queue[node] == 'd')
-      continue;
-    bool is_done = false;
+  // double sum_out = 0;
+  // // std::cout << "Is considered:";
+  // for(auto node:local_stack_checker)
+  // {
+  //   if(is_in_queue[node] == 'd')
+  //     continue;
+  //   bool is_done = false;
     
     
-    std::vector<int> recs = this->chonk_network[node].get_chonk_receivers_copy();
-    std::vector<double> WW = this->chonk_network[node].get_chonk_water_weight_copy();
-    double chonk_water = this->chonk_network[node].get_water_flux();
-    int i = 0;
-    for(auto rec : recs)
-    { 
-      if(is_in_queue[rec] == 'n' || is_in_queue[rec] == 'r' || is_in_queue[rec] == 'd')
-      {
-        // std::cout << is_in_queue[rec] <<"(" << node << "->" << rec << ")" << "|";
-        double this_water = WW[i] * chonk_water ;
-        local_sum +=  this_water;
-        deltas[node] += this_water;
+  //   std::vector<int> recs = this->chonk_network[node].get_chonk_receivers_copy();
+  //   std::vector<double> WW = this->chonk_network[node].get_chonk_water_weight_copy();
+  //   double chonk_water = this->chonk_network[node].get_water_flux();
+  //   int i = 0;
+  //   for(auto rec : recs)
+  //   { 
+  //     if(is_in_queue[rec] == 'n' || is_in_queue[rec] == 'r' || is_in_queue[rec] == 'd')
+  //     {
+  //       // std::cout << is_in_queue[rec] <<"(" << node << "->" << rec << ")" << "|";
+  //       double this_water = WW[i] * chonk_water ;
+  //       local_sum +=  this_water;
+  //       deltas[node] += this_water;
         
-      }
-      i++;
-    }
+  //     }
+  //     i++;
+  //   }
 
-    if(active_nodes[node] == 0)
-    {
-      // std::cout << "z";
-      deltas[node] += chonk_water;
-      local_sum += chonk_water;
-    }
+  //   if(active_nodes[node] == 0)
+  //   {
+  //     // std::cout << "z";
+  //     deltas[node] += chonk_water;
+  //     local_sum += chonk_water;
+  //   }
     
-  }
-  // std::cout << std::endl;
-  for(auto v:deltas)
-  {
-    // std::cout << v.first << "-->" << v.second << std::endl;
-    if(active_nodes[v.first] == 0)
-    {
-      sum_out += v.second;
-    }
-  }
-  // std::cout << "sum_out IS " << sum_out << " out of " << debug_saverW << std::endl;
+  // }
+  // // std::cout << std::endl;
+  // for(auto v:deltas)
+  // {
+  //   // std::cout << v.first << "-->" << v.second << std::endl;
+  //   if(active_nodes[v.first] == 0)
+  //   {
+  //     sum_out += v.second;
+  //   }
+  // }
+  // // std::cout << "sum_out IS " << sum_out << " out of " << debug_saverW << std::endl;
 
 
 
-  if(double_equals(local_sum,debug_saverW,1) == false)
-  {
-    std::cout << "WARNING:: " << debug_saverW << " got added to this local system but there is a delta of " << local_sum - debug_saverW << std::endl;
-    // throw std::runtime_error("WaterDeltaWhileReprocError"); 
-  }
+  // if(double_equals(local_sum,debug_saverW,1) == false)
+  // {
+  //   std::cout << "WARNING:: " << debug_saverW << " got added to this local system but there is a delta of " << local_sum - debug_saverW << std::endl;
+  //   // throw std::runtime_error("WaterDeltaWhileReprocError"); 
+  // }
 
 
   //----------------------------------------------------
@@ -793,7 +793,7 @@ void ModelRunner::reprocess_local_stack(std::vector<int>& local_mstack, std::vec
   xt::pytensor<double,1>& topography = this->io_double_array["topography"];
   xt::pytensor<int,1>& active_nodes = this->io_int_array["active_nodes"];
   
-  double full_delta = 0;
+  // double full_delta = 0;
 
   // Iterating through the local stack
   for(auto tnode:local_mstack)
@@ -836,11 +836,12 @@ void ModelRunner::reprocess_local_stack(std::vector<int>& local_mstack, std::vec
         this->chonk_network[tnode].add_to_sediment_flux( SF_corrector[tnode], SL_corrector[tnode]);
       }
       // # So I need full reproc yaaay
-      full_delta -= this->chonk_network[tnode].get_sediment_flux();
+      // full_delta -= this->chonk_network[tnode].get_sediment_flux();
       this->process_node_nolake_for_sure(tnode, is_processed, active_nodes, 
         cellarea,topography, true, true);
       this->chonk_network[tnode].check_sums();
-      full_delta += this->chonk_network[tnode].get_sediment_flux();
+      // full_delta += this->chonk_network[tnode].get_sediment_flux();
+      // local_Qs_production_for_lakes[tnode] = full_delta;
 
     }
 
