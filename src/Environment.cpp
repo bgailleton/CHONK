@@ -1979,7 +1979,7 @@ void ModelRunner::finalise()
     if(sedcrea + sed_height_tp1[i] < 0)
     {
       // IT STILL HAPPENS
-      // std::cout << "happens??" << sedcrea << "||" << sed_height_tp1[i] << "||" << this->node_in_lake[i] << std::endl;
+      std::cout << "happens??" << sedcrea << "||" << sed_height_tp1[i] << "||" << this->node_in_lake[i] << std::endl;
       surface_elevation_tp1[i] -= sed_height_tp1[i];
       sed_height_tp1[i] = 0.;
       sed_prop_by_label[i] = std::vector<std::vector<double> >();

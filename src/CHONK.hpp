@@ -238,6 +238,8 @@ class chonk
     double sediment_flux;
     // sediment creation flux
     double sediment_creation_flux;
+    // Fluvial part of the sediment flux
+    double fluvialprop_sedflux;
 
 
     // Movers

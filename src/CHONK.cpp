@@ -69,6 +69,7 @@ void chonk::create(int tchonkID, int tcurrent_node, bool tmemory_saver)
   this->deposition_flux = 0;
   this->sediment_creation_flux = 0;
   this->other_attributes["height_lake_sediments_tp1"] = 0;
+  this->fluvialprop_sedflux = 0;
 
   // required params
   this->chonkID = tchonkID;
@@ -90,6 +91,7 @@ void chonk::reset()
   this->deposition_flux = 0;
   this->sediment_creation_flux = 0;
   this->sediment_flux = 0;
+  this->fluvialprop_sedflux = 0;
   this->other_attributes["height_lake_sediments_tp1"] = 0;
 
   this->receivers.clear();
@@ -239,8 +241,6 @@ void chonk::split_and_merge_in_receiving_chonks_ignore_some(std::vector<chonk>& 
     this->reset();
 
 }
-
-
 
 
 
@@ -1009,6 +1009,8 @@ void chonk::charlie_I(double n, double m, double K_r, double K_s,
     B = std::exp(B);
     double C = ( ( Dsphi / E_cap_s ) - 1 ) * std::exp(this_sed_height/dimless_roughness);
     new_sed_height = dimless_roughness * std::log( A * (B * (C + 1) - 1));
+    if(std::isfinite(new_sed_height) == false)
+      std::cout << dimless_roughness << "|*|" << A << "|*|" << B << "|*|"  << C << "|*|"  << Dsphi  << "|*|" << E_cap_s <<  "|*|"  << this_sed_height << "|*|" << std::exp(this_sed_height/dimless_roughness) << std::endl;
   }
 
   double new_sedcrea = (new_sed_height - this_sed_height) / dt;
@@ -1018,7 +1020,7 @@ void chonk::charlie_I(double n, double m, double K_r, double K_s,
 
   if(std::isfinite(this->sediment_creation_flux) == false)
   {
-    std::cout << new_sed_height << "||" << this_sed_height << "||" << Es_tot << "||" << Ds_tot << "||" << this->sediment_flux << "||" << this->water_flux<< std::endl;
+    std::cout << new_sed_height << "||" << this_sed_height << "||" << Es_tot << "||" << Ds_tot << "||" << this->sediment_flux << "||" << this->water_flux<< "||" << this->chonkID <<  std::endl;
     throw std::runtime_error("Sedcrea getting nan value in CHARLIE_I");
   }
 
