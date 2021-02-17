@@ -518,6 +518,7 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
   //----------------------------------------------------
 
 
+
   // /\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\
       // // DEBUG VARIABLE TO CHECK IF WATER IS CREATED WHEN REPROCESSING A LAKE WITH 0 WATER
       // double local_sum = 0;
@@ -604,7 +605,7 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
   for(auto tnode:local_mstack)
   {
     if(is_in_queue[tnode] == 'd')
-    delta_sedsed -= this->chonk_network[tnode].get_erosion_flux_only_bedrock() + this->chonk_network[tnode].get_erosion_flux_only_sediments() - this->chonk_network[tnode].get_deposition_flux();
+      delta_sedsed -= this->chonk_network[tnode].get_erosion_flux_only_bedrock() + this->chonk_network[tnode].get_erosion_flux_only_sediments() - this->chonk_network[tnode].get_deposition_flux();
   }
   // and finally deprocess the stack
   this->deprocess_local_stack(local_mstack,is_in_queue);
@@ -831,6 +832,7 @@ void ModelRunner::reprocess_local_stack(std::vector<int>& local_mstack, std::vec
       // # I am not a nodor:
       if ( this->has_been_outlet[tnode] == 'y' )
       {
+        std::cout << "*^*^*^*^*^*^*^*^*^*^*^**^*^*^*^*^*^*^*^*^*^*^**^*^*^*^*^*^*^*^*^*^*^*IT HAPPENS!!" << std::endl;
         this->chonk_network[tnode].add_to_water_flux( WF_corrector[tnode]);
         this->chonk_network[tnode].add_to_sediment_flux( -1 * local_Qs_production_for_lakes[tnode]);
         this->chonk_network[tnode].add_to_sediment_flux( SF_corrector[tnode], SL_corrector[tnode]);
@@ -1977,7 +1979,7 @@ void ModelRunner::finalise()
     if(sedcrea + sed_height_tp1[i] < 0)
     {
       // IT STILL HAPPENS
-      std::cout << "happens??" << sedcrea << "||" << sed_height_tp1[i] << "||" << this->node_in_lake[i] << std::endl;
+      // std::cout << "happens??" << sedcrea << "||" << sed_height_tp1[i] << "||" << this->node_in_lake[i] << std::endl;
       surface_elevation_tp1[i] -= sed_height_tp1[i];
       sed_height_tp1[i] = 0.;
       sed_prop_by_label[i] = std::vector<std::vector<double> >();
@@ -2335,6 +2337,9 @@ void ModelRunner::manage_fluxes_after_moving_prep(chonk& this_chonk, int label_i
   for(auto method:this->ordered_flux_methods)
   {
     int index = this_chonk.get_current_location();
+    std::vector<double> these_sed_props(this->n_labels,0.);
+    if(is_there_sed_here[index] && this->sed_prop_by_label[index].size()>0) // I SHOULD NOT NEED THE SECOND THING, WHY DO I FUTURE BORIS????
+      these_sed_props = this->sed_prop_by_label[index][this->sed_prop_by_label[index].size() - 1];
     
     if(method == "move")
     {
@@ -2349,12 +2354,11 @@ void ModelRunner::manage_fluxes_after_moving_prep(chonk& this_chonk, int label_i
     switch(this_case)
     {
       case 1:
+      // Classic SPL /!\ probs deprecatedx
         this_chonk.active_simple_SPL(this->labelz_list_double["SPIL_n"][label_id], this->labelz_list_double["SPIL_m"][label_id], this->labelz_list_double["SPIL_K"][label_id], this->timestep, this->io_double["dx"], this->io_double["dy"], label_id);
         break;
       case 8:
-        std::vector<double> these_sed_props(this->n_labels,0.);
-        if(is_there_sed_here[index] && this->sed_prop_by_label[index].size()>0) // I SHOULD NOT NEED THE SECOND THING, WHY DO I FUTURE BORIS????
-          these_sed_props = this->sed_prop_by_label[index][this->sed_prop_by_label[index].size() - 1];
+      // The SPACE model aka CHARLIE_I
         this_chonk.charlie_I(this->labelz_list_double["SPIL_n"][label_id], this->labelz_list_double["SPIL_m"][label_id], this->labelz_list_double["CHARLIE_I_Kr"][label_id], 
   this->labelz_list_double["CHARLIE_I_Ks"][label_id],
   this->labelz_list_double["CHARLIE_I_dimless_roughness"][label_id], this->io_double_array["sed_height"][index], 
@@ -2363,6 +2367,22 @@ void ModelRunner::manage_fluxes_after_moving_prep(chonk& this_chonk, int label_i
   this->labelz_list_double["CHARLIE_I_threshold_entrainment"][label_id],
   label_id, these_sed_props, this->timestep,  this->io_double["dx"], this->io_double["dy"]);
         
+        break;
+
+      case 9:
+      // Cidre hillslope method, only on the sediment layer
+        this_chonk.CidreHillslopes(this->io_double_array["sed_height"][index], this->labelz_list_double["Cidre_HS_kappa_s"][label_id], 
+          0., this->labelz_list_double["Cidre_HS_critical_slope"][label_id],
+  label_id, these_sed_props, this->timestep, this->io_double["dx"], this->io_double["dy"], false, this->graph, 1e-6);
+        break;
+      case 10:
+      // Cidre hillslope method, both sed and bedrock
+        this_chonk.CidreHillslopes(this->io_double_array["sed_height"][index], this->labelz_list_double["Cidre_HS_kappa_s"][label_id], 
+            this->labelz_list_double["Cidre_HS_kappa_r"][label_id], this->labelz_list_double["Cidre_HS_critical_slope"][label_id],
+    label_id, these_sed_props, this->timestep, this->io_double["dx"], this->io_double["dy"], true, this->graph, 1e-6);
+          break;
+
+      default:
         break;
     }
   }
@@ -2382,6 +2402,8 @@ void ModelRunner::initialise_intcorrespondance()
   intcorrespondance["precipitation_discharge"] = 6;
   intcorrespondance["infiltration_discharge"] = 7;
   intcorrespondance["CHARLIE_I"] = 8;
+  intcorrespondance["Cidre_hillslope_diffusion_no_bedrock"] = 9;
+  intcorrespondance["Cidre_hillslope_diffusion"] = 10;
 
 }
 
@@ -2428,6 +2450,28 @@ void ModelRunner::prepare_label_to_list_for_processes()
           labelz_list_double["CHARLIE_I_threshold_entrainment"].push_back(tlab.double_attributes["CHARLIE_I_threshold_entrainment"]);
         }
         break;
+
+      case 9 :
+        labelz_list_double["Cidre_HS_kappa_s"] = std::vector<double>();
+        labelz_list_double["Cidre_HS_critical_slope"] = std::vector<double>();
+        for (auto& tlab:labelz_list)
+        {
+          labelz_list_double["Cidre_HS_kappa_s"].push_back(tlab.double_attributes["Cidre_HS_kappa_s"]);
+          labelz_list_double["Cidre_HS_critical_slope"].push_back(tlab.double_attributes["Cidre_HS_critical_slope"]); 
+        }       
+        break;
+      case 10 :
+        labelz_list_double["Cidre_HS_kappa_s"] = std::vector<double>();
+        labelz_list_double["Cidre_HS_kappa_r"] = std::vector<double>();
+        labelz_list_double["Cidre_HS_critical_slope"] = std::vector<double>();
+        for (auto& tlab:labelz_list)
+        {
+          labelz_list_double["Cidre_HS_kappa_s"].push_back(tlab.double_attributes["Cidre_HS_kappa_s"]);
+          labelz_list_double["Cidre_HS_kappa_r"].push_back(tlab.double_attributes["Cidre_HS_kappa_r"]);
+          labelz_list_double["Cidre_HS_critical_slope"].push_back(tlab.double_attributes["Cidre_HS_critical_slope"]);
+        }
+        break;
+
   
       // defaut case means the law has no correspondance so it does not do anything
       default: 

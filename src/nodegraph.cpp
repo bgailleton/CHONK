@@ -1932,6 +1932,26 @@ void NodeGraphV2::_update_pits_receivers(xt::pytensor<int,2>& conn_basins,xt::py
 
 
 
+std::vector<double> NodeGraphV2::get_distance_to_receivers_custom(int node, std::vector<int> list_of_receivers)
+{
+  std::vector<double> tdist2rec = std::vector<double>(list_of_receivers.size(), -1);
+
+  for(size_t i=0; i<list_of_receivers.size(); i ++)
+  {
+    int tnode = list_of_receivers[i];
+    for(size_t j=0; j < this->graph[node].receivers.size(); j++)
+    {
+      if(tnode == this->graph[node].receivers[j])
+      {
+        tdist2rec[i] = this->graph[node].length2rec[j];
+        break;
+      }
+    } 
+  }
+
+  return tdist2rec;
+}
+
 
 
 

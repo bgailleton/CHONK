@@ -185,6 +185,9 @@ std::vector<std::vector<int> > get_DEBUG_connode() {return  DEBUG_connode;}
 std::vector<int> get_mstree(){std::vector<int> output; for(auto abs: mstree){output.push_back(SBasinOutlets[abs]);}; return output;}
 std::vector<std::vector<int> > get_mstree_translated(){return this->mstree_translated;}
 
+std::vector<double> get_distance_to_receivers_custom(int node, std::vector<int> list_of_receivers);
+
+
 
 
 void recompute_multi_receveivers_and_donors(xt::pytensor<bool,1>& active_nodes, xt::pytensor<double,1>& elevation, std::vector<int>& nodes_to_compute);

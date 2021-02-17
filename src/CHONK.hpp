@@ -85,6 +85,10 @@ class chonk
   double d_star, double threshold_incision, double threshold_sed_entrainment,
   int label, std::vector<double> sed_label_prop, double dt, double Xres, double Yres);
 
+    void CidreHillslopes(double this_sed_height, double kappa_s, double kappa_r, double Sc,
+  int zone_label, std::vector<double> sed_label_prop, double dt, double Xres, double Yres, bool bedrock, 
+  NodeGraphV2& graph, double tolerance_to_Sc);
+
 
 
     // Accessors and modifyers
