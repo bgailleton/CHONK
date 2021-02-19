@@ -146,9 +146,12 @@ void chonk::split_and_merge_in_receiving_chonks(std::vector<chonk>& chonkscape, 
     sum_outwat += this->water_flux * this->weigth_water_fluxes[i];
     // So far the tracker gives equal proportion of its tracking downstream
     other_chonk.add_to_sediment_flux(this->sediment_flux * this->weigth_sediment_fluxes[i], oatalab, this->fluvialprop_sedflux);
-    sum_weight_sed += this->weigth_sediment_fluxes[i];
+    sum_weight_sed += this->weigth_sediment_fluxes[i] * this->sediment_flux ;
     // std::cout << "SEDFLUXDEBUG::" << this->sediment_flux << "||" << this->weigth_sediment_fluxes[i] << "||water::" << this->weigth_water_fluxes[i] << std::endl;
   }
+
+  if(double_equals(sum_weight_sed,this->sediment_flux, 1e-3) == false && graph.is_border[this->current_node] == 'n')
+    std::cout << "WARNING::Sediment balance problem : " << sum_weight_sed << "||" << this->sediment_flux << std::endl;
 
 
 
@@ -915,11 +918,19 @@ void chonk::charlie_I(double n, double m, double K_r, double K_s,
   int zone_label, std::vector<double> sed_label_prop, double dt, double Xres, double Yres)
 {
    // I am recording the current sediment fluxes in the model distributed for each receivers
-  std::vector<double> pre_sedfluxes = this->get_preexisting_sediment_flux_by_receivers_fluvial();
+  std::vector<double> pre_sedfluxes = std::vector<double>(this->receivers.size(), 0. );
+  // Initialising the fluxes bwith the water ones
+  // std::vector<double> charlie_I_weights4sed = this->weigth_water_fluxes;
   double total_fluvial_sedflux = this->sediment_flux * this->fluvialprop_sedflux;
+  for(size_t i=0; i < pre_sedfluxes.size(); i++)
+    pre_sedfluxes[i] = this->weigth_water_fluxes[i] * total_fluvial_sedflux;
+
+
+  if(this->fluvialprop_sedflux > 1)
+    std::cout << "WARNING!!!!! " << fluvialprop_sedflux << std::endl;;
 
   // IMPORTANT in case another process had affected the sed-height bofre, I am applying it
-  this_sed_height +=  this->sediment_creation_flux *dt;
+  this_sed_height += this->sediment_creation_flux *dt;
 
 
   double Er_tot = 0;
@@ -939,6 +950,7 @@ void chonk::charlie_I(double n, double m, double K_r, double K_s,
     return;
 
   double depodivider = 1 + (V_param * d_star * Xres * Yres / this->water_flux);
+  // double
 
   for(auto& flub:pre_sedfluxes)
     flub = flub/depodivider;
@@ -996,6 +1008,8 @@ void chonk::charlie_I(double n, double m, double K_r, double K_s,
   total_fluvial_sedflux += tadd;
 
   // COrrecting analytically (see SPACE gmd paper equation 31)
+  tadd = total_fluvial_sedflux -  total_fluvial_sedflux/depodivider;
+  this->add_to_sediment_flux( -tadd, this->other_attributes_arrays["label_tracker"], 1.);
   total_fluvial_sedflux = total_fluvial_sedflux/depodivider;
 
   double sumweights = 0;
@@ -1004,29 +1018,30 @@ void chonk::charlie_I(double n, double m, double K_r, double K_s,
   {
     for(size_t i=0; i<this->receivers.size(); i++)
     {
-      sumweights += this->weigth_sediment_fluxes[i];
       if(this->sediment_flux>0)
         this->weigth_sediment_fluxes[i] = (pre_sedfluxes[i] + HS_fluxes[i])/this->sediment_flux;
+      sumweights += pre_sedfluxes[i];
+    
     }
   }
+  // std::cout << this->fluvialprop_sedflux << "|";
+  if(double_equals(sumweights,0,1e-7) ==  true)
+    this->weigth_sediment_fluxes = std::vector<double>(this->weigth_water_fluxes);
 
-  // if(double_equals(sumweights,0,1e-7) ==  true)
-  //   this->weigth_sediment_fluxes = std::vector<double>(this->weigth_water_fluxes);
+  sumweights = 0;
+  for (auto s:this->weigth_sediment_fluxes)
+    sumweights += s;
 
-  // sumweights = 0;
-  // for (auto s:this->weigth_sediment_fluxes)
-  //   sumweights += s;
-
-  // if(double_equals(sumweights,1,1e-3) ==  false)
-  // {
-  //   // throw std::runtime_error("Sedweightserrors::" + std::to_string(sumweights));
-  //   for (auto& s:this->weigth_sediment_fluxes)
-  //     s/sumweights;
-  // }
+  if(double_equals(sumweights,1,1e-3) ==  false)
+  {
+    // throw std::runtime_error("Sedweightserrors::" + std::to_string(sumweights));
+    for (auto& s:this->weigth_sediment_fluxes)
+      s/sumweights;
+  }
   
 
   Ds_tot += V_param * d_star * (total_fluvial_sedflux/ (this->water_flux * dt));
-  this->add_to_sediment_flux(-1 * Ds_tot * dt * Xres * Yres, this->other_attributes_arrays["label_tracker"], 1.);
+  // this->add_to_sediment_flux(-1 * Ds_tot * dt * Xres * Yres, this->other_attributes_arrays["label_tracker"], 1.);
 
   // removing the deposition from sediment flux
 
