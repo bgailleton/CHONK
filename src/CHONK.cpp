@@ -139,7 +139,7 @@ void chonk::split_and_merge_in_receiving_chonks(std::vector<chonk>& chonkscape, 
     other_chonk.add_to_water_flux(this->water_flux * this->weigth_water_fluxes[i]);
     sum_outwat += this->water_flux * this->weigth_water_fluxes[i];
     // So far the tracker gives equal proportion of its tracking downstream
-    other_chonk.add_to_sediment_flux(this->sediment_flux * this->weigth_sediment_fluxes[i], oatalab);
+    other_chonk.add_to_sediment_flux(this->sediment_flux * this->weigth_sediment_fluxes[i], oatalab, this->fluvialprop_sedflux);
     sum_weight_sed += this->weigth_sediment_fluxes[i];
     // std::cout << "SEDFLUXDEBUG::" << this->sediment_flux << "||" << this->weigth_sediment_fluxes[i] << "||water::" << this->weigth_water_fluxes[i] << std::endl;
   }
@@ -196,7 +196,7 @@ void chonk::cancel_split_and_merge_in_receiving_chonks(std::vector<chonk>& chonk
     // }
 
     // std::cout << "PALUF";
-    other_chonk.add_to_sediment_flux( -1 * this->sediment_flux * this->weigth_sediment_fluxes[i], oatalab);
+    other_chonk.add_to_sediment_flux( -1 * this->sediment_flux * this->weigth_sediment_fluxes[i], oatalab, this->fluvialprop_sedflux);
     // std::cout << "FIN";
 
 
@@ -232,7 +232,7 @@ void chonk::split_and_merge_in_receiving_chonks_ignore_some(std::vector<chonk>& 
 
 
     // std::cout << "COR";
-    other_chonk.add_to_sediment_flux(this->sediment_flux * this->weigth_sediment_fluxes[i], oatalab);
+    other_chonk.add_to_sediment_flux(this->sediment_flux * this->weigth_sediment_fluxes[i], oatalab, this->fluvialprop_sedflux);
     // std::cout << "kar";
   }
 
@@ -792,13 +792,13 @@ void chonk::set_sediment_flux(double value, std::vector<double> label_proportion
   }
 }
 
-void chonk::add_to_sediment_flux(double value)
+void chonk::add_to_sediment_flux(double value, double prop_fluvial)
 {
-  this->add_to_sediment_flux(value, this->other_attributes_arrays["label_tracker"]);
+  this->add_to_sediment_flux(value, this->other_attributes_arrays["label_tracker"], prop_fluvial );
 }
 
 // Add a certain amount to the sediment flux
-void chonk::add_to_sediment_flux(double value, std::vector<double> label_proportions)
+void chonk::add_to_sediment_flux(double value, std::vector<double> label_proportions, double prop_fluvial)
 {
 
   // if I have no sediment: do nothing
@@ -812,13 +812,19 @@ void chonk::add_to_sediment_flux(double value, std::vector<double> label_proport
   {
     this->sediment_flux += value;
     this->other_attributes_arrays["label_tracker"] = label_proportions;
+    this->fluvialprop_sedflux = prop_fluvial;
     return;
   }
 
 
   // std::vector<double> newlabprop = mix_two_proportions(this->sediment_flux, this->other_attributes_arrays["label_tracker"], value, label_proportions);
   this->other_attributes_arrays["label_tracker"] = mix_two_proportions(this->sediment_flux, this->other_attributes_arrays["label_tracker"], value, label_proportions);;
+  
+  double fluvialsedfluxtot = value * prop_fluvial + this->fluvialprop_sedflux * this->sediment_flux;
   this->sediment_flux += value;
+  this->fluvialprop_sedflux = fluvialsedfluxtot/ this->sediment_flux;
+
+
 
 }
 
@@ -837,33 +843,35 @@ void chonk::add_to_sediment_flux(double value, std::vector<double> label_proport
 void chonk::active_simple_SPL(double n, double m, double K, double dt, double Xres, double Yres, int label)
 {
 
-  // I am recording the current sediment fluxes in the model distributed for each receivers
-  std::vector<double> pre_sedfluxes = get_preexisting_sediment_flux_by_receivers();
-  // Calculation current fluxes
-  for(size_t i=0; i<this->receivers.size(); i++)
-  {
-    // calculating the flux E = K s^n A^m
-    double this_eflux = std::pow(this->water_flux * this->weigth_water_fluxes[i],m) * std::pow(this->slope_to_rec[i],n) * K;
+  throw std::runtime_error("The simplest stream power law is currently broken. Please use Charlie_I with 0 deposition instead.")
+
+  // // I am recording the current sediment fluxes in the model distributed for each receivers
+  // std::vector<double> pre_sedfluxes = get_preexisting_sediment_flux_by_receivers();
+  // // Calculation current fluxes
+  // for(size_t i=0; i<this->receivers.size(); i++)
+  // {
+  //   // calculating the flux E = K s^n A^m
+  //   double this_eflux = std::pow(this->water_flux * this->weigth_water_fluxes[i],m) * std::pow(this->slope_to_rec[i],n) * K;
   
-    // stacking the erosion flux
-    this->erosion_flux_undifferentiated += this_eflux;
+  //   // stacking the erosion flux
+  //   this->erosion_flux_undifferentiated += this_eflux;
 
-    // What has been eroded moves into the sediment flux (which needs to be converted into a volume)
-    std::vector<double> buluf(this->other_attributes_arrays["label_tracker"].size(), 0.);
-    buluf[label] = 1.;
-    this->add_to_sediment_flux(this_eflux * Xres * Yres * dt, buluf);
-    // recording the current flux 
-    pre_sedfluxes[i] += this_eflux * Xres * Yres * dt;
+  //   // What has been eroded moves into the sediment flux (which needs to be converted into a volume)
+  //   std::vector<double> buluf(this->other_attributes_arrays["label_tracker"].size(), 0.);
+  //   buluf[label] = 1.;
+  //   this->add_to_sediment_flux(this_eflux * Xres * Yres * dt, buluf);
+  //   // recording the current flux 
+  //   pre_sedfluxes[i] += this_eflux * Xres * Yres * dt;
 
-  }
+  // }
 
 
-  // Now I need to recalculate the sediment fluxes weights to each receivers
-  for(size_t i=0; i<this->receivers.size(); i++)
-  {
-    if(this->sediment_flux>0)
-      this->weigth_sediment_fluxes[i] = pre_sedfluxes[i]/this->sediment_flux;
-  }
+  // // Now I need to recalculate the sediment fluxes weights to each receivers
+  // for(size_t i=0; i<this->receivers.size(); i++)
+  // {
+  //   if(this->sediment_flux>0)
+  //     this->weigth_sediment_fluxes[i] = pre_sedfluxes[i]/this->sediment_flux;
+  // }
 
   // Done
   return;
@@ -945,10 +953,10 @@ void chonk::charlie_I(double n, double m, double K_r, double K_s,
 
 
   buluf[zone_label] = 1.;
-  this->add_to_sediment_flux(Er_tot * Xres * Yres * dt, buluf);
+  this->add_to_sediment_flux(Er_tot * Xres * Yres * dt, buluf, 1.);
 
   // Adding the sediment entrained into the sedimetn flux
-  this->add_to_sediment_flux(Es_tot * Xres * Yres * dt, sed_label_prop);
+  this->add_to_sediment_flux(Es_tot * Xres * Yres * dt, sed_label_prop, 1.);
 
   this->sediment_flux = this->sediment_flux/depodivider;
 
@@ -1129,7 +1137,7 @@ void chonk::CidreHillslopes(double this_sed_height, double kappa_s, double kappa
     fraction_bedrock_exposed = 0;
 
   this->erosion_flux_only_sediments += local_es;
-  this->add_to_sediment_flux(local_es* dt, sed_label_prop);
+  this->add_to_sediment_flux(local_es* dt, sed_label_prop, 0.);
 
   // std::cout << "3" << std::endl;
 
@@ -1154,7 +1162,7 @@ void chonk::CidreHillslopes(double this_sed_height, double kappa_s, double kappa
   std::vector<double> tlabprop = std::vector<double>(this->other_attributes_arrays["label_tracker"].size(),0);
   tlabprop[zone_label] = 1;
   double dep_without_bedrock = this->sediment_flux/dt / local_L;
-  this->add_to_sediment_flux(local_er * dt,tlabprop);
+  this->add_to_sediment_flux(local_er * dt,tlabprop, 0.);
   this->erosion_flux_only_bedrock += local_er;
   double this_dep = (this->sediment_flux/dt / local_L);
   this->deposition_flux += this_dep;
