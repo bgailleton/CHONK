@@ -834,8 +834,8 @@ void ModelRunner::reprocess_local_stack(std::vector<int>& local_mstack, std::vec
       {
         std::cout << "*^*^*^*^*^*^*^*^*^*^*^**^*^*^*^*^*^*^*^*^*^*^**^*^*^*^*^*^*^*^*^*^*^*IT HAPPENS!!" << std::endl;
         this->chonk_network[tnode].add_to_water_flux( WF_corrector[tnode]);
-        this->chonk_network[tnode].add_to_sediment_flux( -1 * local_Qs_production_for_lakes[tnode]);
-        this->chonk_network[tnode].add_to_sediment_flux( SF_corrector[tnode], SL_corrector[tnode]);
+        this->chonk_network[tnode].add_to_sediment_flux( -1 * local_Qs_production_for_lakes[tnode], this->chonk_network[tnode].get_fluvialprop_sedflux());
+        this->chonk_network[tnode].add_to_sediment_flux( SF_corrector[tnode], SL_corrector[tnode], this->chonk_network[tnode].get_fluvialprop_sedflux());
       }
       // # So I need full reproc yaaay
       // full_delta -= this->chonk_network[tnode].get_sediment_flux();
@@ -1151,7 +1151,7 @@ chonk ModelRunner::preprocess_outletting_chonk(chonk tchonk, EntryPoint& entry_p
   tchonk.reset();
   tchonk.external_moving_prep(ID_recs,weight_water_recs,weight_sed_recs,slope_recs);
   tchonk.set_water_flux(water_rate);
-  tchonk.set_sediment_flux(sedrate,label_prop);
+  tchonk.set_sediment_flux(sedrate,label_prop, 1.);
 
   // for(auto idf:ID_recs)
   //   std::cout << idf << "||";

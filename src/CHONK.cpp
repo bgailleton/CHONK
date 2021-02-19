@@ -790,6 +790,7 @@ void chonk::set_sediment_flux(double value, std::vector<double> label_proportion
   {  
     oatalab[i] = label_proportions[i];
   }
+  this->fluvialprop_sedflux = prop_fluvial;
 }
 
 void chonk::add_to_sediment_flux(double value, double prop_fluvial)
