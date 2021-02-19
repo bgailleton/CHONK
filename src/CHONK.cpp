@@ -669,58 +669,59 @@ void chonk::move_MF_from_fastscapelib_threshold_SF(NodeGraphV2& graph, double th
 void chonk::move_to_steepest_descent_nodepression(NodeGraphV2& graph, double dt, xt::pytensor<double,1>& sed_height, xt::pytensor<double,1>& sed_height_tp1, 
   xt::pytensor<double,1>& surface_elevation, xt::pytensor<double,1>& surface_elevation_tp1, double Xres, double Yres, std::vector<chonk>& chonk_network)
 {
-  // Find the steepest descent node first
-  // Initialising the checkers to minimum
-  int steepest_rec = -9999;
-  double steepest_S = -std::numeric_limits<double>::max();
+  throw std::runtime_error("chonk::move_to_steepest_descent_nodepression is now deprecated. You can use the switch to deactivate the explicit depression solver.")
+  // // Find the steepest descent node first
+  // // Initialising the checkers to minimum
+  // int steepest_rec = -9999;
+  // double steepest_S = -std::numeric_limits<double>::max();
 
-  // I need the receicing neighbours and the distance to them
-  std::vector<int> these_neighbors = graph.get_MF_receivers_at_node(this->current_node);
-  std::vector<double> these_lengths = graph.get_MF_lengths_at_node(this->current_node);
-  bool all_minus_1 = true;
-  // looping through neighbors
-  for(size_t i=0; i<these_neighbors.size(); i++)
-  {
-    int this_neightbor = these_neighbors[i];
-    // checking if this is a neighbor, nodata will be -1 (fastscapelib standards)
-    if(this_neightbor < 0 || this_neightbor >= int(surface_elevation.size()) || this_neightbor == this->current_node)
-      continue;
+  // // I need the receicing neighbours and the distance to them
+  // std::vector<int> these_neighbors = graph.get_MF_receivers_at_node(this->current_node);
+  // std::vector<double> these_lengths = graph.get_MF_lengths_at_node(this->current_node);
+  // bool all_minus_1 = true;
+  // // looping through neighbors
+  // for(size_t i=0; i<these_neighbors.size(); i++)
+  // {
+  //   int this_neightbor = these_neighbors[i];
+  //   // checking if this is a neighbor, nodata will be -1 (fastscapelib standards)
+  //   if(this_neightbor < 0 || this_neightbor >= int(surface_elevation.size()) || this_neightbor == this->current_node)
+  //     continue;
 
-    all_minus_1 = false;
-    // getting the slope, dz/dx
+  //   all_minus_1 = false;
+  //   // getting the slope, dz/dx
     
-    double this_slope = 0;
-    if(these_lengths[i] >= Xres)
-      this_slope = (surface_elevation[this->current_node] - surface_elevation[this_neightbor]) / these_lengths[i];
-    else
-      this_slope = 0;
-    // NEED TO CHECK WHY IT DDOES THAT!!
-    if(this_slope<0)
-    {
-      this_slope = 0;
-    }
+  //   double this_slope = 0;
+  //   if(these_lengths[i] >= Xres)
+  //     this_slope = (surface_elevation[this->current_node] - surface_elevation[this_neightbor]) / these_lengths[i];
+  //   else
+  //     this_slope = 0;
+  //   // NEED TO CHECK WHY IT DDOES THAT!!
+  //   if(this_slope<0)
+  //   {
+  //     this_slope = 0;
+  //   }
 
-    // checking if the slope is higher and recording the receiver
-    if(this_slope>steepest_S)
-    {
-      steepest_rec = this_neightbor;
-      steepest_S = this_slope;
-    }
-    // Mover to the next step
-  }
+  //   // checking if the slope is higher and recording the receiver
+  //   if(this_slope>steepest_S)
+  //   {
+  //     steepest_rec = this_neightbor;
+  //     steepest_S = this_slope;
+  //   }
+  //   // Mover to the next step
+  // }
 
-  // Base level! i am stopping the code there and treating it as a depression already solved to inhibit all the process
-  if(steepest_rec == this->current_node || all_minus_1 == true)
-  {
-    this->depression_solved_at_this_timestep = true;
-    return;
-  }
+  // // Base level! i am stopping the code there and treating it as a depression already solved to inhibit all the process
+  // if(steepest_rec == this->current_node || all_minus_1 == true)
+  // {
+  //   this->depression_solved_at_this_timestep = true;
+  //   return;
+  // }
 
-  // There is a non-pit neighbor, let's save it with its attributes
-  this->receivers.push_back(steepest_rec);
-  this->weigth_water_fluxes.push_back(1.);
-  this->weigth_sediment_fluxes.push_back(1.);
-  this->slope_to_rec.push_back(steepest_S); 
+  // // There is a non-pit neighbor, let's save it with its attributes
+  // this->receivers.push_back(steepest_rec);
+  // this->weigth_water_fluxes.push_back(1.);
+  // this->weigth_sediment_fluxes.push_back(1.);
+  // this->slope_to_rec.push_back(steepest_S); 
 }
 
 
