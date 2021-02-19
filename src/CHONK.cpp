@@ -477,7 +477,7 @@ void chonk::move_MF_from_fastscapelib(NodeGraphV2& graph, xt::pytensor<double,2>
     // std::cout << "WATER WEIGHT " << weight << std::endl;
     this->receivers.push_back(this_neightbor);
     this->weigth_water_fluxes.push_back(weight);
-    this->weigth_sediment_fluxes.push_back( std::vector<double>(weight.size(),0.) );
+    this->weigth_sediment_fluxes.push_back( 0. );
     this->slope_to_rec.push_back(this_slope); 
 
 
@@ -653,7 +653,7 @@ void chonk::move_MF_from_fastscapelib_threshold_SF(NodeGraphV2& graph, double th
 
     this->receivers.push_back(this_neightbor);
     this->weigth_water_fluxes.push_back(weight);
-    this->weigth_sediment_fluxes.push_back( std::vector<double>(weight.size(),0.) );
+    this->weigth_sediment_fluxes.push_back( 0 );
     this->slope_to_rec.push_back(this_slope); 
 
 
@@ -669,7 +669,7 @@ void chonk::move_MF_from_fastscapelib_threshold_SF(NodeGraphV2& graph, double th
 void chonk::move_to_steepest_descent_nodepression(NodeGraphV2& graph, double dt, xt::pytensor<double,1>& sed_height, xt::pytensor<double,1>& sed_height_tp1, 
   xt::pytensor<double,1>& surface_elevation, xt::pytensor<double,1>& surface_elevation_tp1, double Xres, double Yres, std::vector<chonk>& chonk_network)
 {
-  throw std::runtime_error("chonk::move_to_steepest_descent_nodepression is now deprecated. You can use the switch to deactivate the explicit depression solver.")
+  throw std::runtime_error("chonk::move_to_steepest_descent_nodepression is now deprecated. You can use the switch to deactivate the explicit depression solver.");
   // // Find the steepest descent node first
   // // Initialising the checkers to minimum
   // int steepest_rec = -9999;
@@ -845,7 +845,7 @@ void chonk::add_to_sediment_flux(double value, std::vector<double> label_proport
 void chonk::active_simple_SPL(double n, double m, double K, double dt, double Xres, double Yres, int label)
 {
 
-  throw std::runtime_error("The simplest stream power law is currently broken. Please use Charlie_I with 0 deposition instead.")
+  throw std::runtime_error("The simplest stream power law is currently broken. Please use Charlie_I with 0 deposition instead.");
 
   // // I am recording the current sediment fluxes in the model distributed for each receivers
   // std::vector<double> pre_sedfluxes = get_preexisting_sediment_flux_by_receivers();
