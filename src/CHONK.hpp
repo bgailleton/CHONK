@@ -145,7 +145,9 @@ class chonk
     std::vector<double>& get_chonk_water_weight(){return weigth_water_fluxes;}
     std::vector<double>& get_chonk_sediment_weight(){return weigth_sediment_fluxes;}
     std::vector<double> get_preexisting_sediment_flux_by_receivers();
-    
+    std::vector<double> get_preexisting_sediment_flux_by_receivers_hillslopes();
+    std::vector<double> get_preexisting_sediment_flux_by_receivers_fluvial();
+
     // receivers
     std::vector<int> get_chonk_receivers_copy(){return receivers;}
     // water weights

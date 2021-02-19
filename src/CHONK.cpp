@@ -109,6 +109,12 @@ void chonk::reset()
 //####################################################
 //
 
+// void check_sediment_weights()
+// {
+//   double sumsedweights = 0;
+
+// }
+
 void chonk::split_and_merge_in_receiving_chonks(std::vector<chonk>& chonkscape, NodeGraphV2& graph, xt::pytensor<double,1>& surface_elevation_tp1, xt::pytensor<double,1>& sed_height_tp1, double dt)
 {
   // KEEPING FOR LEGACY COMPATIBILITY
@@ -774,6 +780,29 @@ std::vector<double> chonk::get_preexisting_sediment_flux_by_receivers()
   return pre_sedfluxes;
 }
 
+// Returns the proportion of fluvial sediment fluxes sent to the receivers
+std::vector<double> chonk::get_preexisting_sediment_flux_by_receivers_fluvial()
+{
+  std::vector<double> pre_sedfluxes; pre_sedfluxes.reserve(this->weigth_sediment_fluxes.size());
+  for(auto& v:this->weigth_sediment_fluxes)
+  {
+    pre_sedfluxes.emplace_back(v*this->sediment_flux * this->fluvialprop_sedflux);
+  }
+  return pre_sedfluxes;
+}
+
+// Returns the proportion of hillslopes sediment fluxes sent to the receivers
+std::vector<double> chonk::get_preexisting_sediment_flux_by_receivers_hillslopes()
+{
+  std::vector<double> pre_sedfluxes; pre_sedfluxes.reserve(this->weigth_sediment_fluxes.size());
+  for(auto& v:this->weigth_sediment_fluxes)
+  {
+    pre_sedfluxes.emplace_back(v*this->sediment_flux * (1 - this->fluvialprop_sedflux));
+  }
+  return pre_sedfluxes;
+}
+
+
 // Set the total sediment flux manually, with given proportions for each labels
 // Index of the label array is the label, and the sum of the proportions should be 1
 void chonk::set_sediment_flux(double value, std::vector<double> label_proportions, double prop_fluvial)
@@ -886,7 +915,8 @@ void chonk::charlie_I(double n, double m, double K_r, double K_s,
   int zone_label, std::vector<double> sed_label_prop, double dt, double Xres, double Yres)
 {
    // I am recording the current sediment fluxes in the model distributed for each receivers
-  std::vector<double> pre_sedfluxes = this->get_preexisting_sediment_flux_by_receivers();
+  std::vector<double> pre_sedfluxes = this->get_preexisting_sediment_flux_by_receivers_fluvial();
+  double total_fluvial_sedflux = this->sediment_flux * this->fluvialprop_sedflux;
 
   // IMPORTANT in case another process had affected the sed-height bofre, I am applying it
   this_sed_height +=  this->sediment_creation_flux *dt;
@@ -955,40 +985,48 @@ void chonk::charlie_I(double n, double m, double K_r, double K_s,
 
 
   buluf[zone_label] = 1.;
-  this->add_to_sediment_flux(Er_tot * Xres * Yres * dt, buluf, 1.);
+  double tadd = Er_tot * Xres * Yres * dt;
+  this->add_to_sediment_flux(tadd, buluf, 1.);
+  total_fluvial_sedflux += tadd;
 
+  tadd = Es_tot * Xres * Yres * dt;
+  
   // Adding the sediment entrained into the sedimetn flux
-  this->add_to_sediment_flux(Es_tot * Xres * Yres * dt, sed_label_prop, 1.);
+  this->add_to_sediment_flux(tadd, sed_label_prop, 1.);
+  total_fluvial_sedflux += tadd;
 
-  this->sediment_flux = this->sediment_flux/depodivider;
+  // COrrecting analytically (see SPACE gmd paper equation 31)
+  total_fluvial_sedflux = total_fluvial_sedflux/depodivider;
 
   double sumweights = 0;
+  std::vector<double> HS_fluxes = this->get_preexisting_sediment_flux_by_receivers_hillslopes();
   if(this->receivers.size()>0)
   {
     for(size_t i=0; i<this->receivers.size(); i++)
     {
       sumweights += this->weigth_sediment_fluxes[i];
       if(this->sediment_flux>0)
-        this->weigth_sediment_fluxes[i] = pre_sedfluxes[i]/this->sediment_flux;
+        this->weigth_sediment_fluxes[i] = (pre_sedfluxes[i] + HS_fluxes[i])/this->sediment_flux;
     }
   }
 
-  if(double_equals(sumweights,0,1e-7) ==  true)
-    this->weigth_sediment_fluxes = std::vector<double>(this->weigth_water_fluxes);
+  // if(double_equals(sumweights,0,1e-7) ==  true)
+  //   this->weigth_sediment_fluxes = std::vector<double>(this->weigth_water_fluxes);
 
-  sumweights = 0;
-  for (auto s:this->weigth_sediment_fluxes)
-    sumweights += s;
+  // sumweights = 0;
+  // for (auto s:this->weigth_sediment_fluxes)
+  //   sumweights += s;
 
-  if(double_equals(sumweights,1,1e-3) ==  false)
-  {
-    // throw std::runtime_error("Sedweightserrors::" + std::to_string(sumweights));
-    for (auto& s:this->weigth_sediment_fluxes)
-      s/sumweights;
-  }
+  // if(double_equals(sumweights,1,1e-3) ==  false)
+  // {
+  //   // throw std::runtime_error("Sedweightserrors::" + std::to_string(sumweights));
+  //   for (auto& s:this->weigth_sediment_fluxes)
+  //     s/sumweights;
+  // }
   
 
-  Ds_tot += V_param * d_star * (this->sediment_flux/ (this->water_flux * dt));
+  Ds_tot += V_param * d_star * (total_fluvial_sedflux/ (this->water_flux * dt));
+  this->add_to_sediment_flux(-1 * Ds_tot * dt * Xres * Yres, this->other_attributes_arrays["label_tracker"], 1.);
 
   // removing the deposition from sediment flux
 
