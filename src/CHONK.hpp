@@ -119,7 +119,7 @@ class chonk
     // # Sediment flux
     double get_sediment_flux(){return sediment_flux;}
     void set_sediment_flux_no_tacking(double value){sediment_flux = value;}
-    void set_sediment_flux(double value,std::vector<double> label_proportions);
+    void set_sediment_flux(double value,std::vector<double> label_proportions, double prop_fluvial);
     void add_to_sediment_flux_no_tracking(double value){sediment_flux += value;}
     void add_to_sediment_flux(double value, std::vector<double> label_proportions, double prop_fluvial);
     void add_to_sediment_flux(double value, double prop_fluvial);

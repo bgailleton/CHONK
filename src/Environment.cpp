@@ -1152,6 +1152,7 @@ chonk ModelRunner::preprocess_outletting_chonk(chonk tchonk, EntryPoint& entry_p
   tchonk.external_moving_prep(ID_recs,weight_water_recs,weight_sed_recs,slope_recs);
   tchonk.set_water_flux(water_rate);
   tchonk.set_sediment_flux(sedrate,label_prop, 1.);
+  tchonk.I_solemnly_swear_all_my_sediments_are_fluvial();
 
   // for(auto idf:ID_recs)
   //   std::cout << idf << "||";

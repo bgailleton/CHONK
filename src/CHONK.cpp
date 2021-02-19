@@ -369,7 +369,7 @@ void chonk::move_to_steepest_descent(NodeGraphV2& graph, double dt, xt::pytensor
 
   this->receivers.push_back(steepest_rec);
   this->weigth_water_fluxes.push_back(1.);
-  this->weigth_sediment_fluxes.push_back(1.);
+  this->weigth_sediment_fluxes.push_back(0.);
   this->slope_to_rec.push_back(steepest_S); 
 }
 
@@ -477,7 +477,7 @@ void chonk::move_MF_from_fastscapelib(NodeGraphV2& graph, xt::pytensor<double,2>
     // std::cout << "WATER WEIGHT " << weight << std::endl;
     this->receivers.push_back(this_neightbor);
     this->weigth_water_fluxes.push_back(weight);
-    this->weigth_sediment_fluxes.push_back(weight);
+    this->weigth_sediment_fluxes.push_back( std::vector<double>(weight.size(),0.) );
     this->slope_to_rec.push_back(this_slope); 
 
 
@@ -653,7 +653,7 @@ void chonk::move_MF_from_fastscapelib_threshold_SF(NodeGraphV2& graph, double th
 
     this->receivers.push_back(this_neightbor);
     this->weigth_water_fluxes.push_back(weight);
-    this->weigth_sediment_fluxes.push_back(weight);
+    this->weigth_sediment_fluxes.push_back( std::vector<double>(weight.size(),0.) );
     this->slope_to_rec.push_back(this_slope); 
 
 
