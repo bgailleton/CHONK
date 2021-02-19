@@ -776,7 +776,7 @@ std::vector<double> chonk::get_preexisting_sediment_flux_by_receivers()
 
 // Set the total sediment flux manually, with given proportions for each labels
 // Index of the label array is the label, and the sum of the proportions should be 1
-void chonk::set_sediment_flux(double value, std::vector<double> label_proportions)
+void chonk::set_sediment_flux(double value, std::vector<double> label_proportions, double prop_fluvial)
 {
   if(value< 0)
   {
