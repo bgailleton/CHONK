@@ -1095,9 +1095,34 @@ void chonk::CidreHillslopes(double this_sed_height, double kappa_s, double kappa
   int zone_label, std::vector<double> sed_label_prop, double dt, double Xres, double Yres, bool bedrock, 
   NodeGraphV2& graph, double tolerance_to_Sc)
 {
+  if(this->receivers.size() == 0)
+    return;
   // std::cout << "Starting here" << std::endl;
    // I am recording the current sediment fluxes in the model distributed for each receivers
-  std::vector<double> pre_sedfluxes = this->get_preexisting_sediment_flux_by_receivers();
+  std::vector<double> pre_sedfluxes = this->get_preexisting_sediment_flux_by_receivers_hillslopes();
+  double sed_HS_in = this->sediment_flux * (1 - this->fluvialprop_sedflux);
+
+  // getting the steepest slope and dx
+  std::vector<double> dXs =  graph.get_distance_to_receivers_custom(this->chonkID, this->receivers);
+
+  double SS = 0;
+  double SS_dx = 0;
+  int index_SS = 0;
+  double sumslopes = 0;
+  int inc=0;
+  for(auto slope:this->slope_to_rec)
+  {
+    if(slope > SS)
+    {
+      SS = slope;
+      SS_dx = dXs[inc];
+      index_SS = inc;
+    }
+    sumslopes += slope;
+    inc++; 
+  }
+
+
   double save_sed_height = this_sed_height;
   this_sed_height +=  this->sediment_creation_flux * dt;
 
@@ -1105,143 +1130,124 @@ void chonk::CidreHillslopes(double this_sed_height, double kappa_s, double kappa
   double new_sed_height = 0;
 
   // Pre_calculations
-  std::vector<double> dXs =  graph.get_distance_to_receivers_custom(this->chonkID, this->receivers);
 
   // starting with L
   double local_L = 0;
-  for(size_t i =0; i<this->receivers.size(); i++)
-  {
-    double this_nl = 0;
-    double tS = this->slope_to_rec[i];
-    if(tS >= Sc - tolerance_to_Sc)
-      tS = Sc - tolerance_to_Sc; // huge number on purpose
+  double this_nl = 0;
+  if(SS >= Sc - tolerance_to_Sc)
+    SS = Sc - tolerance_to_Sc; // huge number on purpose
 
-    // if(double_equals(tS,Sc, tolerance_to_Sc))
-    //   this_nl = tolerance_to_Sc/Sc;
-    // else
-    this_nl = tS/Sc;
+  // if(double_equals(SS,Sc, tolerance_to_Sc))
+  //   this_nl = tolerance_to_Sc/Sc;
+  // else
+  this_nl = SS/Sc;
 
-    local_L += dXs[i] / (1 - std::pow(this_nl,2));
-  }
+  local_L = SS_dx / (1 - std::pow(this_nl,2));
 
-
-  // Calculating the minimum deposition flux
-  // double local_D = this->sediment_flux / dt / local_L;
-
-  // std::cout << "1:" << local_L << std::endl;
 
 
   // Total E assuming there is enough sediments to be diffused
   double local_es = 0;
-  std::vector<double> e_sed_addition = std::vector<double>(pre_sedfluxes.size(),0);
-  for(size_t i =0; i<this->receivers.size(); i++)
-  {
-    double tS = this->slope_to_rec[i];
-    if(tS > Sc)
-      tS = Sc;
-    double this_local_es = kappa_s * tS;
-    e_sed_addition[i] = this_local_es * dt * Xres * Yres;
-    local_es += this_local_es;
-  }
+  local_es = kappa_s * SS;
+
   // std::cout << "2:" << local_es << std::endl;
 
   // Now checking if I have enough sediment to diffuse (+ the minimum sediment I am adding from the deposition)
   // Careful with my weird choice of having Qs as a total volume of sed through time which is why the equations are a bit weird
 
-  double fraction_bedrock_exposed = 1;
+  double fraction_bedrock_exposed = 0;
 
-  // Calculating the new sediment geight: taking into account deposition and erosion, as deposition depends on what can be eroded
-  if(local_es > 0 && local_L >0)
-    new_sed_height = this_sed_height + ( (this->sediment_flux/dt + local_es * Xres * Yres)/local_L - local_es) * dt;
-  else if (local_es > 0)
-  {
-    new_sed_height = this_sed_height + local_es * Xres * Yres * dt;
-  }
-  else if (local_L >0)
-  {
-    new_sed_height = this_sed_height + this->sediment_flux/dt/local_L;
-  }
-  else
-    new_sed_height = this_sed_height;
+  // Calculating the new sediment height: taking into account deposition and erosion, as deposition depends on what can be eroded
 
-  // std::cout << "2.1: " << new_sed_height  << "|" << this->sediment_flux << "|" << local_es << "|" << local_L << std::endl;
-  if(std::isfinite(new_sed_height) == false)
-    throw std::runtime_error("New sed height failed;");
-  // Chekcing if I am aoverconsuming my sediments
+
   if(new_sed_height < 0 && local_es > 0)
   {
-    // backcalculating erosion rates to match the 0
-  // std::cout << "2.2" << std::endl;
-    double new_local_es = (- this_sed_height - this->sediment_flux/local_L) / ( dt - (Xres * Yres));
-    
-    // correcting the erosion rates
-    double ratio = new_local_es/local_es;
-  // std::cout << "2.3:" << ratio << std::endl;
-
-    for (auto& v:e_sed_addition)
-      v = v * ratio;
-
+    fraction_bedrock_exposed = abs(new_sed_height)/ (local_es * dt);
     new_sed_height = 0;
-    local_es = new_local_es;
-  // std::cout << "2.4" << std::endl;
-
-    // getting the remaining fraction of bedrock exposed
-    fraction_bedrock_exposed = 1-ratio;
+    local_es = (1 - fraction_bedrock_exposed) * local_es;
   }
-  else
-    fraction_bedrock_exposed = 0;
+  else if(local_es == 0)
+  {
+    fraction_bedrock_exposed = 1;
+  }
+
 
   this->erosion_flux_only_sediments += local_es;
-  this->add_to_sediment_flux(local_es* dt, sed_label_prop, 0.);
+  this->add_to_sediment_flux(local_es* dt * Xres * Yres, sed_label_prop, 0.);
+  new_sed_height = this_sed_height - local_es * dt;
 
   // std::cout << "3" << std::endl;
 
 
   // routines for bedrock if activated
-  double local_er = 0;
-  std::vector<double> e_rock_addition = std::vector<double>(pre_sedfluxes.size(),0);
-  if(bedrock && fraction_bedrock_exposed > 0)
+  if(bedrock)
   {
-    
-    for(size_t i =0; i<this->receivers.size(); i++)
+    double local_er = kappa_r * SS * fraction_bedrock_exposed;
+    std::vector<double> tlabprop = std::vector<double>(this->other_attributes_arrays["label_tracker"].size(),0);
+    tlabprop[zone_label] = 1;
+    this->add_to_sediment_flux(local_er * dt * Xres * Yres,tlabprop, 0.);
+    this->erosion_flux_only_bedrock += local_er;
+  }
+
+  if(local_L < 1)
+    local_L = 1;
+
+
+  double this_dep = (sed_HS_in/dt / local_L);
+  this->deposition_flux += this_dep;
+  new_sed_height += this_dep  * dt;
+  this->sediment_creation_flux += (new_sed_height - this_sed_height)/dt;
+  this->add_to_sediment_flux(- this_dep * dt * Xres * Yres, this->other_attributes_arrays["label_tracker"],0);
+  // std::cout << "4" << std::endl;
+
+  double sumsum = 0;
+  double delta_sed = this->sediment_flux * (1 - this->fluvialprop_sedflux) - sed_HS_in;
+  double corrector = 0;
+  for(size_t i = 0; i < this->receivers.size(); i++ )
+  {
+    pre_sedfluxes[i] += this->slope_to_rec[i]/ sumslopes * delta_sed;
+    if(pre_sedfluxes[i] < 0)
     {
-      double tS = this->slope_to_rec[i];
-      if(tS > Sc)
-        tS = Sc;
-      double this_local_er = kappa_r * tS;
-      e_rock_addition[i] = this_local_er * dt * Xres * Yres;
-      local_er += this_local_er;
+      corrector += abs(pre_sedfluxes[i]);
+      pre_sedfluxes[i] = 0;
+    }
+
+    sumsum += pre_sedfluxes[i];
+  }
+
+  if(corrector > 0)
+  {
+    pre_sedfluxes[index_SS] += corrector;
+    sumsum += corrector;
+  }
+
+
+  if(sumsum = 0)
+  {
+    if(this->sediment_flux < 0 || std::isfinite(this->sediment_flux) == false)
+    {
+      this->sediment_flux = 0;
+      std::cout << "CidreSedProblem" << std::endl;
+      // throw std::runtime_error("SedNegCidre");
+    }
+    return;
+  }
+
+  std::vector<double> presedfluv = this->get_preexisting_sediment_flux_by_receivers_fluvial();
+  for(size_t i = 0; i < this->receivers.size(); i++ )
+  {
+    // this->weigth_sediment_fluxes[i] = (pre_sedfluxes[i] + presedfluv[i])/(this->sediment_flux);
+    this->weigth_sediment_fluxes[i] = pre_sedfluxes[i] /sumsum;
+    if(std::isfinite(this->weigth_sediment_fluxes[i]) == false)
+    {
+      std::cout << "cidreWeightProblem" << std::endl;
+      this->weigth_sediment_fluxes = std::vector<double>(this->receivers.size(),0);
+      this->weigth_sediment_fluxes[index_SS] = 1;
+      break;
     }
   }
 
-  std::vector<double> tlabprop = std::vector<double>(this->other_attributes_arrays["label_tracker"].size(),0);
-  tlabprop[zone_label] = 1;
-  double dep_without_bedrock = this->sediment_flux/dt / local_L;
-  this->add_to_sediment_flux(local_er * dt,tlabprop, 0.);
-  this->erosion_flux_only_bedrock += local_er;
-  double this_dep = (this->sediment_flux/dt / local_L);
-  this->deposition_flux += this_dep;
-  new_sed_height += (this_dep - dep_without_bedrock) * dt;
-  this->sediment_creation_flux += (new_sed_height - this_sed_height)/dt;
-  // std::cout << "4" << std::endl;
-
-  double newsum = 0;
-  for ( size_t i = 0 ; i< pre_sedfluxes.size(); i++)
-  {
-    pre_sedfluxes[i] += e_rock_addition[i];
-    pre_sedfluxes[i] += e_sed_addition[i];
-    newsum += pre_sedfluxes[i];
-  }
-
-  if(newsum > 0)
-  {
-    for ( size_t i = 0 ; i< pre_sedfluxes.size(); i++)
-      pre_sedfluxes[i] = pre_sedfluxes[i]/newsum;
-  }
-  this->weigth_sediment_fluxes = std::move(pre_sedfluxes);
-
-  if(this->sediment_flux < 0)
-    throw std::runtime_error("SedNegCidre");
+  
 
   // Done
   return;
