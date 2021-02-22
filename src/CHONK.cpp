@@ -1105,7 +1105,8 @@ void chonk::CidreHillslopes(double this_sed_height, double kappa_s, double kappa
   // getting the steepest slope and dx
   std::vector<double> dXs =  graph.get_distance_to_receivers_custom(this->chonkID, this->receivers);
 
-  double SS = 0;
+  // First calculating the steepest slope driving the gravitational forces 
+  double SS = -9999;
   double SS_dx = 0;
   int index_SS = 0;
   double sumslopes = 0;
@@ -1121,29 +1122,29 @@ void chonk::CidreHillslopes(double this_sed_height, double kappa_s, double kappa
     sumslopes += slope;
     inc++; 
   }
+  if(SS == -9999)
+    throw std::runtime_error("slope exception not handled in cidre hillslope routines");
 
-
+  // Adapting the current sediment height
   double save_sed_height = this_sed_height;
-  this_sed_height +=  this->sediment_creation_flux * dt;
-
-  //Calculating e and L
+  new_sed_height = this_sed_height + this->sediment_creation_flux * dt;
   double new_sed_height = 0;
 
   // Pre_calculations
 
   // starting with L
+  // # Checking the critical slope
   double local_L = 0;
   double this_nl = 0;
   if(SS >= Sc - tolerance_to_Sc)
     SS = Sc - tolerance_to_Sc; // huge number on purpose
 
-  // if(double_equals(SS,Sc, tolerance_to_Sc))
-  //   this_nl = tolerance_to_Sc/Sc;
-  // else
   this_nl = SS/Sc;
 
   local_L = SS_dx / (1 - std::pow(this_nl,2));
 
+  if(std::isfinite(local_L) == false)
+    throw std::runtime_error("Local_L is not finite in cidre hillslope routines");
 
 
   // Total E assuming there is enough sediments to be diffused
@@ -1160,9 +1161,9 @@ void chonk::CidreHillslopes(double this_sed_height, double kappa_s, double kappa
   // Calculating the new sediment height: taking into account deposition and erosion, as deposition depends on what can be eroded
 
 
-  if(new_sed_height < 0 && local_es > 0)
+  if(this_sed_height < 0 && local_es > 0)
   {
-    fraction_bedrock_exposed = abs(new_sed_height)/ (local_es * dt);
+    fraction_bedrock_exposed = abs(this_sed_height)/ (local_es * dt);
     new_sed_height = 0;
     local_es = (1 - fraction_bedrock_exposed) * local_es;
   }
@@ -1189,17 +1190,23 @@ void chonk::CidreHillslopes(double this_sed_height, double kappa_s, double kappa
     this->erosion_flux_only_bedrock += local_er;
   }
 
+  // Cannot create sediment, so L has to be > 1 nor delete them to the oblivion
   if(local_L < 1)
     local_L = 1;
 
-
-  double this_dep = (sed_HS_in/dt / local_L);
+  // Calculating the deposition rate
+  double this_dep = ((sed_HS_in/dt )/ local_L);
+  // And adding it to the thingy
   this->deposition_flux += this_dep;
+  // correcting the new sediment height
   new_sed_height += this_dep  * dt;
+  // And calculating the sediment creation one
   this->sediment_creation_flux += (new_sed_height - this_sed_height)/dt;
+  // Removing the deposited sediments from the global fluxes
   this->add_to_sediment_flux(- this_dep * dt * Xres * Yres, this->other_attributes_arrays["label_tracker"],0);
   // std::cout << "4" << std::endl;
 
+  // Backcalculating the new weight of sediment
   double sumsum = 0;
   double delta_sed = this->sediment_flux * (1 - this->fluvialprop_sedflux) - sed_HS_in;
   double corrector = 0;
