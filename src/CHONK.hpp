@@ -270,5 +270,14 @@ class chonk
 
 std::vector<double> mix_two_proportions(double prop1, std::vector<double> labprop1, double prop2, std::vector<double> labprop2);
 
+template <typename T>
+T sum_vector(std::vector<T>& entry)
+{
+    T sum = 0;
+    for(auto v: entry)
+        sum += v;
+    return sum; 
+}
+
 
 #endif

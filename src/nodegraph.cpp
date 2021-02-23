@@ -1953,7 +1953,39 @@ std::vector<double> NodeGraphV2::get_distance_to_receivers_custom(int node, std:
 }
 
 
-
+// if(this_bool_map["isolate_pixels_draining_to_fixed_channel"])
+//     {
+//       // first read the
+//       // Get the latitude and longitude
+//       cout << "I am reading points from the file: "+ this_string_map["fixed_channel_csv_name"] << endl;
+//       LSDSpatialCSVReader source_points_data( RI, (DATA_DIR+this_string_map["fixed_channel_csv_name"]) );
+//       vector<float> X_coords; 
+//       vector<float> Y_coords; 
+//       vector<int> nodes_from_channel;
+//       if(this_bool_map["use_xy_for_node_index"])
+//       {
+//         cout << "I am going to get node indices from X-Y coordinates." << endl;
+        
+//         source_points_data.get_nodeindices_from_x_and_y_coords(FlowInfo, X_coords, Y_coords, nodes_from_channel);        
+//       } else{
+//         cout << "I am going to get node indices from lat-long coordinates." << endl;
+//         vector<int> nodes_from_channel = source_points_data.get_nodeindices_from_lat_long(FlowInfo); 
+//       }
+      
+//       //vector<int> new_nodes_from_channel = source_points_data.get_nodeindex_vector();
+//       //cout << "Old nodes: " <<  new_nodes_from_channel.size() << " and new: " << nodes_from_channel.size() << endl;
+//       //for (int i = 0; i< int(nodes_from_channel.size()); i++)
+//       //{
+//       //  if (nodes_from_channel[i] < 0)
+//       //  {
+//       //    cout << "Invalid node index: " << nodes_from_channel[i] << endl;
+//       //  }
+//       //}
+//       // Now run the flowinfo routine
+//       LSDRaster NodesRemovedRaster = FlowInfo.find_nodes_not_influenced_by_edge_draining_to_nodelist(nodes_from_channel,filled_topography);
+//       string remove_raster_name = OUT_DIR+OUT_ID+"_IsolateFixedChannel";
+//       NodesRemovedRaster.write_raster(remove_raster_name,raster_ext);
+//     }
 
 
 
