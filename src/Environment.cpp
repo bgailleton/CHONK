@@ -1980,7 +1980,7 @@ void ModelRunner::finalise()
     if(sedcrea + sed_height_tp1[i] < 0)
     {
       // IT STILL HAPPENS
-      std::cout << "happens??" << sedcrea << "||" << sed_height_tp1[i] << "||" << this->node_in_lake[i] << std::endl;
+      // std::cout << "happens??" << sedcrea << "||" << sed_height_tp1[i] << "||" << this->node_in_lake[i] << std::endl;
       surface_elevation_tp1[i] -= sed_height_tp1[i];
       sed_height_tp1[i] = 0.;
       sed_prop_by_label[i] = std::vector<std::vector<double> >();
@@ -1995,12 +1995,12 @@ void ModelRunner::finalise()
       // Applying the delta_h on both surface elevation and sediment layer
       surface_elevation_tp1[i] += sedcrea;
       sed_height_tp1[i] += sedcrea;
-      if(std::ceil(sed_height_tp1[i]/this->io_double["depths_res_sed_proportions"]) != int(sed_prop_by_label[i].size()))
-      {
-        std::cout << "called with " << i << "|" << sedcrea << "|" << sed_height_tp1[i] << std::endl;
-        std::cout << std::ceil(sed_height_tp1[i]/this->io_double["depths_res_sed_proportions"]) << "||" << int(sed_prop_by_label[i].size()) << std::endl;
-        throw std::runtime_error("COCKROACH");
-      }
+      // if(std::ceil(sed_height_tp1[i]/this->io_double["depths_res_sed_proportions"]) != int(sed_prop_by_label[i].size()))
+      // {
+      //   // std::cout << "SEDREGISTERING PROBLEM called with " << i << "|" << sedcrea << "|" << sed_height_tp1[i] << std::endl;
+      //   // std::cout << std::ceil(sed_height_tp1[i]/this->io_double["depths_res_sed_proportions"]) << "||" << int(sed_prop_by_label[i].size()) << std::endl;
+      //   // throw std::runtime_error("COCKROACH");
+      // }
     }
 
 
