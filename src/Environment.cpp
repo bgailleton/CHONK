@@ -2839,7 +2839,8 @@ void ModelRunner::drape_deposition_flux_to_chonks()
         std::cout << ratio_of_dep << "/" << (topography[no] - surface_elevation[no]) << std::endl;
         slangh = 0;
       }
-
+      if(chonk_network[no].get_sediment_creation_flux() != 0)
+        throw("Not0BeforeDrappingException");
       chonk_network[no].add_sediment_creation_flux(slangh);
       chonk_network[no].add_deposition_flux(slangh); // <--- This is solely for balance calculation
       chonk_network[no].set_other_attribute_array("label_tracker", loch.label_prop);
