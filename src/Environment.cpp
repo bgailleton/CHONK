@@ -397,6 +397,17 @@ void ModelRunner::iterative_lake_solver()
 
     //############# Third important task (even if still in step 2): 
     // if I have something to put in me lake, I add the content to it
+
+    if( entry_point.volume_sed < 0)
+    {
+      this->lakes[current_lake].label_prop = mix_two_proportions(this->lakes[current_lake].volume_sed, this->lakes[current_lake].label_prop,entry_point.volume_sed, entry_point.label_prop );
+      this->lakes[current_lake].volume_sed += entry_point.volume_sed;
+      entry_point.volume_sed = 0;
+      if(this->lakes[current_lake].volume_sed < 0)
+        throw("CriticalLakeError:" + std::to_string(this->lakes[current_lake].volume_sed) + " is not a valid volume for lake sediments");
+    }
+
+
     if(entry_point.volume_water > 0 || entry_point.volume_sed > 0)
     {
       // Filling the lake
@@ -412,6 +423,7 @@ void ModelRunner::iterative_lake_solver()
         no_has_outlet++;
 
     }
+
 
     // At that point in the code I have an entry_point corrected for lakes:
     // It has (or not anymore) sediments and/or water to transmit to the outlet.
@@ -447,7 +459,7 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
   // I am writing it as a big script to make it correct. Writing functions when I am sure I keep a feature, but so far I am still working on it a lot
 
 
-  //-------------------------------1---------------------
+  //----------------------------------------------------
   //----------------- INITIALISATION -------------------
   //----------------------------------------------------
 
@@ -459,6 +471,13 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
   // First, saivng some values for debugging and water balance purposes
   double debug_saverW = entry_point.volume_water / this->timestep;
   double outlet_water_saver = this->chonk_network[outlet].get_water_flux();
+
+  // Local mass balance debugger
+  sed_added_by_entry =  entry_point.volume_sed;
+  sed_added_by_prod =  0;
+  sed_already_outletted =  0;
+  sed_added_by_donors = 0;
+  sed_outletting_system = 0;
 
   // temp variable I need for the processing function
   double cellarea = this->io_double["dx"] * this->io_double["dy"];
@@ -622,6 +641,28 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
   this->process_node_nolake_for_sure(this->lakes[current_lake].outlet, is_processed, active_nodes, 
       cellarea,topography, false, false);
   // local_Qs_production_for_lakes[this->lakes[current_lake].outlet] += this->chonk_network[this->lakes[current_lake].outlet].get_sediment_flux();
+  this->sed_added_by_prod += this->chonk_network[this->lakes[current_lake].outlet].get_erosion_flux_only_bedrock()\
+   * this->timestep * this->io_double["dx"] * this->io_double["dy"];
+  this->sed_added_by_prod += this->chonk_network[this->lakes[current_lake].outlet].get_erosion_flux_only_sediments()\
+   * this->timestep * this->io_double["dx"] * this->io_double["dy"];
+  this->sed_added_by_prod -= this->chonk_network[this->lakes[current_lake].outlet].get_deposition_flux()\
+   * this->timestep * this->io_double["dx"] * this->io_double["dy"];
+
+
+  std::vector<int> rec;std::vector<double> wwf;std::vector<double> wws; std::vector<double> strec; 
+    this->chonk_network[this->lakes[current_lake].outlet].copy_moving_prep(rec,wwf, wws, strec);
+    for(size_t u =0; u< rec.size(); ++u)
+    {
+      int ttnode = rec[u]; 
+      if( (is_in_queue[ttnode] == 'y' || ttnode == this->lakes[current_lake].outlet )  && active_nodes[ttnode] == 1 && this->node_in_lake[ttnode] < 0 )
+        continue;
+      if(this->is_this_node_in_this_lake(ttnode, current_lake))
+        continue;
+
+      sed_outletting_system += wws[u] *  this->chonk_network[this->lakes[current_lake].outlet].get_sediment_flux();
+    }
+   
+
 
 
   // this->chonk_network[this->lakes[current_lake].outlet].print_status();
@@ -734,6 +775,13 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
   }
 
 
+
+  // DEBUG LOCAL BALANCE
+  std::cout << "Local balance: EP:" << sed_added_by_entry << " | prod:" << sed_added_by_prod \
+ << " | sed_already_outletted: " << sed_already_outletted << " | don:" << sed_added_by_donors << " | away:" << sed_outletting_system << std::endl;
+
+  std::cout << "Final balance = " << sed_added_by_entry + sed_added_by_prod + sed_already_outletted + sed_added_by_donors - sed_outletting_system << std::endl;
+
 }
 
 void ModelRunner::unpack_entry_points_from_delta_maps(std::queue<int>& iteralake, std::vector<std::vector<double> >& label_prop_of_delta,
@@ -809,7 +857,7 @@ void ModelRunner::reprocess_local_stack(std::vector<int>& local_mstack, std::vec
       for(auto ttnode: this->chonk_network[tnode].get_chonk_receivers_copy())
       {
         // if the node is the outlet, or not a 'y', I ignore it
-        if(is_in_queue[ttnode] != 'y' || ttnode == this->lakes[current_lake].outlet)
+        if(is_in_queue[ttnode] != 'y' || ttnode == this->lakes[current_lake].outlet || (this->is_this_node_in_this_lake(ttnode, current_lake)))
         {          
           ignore_some.push_back(ttnode);
           continue;
@@ -825,6 +873,23 @@ void ModelRunner::reprocess_local_stack(std::vector<int>& local_mstack, std::vec
       // # Ignore_some has the node i so not want
       // # So I transmit my fluxes to the nodes I do not ignore
       this->chonk_network[tnode].split_and_merge_in_receiving_chonks_ignore_some(this->chonk_network, this->graph, this->timestep, ignore_some);
+
+      std::vector<int> rec;std::vector<double> wwf;std::vector<double> wws; std::vector<double> strec; 
+      this->chonk_network[tnode].copy_moving_prep(rec,wwf, wws, strec);
+      for(size_t u =0; u< rec.size(); ++u)
+      {
+        int ttnode = rec[u]; 
+        if(std::find(ignore_some.begin(), ignore_some.end(), ttnode) != ignore_some.end())
+          continue;
+        if(this->is_this_node_in_this_lake(ttnode, current_lake))
+          continue;
+        if(active_nodes[ttnode])
+          this->sed_added_by_donors += wws[u] *  this->chonk_network[tnode].get_sediment_flux();
+        // else
+        //   this->sed_added_by_donors -= wws[u] *  this->chonk_network[tnode].get_sediment_flux();
+
+      }
+      
 
     }
     else
@@ -844,6 +909,26 @@ void ModelRunner::reprocess_local_stack(std::vector<int>& local_mstack, std::vec
       this->chonk_network[tnode].check_sums();
       // full_delta += this->chonk_network[tnode].get_sediment_flux();
       // local_Qs_production_for_lakes[tnode] = full_delta;
+      this->sed_added_by_prod += this->chonk_network[tnode].get_erosion_flux_only_bedrock()\
+   * this->timestep * this->io_double["dx"] * this->io_double["dy"];
+  this->sed_added_by_prod += this->chonk_network[tnode].get_erosion_flux_only_sediments()\
+   * this->timestep * this->io_double["dx"] * this->io_double["dy"];
+  this->sed_added_by_prod -= this->chonk_network[tnode].get_deposition_flux()\
+   * this->timestep * this->io_double["dx"] * this->io_double["dy"];
+
+      std::vector<int> rec;std::vector<double> wwf;std::vector<double> wws; std::vector<double> strec; 
+      this->chonk_network[tnode].copy_moving_prep(rec,wwf, wws, strec);
+      for(size_t u =0; u< rec.size(); ++u)
+      {
+        int ttnode = rec[u]; 
+        if((is_in_queue[ttnode] == 'y' || ttnode == this->lakes[current_lake].outlet) && active_nodes[ttnode] == 1)
+          continue;
+        if(this->is_this_node_in_this_lake(ttnode, current_lake))
+          continue;
+
+        sed_outletting_system += wws[u] *  this->chonk_network[tnode].get_sediment_flux();
+      }
+   
 
     }
 
@@ -985,6 +1070,8 @@ chonk ModelRunner::preprocess_outletting_chonk(chonk tchonk, EntryPoint& entry_p
   std::cout << "Outlet = " << entry_point.volume_sed << " + " <<  \
   tchonk.get_sediment_flux() << " - " << local_Qs_production_for_lakes[outlet] << " = " << sedrate << std::endl;
   entry_point.volume_sed = 0;
+
+  this->sed_already_outletted += tchonk.get_sediment_flux() - local_Qs_production_for_lakes[outlet];
 
   //getting the weights
   // # Initialising a bunch of intermediate containers and variable
@@ -1142,9 +1229,14 @@ chonk ModelRunner::preprocess_outletting_chonk(chonk tchonk, EntryPoint& entry_p
   //   weight_sed_recs = std::vector<double>(weight_sed_recs.size(), 1./int(weight_sed_recs.size()));
 
   // }
-  weight_sed_recs = std::vector<double>(weight_water_recs);
+  weight_sed_recs = std::vector<double>(ID_recs.size(),0);
 
   std::cout << "outlet was " << tchonk.get_sediment_flux() << " and is now " << sedrate << std::endl;;
+  if(sedrate < 0)
+  {
+    std::cout << "Warning::Sedrate recasted to 0" << std::endl;;
+    sedrate = 0;
+  }
 
 
   // Resetting the CHONK

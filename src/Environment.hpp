@@ -439,6 +439,13 @@ std::vector<double>& pre_sed, std::vector<double>& pre_water);
     // std::vector<Lake> lake_network;
     //# Vetor containing the lake ID for each nodes of the landscape. -1 -> NAL node: Not A Lake
 
+    // Debugging local mass_balance to identify sed leaks
+    double sed_added_by_entry;
+    double sed_added_by_prod;
+    double sed_already_outletted;
+    double sed_added_by_donors;
+    double sed_outletting_system;
+
 
     //Labellisation:
     // Number of labels 

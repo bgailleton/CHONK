@@ -958,7 +958,8 @@ void chonk::charlie_I(double n, double m, double K_r, double K_s,
   int zone_label, std::vector<double> sed_label_prop, double dt, double Xres, double Yres)
 {
 
-  // some checks
+  // First some debugging checks about incoming fluxes and receivers states. 
+  // May diseappear once stabilised
   // #1
   if(this->fluvialprop_sedflux > 1)
   {
@@ -982,71 +983,85 @@ void chonk::charlie_I(double n, double m, double K_r, double K_s,
   if(this->receivers.size() == 0)
     return;
 
-
   // IMPORTANT in case another process had affected the sed-height bofre, I am applying it
   this_sed_height += this->sediment_creation_flux *dt;
 
   // First dealing with the erosion
 
+  // # Initialising local fluxes to 0
   double Er_tot = 0;
   double Es_tot = 0;
   double Ds_tot = 0;
   double E_cap_s = 0;
 
+  // Calculating the exponential component first
   double exp_sed_height_roughness =  std::exp(- this_sed_height / dimless_roughness);
 
-  // Calculation current fluxes
+  // Calculation current erosion fluxes for each receivers
   for(size_t i=0; i<this->receivers.size(); i++)
   {
 
+    // Local water flux
     double this_Qw = this->water_flux * this->weigth_water_fluxes[i];
 
+    // Local Stream Power
     double current_stream_power = std::pow(this_Qw,m) * std::pow(this->slope_to_rec[i],n);
 
-    // calculating the flux E = K s^n A^m
+    // Calculating the flux E = K s^n A^m - threshold
+
+    // # Thresholds:
+    // ## Bedrock
     double threshholder_bedrock = 0.;
     if(threshold_incision > 0)
       threshholder_bedrock = current_stream_power * (1 - std::exp(- current_stream_power/threshold_incision) );
-
+    
+    // ## Sediments
     double threshholder_sed = 0.;
     if(threshold_sed_entrainment > 0)
       threshholder_sed = current_stream_power * (1 - std::exp(- current_stream_power/threshold_sed_entrainment) );
 
+
+    // Calculating erosion
+    // # Bedrock erosion
     double Er = (current_stream_power * K_r 
         - threshholder_bedrock )
         * exp_sed_height_roughness;
 
+    // # If neg erosion iz 0
     if(Er<0)
       Er = 0;
 
+    // # Sediment erosion (entrainment)
     double Es = (current_stream_power * K_s
         - threshholder_sed)
         * (1 - exp_sed_height_roughness);
 
+    // # If neg erosion iz 0
     if(Es<0)
       Es = 0;
 
+    // Ecap will be needed for later 
     double datcaps = current_stream_power * K_s - threshholder_sed;
-
-    // if(E_cap_s > 0)
+    // I keep it if negative (see H(t) calculation)
     E_cap_s += datcaps;
 
-    // std::cout << E_cap_s << "|" << current_stream_power<< std::endl;
-
-    // adding to global values
+    // Adding to global values
     Er_tot += Er;
     Es_tot += Es;
-
   }
-// ( Qs_in(i(ii))+(1-phi)*E_reg(i(ii))*dx2+(1-Ff)*E_bed(i(ii))*dx2 )/ (1+V(i(ii))*dx2/(Q(i(ii))));
-  // Adding the eroded bedrock to the sediment flux
 
-  // I need first the Qs_in
+  // Adding the eroded bedrock to the sediment flux
+  
+  //# label proportion for current bedrock
   std::vector<double> buluf(this->other_attributes_arrays["label_tracker"].size(), 0.);
   buluf[zone_label] = 1.;
 
+  //# Depodivider is the analytical solution from sediment divergence (See equation 31 -> SPACE paper)
   double depodivider = (1 + V_param * d_star * Xres * Yres / (this->water_flux ) );
+
+  //# temp variables
   double tot_add = 0;
+  //# Bedrock erosion 
   double tadd = Er_tot * Xres * Yres * dt;
   tot_add += tadd;
   this->add_to_sediment_flux(tadd, buluf, 1.);
@@ -1056,50 +1071,33 @@ void chonk::charlie_I(double n, double m, double K_r, double K_s,
   tot_add += tadd;
   this->add_to_sediment_flux(tadd, sed_label_prop, 1.);
 
+  // # Getting the sediment flux available for fluvial deposition
   double Qs = this->sediment_flux * this->fluvialprop_sedflux;  
-
-
   // COrrecting analytically THE DEPOSITION (see SPACE gmd paper equation 31)
   tadd = Qs/depodivider - Qs;
   this->add_to_sediment_flux(tadd, this->other_attributes_arrays["label_tracker"], 1.);
   Qs += tadd;
 
+  // # Deposition
   Ds_tot += V_param * d_star * (Qs/ (this->water_flux * dt));
-  // std::cout << Ds_tot  << "|" << V_param  << "|" <<  d_star  << "|"  << Qs << "|" <<  (this->water_flux * dt) << std::endl;;
-
   double removersed = -1 * Ds_tot * dt * Xres * Yres;
-// ( 1+V( i (ii) ) * dx2 / ( Q ( i (ii) ) ) )
-
-  // DEBUG CHECK
-  // double ratio_removersed = abs(removersed) / sum_vector(pre_sedfluxes);
-  // double delta_truc_1 = abs(removersed) - total_fluvial_sedflux;
-
-  // if(delta_truc_1 > 0 )
-  // {
-  //   if(delta_truc_1 > 1e2)
-  //     std::cout << "DEBUG::REcalibrating sediment fluxes::" << removersed << " vs " << Qs << std::endl;
-  //   removersed = -total_fluvial_sedflux;
-  //   Ds_tot = - removersed / (dt * Xres * Yres);
-  // }
 
   // Applying to the global fluxes
   this->erosion_flux_only_bedrock += Er_tot;
   this->erosion_flux_only_sediments += Es_tot;
   this->deposition_flux += Ds_tot;
 
-
-
-
   // Now calculating the new sediment heugh analytically
   double phi = 0; // TEMPORARY MEASURE, PHI WILL BE TO BE ADDED AFTER
-  
   double new_sed_height = 0.;
   double Dsphi = Ds_tot / (1 - phi);
 
+  // IMPORTANT to avoid numerical overflow, recasting H to 400 max for the exponential calculation
   double H_eq = this_sed_height;
   if(H_eq > 500)
     H_eq = 400;
 
+  // Case 1 (32)
   if(Dsphi != E_cap_s && E_cap_s > 0)
   {
     new_sed_height = dimless_roughness * std::log( 1/((Dsphi / E_cap_s) - 1) *  \
@@ -1114,29 +1112,6 @@ void chonk::charlie_I(double n, double m, double K_r, double K_s,
   {
     new_sed_height = this_sed_height + Dsphi * dt;
   }
-
-  
-  // if(E_cap_s <= 0 || Es_tot * dt < H_eq)
-  // {
-  //   new_sed_height = H_eq + Dsphi * dt;
-  //   // std::cout << "No ER but In this case Er is " << Er_tot << std::endl;
-
-  // }
-  // else if( (Ds_tot/(1-phi))/E_cap_s == 1 )
-  // {
-  //   new_sed_height = dimless_roughness * std::log( E_cap_s/ dimless_roughness * dt + std::exp(H_eq/dimless_roughness) );
-  // }
-  // else
-  // {
-  //   double A = 1 / ((Dsphi / E_cap_s) - 1);    
-  //   double B = Dsphi - E_cap_s;
-  //   B = B * dt / dimless_roughness;
-  //   B = std::exp(B);
-  //   double C = ( ( Dsphi / E_cap_s ) - 1 ) * std::exp(H_eq/dimless_roughness);
-  //   new_sed_height = dimless_roughness * std::log( A * (B * (C + 1) - 1));
-  //   if(std::isfinite(new_sed_height) == false)
-  //     std::cout << dimless_roughness << "|*|" << A << "|*|" << B << "|*|"  << C << "|*|"  << Dsphi  << "|*|" << E_cap_s <<  "|*|"  << H_eq << "|*|" << std::exp(H_eq/dimless_roughness) << std::endl;
-  // }
 
   double new_sedcrea = (new_sed_height - this_sed_height) / dt;
 
@@ -1153,7 +1128,10 @@ void chonk::charlie_I(double n, double m, double K_r, double K_s,
   // let's assume here that the fluxes are partitioned by water
   auto HS_fluxes = this->get_preexisting_sediment_flux_by_receivers_hillslopes();
   bool HS_already_there = true;
+
   if(sum_vector(HS_fluxes) == 0) {HS_already_there = false;};
+
+
   for(size_t i=0; i<this->receivers.size(); i++)
   {
     if(HS_already_there)
