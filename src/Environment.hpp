@@ -491,7 +491,7 @@ std::vector<double>& pre_sed, std::vector<double>& pre_water);
 
     double DEBUG_GLOBDELT;
     double GLOB_GABUL;
-
+    int n_outlets_remodelled;
 
   private:
     // mirror of the constructors

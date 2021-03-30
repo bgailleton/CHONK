@@ -158,7 +158,7 @@ void chonk::split_and_merge_in_receiving_chonks(std::vector<chonk>& chonkscape, 
   }
 
   if(double_equals(sum_weight_sed,this->sediment_flux, 1e-3) == false && graph.is_border[this->current_node] == 'n')
-    std::cout << "WARNING::Sediment balance problem : " << sum_weight_sed << "||" << this->sediment_flux << std::endl;
+    std::cout << "WARNING::Sediment balance problem : " << sum_weight_sed << "||" << this->sediment_flux << "||" << this->receivers.size() << std::endl;
 
 
 
@@ -951,6 +951,28 @@ void chonk::active_simple_SPL(double n, double m, double K, double dt, double Xr
   return;
 }
 
+void chonk::charlie_I_K_fQs(double n, double m, double K_r, double K_s,
+  double dimless_roughness, double this_sed_height, double V_param, 
+  double d_star, double threshold_incision, double threshold_sed_entrainment,
+  int zone_label, std::vector<double> sed_label_prop, double dt, double Xres, double Yres,
+  std::vector<double> Krmodifyer)
+{
+  // Very trivial modifyer to modulate Kr and simulate a tool effect
+  double mod = 0;
+  for(size_t i=0; i<sed_label_prop.size(); i++)
+  {
+    mod += this->other_attributes_arrays["label_tracker"][i] * Krmodifyer[i];
+  }
+
+  if(mod <= 0)
+    mod = Krmodifyer[zone_label];
+  K_r = mod * K_r;
+
+
+  // Calling good old CHARLIE_I
+  this->charlie_I( n,  m,  K_r,  K_s, dimless_roughness,  this_sed_height,  V_param,  d_star,  threshold_incision,  
+    threshold_sed_entrainment, zone_label,  sed_label_prop,  dt,  Xres,  Yres);
+}
 
 void chonk::charlie_I(double n, double m, double K_r, double K_s,
   double dimless_roughness, double this_sed_height, double V_param, 

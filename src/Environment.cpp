@@ -281,6 +281,8 @@ void ModelRunner::iterative_lake_solver()
 
   // Debugger to ignore
   GLOB_GABUL = 0;
+  this->n_outlets_remodelled = 0;
+
 
   // Initialising the lake_status array: -1 = not a lake; 0 = to be processed and 1= processed at least once
   // setting all potential entry_points to 0
@@ -408,8 +410,21 @@ void ModelRunner::iterative_lake_solver()
     }
 
 
+    double transfer = 0;
+    if(entry_point.volume_water < 0)
+    {
+      transfer += entry_point.volume_water;
+      entry_point.volume_water = 0;
+    }
+
     if(entry_point.volume_water > 0 || entry_point.volume_sed > 0)
     {
+      if(entry_point.volume_water < 0)
+        negsumwat += entry_point.volume_water;
+      if(entry_point.volume_sed < 0)
+        negsumsed += entry_point.volume_sed;
+
+
       // Filling the lake
       current_lake = this->fill_mah_lake(entry_point, iteralake);
     }
@@ -417,6 +432,8 @@ void ModelRunner::iterative_lake_solver()
     {
       // DEBUG CHECEKRS
       negsumwat += entry_point.volume_water;
+      negsumsed += entry_point.volume_sed;
+
       if(this->has_valid_outlet(current_lake))
         has_outlet++;
       else
@@ -433,15 +450,20 @@ void ModelRunner::iterative_lake_solver()
     // this is by far the most complicated part of the code
     if(this->lakes[current_lake].outlet >= 0)
     {
-      std::cout << "Outlets at " << this->lakes[current_lake].outlet << std::endl;
+      entry_point.volume_water += transfer;
+      transfer = 0;
+      std::cout << "Outlets at " << this->lakes[current_lake].outlet << " <--> new lake is " << current_lake << std::endl;
       this->reprocess_nodes_from_lake_outlet_v2(current_lake, this->lakes[current_lake].outlet, is_processed, iteralake, entry_point);
     }
     if(entry_point.volume_sed != 0)
       std::cout << "STILL SED HERE??? " << entry_point.volume_sed << std::endl;
+    if(transfer != 0)
+      std::cout << "LOST IN TRANSFER::" << transfer << std::endl;
 
     // skiping to the next entry node
   }
-  // std::cout << "I had " << negsumsed << " Sediments and " << negsumwat/this->timestep << " Water uncared of with " << has_outlet << "/" << no_has_outlet << " with valid outlet" << std::endl;
+  std::cout << "I had " << negsumsed << " Sediments and " << negsumwat/this->timestep << " Water uncared of with " << has_outlet << "/" << no_has_outlet << " with valid outlet" << std::endl;
+  std::cout << "N OUTLET ROMOB::" << this->n_outlets_remodelled << std::endl;
 
   if(no_has_outlet > 0)
     std::cout << " Caught one lake who could have lost water" << std::endl;
@@ -471,6 +493,8 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
   // First, saivng some values for debugging and water balance purposes
   double debug_saverW = entry_point.volume_water / this->timestep;
   double outlet_water_saver = this->chonk_network[outlet].get_water_flux();
+
+
 
   // Local mass balance debugger
   sed_added_by_entry =  entry_point.volume_sed;
@@ -620,12 +644,18 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
   // preprocessing the quantity given to existing lakes (to later calculate the delta)
   this->check_what_give_to_existing_lakes(local_mstack, outlet, current_lake, pre_sed,
     pre_water, pre_entry_node, label_prop_of_pre);
+  
   double delta_sedsed = 0;
+  std::cout << "nodes:";
   for(auto tnode:local_mstack)
   {
+    if(current_lake == 18)
+      std::cout << tnode << "|";
     if(is_in_queue[tnode] == 'd')
       delta_sedsed -= this->chonk_network[tnode].get_erosion_flux_only_bedrock() + this->chonk_network[tnode].get_erosion_flux_only_sediments() - this->chonk_network[tnode].get_deposition_flux();
   }
+  std::cout << std::endl;
+
   // and finally deprocess the stack
   this->deprocess_local_stack(local_mstack,is_in_queue);
   // std::cout << "PREWATER 20::" << pre_water[20] << std::endl;
@@ -654,6 +684,8 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
     for(size_t u =0; u< rec.size(); ++u)
     {
       int ttnode = rec[u]; 
+      if(this->has_been_outlet[ttnode] == 'y')
+        std::cout << "@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!" << std::endl;
       if( (is_in_queue[ttnode] == 'y' || ttnode == this->lakes[current_lake].outlet )  && active_nodes[ttnode] == 1 && this->node_in_lake[ttnode] < 0 )
         continue;
       if(this->is_this_node_in_this_lake(ttnode, current_lake))
@@ -879,6 +911,9 @@ void ModelRunner::reprocess_local_stack(std::vector<int>& local_mstack, std::vec
       for(size_t u =0; u< rec.size(); ++u)
       {
         int ttnode = rec[u]; 
+        if(ttnode == 1752)
+          std::cout << "node d giving " << wws[u] *  this->chonk_network[tnode].get_sediment_flux() << " to 1752" << std::endl;
+
         if(std::find(ignore_some.begin(), ignore_some.end(), ttnode) != ignore_some.end())
           continue;
         if(this->is_this_node_in_this_lake(ttnode, current_lake))
@@ -898,9 +933,12 @@ void ModelRunner::reprocess_local_stack(std::vector<int>& local_mstack, std::vec
       if ( this->has_been_outlet[tnode] == 'y' )
       {
         std::cout << "*^*^*^*^*^*^*^*^*^*^*^**^*^*^*^*^*^*^*^*^*^*^**^*^*^*^*^*^*^*^*^*^*^*IT HAPPENS!!" << std::endl;
+        this->n_outlets_remodelled ++;
         this->chonk_network[tnode].add_to_water_flux( WF_corrector[tnode]);
         this->chonk_network[tnode].add_to_sediment_flux( -1 * local_Qs_production_for_lakes[tnode], this->chonk_network[tnode].get_fluvialprop_sedflux());
         this->chonk_network[tnode].add_to_sediment_flux( SF_corrector[tnode], SL_corrector[tnode], this->chonk_network[tnode].get_fluvialprop_sedflux());
+        std::cout << "After SF_corrector of " << SF_corrector[tnode] << " shit is " << this->chonk_network[tnode].get_sediment_flux() << std::endl;
+        this->sed_added_by_donors -= SF_corrector[tnode];
       }
       // # So I need full reproc yaaay
       // full_delta -= this->chonk_network[tnode].get_sediment_flux();
@@ -921,6 +959,8 @@ void ModelRunner::reprocess_local_stack(std::vector<int>& local_mstack, std::vec
       for(size_t u =0; u< rec.size(); ++u)
       {
         int ttnode = rec[u]; 
+        if(ttnode == 1752)
+          std::cout << "node y giving " << wws[u] *  this->chonk_network[tnode].get_sediment_flux() << " to 1752" << std::endl;
         if((is_in_queue[ttnode] == 'y' || ttnode == this->lakes[current_lake].outlet) && active_nodes[ttnode] == 1)
           continue;
         if(this->is_this_node_in_this_lake(ttnode, current_lake))
@@ -961,6 +1001,15 @@ void ModelRunner::deprocess_local_stack(std::vector<int>& local_mstack, std::vec
     }
     else
     {
+      std::cout << "This remob outlet is " << this->chonk_network[tnode].get_sediment_flux() << std::endl;
+      this->sed_added_by_donors = this->chonk_network[tnode].get_sediment_flux();
+      std::vector<int> rec;std::vector<double> wwf;std::vector<double> wws; std::vector<double> strec; 
+      this->chonk_network[tnode].copy_moving_prep(rec,wwf, wws, strec);
+      for ( auto trec:rec)
+      {
+        if(this->has_been_outlet[trec] == 'y')
+          std::cout << "Double outlet!Double outlet!Double outlet!Double outlet!Double outlet!Double outlet!Double outlet!Double outlet!Double outlet!Double outlet!Double outlet!Double outlet!Double outlet!Double outlet!Double outlet!Double outlet!Double outlet!" << std::endl;
+      }
       this->chonk_network[tnode].reinitialise_moving_prep();
     }
   }
@@ -999,10 +1048,11 @@ void ModelRunner::check_what_give_to_existing_outlets(std::map<int,double>& WF_c
           SF_corrector[tnode] = 0;
           SL_corrector[tnode] = {};
         }
-
         WF_corrector[tnode] -= tchonk_weight_water_recs[i] * tchonk.get_water_flux();
         SL_corrector[tnode] = mix_two_proportions(SF_corrector[tnode],SL_corrector[tnode], -1 * tchonk_weight_sed_recs[i]* tchonk.get_sediment_flux(), tchonk.get_other_attribute_array("label_tracker"));
         SF_corrector[tnode] -= tchonk_weight_sed_recs[i]* tchonk.get_sediment_flux();
+        std::cout << "CORRECTOR ON " << tnode << " IS " << SF_corrector[tnode] << std::endl;
+        
       }
     }
   }
@@ -2461,6 +2511,16 @@ void ModelRunner::manage_fluxes_after_moving_prep(chonk& this_chonk, int label_i
   label_id, these_sed_props, this->timestep,  this->io_double["dx"], this->io_double["dy"]);
         
         break;
+      case 11:
+      // The SPACE model aka CHARLIE_I
+        this_chonk.charlie_I_K_fQs(this->labelz_list_double["SPIL_n"][label_id], this->labelz_list_double["SPIL_m"][label_id], this->labelz_list_double["CHARLIE_I_Kr"][label_id], 
+  this->labelz_list_double["CHARLIE_I_Ks"][label_id],
+  this->labelz_list_double["CHARLIE_I_dimless_roughness"][label_id], this->io_double_array["sed_height"][index], 
+  this->labelz_list_double["CHARLIE_I_V"][label_id], 
+  this->labelz_list_double["CHARLIE_I_dstar"][label_id], this->labelz_list_double["CHARLIE_I_threshold_incision"][label_id], 
+  this->labelz_list_double["CHARLIE_I_threshold_entrainment"][label_id],
+  label_id, these_sed_props, this->timestep,  this->io_double["dx"], this->io_double["dy"], this->labelz_list_double["CHARLIE_I_Krmodifyer"]);
+        break;
 
       case 9:
       // Cidre hillslope method, only on the sediment layer
@@ -2497,6 +2557,7 @@ void ModelRunner::initialise_intcorrespondance()
   intcorrespondance["CHARLIE_I"] = 8;
   intcorrespondance["Cidre_hillslope_diffusion_no_bedrock"] = 9;
   intcorrespondance["Cidre_hillslope_diffusion"] = 10;
+  intcorrespondance["CHARLIE_I_KfQs"] = 11;
 
 }
 
@@ -2562,6 +2623,33 @@ void ModelRunner::prepare_label_to_list_for_processes()
           labelz_list_double["Cidre_HS_kappa_s"].push_back(tlab.double_attributes["Cidre_HS_kappa_s"]);
           labelz_list_double["Cidre_HS_kappa_r"].push_back(tlab.double_attributes["Cidre_HS_kappa_r"]);
           labelz_list_double["Cidre_HS_critical_slope"].push_back(tlab.double_attributes["Cidre_HS_critical_slope"]);
+        }
+        break;
+
+      // Charlie the first, with dynamic sedimentation
+      case 11:
+        labelz_list_double["SPIL_m"] = std::vector<double>();
+        labelz_list_double["SPIL_n"] = std::vector<double>();
+        labelz_list_double["CHARLIE_I_Kr"] = std::vector<double>();
+        labelz_list_double["CHARLIE_I_Ks"] = std::vector<double>();
+        labelz_list_double["CHARLIE_I_V"] = std::vector<double>();
+        labelz_list_double["CHARLIE_I_dimless_roughness"] = std::vector<double>();
+        labelz_list_double["CHARLIE_I_dstar"] = std::vector<double>();
+        labelz_list_double["CHARLIE_I_threshold_incision"] = std::vector<double>();
+        labelz_list_double["CHARLIE_I_threshold_entrainment"] = std::vector<double>();
+        labelz_list_double["CHARLIE_I_Krmodifyer"] = std::vector<double>();
+        for(auto& tlab:labelz_list)
+        {
+          labelz_list_double["SPIL_m"].push_back(tlab.double_attributes["SPIL_m"]);
+          labelz_list_double["SPIL_n"].push_back(tlab.double_attributes["SPIL_n"]);
+          labelz_list_double["CHARLIE_I_Kr"].push_back(tlab.double_attributes["CHARLIE_I_Kr"]);
+          labelz_list_double["CHARLIE_I_Ks"].push_back(tlab.double_attributes["CHARLIE_I_Ks"]);
+          labelz_list_double["CHARLIE_I_V"].push_back(tlab.double_attributes["CHARLIE_I_V"]);
+          labelz_list_double["CHARLIE_I_dimless_roughness"].push_back(tlab.double_attributes["CHARLIE_I_dimless_roughness"]);
+          labelz_list_double["CHARLIE_I_dstar"].push_back(tlab.double_attributes["CHARLIE_I_dstar"]);
+          labelz_list_double["CHARLIE_I_threshold_incision"].push_back(tlab.double_attributes["CHARLIE_I_threshold_incision"]);
+          labelz_list_double["CHARLIE_I_threshold_entrainment"].push_back(tlab.double_attributes["CHARLIE_I_threshold_entrainment"]);
+          labelz_list_double["CHARLIE_I_Krmodifyer"].push_back(tlab.double_attributes["CHARLIE_I_Krmodifyer"]);
         }
         break;
 
@@ -2839,8 +2927,7 @@ void ModelRunner::drape_deposition_flux_to_chonks()
         std::cout << ratio_of_dep << "/" << (topography[no] - surface_elevation[no]) << std::endl;
         slangh = 0;
       }
-      if(chonk_network[no].get_sediment_creation_flux() != 0)
-        throw("Not0BeforeDrappingException");
+
       chonk_network[no].add_sediment_creation_flux(slangh);
       chonk_network[no].add_deposition_flux(slangh); // <--- This is solely for balance calculation
       chonk_network[no].set_other_attribute_array("label_tracker", loch.label_prop);

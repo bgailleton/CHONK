@@ -84,6 +84,12 @@ class chonk
   double dimless_roughness, double this_sed_height, double V_param, 
   double d_star, double threshold_incision, double threshold_sed_entrainment,
   int label, std::vector<double> sed_label_prop, double dt, double Xres, double Yres);
+    void charlie_I_K_fQs(double n, double m, double K_r, double K_s,
+  double dimless_roughness, double this_sed_height, double V_param, 
+  double d_star, double threshold_incision, double threshold_sed_entrainment,
+  int zone_label, std::vector<double> sed_label_prop, double dt, double Xres, double Yres,
+  std::vector<double> Krmodifyer);
+
 
     void CidreHillslopes(double this_sed_height, double kappa_s, double kappa_r, double Sc,
   int zone_label, std::vector<double> sed_label_prop, double dt, double Xres, double Yres, bool bedrock, 
