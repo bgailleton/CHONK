@@ -300,12 +300,12 @@ class CoreModel:
 		self.model.update_timestep(dt)
 		# tempolake = self.model.get_array_double_param("surface_elevation")
 		# self.model.update_array_double_param("surface_elevation", np.copy(self.model.get_array_double_param("surface_elevation_tp1") + np.random.rand(self.nx * self.ny) * 1e-7 ) )
-		self.model.set_surface_elevation(np.copy(self.model.get_array_double_param("surface_elevation_tp1")) )
+		self.model.set_surface_elevation(np.copy(self.model.get_surface_elevation_tp1()) )
 
 		self.model.update_array_double_param("sed_height", np.copy(self.model.get_array_double_param("sed_height_tp1")) )
 		self.model.initiate_nodegraph()
 		self.model.run()
-		tempolake = self.model.get_array_double_param("topography")
+		tempolake = self.model.get_topography()
 		self.topolake = tempolake.reshape(self.ny,self.nx)
 
 		self.model.add_external_to_surface_elevation_tp1(self.uplift * dt)
@@ -321,7 +321,7 @@ class CoreModel:
 
 	@topo.compute
 	def _topo(self):
-		return self.model.get_array_double_param("surface_elevation").reshape(self.ny,self.nx)
+		return self.model.get_surface_elevation().reshape(self.ny,self.nx)
 
 	@Q_water.compute
 	def _Q_water(self):
@@ -349,7 +349,7 @@ class CoreModel:
 
 	@HS.compute
 	def _HS(self):
-		tester = np.copy(self.model.get_array_double_param("surface_elevation_tp1")).reshape(self.ny,self.nx)
+		tester = np.copy(self.model.get_surface_elevation_tp1()).reshape(self.ny,self.nx)
 		this_HS = np.zeros_like(tester)
 		hillshading(tester.reshape(self.ny,self.nx),self.dx,self.dy,self.nx,self.ny,this_HS,np.deg2rad(60),np.deg2rad(125),1)
 		return this_HS.reshape(self.ny,self.nx)

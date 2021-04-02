@@ -487,16 +487,10 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
   sed_added_by_donors = 0;
   sed_outletting_system = 0;
 
-  // temp variable I need for the processing function
-  double cellarea = this->dx * this->dy;
-
   // Debug tracker to check wether this specific iteration was adding water (needed it during the (very painful) mass balance checks)
   bool was_0 = false;
   if(entry_point.volume_water == 0)
     was_0 = true;
-
-  // I will need these aliases from the global maps
-  xt::pytensor<double,1>& topography = this->topography;
 
   // Initialising a priority queue sorting the nodes to reprocess by their id in the Mstack. the smallest Ids should come first
   // Because I am only processing nodes in between 2 discrete lakes, it should not be a problem
@@ -669,7 +663,7 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
       int ttnode = rec[u]; 
       if(this->has_been_outlet[ttnode] == 'y')
         std::cout << "@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!" << std::endl;
-      if( (is_in_queue[ttnode] == 'y' || ttnode == this->lakes[current_lake].outlet )  && active_nodes[ttnode] == 1 && this->node_in_lake[ttnode] < 0 )
+      if( (is_in_queue[ttnode] == 'y' || ttnode == this->lakes[current_lake].outlet )  && this->active_nodes[ttnode] && this->node_in_lake[ttnode] < 0 )
         continue;
       if(this->is_this_node_in_this_lake(ttnode, current_lake))
         continue;
@@ -939,7 +933,7 @@ void ModelRunner::reprocess_local_stack(std::vector<int>& local_mstack, std::vec
         int ttnode = rec[u]; 
         if(ttnode == 1752)
           std::cout << "node y giving " << wws[u] *  this->chonk_network[tnode].get_sediment_flux() << " to 1752" << std::endl;
-        if((is_in_queue[ttnode] == 'y' || ttnode == this->lakes[current_lake].outlet) && active_nodes[ttnode] == 1)
+        if((is_in_queue[ttnode] == 'y' || ttnode == this->lakes[current_lake].outlet) && active_nodes[ttnode])
           continue;
         if(this->is_this_node_in_this_lake(ttnode, current_lake))
           continue;
@@ -1080,9 +1074,6 @@ chonk ModelRunner::preprocess_outletting_chonk(chonk tchonk, EntryPoint& entry_p
  std::map<int,double>& WF_corrector, std::map<int,double>& SF_corrector, std::map<int,std::vector<double> >& SL_corrector,
  std::vector<double>& pre_sed, std::vector<double>& pre_water, std::vector<int>& pre_entry_node, std::vector<std::vector<double> >& label_prop_of_pre)
 {
-  xt::pytensor<double,1>& topography = this->topography;
-  xt::pytensor<int,1>& active_nodes = this->io_int_array["active_nodes"];
-  double cellarea = this->dx * this->dy;
   // Getting the additioned water rate
   // std::cout << "I WATER RATE IS " << tchonk.get_water_flux() << std::endl;
   double water_rate = entry_point.volume_water / this->timestep;
@@ -1137,7 +1128,7 @@ chonk ModelRunner::preprocess_outletting_chonk(chonk tchonk, EntryPoint& entry_p
   }
 
   // Now iterating thorugh the neighbours
-  std::vector<int> neightbors; std::vector<double> dummy ; graph.get_D8_neighbors(outlet, active_nodes, neightbors, dummy);
+  std::vector<int> neightbors; std::vector<double> dummy ; graph.get_D8_neighbors(outlet, this->active_nodes, neightbors, dummy);
 
   // calculating the slope too 
   double SS = -9999;
@@ -1292,10 +1283,6 @@ void ModelRunner::gather_nodes_to_reproc(std::vector<int>& local_mstack,
   transec.emplace(outlet);
   is_in_queue[outlet] = 'y';
 
-  // I will need these aliases from the global maps
-  xt::pytensor<double,1>& topography = this->topography;
-  xt::pytensor<int,1>& active_nodes = this->io_int_array["active_nodes"];
-
   // this is the loop gathering downstream nodes
   while(transec.empty() == false)
   {
@@ -1312,7 +1299,7 @@ void ModelRunner::gather_nodes_to_reproc(std::vector<int>& local_mstack,
     }
 
     // Otherwise going through neightbors
-    std::vector<int> neightbors; std::vector<double> dummy ; graph.get_D8_neighbors(next_node, active_nodes, neightbors, dummy);
+    std::vector<int> neightbors; std::vector<double> dummy ; graph.get_D8_neighbors(next_node, this->active_nodes, neightbors, dummy);
 
     // checking the state of the neightbor
     for (auto tnode : neightbors)
@@ -1381,7 +1368,7 @@ bool ModelRunner::has_valid_outlet(int lakeid)
   if(outlet<0)
     return false;
 
-  std::vector<int> neightbors; std::vector<double> dummy ; graph.get_D8_neighbors(outlet, this->io_int_array["active_nodes"], neightbors, dummy);
+  std::vector<int> neightbors; std::vector<double> dummy ; graph.get_D8_neighbors(outlet, this->active_nodes, neightbors, dummy);
   for(auto node:neightbors)
   {
     if(this->topography[node] < this->topography[outlet])
@@ -1466,8 +1453,6 @@ int ModelRunner::fill_mah_lake(EntryPoint& entry_point, std::queue<int>& iterala
   std::priority_queue< nodium, std::vector<nodium>, std::greater<nodium> > depressionfiller;
 
   // Aliases and shortcups
-  xt::pytensor<double,1>& topography = this->topography;
-  xt::pytensor<int,1>& active_nodes = this->io_int_array["active_nodes"];
   double cellarea = this->dx * this->dy;
 
   // Starting by adding the first node of the list
@@ -1505,7 +1490,7 @@ int ModelRunner::fill_mah_lake(EntryPoint& entry_point, std::queue<int>& iterala
   std::vector<char> is_in_lake(this->io_int["n_elements"],'n');
 
   // Very specific checekr in the rare case my entry point is an inactive internal node
-  if(active_nodes[entry_point.node] == 0)
+  if(active_nodes[entry_point.node] == false)
   {
     outlet = entry_point.node;
   }
@@ -1787,7 +1772,7 @@ void ModelRunner::drink_lake(int id_eater, int id_edible, EntryPoint& entry_poin
     {      
       int n_DS_n = 0;
       int n_DS_o = 0;
-      std::vector<int> neightbors; std::vector<double> dummy ; graph.get_D8_neighbors(this->lakes[id_edible].outlet, this-> io_int_array["active_nodes"], neightbors, dummy);
+      std::vector<int> neightbors; std::vector<double> dummy ; graph.get_D8_neighbors(this->lakes[id_edible].outlet, active_nodes, neightbors, dummy);
       for(auto tnode:neightbors)
       {
         if(this->topography[tnode] < this->topography[this->lakes[id_edible].outlet])
@@ -1849,8 +1834,6 @@ void ModelRunner::original_gathering_of_water_and_sed_from_pixel_or_flat_area(in
   std::cout << "Originnal entry point is " << sediment_volume << std::endl;
   
   // return;
-  xt::pytensor<int,1>& active_nodes = this->io_int_array["active_nodes"];
-  xt::pytensor<double,1>& topography = this->topography;
 
   std::queue<int> FIFO;
   std::vector<char> is_in_queue(this->io_int["n_elements"], 'n');
@@ -2039,8 +2022,7 @@ void ModelRunner::finalise()
   // First gathering all the aliases 
   xt::pytensor<double,1>& sed_height_tp1 = this->io_double_array["sed_height_tp1"];
   xt::pytensor<double,1>& sed_height = this->io_double_array["sed_height"];
-  // xt::pytensor<double,1> tlake_depth = xt::zeros<double>({size_t(this->io_int["n_elements"])});
-  xt::pytensor<int,1>& active_nodes = this->io_int_array["active_nodes"];
+
   double cellarea = this->dx * this->dy;
 
   // First dealing with lake deposition:
@@ -2793,7 +2775,7 @@ std::vector<xt::pytensor<double,1> > ModelRunner::get_label_tracking_results()
   std::vector<xt::pytensor<double,1> > output;
   for(int i=0; i<this->n_labels; i++)
   {
-    xt::pytensor<double,1> temp = xt::zeros_like(io_double_array["surface_elevation"]);
+    xt::pytensor<double,1> temp = xt::zeros_like(this->surface_elevation);
     output.push_back(temp);
   }
 

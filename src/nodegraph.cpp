@@ -1134,7 +1134,7 @@ void NodeGraphV2::get_D8_neighbors(int i, xt::pytensor<bool,1>& active_nodes, st
   }
 }
 
-std::vector<int> NodeGraphV2::get_all_flat_from_node(int i, xt::pytensor<double,1>& topography,  xt::pytensor<int,1>& active_nodes)
+std::vector<int> NodeGraphV2::get_all_flat_from_node(int i, xt::pytensor<double,1>& topography,  xt::pytensor<bool,1>& active_nodes)
 {
   std::vector<char> is_in_queue(this->un_element,'n');
   is_in_queue[i] = 'y';

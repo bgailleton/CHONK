@@ -389,7 +389,13 @@ std::vector<double>& pre_sed, std::vector<double>& pre_water);
     void set_surface_elevation(xt::pytensor<double,1>&& tsurface_elevation){this->surface_elevation = tsurface_elevation;}
     void set_surface_elevation_tp1(xt::pytensor<double,1>&& tsurface_elevation_tp1){this->surface_elevation_tp1 = tsurface_elevation_tp1;}
     void set_topography(xt::pytensor<double,1>&& ttopography){this->topography = ttopography;}
-    void set_active_nodes(xt::pytensor<double,1>&& tactive_nodes){this->active_nodes = tactive_nodes;}
+    void set_active_nodes(xt::pytensor<bool,1>&& tactive_nodes){this->active_nodes = tactive_nodes;}
+
+    // new getter
+    xt::pytensor<double,1> get_surface_elevation(){return this->surface_elevation ;}
+    xt::pytensor<double,1> get_surface_elevation_tp1(){return this->surface_elevation_tp1 ;}
+    xt::pytensor<double,1> get_topography(){return this->topography ;}
+    xt::pytensor<bool,1> get_active_nodes(){return this->active_nodes ;}
 
 
 

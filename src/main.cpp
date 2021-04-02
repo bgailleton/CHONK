@@ -98,6 +98,15 @@ PYBIND11_MODULE(CHONK_cpp, m)
       .def("get_sed_prop_by_label_matrice", &ModelRunner::get_sed_prop_by_label_matrice)
       .def("get_debugint", &ModelRunner::get_debugint)
       .def("get_Qs_mass_balance", &ModelRunner::get_Qs_mass_balance)
+      .def("set_surface_elevation",&ModelRunner::set_surface_elevation)
+      .def("set_surface_elevation_tp1",&ModelRunner::set_surface_elevation_tp1)
+      .def("set_topography",&ModelRunner::set_topography)
+      .def("set_active_nodes",&ModelRunner::set_active_nodes)
+      .def("get_surface_elevation",&ModelRunner::get_surface_elevation)
+      .def("get_surface_elevation_tp1",&ModelRunner::get_surface_elevation_tp1)
+      .def("get_topography",&ModelRunner::get_topography)
+      .def("get_active_nodes",&ModelRunner::get_active_nodes)
+      .def("add_external_to_surface_elevation_tp1",&ModelRunner::add_external_to_surface_elevation_tp1)
 
     ;
     m.def("set_DEBUG_switch_nodegraph",set_DEBUG_switch_nodegraph);
