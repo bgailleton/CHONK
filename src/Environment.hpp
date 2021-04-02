@@ -384,6 +384,12 @@ std::vector<double>& pre_sed, std::vector<double>& pre_water);
 
     xt::pytensor<int,1> get_debugint();
 
+    // New setters:
+    void set_surface_elevation(xt::pytensor<double,1>&& tsurface_elevation){this->surface_elevation = tsurface_elevation;}
+    void set_surface_elevation_tp1(xt::pytensor<double,1>&& tsurface_elevation_tp1){this->surface_elevation_tp1 = tsurface_elevation_tp1;}
+    void set_topography(xt::pytensor<double,1>&& ttopography){this->topography = ttopography;}
+    void set_active_nodes(xt::pytensor<double,1>&& tactive_nodes){this->active_nodes = tactive_nodes;}
+
 
 
   protected:
@@ -424,6 +430,19 @@ std::vector<double>& pre_sed, std::vector<double>& pre_water);
     std::vector<double> gave_to_lake_water;
     std::vector<double> gave_to_lake_sed;
 
+    // Surface elevation at time t
+    xt::pytensor<double,1> surface_elevation;
+    // Surface elevation at next time step
+    xt::pytensor<double,1> surface_elevation_tp1;
+    // Current Surface elevation + lake depth
+    xt::pytensor<double,1> topography;
+    // active-node array, needed for node graphing around
+    xt::pytensor<bool,1> active_nodes;
+
+
+
+
+    // ONGOING DEPRECATION
     // parameters, stored un maps of thingies by type
     // these parameters are "model-wide parameters" like elevation, lake_depth or precipitation
     std::map<std::string, int> io_int;
