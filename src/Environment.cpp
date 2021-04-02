@@ -135,28 +135,12 @@ void ModelRunner::initiate_nodegraph()
 
   // std::cout << "initiating nodegraph..." <<std::endl;
   // Creating the nodegraph and preprocessing the depression nodes
-  this->io_double_array["topography"] = xt::pytensor<double,1>(this->io_double_array["surface_elevation"]);
+  this->topography = xt::pytensor<double,1>(this->surface_elevation);
 
-
-  // First jsut sorting out the active node array.
-  // Needs cleaning and optimisation cause some routines with bool where somehow buggy
-  xt::pytensor<bool,1> active_nodes = xt::zeros<bool>({this->io_int_array["active_nodes"].size()});
-  xt::pytensor<int,1>& inctive_nodes = this->io_int_array["active_nodes"];
-
-
-  // Converting int to bool
-  for(size_t i =0; i<inctive_nodes.size(); i++)
-  {
-    int B = inctive_nodes[i];
-    if(B==1)
-      active_nodes[i] = true;
-    else
-      active_nodes[i] = false;
-  }
 
   // Dat is the real stuff:
   // Initialising the graph
-  this->graph = NodeGraphV2(this->io_double_array["surface_elevation"], active_nodes,this->io_double["dx"], this->io_double["dy"],
+  this->graph = NodeGraphV2(this->surface_elevation, active_nodes,this->io_double["dx"], this->io_double["dy"],
                             this->io_int["n_rows"], this->io_int["n_cols"], this->lake_solver);
   
   // Chonkification: initialising chonk network
@@ -217,7 +201,7 @@ void ModelRunner::run()
 
   // Aliases for efficiency
   xt::pytensor<int,1>& inctive_nodes = this->io_int_array["active_nodes"];
-  xt::pytensor<double,1>& surface_elevation =  this->io_double_array["surface_elevation"];
+  xt::pytensor<double,1>& surface_elevation =  this->surface_elevation;
   double cellarea = this->io_double["dx"] * this->io_double["dy"];
 
   // Debug checker
@@ -512,7 +496,7 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
     was_0 = true;
 
   // I will need these aliases from the global maps
-  xt::pytensor<double,1>& topography = this->io_double_array["topography"];
+  xt::pytensor<double,1>& topography = this->topography;
   xt::pytensor<int,1>& active_nodes = this->io_int_array["active_nodes"];
 
   // Initialising a priority queue sorting the nodes to reprocess by their id in the Mstack. the smallest Ids should come first
@@ -871,7 +855,7 @@ void ModelRunner::reprocess_local_stack(std::vector<int>& local_mstack, std::vec
   // I will need that
   double cellarea = this->io_double["dx"] * this->io_double["dy"];
   // I will need these aliases from the global maps
-  xt::pytensor<double,1>& topography = this->io_double_array["topography"];
+  xt::pytensor<double,1>& topography = this->topography;
   xt::pytensor<int,1>& active_nodes = this->io_int_array["active_nodes"];
   
   // double full_delta = 0;
@@ -1102,7 +1086,7 @@ chonk ModelRunner::preprocess_outletting_chonk(chonk tchonk, EntryPoint& entry_p
  std::map<int,double>& WF_corrector, std::map<int,double>& SF_corrector, std::map<int,std::vector<double> >& SL_corrector,
  std::vector<double>& pre_sed, std::vector<double>& pre_water, std::vector<int>& pre_entry_node, std::vector<std::vector<double> >& label_prop_of_pre)
 {
-  xt::pytensor<double,1>& topography = this->io_double_array["topography"];
+  xt::pytensor<double,1>& topography = this->topography;
   xt::pytensor<int,1>& active_nodes = this->io_int_array["active_nodes"];
   double cellarea = this->io_double["dx"] * this->io_double["dy"];
   // Getting the additioned water rate
@@ -1315,7 +1299,7 @@ void ModelRunner::gather_nodes_to_reproc(std::vector<int>& local_mstack,
   is_in_queue[outlet] = 'y';
 
   // I will need these aliases from the global maps
-  xt::pytensor<double,1>& topography = this->io_double_array["topography"];
+  xt::pytensor<double,1>& topography = this->topography;
   xt::pytensor<int,1>& active_nodes = this->io_int_array["active_nodes"];
 
   // this is the loop gathering downstream nodes
@@ -1406,7 +1390,7 @@ bool ModelRunner::has_valid_outlet(int lakeid)
   std::vector<int> neightbors; std::vector<double> dummy ; graph.get_D8_neighbors(outlet, this->io_int_array["active_nodes"], neightbors, dummy);
   for(auto node:neightbors)
   {
-    if(this->io_double_array["topography"][node] < this->io_double_array["topography"][outlet])
+    if(this->topography[node] < this->topography[outlet])
     {
       int tlid = this->node_in_lake[node];
       if(tlid >= 0) tlid = this->motherlake(tlid);
@@ -1488,7 +1472,7 @@ int ModelRunner::fill_mah_lake(EntryPoint& entry_point, std::queue<int>& iterala
   std::priority_queue< nodium, std::vector<nodium>, std::greater<nodium> > depressionfiller;
 
   // Aliases and shortcups
-  xt::pytensor<double,1>& topography = this->io_double_array["topography"];
+  xt::pytensor<double,1>& topography = this->topography;
   xt::pytensor<int,1>& active_nodes = this->io_int_array["active_nodes"];
   double cellarea = this->io_double["dx"] * this->io_double["dy"];
 
@@ -1812,7 +1796,7 @@ void ModelRunner::drink_lake(int id_eater, int id_edible, EntryPoint& entry_poin
       std::vector<int> neightbors; std::vector<double> dummy ; graph.get_D8_neighbors(this->lakes[id_edible].outlet, this-> io_int_array["active_nodes"], neightbors, dummy);
       for(auto tnode:neightbors)
       {
-        if(this->io_double_array["topography"][tnode] < this->io_double_array["topography"][this->lakes[id_edible].outlet])
+        if(this->topography[tnode] < this->topography[this->lakes[id_edible].outlet])
         {
           int ttttlake = this->node_in_lake[tnode];
           if(ttttlake >= 0)
@@ -1872,7 +1856,7 @@ void ModelRunner::original_gathering_of_water_and_sed_from_pixel_or_flat_area(in
   
   // return;
   xt::pytensor<int,1>& active_nodes = this->io_int_array["active_nodes"];
-  xt::pytensor<double,1>& topography = this->io_double_array["topography"];
+  xt::pytensor<double,1>& topography = this->topography;
 
   std::queue<int> FIFO;
   std::vector<char> is_in_queue(this->io_int["n_elements"], 'n');
@@ -2060,8 +2044,8 @@ void ModelRunner::finalise()
   // Finilising the timestep by applying the changes to the thingy
   // First gathering all the aliases 
   xt::pytensor<double,1>& surface_elevation_tp1 = this->io_double_array["surface_elevation_tp1"];
-  xt::pytensor<double,1>& surface_elevation = this->io_double_array["surface_elevation"];
-  xt::pytensor<double,1>& topography = this->io_double_array["topography"];
+  xt::pytensor<double,1>& surface_elevation = this->surface_elevation;
+  xt::pytensor<double,1>& topography = this->topography;
   xt::pytensor<double,1>& sed_height_tp1 = this->io_double_array["sed_height_tp1"];
   xt::pytensor<double,1>& sed_height = this->io_double_array["sed_height"];
   // xt::pytensor<double,1> tlake_depth = xt::zeros<double>({size_t(this->io_int["n_elements"])});
@@ -2180,7 +2164,7 @@ void ModelRunner::finalise()
 
   }
 
-  auto tlake_depth = this->io_double_array["topography"] - this->io_double_array["surface_elevation"];
+  auto tlake_depth = this->topography - this->surface_elevation;
   // Calculating the water balance thingies
   double save_Ql_out = this->Ql_out;
   this->Ql_out = 0;
@@ -2457,16 +2441,15 @@ void ModelRunner::manage_move_prep(chonk& this_chonk)
   switch(this_case)
   {
     case 2:
-      this_chonk.move_to_steepest_descent(this->graph, this->timestep, this->io_double_array["sed_height"], this->io_double_array["sed_height_tp1"], 
-   this->io_double_array["topography"],  this->io_double_array["surface_elevation_tp1"], this->io_double["dx"], this->io_double["dy"], chonk_network);
+      this_chonk.move_to_steepest_descent(this->graph, this->timestep,  this->topography, this->io_double["dx"], this->io_double["dy"], chonk_network);
       break;
     case 3:
-      this_chonk.move_MF_from_fastscapelib(this->graph, this->io_double_array2d["external_weigths_water"], this->timestep, this->io_double_array["sed_height"], this->io_double_array["sed_height_tp1"], 
-   this->io_double_array["topography"],  this->io_double_array["surface_elevation_tp1"], this->io_double["dx"], this->io_double["dy"], chonk_network);
+      this_chonk.move_MF_from_fastscapelib(this->graph, this->io_double_array2d["external_weigths_water"], this->timestep, 
+   this->topography, this->io_double["dx"], this->io_double["dy"], chonk_network);
       break;
     case 4:
-      this_chonk.move_MF_from_fastscapelib_threshold_SF(this->graph, this->io_double["threshold_single_flow"], this->timestep, this->io_double_array["sed_height"], this->io_double_array["sed_height_tp1"], 
-   this->io_double_array["topography"],  this->io_double_array["surface_elevation_tp1"], this->io_double["dx"], this->io_double["dy"], chonk_network);
+      this_chonk.move_MF_from_fastscapelib_threshold_SF(this->graph, this->io_double["threshold_single_flow"], this->timestep,  this->topography, 
+        this->io_double["dx"], this->io_double["dy"], chonk_network);
       break;
       
     default:
@@ -2699,7 +2682,7 @@ void ModelRunner::process_inherited_water()
 
     // getting node underwater
     std::vector<int>& unodes = tlake.nodes;
-    xt::pytensor<double,1>& surface_elevation = this->io_double_array["surface_elevation"];
+    xt::pytensor<double,1>& surface_elevation = this->surface_elevation;
 
 
     double minelev = std::numeric_limits<double>::max();
@@ -2888,8 +2871,8 @@ void ModelRunner::DEBUG_check_weird_val_stacks()
 void ModelRunner::drape_deposition_flux_to_chonks()
 {
 
-  xt::pytensor<double,1>& topography = this->io_double_array["topography"];
-  xt::pytensor<double,1>& surface_elevation = this->io_double_array["surface_elevation"];
+  xt::pytensor<double,1>& topography = this->topography;
+  xt::pytensor<double,1>& surface_elevation = this->surface_elevation;
 
   double cellarea = this->io_double["dx"] * this->io_double["dy"];
   std::vector<char> isinhere(this->io_int["n_elements"],'n');

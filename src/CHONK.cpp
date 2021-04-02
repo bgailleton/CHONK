@@ -270,8 +270,7 @@ void chonk::split_and_merge_in_receiving_chonks_ignore_some(std::vector<chonk>& 
 
 
 // Simplest function we can think of: move the thingy to 
-void chonk::move_to_steepest_descent(NodeGraphV2& graph, double dt, xt::pytensor<double,1>& sed_height, xt::pytensor<double,1>& sed_height_tp1, 
-  xt::pytensor<double,1>& surface_elevation, xt::pytensor<double,1>& surface_elevation_tp1, double Xres, double Yres, std::vector<chonk>& chonk_network)
+void chonk::move_to_steepest_descent(NodeGraphV2& graph, double dt, xt::pytensor<double,1>& surface_elevation, double Xres, double Yres, std::vector<chonk>& chonk_network)
 {
   // Find the steepest descent node first
   // Initialising the checkers to minimum
@@ -344,45 +343,6 @@ void chonk::move_to_steepest_descent(NodeGraphV2& graph, double dt, xt::pytensor
     return; 
   }
 
-  // // This is the part where I deal with topographic depression now
-  // int pit_id = graph.get_pits_ID_at_node(current_node);
-
-  // // Is this a pit?
-  // if(pit_id>=0)
-  // {
-    
-  //   // Apparently so, let's check if I am at the bottom
-  //   int pit_bottom = graph.get_pits_bottom_at_pit_ID(pit_id);
-
-  //   if(current_node == pit_bottom)
-  //   {
-  //     // Need to deal with depressions here!!!!
-  //     this->solve_depression_simple(graph,  dt, sed_height, sed_height_tp1, surface_elevation, surface_elevation_tp1, Xres, Yres, chonk_network);
-  //     // # I WANT TO STOP HERE IF THE DEPRESSION IS SOLVED!!!
-  //     // # The depression solving routine takes care of the receivers and all
-  //     return;
-  //   }
-  // }
-
-  // There is a non-pit neighbor, let's save it with its attributes
-
-  // int steepest_rec = graph.get_Srec(this->current_node);
-
-  // double steepest_S;
-  // if(steepest_rec == this->current_node)
-  // {
-  //   throw std::runtime_error("D8MoveToItselfError::Should be detected before...");
-  //   return;
-  // }
-
-  // steepest_S = surface_elevation[this->current_node] - surface_elevation[steepest_rec];
-  // if(double_equals(steepest_S,0.,1e-6))
-  //   steepest_S = 0.;
-  // else
-  //   steepest_S = steepest_S/graph.get_length2Srec(this->current_node);
-
-  // std::cout << steepest_S << "||" << graph.get_length2Srec(this->current_node)  << std::endl;
-
   this->receivers.push_back(steepest_rec);
   this->weigth_water_fluxes.push_back(1.);
   this->weigth_sediment_fluxes.push_back(0.);
@@ -391,8 +351,8 @@ void chonk::move_to_steepest_descent(NodeGraphV2& graph, double dt, xt::pytensor
 
 
 // Function where the weights of splitting the water comes from fastscapelib p method
-void chonk::move_MF_from_fastscapelib(NodeGraphV2& graph, xt::pytensor<double,2>& external_weigth_water_fluxes, double dt, xt::pytensor<double,1>& sed_height, xt::pytensor<double,1>& sed_height_tp1, 
-  xt::pytensor<double,1>& surface_elevation, xt::pytensor<double,1>& surface_elevation_tp1, double Xres, double Yres, std::vector<chonk>& chonk_network)
+void chonk::move_MF_from_fastscapelib(NodeGraphV2& graph, xt::pytensor<double,2>& external_weigth_water_fluxes, double dt,  
+  xt::pytensor<double,1>& surface_elevation, double Xres, double Yres, std::vector<chonk>& chonk_network)
 { 
   // std::cout << "1.1" << std::endl;
 
@@ -504,8 +464,8 @@ void chonk::move_MF_from_fastscapelib(NodeGraphV2& graph, xt::pytensor<double,2>
 
 
 // Function where the weights of splitting the water comes from fastscapelib p method
-void chonk::move_MF_from_fastscapelib_threshold_SF(NodeGraphV2& graph, double threshold_Q, double dt, xt::pytensor<double,1>& sed_height, xt::pytensor<double,1>& sed_height_tp1, 
-  xt::pytensor<double,1>& surface_elevation, xt::pytensor<double,1>& surface_elevation_tp1, double Xres, double Yres, std::vector<chonk>& chonk_network)
+void chonk::move_MF_from_fastscapelib_threshold_SF(NodeGraphV2& graph, double threshold_Q, double dt,
+  xt::pytensor<double,1>& surface_elevation, double Xres, double Yres, std::vector<chonk>& chonk_network)
 { 
 
   // I need the receicing neighbours and the distance to them
@@ -676,68 +636,6 @@ void chonk::move_MF_from_fastscapelib_threshold_SF(NodeGraphV2& graph, double th
     // Mover to the next step
   }
 
-}
-
-
-
-
-// Simplest function we can think of: move the thingy to 
-void chonk::move_to_steepest_descent_nodepression(NodeGraphV2& graph, double dt, xt::pytensor<double,1>& sed_height, xt::pytensor<double,1>& sed_height_tp1, 
-  xt::pytensor<double,1>& surface_elevation, xt::pytensor<double,1>& surface_elevation_tp1, double Xres, double Yres, std::vector<chonk>& chonk_network)
-{
-  throw std::runtime_error("chonk::move_to_steepest_descent_nodepression is now deprecated. You can use the switch to deactivate the explicit depression solver.");
-  // // Find the steepest descent node first
-  // // Initialising the checkers to minimum
-  // int steepest_rec = -9999;
-  // double steepest_S = -std::numeric_limits<double>::max();
-
-  // // I need the receicing neighbours and the distance to them
-  // std::vector<int> these_neighbors = graph.get_MF_receivers_at_node(this->current_node);
-  // std::vector<double> these_lengths = graph.get_MF_lengths_at_node(this->current_node);
-  // bool all_minus_1 = true;
-  // // looping through neighbors
-  // for(size_t i=0; i<these_neighbors.size(); i++)
-  // {
-  //   int this_neightbor = these_neighbors[i];
-  //   // checking if this is a neighbor, nodata will be -1 (fastscapelib standards)
-  //   if(this_neightbor < 0 || this_neightbor >= int(surface_elevation.size()) || this_neightbor == this->current_node)
-  //     continue;
-
-  //   all_minus_1 = false;
-  //   // getting the slope, dz/dx
-    
-  //   double this_slope = 0;
-  //   if(these_lengths[i] >= Xres)
-  //     this_slope = (surface_elevation[this->current_node] - surface_elevation[this_neightbor]) / these_lengths[i];
-  //   else
-  //     this_slope = 0;
-  //   // NEED TO CHECK WHY IT DDOES THAT!!
-  //   if(this_slope<0)
-  //   {
-  //     this_slope = 0;
-  //   }
-
-  //   // checking if the slope is higher and recording the receiver
-  //   if(this_slope>steepest_S)
-  //   {
-  //     steepest_rec = this_neightbor;
-  //     steepest_S = this_slope;
-  //   }
-  //   // Mover to the next step
-  // }
-
-  // // Base level! i am stopping the code there and treating it as a depression already solved to inhibit all the process
-  // if(steepest_rec == this->current_node || all_minus_1 == true)
-  // {
-  //   this->depression_solved_at_this_timestep = true;
-  //   return;
-  // }
-
-  // // There is a non-pit neighbor, let's save it with its attributes
-  // this->receivers.push_back(steepest_rec);
-  // this->weigth_water_fluxes.push_back(1.);
-  // this->weigth_sediment_fluxes.push_back(1.);
-  // this->slope_to_rec.push_back(steepest_S); 
 }
 
 

@@ -322,6 +322,7 @@ class ModelRunner
 
 
     void add_external_to_double_array(std::string key,xt::pytensor<double,1>& adder){this->io_double_array[key] += adder;}
+    void add_external_to_surface_elevation_tp1(xt::pytensor<double,1>& adder){this->surface_elevation_tp1 += adder;}
 
 
     double get_Qw_in() {return Qw_in;};

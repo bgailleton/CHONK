@@ -58,14 +58,12 @@ class chonk
     void cancel_split_and_merge_in_receiving_chonks(std::vector<chonk>& chonkscape, NodeGraphV2& graph, double dt);
 
     // move and split functions
-    void move_to_steepest_descent(NodeGraphV2& graph, double dt, xt::pytensor<double,1>& sed_height, xt::pytensor<double,1>& sed_height_tp1, 
-  xt::pytensor<double,1>& surface_elevation, xt::pytensor<double,1>& surface_elevation_tp1, double Xres, double Yres, std::vector<chonk>& chonk_network);
-    void move_to_steepest_descent_nodepression(NodeGraphV2& graph, double dt, xt::pytensor<double,1>& sed_height, xt::pytensor<double,1>& sed_height_tp1, 
-  xt::pytensor<double,1>& surface_elevation, xt::pytensor<double,1>& surface_elevation_tp1, double Xres, double Yres, std::vector<chonk>& chonk_network);
-    void move_MF_from_fastscapelib(NodeGraphV2& graph, xt::pytensor<double,2>& external_weigth_water_fluxes, double dt, xt::pytensor<double,1>& sed_height, xt::pytensor<double,1>& sed_height_tp1, 
-  xt::pytensor<double,1>& surface_elevation, xt::pytensor<double,1>& surface_elevation_tp1, double Xres, double Yres, std::vector<chonk>& chonk_network);
-    void move_MF_from_fastscapelib_threshold_SF(NodeGraphV2& graph, double threshold_Q, double dt, xt::pytensor<double,1>& sed_height, xt::pytensor<double,1>& sed_height_tp1, 
-  xt::pytensor<double,1>& surface_elevation, xt::pytensor<double,1>& surface_elevation_tp1, double Xres, double Yres, std::vector<chonk>& chonk_network);
+    void move_to_steepest_descent(NodeGraphV2& graph, double dt,  xt::pytensor<double,1>& surface_elevation, double Xres, double Yres, std::vector<chonk>& chonk_network);
+    void move_MF_from_fastscapelib(NodeGraphV2& graph, xt::pytensor<double,2>& external_weigth_water_fluxes, double dt, 
+  xt::pytensor<double,1>& surface_elevation, double Xres, double Yres, std::vector<chonk>& chonk_network);
+    void move_MF_from_fastscapelib_threshold_SF(NodeGraphV2& graph, double threshold_Q, double dt,
+  xt::pytensor<double,1>& surface_elevation, double Xres, double Yres, std::vector<chonk>& chonk_network);
+    
     // Functions that apply and calculate fluxes
     //#### In place flux applyer (BEFORE move)
     void inplace_only_drainage_area(double Xres, double Yres);

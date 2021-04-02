@@ -270,12 +270,13 @@ class CoreModel:
 		self.model.update_int_param("n_elements",self.ny*self.nx)
 
 		self.model.update_double_param("threshold_single_flow", self.threshold_single_flow)
-		self.model.update_array_int_param("active_nodes", self.active_nodes)
+		self.model.set_active_nodes( self.active_nodes)
 
 		self.topolake = np.copy(self.surface_elevation).reshape(self.ny,self.nx) 
 
-		self.model.update_array_double_param("surface_elevation", self.surface_elevation)
-		self.model.update_array_double_param("surface_elevation_tp1", np.copy( self.surface_elevation))
+		self.model.set_surface_elevation(self.surface_elevation)
+		self.model.set_surface_elevation_tp1(np.copy( self.surface_elevation))
+
 		self.model.update_array_double_param("sed_height" , np.copy(self.sed_height))
 		self.model.update_array_double_param("sed_height_tp1" , np.copy(self.sed_height))
 		self.model.update_array_double_param("lake_depth" , np.zeros_like(self.sed_height))
@@ -299,13 +300,15 @@ class CoreModel:
 		self.model.update_timestep(dt)
 		# tempolake = self.model.get_array_double_param("surface_elevation")
 		# self.model.update_array_double_param("surface_elevation", np.copy(self.model.get_array_double_param("surface_elevation_tp1") + np.random.rand(self.nx * self.ny) * 1e-7 ) )
-		self.model.update_array_double_param("surface_elevation", np.copy(self.model.get_array_double_param("surface_elevation_tp1")) )
+		self.model.set_surface_elevation(np.copy(self.model.get_array_double_param("surface_elevation_tp1")) )
+
 		self.model.update_array_double_param("sed_height", np.copy(self.model.get_array_double_param("sed_height_tp1")) )
 		self.model.initiate_nodegraph()
 		self.model.run()
 		tempolake = self.model.get_array_double_param("topography")
 		self.topolake = tempolake.reshape(self.ny,self.nx)
-		self.model.add_external_to_double_array("surface_elevation_tp1",self.uplift * dt)
+
+		self.model.add_external_to_surface_elevation_tp1(self.uplift * dt)
 
 
 
