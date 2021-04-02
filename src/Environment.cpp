@@ -127,6 +127,8 @@ void ModelRunner::create(double ttimestep, std::vector<std::string> tordered_flu
   this->Qw_out = 0;
   this->Ql_in = 0;
   this->Ql_out = 0;
+  // Flushub tuc
+  // galg
 }
 
 // initialising the node graph and the chonk network
@@ -143,7 +145,7 @@ void ModelRunner::initiate_nodegraph()
 
   // Dat is the real stuff:
   // Initialising the graph
-  this->graph = NodeGraphV2(this->surface_elevation, active_nodes,this->dx, this->dy,
+  this->graph = NodeGraphV2(this->surface_elevation, this->active_nodes,this->dx, this->dy,
                             this->io_int["n_rows"], this->io_int["n_cols"], this->lake_solver);
   
   // Chonkification: initialising chonk network
@@ -217,7 +219,7 @@ void ModelRunner::run()
     // Processing that node
     // ### Saving the local production of sediment, in order to cancel it later
     double templocalQS = this->chonk_network[node].get_sediment_flux(); 
-    this->process_node(node, is_processed, lake_incrementor, underfilled_lake, active_nodes, cellarea, surface_elevation, true);   
+    this->process_node(node, is_processed, lake_incrementor, underfilled_lake, this->active_nodes, cellarea, surface_elevation, true);   
     // ### Saving the local production of sediment, in order to cancel it later
     this->local_Qs_production_for_lakes[node] = this->chonk_network[node].get_sediment_flux() - templocalQS; 
 
@@ -386,11 +388,17 @@ void ModelRunner::iterative_lake_solver()
 
     if( entry_point.volume_sed < 0)
     {
-      this->lakes[current_lake].label_prop = mix_two_proportions(this->lakes[current_lake].volume_sed, this->lakes[current_lake].label_prop,entry_point.volume_sed, entry_point.label_prop );
+      this->lakes[current_lake].label_prop = mix_two_proportions(this->lakes[current_lake].volume_sed, 
+            this->lakes[current_lake].label_prop,entry_point.volume_sed, entry_point.label_prop );
+
       this->lakes[current_lake].volume_sed += entry_point.volume_sed;
+
+      double save_volume_sed = entry_point.volume_sed;
+      
       entry_point.volume_sed = 0;
+      
       if(this->lakes[current_lake].volume_sed < 0)
-        throw("CriticalLakeError:" + std::to_string(this->lakes[current_lake].volume_sed) + " is not a valid volume for lake sediments");
+        throw std::runtime_error("CriticalLakeError:" + std::to_string(this->lakes[current_lake].volume_sed) + " is not a valid volume for lake sediments maybe " + std::to_string(save_volume_sed) + " is the problem");
     }
 
 
@@ -645,7 +653,7 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
   //----------------------------------------------------
   // Process the outlet, whithout preparing the move (Already done) and readding the precipitation-like fluxes (already taken into account).
   // local_Qs_production_for_lakes[this->lakes[current_lake].outlet] = -1 * this->chonk_network[this->lakes[current_lake].outlet].get_sediment_flux();
-  this->process_node_nolake_for_sure(this->lakes[current_lake].outlet, is_processed, active_nodes, 
+  this->process_node_nolake_for_sure(this->lakes[current_lake].outlet, is_processed, this->active_nodes, 
       cellarea,topography, false, false);
   // local_Qs_production_for_lakes[this->lakes[current_lake].outlet] += this->chonk_network[this->lakes[current_lake].outlet].get_sediment_flux();
   this->sed_added_by_prod += this->chonk_network[this->lakes[current_lake].outlet].get_erosion_flux_only_bedrock()\
@@ -836,7 +844,7 @@ void ModelRunner::label_nodes_with_no_rec_in_local_stack(std::vector<int>& local
       if(has_recs_in_local_stack[rec] == 'p' || has_recs_in_local_stack[rec] == 'o')
         has_recs_in_local_stack[node] = 'o';
     }
-    if(this->io_int_array["active_nodes"][node] == 0)
+    if(this->active_nodes[node] == false)
       has_recs_in_local_stack[node] = 'p';
   }
 }
@@ -890,7 +898,8 @@ void ModelRunner::reprocess_local_stack(std::vector<int>& local_mstack, std::vec
           continue;
         if(this->is_this_node_in_this_lake(ttnode, current_lake))
           continue;
-        if(active_nodes[ttnode])
+
+        if(this->active_nodes[ttnode])
           this->sed_added_by_donors += wws[u] *  this->chonk_network[tnode].get_sediment_flux();
         // else
         //   this->sed_added_by_donors -= wws[u] *  this->chonk_network[tnode].get_sediment_flux();
@@ -914,7 +923,7 @@ void ModelRunner::reprocess_local_stack(std::vector<int>& local_mstack, std::vec
       }
       // # So I need full reproc yaaay
       // full_delta -= this->chonk_network[tnode].get_sediment_flux();
-      this->process_node_nolake_for_sure(tnode, is_processed, active_nodes, 
+      this->process_node_nolake_for_sure(tnode, is_processed, this->active_nodes, 
         cellarea,topography, true, true);
       this->chonk_network[tnode].check_sums();
       // full_delta += this->chonk_network[tnode].get_sediment_flux();
@@ -933,7 +942,7 @@ void ModelRunner::reprocess_local_stack(std::vector<int>& local_mstack, std::vec
         int ttnode = rec[u]; 
         if(ttnode == 1752)
           std::cout << "node y giving " << wws[u] *  this->chonk_network[tnode].get_sediment_flux() << " to 1752" << std::endl;
-        if((is_in_queue[ttnode] == 'y' || ttnode == this->lakes[current_lake].outlet) && active_nodes[ttnode])
+        if((is_in_queue[ttnode] == 'y' || ttnode == this->lakes[current_lake].outlet) && this->active_nodes[ttnode])
           continue;
         if(this->is_this_node_in_this_lake(ttnode, current_lake))
           continue;
@@ -1490,7 +1499,7 @@ int ModelRunner::fill_mah_lake(EntryPoint& entry_point, std::queue<int>& iterala
   std::vector<char> is_in_lake(this->io_int["n_elements"],'n');
 
   // Very specific checekr in the rare case my entry point is an inactive internal node
-  if(active_nodes[entry_point.node] == false)
+  if(this->active_nodes[entry_point.node] == false)
   {
     outlet = entry_point.node;
   }
@@ -1503,7 +1512,7 @@ int ModelRunner::fill_mah_lake(EntryPoint& entry_point, std::queue<int>& iterala
     // then pop the next node
     depressionfiller.pop();
     // go through neighbours manually and either feed the queue or detect an outlet
-    std::vector<int> neightbors; std::vector<double> dummy ; graph.get_D8_neighbors(next_node.node, active_nodes, neightbors, dummy);
+    std::vector<int> neightbors; std::vector<double> dummy ; graph.get_D8_neighbors(next_node.node, this->active_nodes, neightbors, dummy);
 
     // For each of the neighbouring node: checking their status
     for(auto tnode:neightbors)
@@ -1553,7 +1562,7 @@ int ModelRunner::fill_mah_lake(EntryPoint& entry_point, std::queue<int>& iterala
         for(auto tnode : this->lakes[current_lake].nodes)
           topography[tnode] = this->lakes[current_lake].water_elevation;
         // get all flat nodes around that one but the outlet
-        std::vector<int> fnodes = this->graph.get_all_flat_from_node(next_node.node, topography, active_nodes);
+        std::vector<int> fnodes = this->graph.get_all_flat_from_node(next_node.node, topography, this->active_nodes);
         for(auto tnode : fnodes)
         {
           if(is_in_lake[tnode] == 'n' && tnode != outlet)
@@ -1772,7 +1781,7 @@ void ModelRunner::drink_lake(int id_eater, int id_edible, EntryPoint& entry_poin
     {      
       int n_DS_n = 0;
       int n_DS_o = 0;
-      std::vector<int> neightbors; std::vector<double> dummy ; graph.get_D8_neighbors(this->lakes[id_edible].outlet, active_nodes, neightbors, dummy);
+      std::vector<int> neightbors; std::vector<double> dummy ; graph.get_D8_neighbors(this->lakes[id_edible].outlet, this->active_nodes, neightbors, dummy);
       for(auto tnode:neightbors)
       {
         if(this->topography[tnode] < this->topography[this->lakes[id_edible].outlet])
@@ -1846,17 +1855,17 @@ void ModelRunner::original_gathering_of_water_and_sed_from_pixel_or_flat_area(in
     int next_node = FIFO.front();
     FIFO.pop();
 
-    std::vector<int> neightbors; std::vector<double> dummy ; graph.get_D8_neighbors(next_node, active_nodes, neightbors, dummy);
+    std::vector<int> neightbors; std::vector<double> dummy ; graph.get_D8_neighbors(next_node, this->active_nodes, neightbors, dummy);
     double telev = topography[next_node];
 
     for(auto tnode:neightbors)
     {
-      if(active_nodes[tnode] == false)
+      if(this->active_nodes[tnode] == false)
         continue;
       if(is_in_queue[tnode] == 'y')
         continue;
 
-      if(topography[tnode] == telev)
+      if(this->topography[tnode] == telev)
       {
         FIFO.push(tnode);
         is_in_queue[tnode] = 'y';
@@ -1916,7 +1925,7 @@ void ModelRunner::process_node(int& node, std::vector<bool>& is_processed, int& 
     else
     {
       // If the lake solver is not activated, I am transferring the fluxes to the receiver according to Cordonnier et al. planar graph (see node graph)  
-      if(active_nodes[node] && this->graph.is_depression(node))
+      if(this->active_nodes[node] && this->graph.is_depression(node))
       {
         // Getting the so-called node
         int next_node = this->graph.get_Srec(node);
@@ -1931,7 +1940,8 @@ void ModelRunner::process_node(int& node, std::vector<bool>& is_processed, int& 
         // Applying the fluxes modifyers
         this->manage_fluxes_after_moving_prep(this->chonk_network[node],this->label_array[node]);
         // Splitting the fluxes
-        this->chonk_network[node].split_and_merge_in_receiving_chonks(this->chonk_network, this->graph, this->surface_elevation_tp1, io_double_array["sed_height_tp1"], this->timestep);
+        this->chonk_network[node].split_and_merge_in_receiving_chonks(this->chonk_network, this->graph, this->surface_elevation_tp1, 
+          io_double_array["sed_height_tp1"], this->timestep);
         is_processed[node] = true;
         // Done        
       }
@@ -2042,7 +2052,7 @@ void ModelRunner::finalise()
     this->Qs_mass_balance += this->chonk_network[i].get_deposition_flux() * cellarea * timestep;
 
 
-    if(active_nodes[i] == 0)
+    if(this->active_nodes[i] == false)
       continue;
 
     // Getting the current chonk
@@ -2155,7 +2165,7 @@ void ModelRunner::finalise()
   // xt::pytensor<int,1>& active_nodes = this->io_int_array["active_nodes"];
   for(int i =0; i<this->io_int["n_elements"]; i++)
   {
-    if(active_nodes[i] == 0)
+    if(this->active_nodes[i] == false)
     {
       this->Qw_out += this->chonk_network[i].get_water_flux();
       this->Qs_mass_balance += this->chonk_network[i].get_sediment_flux();
@@ -2432,70 +2442,100 @@ void ModelRunner::manage_move_prep(chonk& this_chonk)
 
 void ModelRunner::manage_fluxes_after_moving_prep(chonk& this_chonk, int label_id)
 {
-  bool has_moved = false;
-  for(auto method:this->ordered_flux_methods)
+  int index = this_chonk.get_current_location();
+  std::vector<double> these_sed_props(this->n_labels,0.);
+  if(is_there_sed_here[index] && this->sed_prop_by_label[index].size()>0) // I SHOULD NOT NEED THE SECOND THING, WHY DO I FUTURE BORIS????
+    these_sed_props = this->sed_prop_by_label[index][this->sed_prop_by_label[index].size() - 1];
+
+  if(this->CHARLIE_I)
   {
-    int index = this_chonk.get_current_location();
-    std::vector<double> these_sed_props(this->n_labels,0.);
-    if(is_there_sed_here[index] && this->sed_prop_by_label[index].size()>0) // I SHOULD NOT NEED THE SECOND THING, WHY DO I FUTURE BORIS????
-      these_sed_props = this->sed_prop_by_label[index][this->sed_prop_by_label[index].size() - 1];
-    
-    if(method == "move")
-    {
-       has_moved = true;
-       continue;
-    }
 
-    if(has_moved == false)
-      continue;
+    double this_Kr = this->labelz_list[label_id].Kr_modifyer * this->labelz_list[label_id].base_K;
+    double this_Ks = this->labelz_list[label_id].Ks_modifyer * this->labelz_list[label_id].base_K;
 
-    int this_case = intcorrespondance[method];
-    switch(this_case)
-    {
-      case 1:
-      // Classic SPL /!\ probs deprecatedx
-        this_chonk.active_simple_SPL(this->labelz_list_double["SPIL_n"][label_id], this->labelz_list_double["SPIL_m"][label_id], this->labelz_list_double["SPIL_K"][label_id], this->timestep, this->dx, this->dy, label_id);
-        break;
-      case 8:
-      // The SPACE model aka CHARLIE_I
-        this_chonk.charlie_I(this->labelz_list_double["SPIL_n"][label_id], this->labelz_list_double["SPIL_m"][label_id], this->labelz_list_double["CHARLIE_I_Kr"][label_id], 
-  this->labelz_list_double["CHARLIE_I_Ks"][label_id],
-  this->labelz_list_double["CHARLIE_I_dimless_roughness"][label_id], this->io_double_array["sed_height"][index], 
-  this->labelz_list_double["CHARLIE_I_V"][label_id], 
-  this->labelz_list_double["CHARLIE_I_dstar"][label_id], this->labelz_list_double["CHARLIE_I_threshold_incision"][label_id], 
-  this->labelz_list_double["CHARLIE_I_threshold_entrainment"][label_id],
-  label_id, these_sed_props, this->timestep,  this->dx, this->dy);
-        
-        break;
-      case 11:
-      // The SPACE model aka CHARLIE_I
-        this_chonk.charlie_I_K_fQs(this->labelz_list_double["SPIL_n"][label_id], this->labelz_list_double["SPIL_m"][label_id], this->labelz_list_double["CHARLIE_I_Kr"][label_id], 
-  this->labelz_list_double["CHARLIE_I_Ks"][label_id],
-  this->labelz_list_double["CHARLIE_I_dimless_roughness"][label_id], this->io_double_array["sed_height"][index], 
-  this->labelz_list_double["CHARLIE_I_V"][label_id], 
-  this->labelz_list_double["CHARLIE_I_dstar"][label_id], this->labelz_list_double["CHARLIE_I_threshold_incision"][label_id], 
-  this->labelz_list_double["CHARLIE_I_threshold_entrainment"][label_id],
-  label_id, these_sed_props, this->timestep,  this->dx, this->dy, this->labelz_list_double["CHARLIE_I_Krmodifyer"]);
-        break;
-
-      case 9:
-      // Cidre hillslope method, only on the sediment layer
-        this_chonk.CidreHillslopes(this->io_double_array["sed_height"][index], this->labelz_list_double["Cidre_HS_kappa_s"][label_id], 
-          0., this->labelz_list_double["Cidre_HS_critical_slope"][label_id],
-  label_id, these_sed_props, this->timestep, this->dx, this->dy, false, this->graph, 1e-6);
-        break;
-      case 10:
-      // Cidre hillslope method, both sed and bedrock
-        this_chonk.CidreHillslopes(this->io_double_array["sed_height"][index], this->labelz_list_double["Cidre_HS_kappa_s"][label_id], 
-            this->labelz_list_double["Cidre_HS_kappa_r"][label_id], this->labelz_list_double["Cidre_HS_critical_slope"][label_id],
-    label_id, these_sed_props, this->timestep, this->dx, this->dy, true, this->graph, 1e-6);
-          break;
-
-      default:
-        break;
-    }
+    this_chonk.charlie_I(this->labelz_list[label_id].n, this->labelz_list[label_id].m, this_Kr, this_Ks,
+    this->labelz_list[label_id].dimless_roughness, this->io_double_array["sed_height"][index], 
+    this->labelz_list[label_id].V, this->labelz_list[label_id].dstar, this->labelz_list[label_id].threshold_incision, 
+    this->labelz_list[label_id].threshold_entrainment,label_id, these_sed_props, this->timestep,  this->dx, this->dy);
   }
+
+  if(this->CIDRE_HS)
+  {
+
+    double this_kappas = this->labelz_list[label_id].kappa_s_mod * this->labelz_list[label_id].kappa_base;
+    double this_kappar = this->labelz_list[label_id].kappa_r_mod * this->labelz_list[label_id].kappa_base;
+
+    this_chonk.CidreHillslopes(this->io_double_array["sed_height"][index], this_kappas, 
+            this_kappar, this->labelz_list[label_id].critical_slope,
+    label_id, these_sed_props, this->timestep, this->dx, this->dy, true, this->graph, 1e-6);
+  }
+
   return;
+
+  // bool has_moved = false;
+  // for(auto method:this->ordered_flux_methods)
+  // {
+  //   int index = this_chonk.get_current_location();
+  //   std::vector<double> these_sed_props(this->n_labels,0.);
+  //   if(is_there_sed_here[index] && this->sed_prop_by_label[index].size()>0) // I SHOULD NOT NEED THE SECOND THING, WHY DO I FUTURE BORIS????
+  //     these_sed_props = this->sed_prop_by_label[index][this->sed_prop_by_label[index].size() - 1];
+    
+  //   if(method == "move")
+  //   {
+  //      has_moved = true;
+  //      continue;
+  //   }
+
+  //   if(has_moved == false)
+  //     continue;
+
+  //   int this_case = intcorrespondance[method];
+  //   switch(this_case)
+  //   {
+  //     case 1:
+  //     // Classic SPL /!\ probs deprecatedx
+  //       this_chonk.active_simple_SPL(this->labelz_list_double["SPIL_n"][label_id], this->labelz_list_double["SPIL_m"][label_id], this->labelz_list_double["SPIL_K"][label_id], this->timestep, this->dx, this->dy, label_id);
+  //       break;
+  //     case 8:
+  //     // The SPACE model aka CHARLIE_I
+  //       this_chonk.charlie_I(this->labelz_list_double["SPIL_n"][label_id], this->labelz_list_double["SPIL_m"][label_id], this->labelz_list_double["CHARLIE_I_Kr"][label_id], 
+  // this->labelz_list_double["CHARLIE_I_Ks"][label_id],
+  // this->labelz_list_double["CHARLIE_I_dimless_roughness"][label_id], this->io_double_array["sed_height"][index], 
+  // this->labelz_list_double["CHARLIE_I_V"][label_id], 
+  // this->labelz_list_double["CHARLIE_I_dstar"][label_id], this->labelz_list_double["CHARLIE_I_threshold_incision"][label_id], 
+  // this->labelz_list_double["CHARLIE_I_threshold_entrainment"][label_id],
+  // label_id, these_sed_props, this->timestep,  this->dx, this->dy);
+        
+  //       break;
+  //     case 11:
+  //     // The SPACE model aka CHARLIE_I
+  //       this_chonk.charlie_I_K_fQs(this->labelz_list_double["SPIL_n"][label_id], this->labelz_list_double["SPIL_m"][label_id], this->labelz_list_double["CHARLIE_I_Kr"][label_id], 
+  // this->labelz_list_double["CHARLIE_I_Ks"][label_id],
+  // this->labelz_list_double["CHARLIE_I_dimless_roughness"][label_id], this->io_double_array["sed_height"][index], 
+  // this->labelz_list_double["CHARLIE_I_V"][label_id], 
+  // this->labelz_list_double["CHARLIE_I_dstar"][label_id], this->labelz_list_double["CHARLIE_I_threshold_incision"][label_id], 
+  // this->labelz_list_double["CHARLIE_I_threshold_entrainment"][label_id],
+  // label_id, these_sed_props, this->timestep,  this->dx, this->dy, this->labelz_list_double["CHARLIE_I_Krmodifyer"]);
+  //       break;
+
+  //     case 9:
+  //     // Cidre hillslope method, only on the sediment layer
+  //       this_chonk.CidreHillslopes(this->io_double_array["sed_height"][index], this->labelz_list_double["Cidre_HS_kappa_s"][label_id], 
+  //         0., this->labelz_list_double["Cidre_HS_critical_slope"][label_id],
+  // label_id, these_sed_props, this->timestep, this->dx, this->dy, false, this->graph, 1e-6);
+  //       break;
+  //     case 10:
+  //     // Cidre hillslope method, both sed and bedrock
+  //       this_chonk.CidreHillslopes(this->io_double_array["sed_height"][index], this->labelz_list_double["Cidre_HS_kappa_s"][label_id], 
+  //           this->labelz_list_double["Cidre_HS_kappa_r"][label_id], this->labelz_list_double["Cidre_HS_critical_slope"][label_id],
+  //   label_id, these_sed_props, this->timestep, this->dx, this->dy, true, this->graph, 1e-6);
+  //         break;
+
+  //     default:
+  //       break;
+  //   }
+  // }
+  // return;
 }
 
 // Initialise ad-hoc set of internal correspondance between process names and integer

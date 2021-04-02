@@ -50,6 +50,24 @@ public:
     labelz(int id){this->label_id = label_id;};
     // ID and place in the labelz vector
     int label_id;
+
+    double m = 0.45;
+    double n = 1;
+    double base_K = 1e-5;
+    double Ks_modifyer = 1.2;
+    double Kr_modifyer = 0.8;
+    double dimless_roughness = 0.5;
+    double V = 0.5;
+    double dstar = 1;
+    double threshold_incision = 0;
+    double threshold_entrainment = 0;
+
+    double kappa_base = 1e-5;
+    double kappa_r_mod = 0.8;
+    double kappa_s_mod = 1.5;
+    double critical_slope = 0.6;
+
+    // Old stuffus  
     // integers attributes
     std::unordered_map<std::string, int> int_attributes;
     // floating points attributes
@@ -389,6 +407,8 @@ std::vector<double>& pre_sed, std::vector<double>& pre_water);
     void set_surface_elevation(xt::pytensor<double,1>&& tsurface_elevation){this->surface_elevation = tsurface_elevation;}
     void set_surface_elevation_tp1(xt::pytensor<double,1>&& tsurface_elevation_tp1){this->surface_elevation_tp1 = tsurface_elevation_tp1;}
     void set_topography(xt::pytensor<double,1>&& ttopography){this->topography = ttopography;}
+    void set_sed_height(xt::pytensor<double,1>&& tsed_height){this->sed_height = tsed_height;}
+    void set_sed_height_tp1(xt::pytensor<double,1>&& tsed_height_tp1){this->sed_height_tp1 = tsed_height_tp1;}
     void set_active_nodes(xt::pytensor<bool,1>&& tactive_nodes){this->active_nodes = tactive_nodes;}
 
     // new getter
@@ -413,10 +433,12 @@ std::vector<double>& pre_sed, std::vector<double>& pre_water);
     double dy;
     double cellarea;
 
-
+    // Activators
     // lake switch, if True: dynamic lake modelling
     // if false: fluxes rerouted from flux bottom to outlet
     bool lake_solver;
+    bool CHARLIE_I = true;
+    bool CIDRE_HS = false;
 
     // All the methods affecting the fluxes in the right order you want to apply it 
     // Important::it requires the strng "move" at the place at which the move method will be called
@@ -451,6 +473,10 @@ std::vector<double>& pre_sed, std::vector<double>& pre_water);
     xt::pytensor<double,1> topography;
     // active-node array, needed for node graphing around
     xt::pytensor<bool,1> active_nodes;
+    //sed_height
+    xt::pytensor<double,1> sed_height;
+    xt::pytensor<double,1> sed_height_tp1;
+
 
 
 
