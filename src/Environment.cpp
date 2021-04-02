@@ -136,11 +136,14 @@ void ModelRunner::initiate_nodegraph()
   // std::cout << "initiating nodegraph..." <<std::endl;
   // Creating the nodegraph and preprocessing the depression nodes
   this->topography = xt::pytensor<double,1>(this->surface_elevation);
+  this->dx = this->io_double["dx"];
+  this->dy = this->io_double["dy"];
+  this->cellarea = this->dx * this->dy;
 
 
   // Dat is the real stuff:
   // Initialising the graph
-  this->graph = NodeGraphV2(this->surface_elevation, active_nodes,this->io_double["dx"], this->io_double["dy"],
+  this->graph = NodeGraphV2(this->surface_elevation, active_nodes,this->dx, this->dy,
                             this->io_int["n_rows"], this->io_int["n_cols"], this->lake_solver);
   
   // Chonkification: initialising chonk network
@@ -199,10 +202,7 @@ void ModelRunner::run()
   is_processed = std::vector<bool>(io_int["n_elements"],false);
   this->local_Qs_production_for_lakes = std::vector<double>(this->io_int["n_elements"],0);
 
-  // Aliases for efficiency
-  xt::pytensor<int,1>& inctive_nodes = this->io_int_array["active_nodes"];
-  xt::pytensor<double,1>& surface_elevation =  this->surface_elevation;
-  double cellarea = this->io_double["dx"] * this->io_double["dy"];
+  double cellarea = this->dx * this->dy;
 
   // Debug checker
   int underfilled_lake = 0;
@@ -217,7 +217,7 @@ void ModelRunner::run()
     // Processing that node
     // ### Saving the local production of sediment, in order to cancel it later
     double templocalQS = this->chonk_network[node].get_sediment_flux(); 
-    this->process_node(node, is_processed, lake_incrementor, underfilled_lake, inctive_nodes, cellarea, surface_elevation, true);   
+    this->process_node(node, is_processed, lake_incrementor, underfilled_lake, active_nodes, cellarea, surface_elevation, true);   
     // ### Saving the local production of sediment, in order to cancel it later
     this->local_Qs_production_for_lakes[node] = this->chonk_network[node].get_sediment_flux() - templocalQS; 
 
@@ -488,7 +488,7 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
   sed_outletting_system = 0;
 
   // temp variable I need for the processing function
-  double cellarea = this->io_double["dx"] * this->io_double["dy"];
+  double cellarea = this->dx * this->dy;
 
   // Debug tracker to check wether this specific iteration was adding water (needed it during the (very painful) mass balance checks)
   bool was_0 = false;
@@ -497,7 +497,6 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
 
   // I will need these aliases from the global maps
   xt::pytensor<double,1>& topography = this->topography;
-  xt::pytensor<int,1>& active_nodes = this->io_int_array["active_nodes"];
 
   // Initialising a priority queue sorting the nodes to reprocess by their id in the Mstack. the smallest Ids should come first
   // Because I am only processing nodes in between 2 discrete lakes, it should not be a problem
@@ -656,11 +655,11 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
       cellarea,topography, false, false);
   // local_Qs_production_for_lakes[this->lakes[current_lake].outlet] += this->chonk_network[this->lakes[current_lake].outlet].get_sediment_flux();
   this->sed_added_by_prod += this->chonk_network[this->lakes[current_lake].outlet].get_erosion_flux_only_bedrock()\
-   * this->timestep * this->io_double["dx"] * this->io_double["dy"];
+   * this->timestep * this->dx * this->dy;
   this->sed_added_by_prod += this->chonk_network[this->lakes[current_lake].outlet].get_erosion_flux_only_sediments()\
-   * this->timestep * this->io_double["dx"] * this->io_double["dy"];
+   * this->timestep * this->dx * this->dy;
   this->sed_added_by_prod -= this->chonk_network[this->lakes[current_lake].outlet].get_deposition_flux()\
-   * this->timestep * this->io_double["dx"] * this->io_double["dy"];
+   * this->timestep * this->dx * this->dy;
 
 
   std::vector<int> rec;std::vector<double> wwf;std::vector<double> wws; std::vector<double> strec; 
@@ -852,11 +851,6 @@ void ModelRunner::reprocess_local_stack(std::vector<int>& local_mstack, std::vec
   std::map<int,double>& WF_corrector, std::map<int,double>& SF_corrector, 
   std::map<int,std::vector<double> >& SL_corrector)
 {
-  // I will need that
-  double cellarea = this->io_double["dx"] * this->io_double["dy"];
-  // I will need these aliases from the global maps
-  xt::pytensor<double,1>& topography = this->topography;
-  xt::pytensor<int,1>& active_nodes = this->io_int_array["active_nodes"];
   
   // double full_delta = 0;
 
@@ -932,11 +926,11 @@ void ModelRunner::reprocess_local_stack(std::vector<int>& local_mstack, std::vec
       // full_delta += this->chonk_network[tnode].get_sediment_flux();
       // local_Qs_production_for_lakes[tnode] = full_delta;
       this->sed_added_by_prod += this->chonk_network[tnode].get_erosion_flux_only_bedrock()\
-   * this->timestep * this->io_double["dx"] * this->io_double["dy"];
+   * this->timestep * this->dx * this->dy;
   this->sed_added_by_prod += this->chonk_network[tnode].get_erosion_flux_only_sediments()\
-   * this->timestep * this->io_double["dx"] * this->io_double["dy"];
+   * this->timestep * this->dx * this->dy;
   this->sed_added_by_prod -= this->chonk_network[tnode].get_deposition_flux()\
-   * this->timestep * this->io_double["dx"] * this->io_double["dy"];
+   * this->timestep * this->dx * this->dy;
 
       std::vector<int> rec;std::vector<double> wwf;std::vector<double> wws; std::vector<double> strec; 
       this->chonk_network[tnode].copy_moving_prep(rec,wwf, wws, strec);
@@ -1088,7 +1082,7 @@ chonk ModelRunner::preprocess_outletting_chonk(chonk tchonk, EntryPoint& entry_p
 {
   xt::pytensor<double,1>& topography = this->topography;
   xt::pytensor<int,1>& active_nodes = this->io_int_array["active_nodes"];
-  double cellarea = this->io_double["dx"] * this->io_double["dy"];
+  double cellarea = this->dx * this->dy;
   // Getting the additioned water rate
   // std::cout << "I WATER RATE IS " << tchonk.get_water_flux() << std::endl;
   double water_rate = entry_point.volume_water / this->timestep;
@@ -1474,7 +1468,7 @@ int ModelRunner::fill_mah_lake(EntryPoint& entry_point, std::queue<int>& iterala
   // Aliases and shortcups
   xt::pytensor<double,1>& topography = this->topography;
   xt::pytensor<int,1>& active_nodes = this->io_int_array["active_nodes"];
-  double cellarea = this->io_double["dx"] * this->io_double["dy"];
+  double cellarea = this->dx * this->dy;
 
   // Starting by adding the first node of the list
   depressionfiller.emplace(nodium(entry_point.node, topography[entry_point.node]));
@@ -1548,7 +1542,7 @@ int ModelRunner::fill_mah_lake(EntryPoint& entry_point, std::queue<int>& iterala
     }
 
     // calculating the xy surface of the lake
-    double area_component_of_volume = int(this->lakes[current_lake].nodes.size()) * this->io_double["dx"] * this->io_double["dy"];
+    double area_component_of_volume = int(this->lakes[current_lake].nodes.size()) * this->dx * this->dy;
     // Calculating the maximum volume to add until next node
     double dV = (next_node.elevation - this->lakes[current_lake].water_elevation) * area_component_of_volume;
 
@@ -1908,7 +1902,7 @@ void ModelRunner::original_gathering_of_water_and_sed_from_pixel_or_flat_area(in
 }
 
 void ModelRunner::process_node(int& node, std::vector<bool>& is_processed, int& lake_incrementor, int& underfilled_lake,
-  xt::pytensor<int,1>& inctive_nodes, double& cellarea, xt::pytensor<double,1>& surface_elevation, bool need_move_prep)
+  xt::pytensor<bool,1>& active_nodes, double& cellarea, xt::pytensor<double,1>& surface_elevation, bool need_move_prep)
 {
     // Just a check: if the lake solver is not activated, I have no reason to reprocess node
     if(this->lake_solver == false && is_processed[node])
@@ -1939,7 +1933,7 @@ void ModelRunner::process_node(int& node, std::vector<bool>& is_processed, int& 
     else
     {
       // If the lake solver is not activated, I am transferring the fluxes to the receiver according to Cordonnier et al. planar graph (see node graph)  
-      if(inctive_nodes[node] == 1 && this->graph.is_depression(node))
+      if(active_nodes[node] && this->graph.is_depression(node))
       {
         // Getting the so-called node
         int next_node = this->graph.get_Srec(node);
@@ -1954,7 +1948,7 @@ void ModelRunner::process_node(int& node, std::vector<bool>& is_processed, int& 
         // Applying the fluxes modifyers
         this->manage_fluxes_after_moving_prep(this->chonk_network[node],this->label_array[node]);
         // Splitting the fluxes
-        this->chonk_network[node].split_and_merge_in_receiving_chonks(this->chonk_network, this->graph, this->io_double_array["surface_elevation_tp1"], io_double_array["sed_height_tp1"], this->timestep);
+        this->chonk_network[node].split_and_merge_in_receiving_chonks(this->chonk_network, this->graph, this->surface_elevation_tp1, io_double_array["sed_height_tp1"], this->timestep);
         is_processed[node] = true;
         // Done        
       }
@@ -1984,11 +1978,11 @@ void ModelRunner::process_node(int& node, std::vector<bool>& is_processed, int& 
     // Fluxes after moving prep are active fluxes such as erosion or other thingies
     this->manage_fluxes_after_moving_prep(this->chonk_network[node],this->label_array[node]);
     // Apply the changes and propagate the fluxes downstream
-    this->chonk_network[node].split_and_merge_in_receiving_chonks(this->chonk_network, this->graph, this->io_double_array["surface_elevation_tp1"], io_double_array["sed_height_tp1"], this->timestep);
+    this->chonk_network[node].split_and_merge_in_receiving_chonks(this->chonk_network, this->graph, this->surface_elevation_tp1, io_double_array["sed_height_tp1"], this->timestep);
 }
 
 void ModelRunner::process_node_nolake_for_sure(int node, std::vector<bool>& is_processed,
-  xt::pytensor<int,1>& inctive_nodes, double& cellarea, xt::pytensor<double,1>& surface_elevation, bool need_move_prep, bool need_flux_before_move)
+  xt::pytensor<bool,1>& active_nodes, double& cellarea, xt::pytensor<double,1>& surface_elevation, bool need_move_prep, bool need_flux_before_move)
 {
   local_Qs_production_for_lakes[node] = -1 * this->chonk_network[node].get_sediment_flux() ;
 
@@ -2008,15 +2002,15 @@ void ModelRunner::process_node_nolake_for_sure(int node, std::vector<bool>& is_p
   // this->chonk_network[node].print_status();
   this->manage_fluxes_after_moving_prep(this->chonk_network[node],this->label_array[node]);
   
-  // if(this->chonk_network[node].get_chonk_receivers().size() == 0 && inctive_nodes[node] > 0)
+  // if(this->chonk_network[node].get_chonk_receivers().size() == 0 && active_nodes[node] > 0)
   //   throw std::runtime_error("NoRecError::internal flux broken");
   
-  this->chonk_network[node].split_and_merge_in_receiving_chonks(this->chonk_network, this->graph, this->io_double_array["surface_elevation_tp1"], io_double_array["sed_height_tp1"], this->timestep);
+  this->chonk_network[node].split_and_merge_in_receiving_chonks(this->chonk_network, this->graph, this->surface_elevation_tp1, io_double_array["sed_height_tp1"], this->timestep);
   local_Qs_production_for_lakes[node] +=  this->chonk_network[node].get_sediment_flux() ;
 }
 
 void ModelRunner::process_node_nolake_for_sure(int node, std::vector<bool>& is_processed,
-  xt::pytensor<int,1>& inctive_nodes, double& cellarea, xt::pytensor<double,1>& surface_elevation, bool need_move_prep, bool need_flux_before_move, std::vector<int>& ignore_some)
+  xt::pytensor<bool,1>& active_nodes, double& cellarea, xt::pytensor<double,1>& surface_elevation, bool need_move_prep, bool need_flux_before_move, std::vector<int>& ignore_some)
 {
   local_Qs_production_for_lakes[node] = -1 * this->chonk_network[node].get_sediment_flux() ;
 
@@ -2043,14 +2037,11 @@ void ModelRunner::finalise()
 {
   // Finilising the timestep by applying the changes to the thingy
   // First gathering all the aliases 
-  xt::pytensor<double,1>& surface_elevation_tp1 = this->io_double_array["surface_elevation_tp1"];
-  xt::pytensor<double,1>& surface_elevation = this->surface_elevation;
-  xt::pytensor<double,1>& topography = this->topography;
   xt::pytensor<double,1>& sed_height_tp1 = this->io_double_array["sed_height_tp1"];
   xt::pytensor<double,1>& sed_height = this->io_double_array["sed_height"];
   // xt::pytensor<double,1> tlake_depth = xt::zeros<double>({size_t(this->io_int["n_elements"])});
   xt::pytensor<int,1>& active_nodes = this->io_int_array["active_nodes"];
-  double cellarea = this->io_double["dx"] * this->io_double["dy"];
+  double cellarea = this->dx * this->dy;
 
   // First dealing with lake deposition:
   this->drape_deposition_flux_to_chonks();
@@ -2170,7 +2161,7 @@ void ModelRunner::finalise()
   this->Ql_out = 0;
   for(int i=0; i<this->io_int["n_elements"]; i++)
   {
-    this->Ql_out += (tlake_depth[i] - this->io_double_array["lake_depth"][i]) * this->io_double["dx"] * this->io_double["dy"] / this->timestep;
+    this->Ql_out += (tlake_depth[i] - this->io_double_array["lake_depth"][i]) * this->dx * this->dy / this->timestep;
   }
 
   
@@ -2388,16 +2379,16 @@ void ModelRunner::manage_fluxes_before_moving_prep(chonk& this_chonk, int label_
     switch(this_case)
     {
       case 5:
-        this_chonk.inplace_only_drainage_area(this->io_double["dx"], this->io_double["dy"]);
-        this->Qw_in += this->io_double["dx"]* this->io_double["dy"];
+        this_chonk.inplace_only_drainage_area(this->dx, this->dy);
+        this->Qw_in += this->dx* this->dy;
         break;
       case 6:
-        this_chonk.inplace_precipitation_discharge(this->io_double["dx"], this->io_double["dy"],this->io_double_array["precipitation"]);
-        this->Qw_in += this->io_double_array["precipitation"][this_chonk.get_current_location()] * this->io_double["dx"]* this->io_double["dy"];
+        this_chonk.inplace_precipitation_discharge(this->dx, this->dy,this->io_double_array["precipitation"]);
+        this->Qw_in += this->io_double_array["precipitation"][this_chonk.get_current_location()] * this->dx* this->dy;
         break;
       case 7:
-        this_chonk.inplace_infiltration(this->io_double["dx"], this->io_double["dy"], this->io_double_array["infiltration"]);
-        this->Qw_out += this->io_double_array["infiltration"][this_chonk.get_current_location()] * this->io_double["dx"]* this->io_double["dy"];
+        this_chonk.inplace_infiltration(this->dx, this->dy, this->io_double_array["infiltration"]);
+        this->Qw_out += this->io_double_array["infiltration"][this_chonk.get_current_location()] * this->dx* this->dy;
         break;
     }
 
@@ -2415,16 +2406,16 @@ void ModelRunner::cancel_fluxes_before_moving_prep(chonk& this_chonk, int label_
     switch(this_case)
     {
       case 5:
-        this_chonk.cancel_inplace_only_drainage_area(this->io_double["dx"], this->io_double["dy"]);
-        this->Qw_in -= this->io_double["dx"]* this->io_double["dy"];
+        this_chonk.cancel_inplace_only_drainage_area(this->dx, this->dy);
+        this->Qw_in -= this->dx* this->dy;
         break;
       case 6:
-        this_chonk.cancel_inplace_precipitation_discharge(this->io_double["dx"], this->io_double["dy"],this->io_double_array["precipitation"]);
-        this->Qw_in -= this->io_double_array["precipitation"][this_chonk.get_current_location()] * this->io_double["dx"]* this->io_double["dy"];
+        this_chonk.cancel_inplace_precipitation_discharge(this->dx, this->dy,this->io_double_array["precipitation"]);
+        this->Qw_in -= this->io_double_array["precipitation"][this_chonk.get_current_location()] * this->dx* this->dy;
         break;
       case 7:
-        this_chonk.cancel_inplace_infiltration(this->io_double["dx"], this->io_double["dy"], this->io_double_array["infiltration"]);
-        this->Qw_out -= this->io_double_array["infiltration"][this_chonk.get_current_location()] * this->io_double["dx"]* this->io_double["dy"];
+        this_chonk.cancel_inplace_infiltration(this->dx, this->dy, this->io_double_array["infiltration"]);
+        this->Qw_out -= this->io_double_array["infiltration"][this_chonk.get_current_location()] * this->dx* this->dy;
         break;
     }
 
@@ -2441,15 +2432,15 @@ void ModelRunner::manage_move_prep(chonk& this_chonk)
   switch(this_case)
   {
     case 2:
-      this_chonk.move_to_steepest_descent(this->graph, this->timestep,  this->topography, this->io_double["dx"], this->io_double["dy"], chonk_network);
+      this_chonk.move_to_steepest_descent(this->graph, this->timestep,  this->topography, this->dx, this->dy, chonk_network);
       break;
     case 3:
       this_chonk.move_MF_from_fastscapelib(this->graph, this->io_double_array2d["external_weigths_water"], this->timestep, 
-   this->topography, this->io_double["dx"], this->io_double["dy"], chonk_network);
+   this->topography, this->dx, this->dy, chonk_network);
       break;
     case 4:
       this_chonk.move_MF_from_fastscapelib_threshold_SF(this->graph, this->io_double["threshold_single_flow"], this->timestep,  this->topography, 
-        this->io_double["dx"], this->io_double["dy"], chonk_network);
+        this->dx, this->dy, chonk_network);
       break;
       
     default:
@@ -2481,7 +2472,7 @@ void ModelRunner::manage_fluxes_after_moving_prep(chonk& this_chonk, int label_i
     {
       case 1:
       // Classic SPL /!\ probs deprecatedx
-        this_chonk.active_simple_SPL(this->labelz_list_double["SPIL_n"][label_id], this->labelz_list_double["SPIL_m"][label_id], this->labelz_list_double["SPIL_K"][label_id], this->timestep, this->io_double["dx"], this->io_double["dy"], label_id);
+        this_chonk.active_simple_SPL(this->labelz_list_double["SPIL_n"][label_id], this->labelz_list_double["SPIL_m"][label_id], this->labelz_list_double["SPIL_K"][label_id], this->timestep, this->dx, this->dy, label_id);
         break;
       case 8:
       // The SPACE model aka CHARLIE_I
@@ -2491,7 +2482,7 @@ void ModelRunner::manage_fluxes_after_moving_prep(chonk& this_chonk, int label_i
   this->labelz_list_double["CHARLIE_I_V"][label_id], 
   this->labelz_list_double["CHARLIE_I_dstar"][label_id], this->labelz_list_double["CHARLIE_I_threshold_incision"][label_id], 
   this->labelz_list_double["CHARLIE_I_threshold_entrainment"][label_id],
-  label_id, these_sed_props, this->timestep,  this->io_double["dx"], this->io_double["dy"]);
+  label_id, these_sed_props, this->timestep,  this->dx, this->dy);
         
         break;
       case 11:
@@ -2502,20 +2493,20 @@ void ModelRunner::manage_fluxes_after_moving_prep(chonk& this_chonk, int label_i
   this->labelz_list_double["CHARLIE_I_V"][label_id], 
   this->labelz_list_double["CHARLIE_I_dstar"][label_id], this->labelz_list_double["CHARLIE_I_threshold_incision"][label_id], 
   this->labelz_list_double["CHARLIE_I_threshold_entrainment"][label_id],
-  label_id, these_sed_props, this->timestep,  this->io_double["dx"], this->io_double["dy"], this->labelz_list_double["CHARLIE_I_Krmodifyer"]);
+  label_id, these_sed_props, this->timestep,  this->dx, this->dy, this->labelz_list_double["CHARLIE_I_Krmodifyer"]);
         break;
 
       case 9:
       // Cidre hillslope method, only on the sediment layer
         this_chonk.CidreHillslopes(this->io_double_array["sed_height"][index], this->labelz_list_double["Cidre_HS_kappa_s"][label_id], 
           0., this->labelz_list_double["Cidre_HS_critical_slope"][label_id],
-  label_id, these_sed_props, this->timestep, this->io_double["dx"], this->io_double["dy"], false, this->graph, 1e-6);
+  label_id, these_sed_props, this->timestep, this->dx, this->dy, false, this->graph, 1e-6);
         break;
       case 10:
       // Cidre hillslope method, both sed and bedrock
         this_chonk.CidreHillslopes(this->io_double_array["sed_height"][index], this->labelz_list_double["Cidre_HS_kappa_s"][label_id], 
             this->labelz_list_double["Cidre_HS_kappa_r"][label_id], this->labelz_list_double["Cidre_HS_critical_slope"][label_id],
-    label_id, these_sed_props, this->timestep, this->io_double["dx"], this->io_double["dy"], true, this->graph, 1e-6);
+    label_id, these_sed_props, this->timestep, this->dx, this->dy, true, this->graph, 1e-6);
           break;
 
       default:
@@ -2682,7 +2673,6 @@ void ModelRunner::process_inherited_water()
 
     // getting node underwater
     std::vector<int>& unodes = tlake.nodes;
-    xt::pytensor<double,1>& surface_elevation = this->surface_elevation;
 
 
     double minelev = std::numeric_limits<double>::max();
@@ -2695,7 +2685,7 @@ void ModelRunner::process_inherited_water()
         minnodor = node;
         minelev = surface_elevation[node];
       }
-      // sumwat += this->io_double_array["lake_depth"][node] * this->io_double["dx"] * this->io_double["dy"] / this->timestep ;
+      // sumwat += this->io_double_array["lake_depth"][node] * this->dx * this->dy / this->timestep ;
     }
 
     this->chonk_network[minnodor].add_to_water_flux(tlake.volume_water/this->timestep);
@@ -2871,10 +2861,7 @@ void ModelRunner::DEBUG_check_weird_val_stacks()
 void ModelRunner::drape_deposition_flux_to_chonks()
 {
 
-  xt::pytensor<double,1>& topography = this->topography;
-  xt::pytensor<double,1>& surface_elevation = this->surface_elevation;
 
-  double cellarea = this->io_double["dx"] * this->io_double["dy"];
   std::vector<char> isinhere(this->io_int["n_elements"],'n');
 
 

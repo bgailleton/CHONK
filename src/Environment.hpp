@@ -240,13 +240,13 @@ class ModelRunner
 
     // Main function processing a given node. Call the fluxe managing functions and takes care of lake management
     void process_node(int& node, std::vector<bool>& is_processed, int& lake_incrementor, int& underfilled_lake,
-  xt::pytensor<int,1>& inctive_nodes, double& cellarea, xt::pytensor<double,1>& surface_elevation, bool need_move_prep);
+  xt::pytensor<bool,1>& active_nodes, double& cellarea, xt::pytensor<double,1>& surface_elevation, bool need_move_prep);
 
     // Avoid recursion by having this relatively small function processing node that I am sure won't need lake management
     void process_node_nolake_for_sure(int node, std::vector<bool>& is_processed,
-  xt::pytensor<int,1>& inctive_nodes, double& cellarea, xt::pytensor<double,1>& surface_elevation, bool need_move_prep , bool need_flux_before_move);
+  xt::pytensor<bool,1>& active_nodes, double& cellarea, xt::pytensor<double,1>& surface_elevation, bool need_move_prep , bool need_flux_before_move);
     void process_node_nolake_for_sure(int node, std::vector<bool>& is_processed,
-  xt::pytensor<int,1>& inctive_nodes, double& cellarea, xt::pytensor<double,1>& surface_elevation, bool need_move_prep, bool need_flux_before_move, std::vector<int>& ignore_some);
+  xt::pytensor<bool,1>& active_nodes, double& cellarea, xt::pytensor<double,1>& surface_elevation, bool need_move_prep, bool need_flux_before_move, std::vector<int>& ignore_some);
 
     // Accessing functions (so far only works when memory mode is normal)
     // # return the water flux at dt
@@ -401,6 +401,12 @@ std::vector<double>& pre_sed, std::vector<double>& pre_water);
     double start_time;
     // Curret time (see above)
     double current_time;
+
+    // Spatial thingies
+    double dx;
+    double dy;
+    double cellarea;
+
 
     // lake switch, if True: dynamic lake modelling
     // if false: fluxes rerouted from flux bottom to outlet
