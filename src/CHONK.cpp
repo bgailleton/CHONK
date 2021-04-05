@@ -76,6 +76,10 @@ void chonk::create(int tchonkID, int tcurrent_node, bool tmemory_saver)
   this->current_node = tcurrent_node;
   this->depression_solved_at_this_timestep = false;
   this->memory_saver = tmemory_saver;
+  this->receivers.reserve(8);
+  this->weigth_water_fluxes.reserve(8);
+  this->weigth_sediment_fluxes.reserve(8);
+  this->slope_to_rec.reserve(8);
 }
 
 // This empty my chonk to reduce it's memory usage
@@ -98,6 +102,11 @@ void chonk::reset()
   this->weigth_water_fluxes.clear();
   this->weigth_sediment_fluxes.clear();
   this->slope_to_rec.clear();
+  
+  this->receivers.reserve(8);
+  this->weigth_water_fluxes.reserve(8);
+  this->weigth_sediment_fluxes.reserve(8);
+  this->slope_to_rec.reserve(8);
 }
 
 
@@ -343,10 +352,10 @@ void chonk::move_to_steepest_descent(NodeGraphV2& graph, double dt, xt::pytensor
     return; 
   }
 
-  this->receivers.push_back(steepest_rec);
-  this->weigth_water_fluxes.push_back(1.);
-  this->weigth_sediment_fluxes.push_back(0.);
-  this->slope_to_rec.push_back(steepest_S); 
+  this->receivers.emplace_back(steepest_rec);
+  this->weigth_water_fluxes.emplace_back(1.);
+  this->weigth_sediment_fluxes.emplace_back(0.);
+  this->slope_to_rec.emplace_back(steepest_S); 
 }
 
 
@@ -451,10 +460,10 @@ void chonk::move_MF_from_fastscapelib(NodeGraphV2& graph, xt::pytensor<double,2>
     // There is a non-pit neighbor, let's save it with its attributes
     double weight = waterweigths[i];
     // std::cout << "WATER WEIGHT " << weight << std::endl;
-    this->receivers.push_back(this_neightbor);
-    this->weigth_water_fluxes.push_back(weight);
-    this->weigth_sediment_fluxes.push_back( 0. );
-    this->slope_to_rec.push_back(this_slope); 
+    this->receivers.emplace_back(this_neightbor);
+    this->weigth_water_fluxes.emplace_back(weight);
+    this->weigth_sediment_fluxes.emplace_back( 0. );
+    this->slope_to_rec.emplace_back(this_slope); 
 
 
     // Mover to the next step
@@ -627,10 +636,10 @@ void chonk::move_MF_from_fastscapelib_threshold_SF(NodeGraphV2& graph, double th
 
 
 
-    this->receivers.push_back(this_neightbor);
-    this->weigth_water_fluxes.push_back(weight);
-    this->weigth_sediment_fluxes.push_back( 0 );
-    this->slope_to_rec.push_back(this_slope); 
+    this->receivers.emplace_back(this_neightbor);
+    this->weigth_water_fluxes.emplace_back(weight);
+    this->weigth_sediment_fluxes.emplace_back( 0 );
+    this->slope_to_rec.emplace_back(this_slope); 
 
 
     // Mover to the next step

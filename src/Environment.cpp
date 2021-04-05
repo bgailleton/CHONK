@@ -2439,29 +2439,34 @@ void ModelRunner::manage_fluxes_before_moving_prep(chonk& this_chonk, int label_
 
 void ModelRunner::cancel_fluxes_before_moving_prep(chonk& this_chonk, int label_id)
 {
-  for(auto method:this->ordered_flux_methods)
-  {
-    if(method == "move")
-      break;
-    int this_case = intcorrespondance[method];
 
-    switch(this_case)
-    {
-      case 5:
-        this_chonk.cancel_inplace_only_drainage_area(this->dx, this->dy);
-        this->Qw_in -= this->dx* this->dy;
-        break;
-      case 6:
-        this_chonk.cancel_inplace_precipitation_discharge(this->dx, this->dy,this->io_double_array["precipitation"]);
-        this->Qw_in -= this->io_double_array["precipitation"][this_chonk.get_current_location()] * this->dx* this->dy;
-        break;
-      case 7:
-        this_chonk.cancel_inplace_infiltration(this->dx, this->dy, this->io_double_array["infiltration"]);
-        this->Qw_out -= this->io_double_array["infiltration"][this_chonk.get_current_location()] * this->dx* this->dy;
-        break;
-    }
+  this_chonk.cancel_inplace_only_drainage_area(this->dx, this->dy);
+  this->Qw_in -= this->dx* this->dy;
 
-  }
+  return;
+  // for(auto method:this->ordered_flux_methods)
+  // {
+  //   if(method == "move")
+  //     break;
+  //   int this_case = intcorrespondance[method];
+
+  //   switch(this_case)
+  //   {
+  //     case 5:
+  //       this_chonk.cancel_inplace_only_drainage_area(this->dx, this->dy);
+  //       this->Qw_in -= this->dx* this->dy;
+  //       break;
+  //     case 6:
+  //       this_chonk.cancel_inplace_precipitation_discharge(this->dx, this->dy,this->io_double_array["precipitation"]);
+  //       this->Qw_in -= this->io_double_array["precipitation"][this_chonk.get_current_location()] * this->dx* this->dy;
+  //       break;
+  //     case 7:
+  //       this_chonk.cancel_inplace_infiltration(this->dx, this->dy, this->io_double_array["infiltration"]);
+  //       this->Qw_out -= this->io_double_array["infiltration"][this_chonk.get_current_location()] * this->dx* this->dy;
+  //       break;
+  //   }
+
+  // }
 }
 
 
@@ -2470,28 +2475,29 @@ void ModelRunner::manage_move_prep(chonk& this_chonk)
 {
 
   CHRONO_start[5] = std::chrono::high_resolution_clock::now();
-
-
-  int this_case = intcorrespondance[this->move_method];
-
-  std::vector<int> rec = this_chonk.get_chonk_receivers_copy();
-  switch(this_case)
-  {
-    case 2:
-      this_chonk.move_to_steepest_descent(this->graph, this->timestep,  this->topography, this->dx, this->dy, chonk_network);
-      break;
-    case 3:
-      this_chonk.move_MF_from_fastscapelib(this->graph, this->io_double_array2d["external_weigths_water"], this->timestep, 
-   this->topography, this->dx, this->dy, chonk_network);
-      break;
-    case 4:
-      this_chonk.move_MF_from_fastscapelib_threshold_SF(this->graph, this->io_double["threshold_single_flow"], this->timestep,  this->topography, 
+  this_chonk.move_MF_from_fastscapelib_threshold_SF(this->graph, this->io_double["threshold_single_flow"], this->timestep,  this->topography, 
         this->dx, this->dy, chonk_network);
-      break;
+
+  // int this_case = intcorrespondance[this->move_method];
+
+  // std::vector<int> rec = this_chonk.get_chonk_receivers_copy();
+  // switch(this_case)
+  // {
+  //   case 2:
+  //     this_chonk.move_to_steepest_descent(this->graph, this->timestep,  this->topography, this->dx, this->dy, chonk_network);
+  //     break;
+  //   case 3:
+  //     this_chonk.move_MF_from_fastscapelib(this->graph, this->io_double_array2d["external_weigths_water"], this->timestep, 
+  //  this->topography, this->dx, this->dy, chonk_network);
+  //     break;
+  //   case 4:
+  //     this_chonk.move_MF_from_fastscapelib_threshold_SF(this->graph, this->io_double["threshold_single_flow"], this->timestep,  this->topography, 
+  //       this->dx, this->dy, chonk_network);
+  //     break;
       
-    default:
-      std::cout << "WARNING::move method name unrecognised, not sure what will happen now, probably crash" << std::endl;
-  }
+  //   default:
+  //     std::cout << "WARNING::move method name unrecognised, not sure what will happen now, probably crash" << std::endl;
+  // }
 
   CHRONO_stop[5] = std::chrono::high_resolution_clock::now();
   CHRONO_n_time[5] ++;
