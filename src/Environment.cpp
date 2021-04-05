@@ -338,11 +338,11 @@ void ModelRunner::iterative_lake_solver()
     this->original_gathering_of_water_and_sed_from_pixel_or_flat_area(starting_node, water_volume, sediment_volume, label_prop, these_nodes);
 
     // Also create an empty lake here
-    this->lakes.push_back(LakeLite(this->lake_incrementor));
+    this->lakes.emplace_back(LakeLite(this->lake_incrementor));
     // and gives it its nodes
     this->lakes[lake_incrementor].nodes = these_nodes;
     // Registering my entry point with the water and sediment content in the queu helper
-    this->queue_adder_for_lake.push_back(EntryPoint( water_volume,  sediment_volume,  starting_node, label_prop));
+    this->queue_adder_for_lake.emplace_back(EntryPoint( water_volume,  sediment_volume,  starting_node, label_prop));
     // Emplacing the node in the queue
     iteralake.emplace(starting_node);
 
@@ -590,7 +590,7 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
       // std::map<int,double> deltas;
       // std::vector<int> nodes;
       // std::vector<int> local_stack_checker = std::vector<int>(local_mstack);
-      // local_stack_checker.push_back(outlet);
+      // local_stack_checker.emplace_back(outlet);
       // // this->label_nodes_with_no_rec_in_local_stack(local_stack_checker,is_in_queue, has_recs_in_local_stack);
       // for(auto node:local_stack_checker)
       // {
@@ -614,7 +614,7 @@ void ModelRunner::reprocess_nodes_from_lake_outlet_v2(int current_lake, int outl
       //       if(is_done == false)
       //       {
       //         deltas[node] = (-1 * this_water);
-      //         nodes.push_back(node);
+      //         nodes.emplace_back(node);
       //       }
       //       else
       //       {
@@ -908,13 +908,13 @@ void ModelRunner::reprocess_local_stack(std::vector<int>& local_mstack, std::vec
         // if the node is the outlet, or not a 'y', I ignore it
         if(is_in_queue[ttnode] != 'y' || ttnode == this->lakes[current_lake].outlet || (this->is_this_node_in_this_lake(ttnode, current_lake)))
         {          
-          ignore_some.push_back(ttnode);
+          ignore_some.emplace_back(ttnode);
           continue;
         }
         // I also ignore the nodes in the current lake (they have a 'y' signature)
         else if (this->node_in_lake[ttnode] >= 0)
         {
-          ignore_some.push_back(ttnode);
+          ignore_some.emplace_back(ttnode);
           continue;
         }
       }
@@ -1203,27 +1203,27 @@ chonk ModelRunner::preprocess_outletting_chonk(chonk tchonk, EntryPoint& entry_p
     if(this->is_this_node_in_this_lake(tnode, current_lake) ==  false)
     {
       // get the node
-      ID_recs.push_back(tnode);
+      ID_recs.emplace_back(tnode);
       // calculate the slope
       double tS = topography[outlet] - topography[tnode];
       tS = tS / dummy[i];
       // If j exists push the weights
       if(j >= 0)
       {
-        weight_water_recs.push_back(tchonk_weight_water_recs[j]);
-        weight_sed_recs.push_back(tchonk_weight_sed_recs[j]);
+        weight_water_recs.emplace_back(tchonk_weight_water_recs[j]);
+        weight_sed_recs.emplace_back(tchonk_weight_sed_recs[j]);
         sumW += tchonk_weight_water_recs[j];
         sumS += tchonk_weight_sed_recs[j];
       }
       else
       {
         // else 0
-        weight_water_recs.push_back(0);
-        weight_sed_recs.push_back(0);
+        weight_water_recs.emplace_back(0);
+        weight_sed_recs.emplace_back(0);
       }
       
       // Slope      
-      slope_recs.push_back(tS);
+      slope_recs.emplace_back(tS);
       nrecs++;
 
     }
@@ -1470,11 +1470,11 @@ void ModelRunner::check_what_gives_to_lake(int entry_node, std::vector<int>& the
     {
     
       index = int(these_lakid.size());
-      these_lakid.push_back(this_lakid);
-      twat.push_back(this->chonk_network[entry_node].get_water_flux() * WWC[idx_rec]);
-      tsed.push_back(this->chonk_network[entry_node].get_sediment_flux() * WWS[idx_rec]);
-      tlab.push_back(this->chonk_network[entry_node].get_other_attribute_array("label_tracker"));
-      these_ET.push_back(rec);
+      these_lakid.emplace_back(this_lakid);
+      twat.emplace_back(this->chonk_network[entry_node].get_water_flux() * WWC[idx_rec]);
+      tsed.emplace_back(this->chonk_network[entry_node].get_sediment_flux() * WWS[idx_rec]);
+      tlab.emplace_back(this->chonk_network[entry_node].get_other_attribute_array("label_tracker"));
+      these_ET.emplace_back(rec);
 
     }
     else
@@ -1510,13 +1510,13 @@ int ModelRunner::fill_mah_lake(EntryPoint& entry_point, std::queue<int>& iterala
   // Creating a new lake: the iterative strategy makes new lakes on the top of existing ones
   // And storing its ID
   int current_lake = this->lake_incrementor;
-  this->lakes.push_back(LakeLite(this->lake_incrementor));
+  this->lakes.emplace_back(LakeLite(this->lake_incrementor));
 
   // DEBUG STATEMENT
   std::cout << "Filling lake " << current_lake << " with sed " << entry_point.volume_sed << std::endl;
 
   // Creating an empty entry-point for the lake
-  this->queue_adder_for_lake.push_back(EntryPoint(entry_point.node));
+  this->queue_adder_for_lake.emplace_back(EntryPoint(entry_point.node));
 
   // Finally getting the incrementor ready for the next lake
   this->lake_incrementor++;
@@ -1591,7 +1591,7 @@ int ModelRunner::fill_mah_lake(EntryPoint& entry_point, std::queue<int>& iterala
       // Otherwise...
       if(outlet < 0)
       {
-        this->lakes[current_lake].nodes.push_back(next_node.node);
+        this->lakes[current_lake].nodes.emplace_back(next_node.node);
         is_in_lake[next_node.node] = 'y';
       }
       else
@@ -1604,7 +1604,7 @@ int ModelRunner::fill_mah_lake(EntryPoint& entry_point, std::queue<int>& iterala
         {
           if(is_in_lake[tnode] == 'n' && tnode != outlet)
           {
-            this->lakes[current_lake].nodes.push_back(tnode);
+            this->lakes[current_lake].nodes.emplace_back(tnode);
             is_in_lake[tnode] = 'y';
           }
         }
@@ -1665,7 +1665,7 @@ int ModelRunner::fill_mah_lake(EntryPoint& entry_point, std::queue<int>& iterala
         this->drink_lake(this->lakes[current_lake].id, this->motherlake(this->node_in_lake[tnode]), \
           entry_point, iteralake);
         // Saving which lakes have been ingested
-        lakes_ingested.push_back(this->motherlake(this->node_in_lake[tnode]));
+        lakes_ingested.emplace_back(this->motherlake(this->node_in_lake[tnode]));
 
         std::cout << entry_point.volume_sed << "|" << this->lakes[current_lake].volume_sed << std::endl;
       }
@@ -1698,7 +1698,7 @@ int ModelRunner::fill_mah_lake(EntryPoint& entry_point, std::queue<int>& iterala
         if(is_in_dat_lake[tn] == 'n')
         {
           is_in_dat_lake[tn] = 'y';
-          this->lakes[current_lake].nodes.push_back(tn);
+          this->lakes[current_lake].nodes.emplace_back(tn);
         }
       }
     }
@@ -1884,7 +1884,7 @@ void ModelRunner::original_gathering_of_water_and_sed_from_pixel_or_flat_area(in
   std::queue<int> FIFO;
   std::vector<char> is_in_queue(this->io_int["n_elements"], 'n');
   is_in_queue[starting_node] = 'y';
-  these_nodes.push_back(starting_node);
+  these_nodes.emplace_back(starting_node);
   FIFO.push(starting_node);
   
   while(FIFO.empty() == false)
@@ -1914,7 +1914,7 @@ void ModelRunner::original_gathering_of_water_and_sed_from_pixel_or_flat_area(in
           water_volume +=  this->chonk_network[tnode].get_water_flux()  * this->timestep;
           sediment_volume += this->chonk_network[tnode].get_sediment_flux();
           this->lake_status[tnode] = 1;
-          these_nodes.push_back(tnode);
+          these_nodes.emplace_back(tnode);
         
         }
 
@@ -2301,7 +2301,7 @@ void ModelRunner::add_to_sediment_tracking(int index, double height, std::vector
 
     if(sed_prop_by_label[index].size() == 0)
     {
-      sed_prop_by_label[index].push_back(std::vector<double>(label_prop.size(), 0.) );
+      sed_prop_by_label[index].emplace_back(std::vector<double>(label_prop.size(), 0.) );
       current_box = 0;
     }
 
@@ -2312,7 +2312,7 @@ void ModelRunner::add_to_sediment_tracking(int index, double height, std::vector
 
       for(int i = 0; i < int(boxes_ta_filled) + 1; i++)
       {
-        sed_prop_by_label[index].push_back(label_prop);
+        sed_prop_by_label[index].emplace_back(label_prop);
         current_box++;
       }
       // std::cout << "J" << std::endl;;
@@ -2324,7 +2324,7 @@ void ModelRunner::add_to_sediment_tracking(int index, double height, std::vector
 
       for(int i = 0; i < int(boxes_ta_filled); i++)
       {
-        sed_prop_by_label[index].push_back(label_prop);
+        sed_prop_by_label[index].emplace_back(label_prop);
         current_box++;
       }
       // std::cout << "L" << std::endl;;
@@ -2637,9 +2637,9 @@ void ModelRunner::prepare_label_to_list_for_processes()
         labelz_list_double["SPIL_K"] = std::vector<double>();
         for(auto& tlab:labelz_list)
         {
-          labelz_list_double["SPIL_m"].push_back(tlab.double_attributes["SPIL_m"]);
-          labelz_list_double["SPIL_n"].push_back(tlab.double_attributes["SPIL_n"]);
-          labelz_list_double["SPIL_K"].push_back(tlab.double_attributes["SPIL_K"]);
+          labelz_list_double["SPIL_m"].emplace_back(tlab.double_attributes["SPIL_m"]);
+          labelz_list_double["SPIL_n"].emplace_back(tlab.double_attributes["SPIL_n"]);
+          labelz_list_double["SPIL_K"].emplace_back(tlab.double_attributes["SPIL_K"]);
         }
         break;
       // Charlie the first
@@ -2655,15 +2655,15 @@ void ModelRunner::prepare_label_to_list_for_processes()
         labelz_list_double["CHARLIE_I_threshold_entrainment"] = std::vector<double>();
         for(auto& tlab:labelz_list)
         {
-          labelz_list_double["SPIL_m"].push_back(tlab.double_attributes["SPIL_m"]);
-          labelz_list_double["SPIL_n"].push_back(tlab.double_attributes["SPIL_n"]);
-          labelz_list_double["CHARLIE_I_Kr"].push_back(tlab.double_attributes["CHARLIE_I_Kr"]);
-          labelz_list_double["CHARLIE_I_Ks"].push_back(tlab.double_attributes["CHARLIE_I_Ks"]);
-          labelz_list_double["CHARLIE_I_V"].push_back(tlab.double_attributes["CHARLIE_I_V"]);
-          labelz_list_double["CHARLIE_I_dimless_roughness"].push_back(tlab.double_attributes["CHARLIE_I_dimless_roughness"]);
-          labelz_list_double["CHARLIE_I_dstar"].push_back(tlab.double_attributes["CHARLIE_I_dstar"]);
-          labelz_list_double["CHARLIE_I_threshold_incision"].push_back(tlab.double_attributes["CHARLIE_I_threshold_incision"]);
-          labelz_list_double["CHARLIE_I_threshold_entrainment"].push_back(tlab.double_attributes["CHARLIE_I_threshold_entrainment"]);
+          labelz_list_double["SPIL_m"].emplace_back(tlab.double_attributes["SPIL_m"]);
+          labelz_list_double["SPIL_n"].emplace_back(tlab.double_attributes["SPIL_n"]);
+          labelz_list_double["CHARLIE_I_Kr"].emplace_back(tlab.double_attributes["CHARLIE_I_Kr"]);
+          labelz_list_double["CHARLIE_I_Ks"].emplace_back(tlab.double_attributes["CHARLIE_I_Ks"]);
+          labelz_list_double["CHARLIE_I_V"].emplace_back(tlab.double_attributes["CHARLIE_I_V"]);
+          labelz_list_double["CHARLIE_I_dimless_roughness"].emplace_back(tlab.double_attributes["CHARLIE_I_dimless_roughness"]);
+          labelz_list_double["CHARLIE_I_dstar"].emplace_back(tlab.double_attributes["CHARLIE_I_dstar"]);
+          labelz_list_double["CHARLIE_I_threshold_incision"].emplace_back(tlab.double_attributes["CHARLIE_I_threshold_incision"]);
+          labelz_list_double["CHARLIE_I_threshold_entrainment"].emplace_back(tlab.double_attributes["CHARLIE_I_threshold_entrainment"]);
         }
         break;
 
@@ -2672,8 +2672,8 @@ void ModelRunner::prepare_label_to_list_for_processes()
         labelz_list_double["Cidre_HS_critical_slope"] = std::vector<double>();
         for (auto& tlab:labelz_list)
         {
-          labelz_list_double["Cidre_HS_kappa_s"].push_back(tlab.double_attributes["Cidre_HS_kappa_s"]);
-          labelz_list_double["Cidre_HS_critical_slope"].push_back(tlab.double_attributes["Cidre_HS_critical_slope"]); 
+          labelz_list_double["Cidre_HS_kappa_s"].emplace_back(tlab.double_attributes["Cidre_HS_kappa_s"]);
+          labelz_list_double["Cidre_HS_critical_slope"].emplace_back(tlab.double_attributes["Cidre_HS_critical_slope"]); 
         }       
         break;
       case 10 :
@@ -2682,9 +2682,9 @@ void ModelRunner::prepare_label_to_list_for_processes()
         labelz_list_double["Cidre_HS_critical_slope"] = std::vector<double>();
         for (auto& tlab:labelz_list)
         {
-          labelz_list_double["Cidre_HS_kappa_s"].push_back(tlab.double_attributes["Cidre_HS_kappa_s"]);
-          labelz_list_double["Cidre_HS_kappa_r"].push_back(tlab.double_attributes["Cidre_HS_kappa_r"]);
-          labelz_list_double["Cidre_HS_critical_slope"].push_back(tlab.double_attributes["Cidre_HS_critical_slope"]);
+          labelz_list_double["Cidre_HS_kappa_s"].emplace_back(tlab.double_attributes["Cidre_HS_kappa_s"]);
+          labelz_list_double["Cidre_HS_kappa_r"].emplace_back(tlab.double_attributes["Cidre_HS_kappa_r"]);
+          labelz_list_double["Cidre_HS_critical_slope"].emplace_back(tlab.double_attributes["Cidre_HS_critical_slope"]);
         }
         break;
 
@@ -2702,16 +2702,16 @@ void ModelRunner::prepare_label_to_list_for_processes()
         labelz_list_double["CHARLIE_I_Krmodifyer"] = std::vector<double>();
         for(auto& tlab:labelz_list)
         {
-          labelz_list_double["SPIL_m"].push_back(tlab.double_attributes["SPIL_m"]);
-          labelz_list_double["SPIL_n"].push_back(tlab.double_attributes["SPIL_n"]);
-          labelz_list_double["CHARLIE_I_Kr"].push_back(tlab.double_attributes["CHARLIE_I_Kr"]);
-          labelz_list_double["CHARLIE_I_Ks"].push_back(tlab.double_attributes["CHARLIE_I_Ks"]);
-          labelz_list_double["CHARLIE_I_V"].push_back(tlab.double_attributes["CHARLIE_I_V"]);
-          labelz_list_double["CHARLIE_I_dimless_roughness"].push_back(tlab.double_attributes["CHARLIE_I_dimless_roughness"]);
-          labelz_list_double["CHARLIE_I_dstar"].push_back(tlab.double_attributes["CHARLIE_I_dstar"]);
-          labelz_list_double["CHARLIE_I_threshold_incision"].push_back(tlab.double_attributes["CHARLIE_I_threshold_incision"]);
-          labelz_list_double["CHARLIE_I_threshold_entrainment"].push_back(tlab.double_attributes["CHARLIE_I_threshold_entrainment"]);
-          labelz_list_double["CHARLIE_I_Krmodifyer"].push_back(tlab.double_attributes["CHARLIE_I_Krmodifyer"]);
+          labelz_list_double["SPIL_m"].emplace_back(tlab.double_attributes["SPIL_m"]);
+          labelz_list_double["SPIL_n"].emplace_back(tlab.double_attributes["SPIL_n"]);
+          labelz_list_double["CHARLIE_I_Kr"].emplace_back(tlab.double_attributes["CHARLIE_I_Kr"]);
+          labelz_list_double["CHARLIE_I_Ks"].emplace_back(tlab.double_attributes["CHARLIE_I_Ks"]);
+          labelz_list_double["CHARLIE_I_V"].emplace_back(tlab.double_attributes["CHARLIE_I_V"]);
+          labelz_list_double["CHARLIE_I_dimless_roughness"].emplace_back(tlab.double_attributes["CHARLIE_I_dimless_roughness"]);
+          labelz_list_double["CHARLIE_I_dstar"].emplace_back(tlab.double_attributes["CHARLIE_I_dstar"]);
+          labelz_list_double["CHARLIE_I_threshold_incision"].emplace_back(tlab.double_attributes["CHARLIE_I_threshold_incision"]);
+          labelz_list_double["CHARLIE_I_threshold_entrainment"].emplace_back(tlab.double_attributes["CHARLIE_I_threshold_entrainment"]);
+          labelz_list_double["CHARLIE_I_Krmodifyer"].emplace_back(tlab.double_attributes["CHARLIE_I_Krmodifyer"]);
         }
         break;
 
@@ -2882,7 +2882,7 @@ std::vector<xt::pytensor<double,1> > ModelRunner::get_label_tracking_results()
   for(int i=0; i<this->n_labels; i++)
   {
     xt::pytensor<double,1> temp = xt::zeros_like(this->surface_elevation);
-    output.push_back(temp);
+    output.emplace_back(temp);
   }
 
   for( int i=0; i< io_int["n_elements"];i++)
@@ -3113,7 +3113,7 @@ xt::pytensor<double,1> pop_elevation_to_SS_SF_SPIL(xt::pytensor<int,1>& stack, x
 //   // std::cout << "start" << std::endl;
 
 //   // Some magic to keep a nice balance between cpu and memory optimisation: I initialise a vector assuming I will probably not need to reprocess > 1/4 of the nodes
-//   // if I eceed this size, I use push_back whihc is slightly slower
+//   // if I eceed this size, I use emplace_back whihc is slightly slower
 //   int tsize = int(round(this->io_int["n_elements"]/4));
 //   // I am initialising various ID to insert and read nodes in this vector
 //   int insert_id_trav = 0,insert_id_lake = 0,reading_id = -1, insert_id_proc = 1;
@@ -3156,7 +3156,7 @@ xt::pytensor<double,1> pop_elevation_to_SS_SF_SPIL(xt::pytensor<int,1>& stack, x
 //         insert_id_trav++;
 //       }
 //       else
-//         traversal.push_back(this_node);
+//         traversal.emplace_back(this_node);
 //     }
 
 //     std::vector<int> golog = this->graph.get_MF_receivers_at_node(this_node);
@@ -3187,7 +3187,7 @@ xt::pytensor<double,1> pop_elevation_to_SS_SF_SPIL(xt::pytensor<int,1>& stack, x
 //           for(auto recnode:datiznogoud)
 //           {
 //             if(recnode != node)
-//               new_rec.push_back(recnode);
+//               new_rec.emplace_back(recnode);
 //           }
 //           // std::cout << "IT HAPPENS" << std::endl;
 //           this->graph.update_receivers_at_node(this_node, new_rec);
@@ -3205,7 +3205,7 @@ xt::pytensor<double,1> pop_elevation_to_SS_SF_SPIL(xt::pytensor<int,1>& stack, x
 //           insert_id_lake++;
 //         }
 //         else
-//           travlake.push_back(node);
+//           travlake.emplace_back(node);
 
 //         // I do not want to reprocess this node, so I am putting "in the Q" so that it gets ignored now. I know I have to reprocess it
 //         is_in_Q.insert(node);
@@ -3225,11 +3225,11 @@ xt::pytensor<double,1> pop_elevation_to_SS_SF_SPIL(xt::pytensor<int,1>& stack, x
 //         insert_id_proc++;
 //       }
 //       else
-//         tQ.push_back(node);
+//         tQ.emplace_back(node);
 
 //     }
 //     if(recomputed_neight)
-//       nodes_to_recompute_neighbors_at_the_end.push_back(this_node);
+//       nodes_to_recompute_neighbors_at_the_end.emplace_back(this_node);
 
 //   }
 
@@ -3287,13 +3287,13 @@ xt::pytensor<double,1> pop_elevation_to_SS_SF_SPIL(xt::pytensor<int,1>& stack, x
 //   for(auto node:these_nodes)
 //   {
 //     if(std::find(this->nodes.begin(), this->nodes.end(), node) == this->nodes.end())
-//       this->nodes.push_back(node);
+//       this->nodes.emplace_back(node);
 //     node_in_lake[node] = this->lake_id;
 //   }
 
 //   for(auto node:these_node_in_queue)
 //   {
-//     this->node_in_queue.push_back(node);
+//     this->node_in_queue.emplace_back(node);
 //     is_in_queue[node] = true;
 //   }
 
@@ -3324,7 +3324,7 @@ xt::pytensor<double,1> pop_elevation_to_SS_SF_SPIL(xt::pytensor<int,1>& stack, x
 //   Lake temp = Lake(save_ID);
 //   other_lake = temp;
 //   other_lake.set_parent_lake(this->lake_id);
-//   this->ingested_lakes.push_back(other_lake.get_lake_id());
+//   this->ingested_lakes.emplace_back(other_lake.get_lake_id());
 
 //   for(auto lid:other_lake.get_ingested_lakes())
 //     lake_network[lid].set_parent_lake(this->lake_id);
@@ -3457,7 +3457,7 @@ xt::pytensor<double,1> pop_elevation_to_SS_SF_SPIL(xt::pytensor<int,1>& stack, x
 //     // This function fills an original lake, hence there is no lake depth yet:
 //     this->water_elevation = surface_elevation[originode];
 //     is_in_queue[originode] = true;
-//     // this->nodes.push_back(originode);
+//     // this->nodes.emplace_back(originode);
 //     // this->n_nodes ++;
 //   }
 
@@ -3556,7 +3556,7 @@ xt::pytensor<double,1> pop_elevation_to_SS_SF_SPIL(xt::pytensor<int,1>& stack, x
 //         // Otehr wise, I do not have an outlet and I can save this node as in depression
 //     if(isinnodelist)
 //     {
-//       this->nodes.push_back(next_node.node);
+//       this->nodes.emplace_back(next_node.node);
       
 //       this->n_nodes ++;
 //     }
@@ -3747,7 +3747,7 @@ xt::pytensor<double,1> pop_elevation_to_SS_SF_SPIL(xt::pytensor<int,1>& stack, x
 //       this->depressionfiller.pop();
 //       while(dat.node != this->outlet_node)
 //       {
-//         toreadd.push_back(dat);
+//         toreadd.emplace_back(dat);
 //         dat = this->depressionfiller.top();
 //         this->depressionfiller.pop();
 //       }
@@ -3756,7 +3756,7 @@ xt::pytensor<double,1> pop_elevation_to_SS_SF_SPIL(xt::pytensor<int,1>& stack, x
 
 //       // Formerly add the node to the lake
 //       if(std::find(this->nodes.begin(), this->nodes.end(), this->outlet_node) == this->nodes.end())
-//         this->nodes.push_back(this->outlet_node);
+//         this->nodes.emplace_back(this->outlet_node);
 
 //       this->depths[this->outlet_node] = this->water_elevation - surface_elevation[this->outlet_node]; // should be 0 here yo
 //       node_in_lake[this->outlet_node] = this->lake_id;
@@ -3921,7 +3921,7 @@ xt::pytensor<double,1> pop_elevation_to_SS_SF_SPIL(xt::pytensor<int,1>& stack, x
 //       // Making sure I mark it as queued
 //       is_in_queue[node] = true;
 //       // Adding the node to the list of nodes in me queue
-//       this->node_in_queue.push_back(node);
+//       this->node_in_queue.emplace_back(node);
 //     }
 
 //     // Else, if not in queue and has lower elevation, then the current mother node IS an outlet

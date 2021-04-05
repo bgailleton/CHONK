@@ -76,19 +76,19 @@ NodeGraphV2::NodeGraphV2(
   this->flat_mask = xt::zeros<int>({this->un_element}) - 1;
 
   // these vectors are additioned to the node indice to test the neighbors
-  this->neightbourer.push_back({-ncols - 1, - ncols, - ncols + 1, -1,1,ncols - 1, ncols, ncols + 1 }); // internal node 0
-  this->neightbourer.push_back({(nrows - 1) * ncols - 1, (nrows - 1) * ncols, (nrows - 1) * ncols + 1, -1,1,ncols - 1, ncols, ncols + 1 });// periodic_first_row 1
-  this->neightbourer.push_back({-ncols - 1, - ncols, - ncols + 1, -1,1,- (nrows - 1) * ncols - 1, - (nrows - 1) * ncols, - (nrows - 1) * ncols + 1 });// periodic_last_row 2
-  this->neightbourer.push_back({- 1, - ncols, - ncols + 1, (ncols - 1),1, 2 * ncols - 1, ncols, ncols + 1 }); // periodic_first_col 3
-  this->neightbourer.push_back({-ncols - 1, - ncols, - 2 * ncols + 1, -1,-ncols + 1, ncols - 1, ncols, 1 }); // periodic last_col 4
-  this->neightbourer.push_back({ -1,1,ncols - 1, ncols, ncols + 1 }); // normal_first_row 5
-  this->neightbourer.push_back({-ncols - 1, - ncols, - ncols + 1, -1,1}); // normal_last_row 6
-  this->neightbourer.push_back({ - ncols, - ncols + 1, 1,  ncols, ncols + 1 }); // normal_first_col 7
-  this->neightbourer.push_back({-ncols - 1, - ncols, -1, ncols - 1, ncols }); // normal_last_col 8
-  this->neightbourer.push_back({1, ncols, ncols + 1 }); // normal_top_left 9
-  this->neightbourer.push_back({ -1,ncols - 1, ncols}); // normal_top_right 10
-  this->neightbourer.push_back({ - ncols, - ncols + 1, 1}); // normal_bottom_left 11
-  this->neightbourer.push_back({-ncols - 1, - ncols, -1}); // normal_bottom_right 12
+  this->neightbourer.emplace_back(std::initializer_list<int>{-ncols - 1, - ncols, - ncols + 1, -1,1,ncols - 1, ncols, ncols + 1 }); // internal node 0
+  this->neightbourer.emplace_back(std::initializer_list<int>{(nrows - 1) * ncols - 1, (nrows - 1) * ncols, (nrows - 1) * ncols + 1, -1,1,ncols - 1, ncols, ncols + 1 });// periodic_first_row 1
+  this->neightbourer.emplace_back(std::initializer_list<int>{-ncols - 1, - ncols, - ncols + 1, -1,1,- (nrows - 1) * ncols - 1, - (nrows - 1) * ncols, - (nrows - 1) * ncols + 1 });// periodic_last_row 2
+  this->neightbourer.emplace_back(std::initializer_list<int>{- 1, - ncols, - ncols + 1, (ncols - 1),1, 2 * ncols - 1, ncols, ncols + 1 }); // periodic_first_col 3
+  this->neightbourer.emplace_back(std::initializer_list<int>{-ncols - 1, - ncols, - 2 * ncols + 1, -1,-ncols + 1, ncols - 1, ncols, 1 }); // periodic last_col 4
+  this->neightbourer.emplace_back(std::initializer_list<int>{ -1,1,ncols - 1, ncols, ncols + 1 }); // normal_first_row 5
+  this->neightbourer.emplace_back(std::initializer_list<int>{-ncols - 1, - ncols, - ncols + 1, -1,1}); // normal_last_row 6
+  this->neightbourer.emplace_back(std::initializer_list<int>{ - ncols, - ncols + 1, 1,  ncols, ncols + 1 }); // normal_first_col 7
+  this->neightbourer.emplace_back(std::initializer_list<int>{-ncols - 1, - ncols, -1, ncols - 1, ncols }); // normal_last_col 8
+  this->neightbourer.emplace_back(std::initializer_list<int>{1, ncols, ncols + 1 }); // normal_top_left 9
+  this->neightbourer.emplace_back(std::initializer_list<int>{ -1,ncols - 1, ncols}); // normal_top_right 10
+  this->neightbourer.emplace_back(std::initializer_list<int>{ - ncols, - ncols + 1, 1}); // normal_bottom_left 11
+  this->neightbourer.emplace_back(std::initializer_list<int>{-ncols - 1, - ncols, -1}); // normal_bottom_right 12
 
 
   this->is_border = std::vector<char>(this->un_element,'y');
@@ -178,15 +178,15 @@ NodeGraphV2::NodeGraphV2(
           if(pits_to_reroute[tgnode] == false)
             tgnode = this->graph[tgnode].Sreceivers;
           //# Will be a receiver
-          this->graph[i].receivers.push_back(tgnode);
+          this->graph[i].receivers.emplace_back(tgnode);
           //# I will have to check its own receivers for potential cyclicity
-          node_to_check.push_back(tgnode);
+          node_to_check.emplace_back(tgnode);
           //# Which pit is it connected to
-          origin_pit.push_back(i);
+          origin_pit.emplace_back(i);
           //# Arbitrary length
-          this->graph[i].length2rec.push_back(dx*10000.);
+          this->graph[i].length2rec.emplace_back(dx*10000.);
           //# The basin I DONT want to reach
-          force_target_basin.push_back(i);
+          force_target_basin.emplace_back(i);
   
           // Keepign this check just in case, will remove later. Throw an error in case cyclicity is detected
           if(basin_labels[tgnode] == basin_labels[i])
@@ -220,8 +220,8 @@ NodeGraphV2::NodeGraphV2(
         {
           if(basin_labels[trec] != this_target_basin  || active_nodes[trec] == false) //|| trec == this_node_to_check??
           {
-            new_rec.push_back(trec);
-            new_length.push_back(this->graph[this_node_to_check].length2rec[idL]);
+            new_rec.emplace_back(trec);
+            new_length.emplace_back(this->graph[this_node_to_check].length2rec[idL]);
           }
           idL++;
         }
@@ -254,7 +254,7 @@ NodeGraphV2::NodeGraphV2(
       //   int trec = Mrec(node_to_check[i],j);
       //   if(trec < 0 || node_to_check[i] == trec)
       //   {continue;}
-      //   rec.push_back(trec);
+      //   rec.emplace_back(trec);
       // }
       std::vector<int> to_recompute = {node_to_check[i]};
       this->recompute_multi_receveivers_and_donors(active_nodes,elevation,to_recompute);
@@ -263,8 +263,8 @@ NodeGraphV2::NodeGraphV2(
       // In the particular case where my outlet is *also* a pit, I do not want to remove its receiver Y though???
       // if(pits_to_reroute[node_to_check[i]])
       // {
-      //   this->graph[node_to_check[i]].receivers.push_back(this->graph[this->graph[node_to_check[i]].Sreceivers].Sreceivers);
-      //   this->graph[node_to_check[i]].length2rec.push_back(dx * 10000.);
+      //   this->graph[node_to_check[i]].receivers.emplace_back(this->graph[this->graph[node_to_check[i]].Sreceivers].Sreceivers);
+      //   this->graph[node_to_check[i]].length2rec.emplace_back(dx * 10000.);
       // }
 
       // // Correcting the Vertex inplace
@@ -320,7 +320,7 @@ std::vector<int> NodeGraphV2::get_Cordonnier_order()
   for(int i = this->n_element - 1; i >= 0; i-- )
   {
     if(this->is_depression(i))
-      output.push_back(i);
+      output.emplace_back(i);
   }
   return output;
 }
@@ -353,7 +353,7 @@ void NodeGraphV2::fix_cyclicity(
     if(Sstack[i] == Srec[Sstack[i]])
     {
       tlabel = Sstack[i];
-      nodes_to_double_check.push_back(Sstack[i]);
+      nodes_to_double_check.emplace_back(Sstack[i]);
 
     }
     baslab[Sstack[i]] = tlabel;
@@ -373,7 +373,7 @@ void NodeGraphV2::fix_cyclicity(
         for(size_t j =0 ; j<8;j++)
         {
           if(Mrec(new_rec,j)>=0)
-            gurg.push_back(Mrec(new_rec,j));
+            gurg.emplace_back(Mrec(new_rec,j));
         }
         this->graph[new_rec].receivers = gurg;
       }
@@ -384,7 +384,7 @@ void NodeGraphV2::fix_cyclicity(
         for(auto rec:this->graph[new_rec].receivers)
         {
           if(baslab[rec] == target_basin)
-            gurg.push_back(rec);
+            gurg.emplace_back(rec);
         }
         this->graph[new_rec].receivers = gurg;
         this->graph[node].receivers = {new_rec};
@@ -473,6 +473,11 @@ void NodeGraphV2::compute_receveivers_and_donors(xt::pytensor<bool,1>& active_no
     this->graph[i].length2rec.clear();
     this->graph[i].donors.clear();
     this->graph[i].length2don.clear();
+    this->graph[i].donors.reserve(8);
+    this->graph[i].Sdonors.reserve(8);
+    this->graph[i].receivers.reserve(8);
+    this->graph[i].length2rec.reserve(8);
+    this->graph[i].length2don.reserve(8);
     // std::vector<int> receivers,donors;
     // std::vector<double> length2rec,length2don;
 
@@ -495,8 +500,8 @@ void NodeGraphV2::compute_receveivers_and_donors(xt::pytensor<bool,1>& active_no
       test_elev = elevation[node];
       if(test_elev < this_elev)
       {
-        this->graph[i].receivers.push_back(node);
-        this->graph[i].length2rec.push_back(this->lengthener[idL]);
+        this->graph[i].receivers.emplace_back(node);
+        this->graph[i].length2rec.emplace_back(this->lengthener[idL]);
         double slope = (this_elev - test_elev)/ this->lengthener[idL];
         if(slope>SS)
         {
@@ -506,8 +511,8 @@ void NodeGraphV2::compute_receveivers_and_donors(xt::pytensor<bool,1>& active_no
       }
       else if(test_elev>this_elev)
       {
-        this->graph[i].donors.push_back(node);
-        this->graph[i].length2don.push_back(this->lengthener[idL]);
+        this->graph[i].donors.emplace_back(node);
+        this->graph[i].length2don.emplace_back(this->lengthener[idL]);
       }
       else if (test_elev == this_elev)
       {
@@ -524,7 +529,7 @@ void NodeGraphV2::compute_receveivers_and_donors(xt::pytensor<bool,1>& active_no
     {  
 
       this->graph[i].Sreceivers = SSid;
-      this->graph[SSid].Sdonors.push_back(i);
+      this->graph[SSid].Sdonors.emplace_back(i);
     
     }
     else
@@ -610,8 +615,8 @@ void NodeGraphV2::compute_receveivers_and_donors(xt::pytensor<bool,1>& active_no
       //       if(this_flat_mask[this_flat_surface_node_index[node]] > this_flat_mask[this_flat_surface_node_index[next]] )
       //       {
       //         all_flat = false;
-      //         this->graph[node].receivers.push_back(next);
-      //         this->graph[node].length2rec.push_back(this->lengthener[idL]);
+      //         this->graph[node].receivers.emplace_back(next);
+      //         this->graph[node].length2rec.emplace_back(this->lengthener[idL]);
       //         double this_slope = this_flat_mask[this_flat_surface_node_index[node]] - this_flat_mask[this_flat_surface_node_index[next]];
       //         this_slope = this_slope / this->lengthener[idL];
 
@@ -626,15 +631,15 @@ void NodeGraphV2::compute_receveivers_and_donors(xt::pytensor<bool,1>& active_no
       //         //   SS_done = true;
       //         //   this->graph[node].Sreceivers = next;
       //         //   this->graph[node].length2Srec = this->lengthener[idL];
-      //         //   this->graph[next].Sdonors.push_back(node);
+      //         //   this->graph[next].Sdonors.emplace_back(node);
       //         // }
 
       //       }
       //       else if(this_flat_mask[this_flat_surface_node_index[node]] < this_flat_mask[this_flat_surface_node_index[next]] )
       //       {
       //         // all_flat = false;
-      //         this->graph[node].donors.push_back(next);
-      //         this->graph[node].length2don.push_back(this->lengthener[idL]);
+      //         this->graph[node].donors.emplace_back(next);
+      //         this->graph[node].length2don.emplace_back(this->lengthener[idL]);
       //       }
       //     }
 
@@ -649,12 +654,12 @@ void NodeGraphV2::compute_receveivers_and_donors(xt::pytensor<bool,1>& active_no
       //       processed[node] = true;
       //       this->graph[node].Sreceivers = S_id;
       //       this->graph[node].length2Srec = S_length;
-      //       this->graph[S_id].Sdonors.push_back(node);
+      //       this->graph[S_id].Sdonors.emplace_back(node);
       //     }
 
       //     if(all_flat)
       //     {
-      //       node_to_check_after_flat.push_back(node);
+      //       node_to_check_after_flat.emplace_back(node);
       //     }
 
       //     flat_ID[node] = flat_indenter;
@@ -697,11 +702,11 @@ void NodeGraphV2::compute_receveivers_and_donors(xt::pytensor<bool,1>& active_no
             is_sorted = true;
             this->graph[i].Sreceivers = next;
             this->graph[i].length2Srec = this->lengthener[idL];
-            this->graph[next].Sdonors.push_back(i);
-            this->graph[next].donors.push_back(i);
-            this->graph[i].length2don.push_back(this->lengthener[idL]);
-            this->graph[i].receivers.push_back(next);
-            this->graph[i].length2rec.push_back(this->lengthener[idL]);
+            this->graph[next].Sdonors.emplace_back(i);
+            this->graph[next].donors.emplace_back(i);
+            this->graph[i].length2don.emplace_back(this->lengthener[idL]);
+            this->graph[i].receivers.emplace_back(next);
+            this->graph[i].length2rec.emplace_back(this->lengthener[idL]);
           }
         }
 
@@ -710,7 +715,7 @@ void NodeGraphV2::compute_receveivers_and_donors(xt::pytensor<bool,1>& active_no
       if(is_sorted)
         n_sorted ++;
       else
-        next_to_check.push_back(i);
+        next_to_check.emplace_back(i);
       
       //   this->graph[i].Sreceivers = i;
 
@@ -738,11 +743,11 @@ void NodeGraphV2::compute_receveivers_and_donors(xt::pytensor<bool,1>& active_no
 //   std::queue<int> Quack;Quack.push(starting_node);
 
 //   is_queued.insert(starting_node);
-//   output.push_back(starting_node);
+//   output.emplace_back(starting_node);
 //   char lefalse = 'f', letrue = 't';
 
-//   is_low_edge.push_back(lefalse);
-//   is_high_edge.push_back(lefalse);
+//   is_low_edge.emplace_back(lefalse);
+//   is_high_edge.emplace_back(lefalse);
 //   this_flat_surface_node_index[starting_node] = 0;
 
 //   double checkelev = elevation[starting_node];
@@ -783,9 +788,9 @@ void NodeGraphV2::compute_receveivers_and_donors(xt::pytensor<bool,1>& active_no
 
 //         Quack.push(node);
 //         is_queued.insert(node);
-//         output.push_back(node);
-//         is_low_edge.push_back(lefalse);
-//         is_high_edge.push_back(lefalse);
+//         output.emplace_back(node);
+//         is_low_edge.emplace_back(lefalse);
+//         is_high_edge.emplace_back(lefalse);
 //         this_flat_surface_node_index[node] = index;
 //         index++;
 
@@ -945,6 +950,10 @@ void NodeGraphV2::recompute_multi_receveivers_and_donors(xt::pytensor<bool,1>& a
     }
     std::vector<int> receivers,donors;
     std::vector<double> length2rec,length2don;
+    receivers.reserve(8);
+    donors.reserve(8);
+    length2rec.reserve(8);
+    length2don.reserve(8);
     int checker;
     if(i<ncols)
       checker = 1;
@@ -968,19 +977,19 @@ void NodeGraphV2::recompute_multi_receveivers_and_donors(xt::pytensor<bool,1>& a
       test_elev = elevation[node];
       if(test_elev<this_elev)
       {
-        receivers.push_back(node);
-        length2rec.push_back(this->lengthener[idL]);
+        receivers.emplace_back(node);
+        length2rec.emplace_back(this->lengthener[idL]);
       }
       else if(test_elev>this_elev)
       {
-        donors.push_back(node);
-        length2don.push_back(this->lengthener[idL]);
+        donors.emplace_back(node);
+        length2don.emplace_back(this->lengthener[idL]);
       }
     }
-    this->graph[i].receivers = receivers;
-    this->graph[i].donors = donors;
-    this->graph[i].length2rec = length2rec;
-    this->graph[i].length2don = length2don;
+    this->graph[i].receivers = std::move(receivers);
+    this->graph[i].donors = std::move(donors);
+    this->graph[i].length2rec = std::move(length2rec);
+    this->graph[i].length2don = std::move(length2don);
 
   }
 
@@ -1129,8 +1138,8 @@ int NodeGraphV2::get_checker(int i, bool is_active)
 //   {
 //     int node = i+adder;
 //     idL++;
-//     neightbouring_nodes.push_back(node);
-//     length2neigh.push_back(this->lengthener[idL]);
+//     neightbouring_nodes.emplace_back(node);
+//     length2neigh.emplace_back(this->lengthener[idL]);
 //   }
 // }
 
@@ -1140,6 +1149,7 @@ std::vector<int> NodeGraphV2::get_all_flat_from_node(int i, xt::pytensor<double,
   is_in_queue[i] = 'y';
   std::queue<int> baal;baal.emplace(i);
   std::vector<int> output;
+  output.reserve(std::round(topography.size()/10));
   while(baal.empty() == false)
   {
     std::vector<int> neightbouring_nodes; std::vector<double> length2neigh;
@@ -1161,7 +1171,7 @@ std::vector<int> NodeGraphV2::get_all_flat_from_node(int i, xt::pytensor<double,
     }
 
     if(is_there_lower == false)
-      output.push_back(next_node);
+      output.emplace_back(next_node);
 
   }
   return output;
@@ -1173,6 +1183,8 @@ void NodeGraphV2::get_D8_neighbors(int i, xt::pytensor<bool,1>& active_nodes, st
   // these vectors are additioned to the node indice to test the neighbors
   neightbouring_nodes = std::vector<int>();
   length2neigh = std::vector<double>();
+  neightbouring_nodes.reserve(8);
+  length2neigh.reserve(8);
 
   // if(active_nodes[i] == 0)
   //   return;
@@ -1184,8 +1196,8 @@ void NodeGraphV2::get_D8_neighbors(int i, xt::pytensor<bool,1>& active_nodes, st
   {
     int node = i+adder;
     idL++;
-    neightbouring_nodes.push_back(node);
-    length2neigh.push_back(this->lengthener[idL]);
+    neightbouring_nodes.emplace_back(node);
+    length2neigh.emplace_back(this->lengthener[idL]);
   }
 }
 
@@ -1194,6 +1206,8 @@ void NodeGraphV2::get_D4_neighbors(int i, xt::pytensor<bool,1>& active_nodes, st
   // these vectors are additioned to the node indice to test the neighbors
   neightbouring_nodes = std::vector<int>();
   length2neigh = std::vector<double>();
+  neightbouring_nodes.reserve(4);
+  length2neigh.reserve(4);
 
   if(active_nodes[i] == false)
     return;
@@ -1215,8 +1229,8 @@ void NodeGraphV2::get_D4_neighbors(int i, xt::pytensor<bool,1>& active_nodes, st
   {
     int adder = this->neightbourer[checker][it]; 
     int node = i+adder;
-    neightbouring_nodes.push_back(node);
-    length2neigh.push_back(this->lengthener[it]);
+    neightbouring_nodes.emplace_back(node);
+    length2neigh.emplace_back(this->lengthener[it]);
   }
 }
 
@@ -1300,7 +1314,7 @@ std::vector<int> multiple_stack_fastscape(int n_element, std::vector<Vertex>& gr
     for(int i=0; i< int(is_in_stack.size()); i++)
     {
       if(is_in_stack[i] == false)
-        not_in_stack.push_back(i);
+        not_in_stack.emplace_back(i);
     }
     std::cout << "Got them! you can access the ghost nodes with model.get_broken_nodes()" << std::endl;
     if(EXTENSIVE_STACK_INFO == false)
@@ -1346,9 +1360,9 @@ std::vector<int> multiple_stack_fastscape(int n_element, std::vector<Vertex>& gr
         }
         if(found)
         {
-          isolated_nodes.push_back(node);
-          min_donor.push_back(min_ID);
-          score.push_back(min_score);
+          isolated_nodes.emplace_back(node);
+          min_donor.emplace_back(min_ID);
+          score.emplace_back(min_score);
         }
 
       }
@@ -1462,7 +1476,7 @@ void NodeGraphV2::compute_basins(xt::pytensor<bool,1>& active_nodes)
     if (irec == istack)
     {
       ibasin ++;
-      SBasinOutlets.push_back(istack);
+      SBasinOutlets.emplace_back(istack);
     }
     SBasinID[istack] = ibasin;
   }
@@ -1482,7 +1496,7 @@ void NodeGraphV2::compute_pits(xt::pytensor<bool,1>& active_nodes)
 
     if (active_nodes[inode])
     {
-      pits.push_back(inode);
+      pits.emplace_back(inode);
       ipit += 1;
     }
   }
@@ -1749,7 +1763,7 @@ xt::xtensor<int,1> NodeGraphV2::_compute_mst_kruskal(xt::pytensor<int,2>& conn_b
     if (uf.Find(b0) != uf.Find(b1))
     {
       mstree[mstree_size] = eid;
-      mstree_translated.push_back({SBasinOutlets[b0],SBasinOutlets[b1]});
+      mstree_translated.emplace_back(std::initializer_list<int>{SBasinOutlets[b0],SBasinOutlets[b1]});
       mstree_size ++;
       uf.Union(b0, b1);
     }
