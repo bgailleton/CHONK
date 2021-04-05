@@ -257,9 +257,10 @@ class CoreModel:
 
 	def initialize(self):
 		self.n_depths_recorded = np.arange(0,self.depths_res_sed_proportions * self.n_depth_sed_tracking,self.depths_res_sed_proportions)
-
+		# input("BITE")
 		# Initialising the model itself with default processes
 		self.model = ch.ModelRunner( 1, ["move"], "") 
+		# input("BITE2")
 
 		self.model.update_double_param("dx", self.dx)
 		self.model.update_double_param("dy", self.dy)
@@ -271,15 +272,19 @@ class CoreModel:
 
 		self.model.update_double_param("threshold_single_flow", self.threshold_single_flow)
 		self.model.set_active_nodes( self.active_nodes)
+		# input("BITE3")
 
 		self.topolake = np.copy(self.surface_elevation).reshape(self.ny,self.nx) 
+		# input("BITE4")
 
 		self.model.set_surface_elevation(self.surface_elevation)
 		self.model.set_surface_elevation_tp1(np.copy( self.surface_elevation))
+		# input("BITE5")
 
-		self.model.update_array_double_param("sed_height" , np.copy(self.sed_height))
-		self.model.update_array_double_param("sed_height_tp1" , np.copy(self.sed_height))
+		self.model.set_sed_height(np.copy(self.sed_height))
+		self.model.set_sed_height_tp1(np.copy(self.sed_height))
 		self.model.update_array_double_param("lake_depth" , np.zeros_like(self.sed_height))
+		# input("BITE6")
 
 		self.model.update_move_method(self.move_method)
 		self.model.update_flux_methods(self.method_string)
@@ -293,18 +298,25 @@ class CoreModel:
 		# Setting the labelling
 		self.model.initialise_label_list(self.label_list)
 		self.model.update_label_array(self.label_array.ravel())
+		# input("BITE7")
 
 	@xs.runtime(args='step_delta')
 	def run_step(self, dt):
-		# print("Running", dt)
+
+		# input("BITE8")
+
 		self.model.update_timestep(dt)
 		# tempolake = self.model.get_array_double_param("surface_elevation")
 		# self.model.update_array_double_param("surface_elevation", np.copy(self.model.get_array_double_param("surface_elevation_tp1") + np.random.rand(self.nx * self.ny) * 1e-7 ) )
 		self.model.set_surface_elevation(np.copy(self.model.get_surface_elevation_tp1()) )
+		# input("BITE9")
 
-		self.model.update_array_double_param("sed_height", np.copy(self.model.get_array_double_param("sed_height_tp1")) )
+		self.model.set_sed_height(np.copy(self.model.get_sed_height_tp1()) )
+		# input("BITE10")
 		self.model.initiate_nodegraph()
+		# input("BITE11")
 		self.model.run()
+		# input("BITE12")
 		tempolake = self.model.get_topography()
 		self.topolake = tempolake.reshape(self.ny,self.nx)
 
@@ -333,7 +345,7 @@ class CoreModel:
 
 	@sed_thickness.compute
 	def _sed_thickness(self):
-		return self.model.get_array_double_param("sed_height_tp1").reshape(self.ny,self.nx)
+		return self.model.get_sed_height_tp1().reshape(self.ny,self.nx)
 
 	@lake_depth.compute
 	def _lake_depth(self):

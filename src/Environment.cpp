@@ -113,7 +113,8 @@ void EntryPoint::ingestNkill(EntryPoint& other)
 
 // Initialises the model object, actually Does not do much but is required.
 void ModelRunner::create(double ttimestep, std::vector<std::string> tordered_flux_methods, std::string tmove_method)
-{
+{ 
+  // std::cout << "THING1" << std::endl;
   // Saving all the attributes
   this->timestep = ttimestep;
   this->ordered_flux_methods = tordered_flux_methods;
@@ -127,6 +128,7 @@ void ModelRunner::create(double ttimestep, std::vector<std::string> tordered_flu
   this->Qw_out = 0;
   this->Ql_in = 0;
   this->Ql_out = 0;
+  // std::cout << "THING2" << std::endl;
   // Flushub tuc
   // galg
 }
@@ -194,6 +196,8 @@ void ModelRunner::initiate_nodegraph()
   }
 
   // ready to run this time step!
+  // std::cout << "THING3" << std::endl;
+
 }
 
 // this is the main running function
@@ -219,6 +223,7 @@ void ModelRunner::run()
     // Processing that node
     // ### Saving the local production of sediment, in order to cancel it later
     double templocalQS = this->chonk_network[node].get_sediment_flux(); 
+    // std::cout << "Processing node " << i << std::endl;
     this->process_node(node, is_processed, lake_incrementor, underfilled_lake, this->active_nodes, cellarea, surface_elevation, true);   
     // ### Saving the local production of sediment, in order to cancel it later
     this->local_Qs_production_for_lakes[node] = this->chonk_network[node].get_sediment_flux() - templocalQS; 
@@ -1951,7 +1956,7 @@ void ModelRunner::process_node(int& node, std::vector<bool>& is_processed, int& 
         this->manage_fluxes_after_moving_prep(this->chonk_network[node],this->label_array[node]);
         // Splitting the fluxes
         this->chonk_network[node].split_and_merge_in_receiving_chonks(this->chonk_network, this->graph, this->surface_elevation_tp1, 
-          io_double_array["sed_height_tp1"], this->timestep);
+          this->sed_height_tp1, this->timestep);
         is_processed[node] = true;
         // Done        
       }
@@ -1981,7 +1986,7 @@ void ModelRunner::process_node(int& node, std::vector<bool>& is_processed, int& 
     // Fluxes after moving prep are active fluxes such as erosion or other thingies
     this->manage_fluxes_after_moving_prep(this->chonk_network[node],this->label_array[node]);
     // Apply the changes and propagate the fluxes downstream
-    this->chonk_network[node].split_and_merge_in_receiving_chonks(this->chonk_network, this->graph, this->surface_elevation_tp1, io_double_array["sed_height_tp1"], this->timestep);
+    this->chonk_network[node].split_and_merge_in_receiving_chonks(this->chonk_network, this->graph, this->surface_elevation_tp1, this->sed_height_tp1, this->timestep);
 }
 
 void ModelRunner::process_node_nolake_for_sure(int node, std::vector<bool>& is_processed,
@@ -2008,7 +2013,7 @@ void ModelRunner::process_node_nolake_for_sure(int node, std::vector<bool>& is_p
   // if(this->chonk_network[node].get_chonk_receivers().size() == 0 && active_nodes[node] > 0)
   //   throw std::runtime_error("NoRecError::internal flux broken");
   
-  this->chonk_network[node].split_and_merge_in_receiving_chonks(this->chonk_network, this->graph, this->surface_elevation_tp1, io_double_array["sed_height_tp1"], this->timestep);
+  this->chonk_network[node].split_and_merge_in_receiving_chonks(this->chonk_network, this->graph, this->surface_elevation_tp1, this->sed_height_tp1, this->timestep);
   local_Qs_production_for_lakes[node] +=  this->chonk_network[node].get_sediment_flux() ;
 }
 
@@ -2040,8 +2045,8 @@ void ModelRunner::finalise()
 {
   // Finilising the timestep by applying the changes to the thingy
   // First gathering all the aliases 
-  xt::pytensor<double,1>& sed_height_tp1 = this->io_double_array["sed_height_tp1"];
-  xt::pytensor<double,1>& sed_height = this->io_double_array["sed_height"];
+  // xt::pytensor<double,1>& sed_height_tp1 = this->this->sed_height_tp1;
+  // xt::pytensor<double,1>& sed_height = this->sed_height;
 
   double cellarea = this->dx * this->dy;
 
@@ -2464,7 +2469,7 @@ void ModelRunner::manage_fluxes_after_moving_prep(chonk& this_chonk, int label_i
     double this_Ks = this->labelz_list[label_id].Ks_modifyer * this->labelz_list[label_id].base_K;
 
     this_chonk.charlie_I(this->labelz_list[label_id].n, this->labelz_list[label_id].m, this_Kr, this_Ks,
-    this->labelz_list[label_id].dimless_roughness, this->io_double_array["sed_height"][index], 
+    this->labelz_list[label_id].dimless_roughness, this->sed_height[index], 
     this->labelz_list[label_id].V, this->labelz_list[label_id].dstar, this->labelz_list[label_id].threshold_incision, 
     this->labelz_list[label_id].threshold_entrainment,label_id, these_sed_props, this->timestep,  this->dx, this->dy);
   }
@@ -2477,7 +2482,7 @@ void ModelRunner::manage_fluxes_after_moving_prep(chonk& this_chonk, int label_i
     double this_kappar = this->labelz_list[label_id].kappa_r_mod * this->labelz_list[label_id].kappa_base;
     // std::cout << "kappe_r is " << this_kappar << " and kappa_s is " << this_kappas << " Sc = " << this->labelz_list[label_id].critical_slope << std::endl;
 
-    this_chonk.CidreHillslopes(this->io_double_array["sed_height"][index], this_kappas, 
+    this_chonk.CidreHillslopes(this->sed_height[index], this_kappas, 
             this_kappar, this->labelz_list[label_id].critical_slope,
     label_id, these_sed_props, this->timestep, this->dx, this->dy, true, this->graph, 1e-6);
   }
@@ -2512,7 +2517,7 @@ void ModelRunner::manage_fluxes_after_moving_prep(chonk& this_chonk, int label_i
   //     // The SPACE model aka CHARLIE_I
   //       this_chonk.charlie_I(this->labelz_list_double["SPIL_n"][label_id], this->labelz_list_double["SPIL_m"][label_id], this->labelz_list_double["CHARLIE_I_Kr"][label_id], 
   // this->labelz_list_double["CHARLIE_I_Ks"][label_id],
-  // this->labelz_list_double["CHARLIE_I_dimless_roughness"][label_id], this->io_double_array["sed_height"][index], 
+  // this->labelz_list_double["CHARLIE_I_dimless_roughness"][label_id], this->sed_height[index], 
   // this->labelz_list_double["CHARLIE_I_V"][label_id], 
   // this->labelz_list_double["CHARLIE_I_dstar"][label_id], this->labelz_list_double["CHARLIE_I_threshold_incision"][label_id], 
   // this->labelz_list_double["CHARLIE_I_threshold_entrainment"][label_id],
@@ -2523,7 +2528,7 @@ void ModelRunner::manage_fluxes_after_moving_prep(chonk& this_chonk, int label_i
   //     // The SPACE model aka CHARLIE_I
   //       this_chonk.charlie_I_K_fQs(this->labelz_list_double["SPIL_n"][label_id], this->labelz_list_double["SPIL_m"][label_id], this->labelz_list_double["CHARLIE_I_Kr"][label_id], 
   // this->labelz_list_double["CHARLIE_I_Ks"][label_id],
-  // this->labelz_list_double["CHARLIE_I_dimless_roughness"][label_id], this->io_double_array["sed_height"][index], 
+  // this->labelz_list_double["CHARLIE_I_dimless_roughness"][label_id], this->sed_height[index], 
   // this->labelz_list_double["CHARLIE_I_V"][label_id], 
   // this->labelz_list_double["CHARLIE_I_dstar"][label_id], this->labelz_list_double["CHARLIE_I_threshold_incision"][label_id], 
   // this->labelz_list_double["CHARLIE_I_threshold_entrainment"][label_id],
@@ -2532,13 +2537,13 @@ void ModelRunner::manage_fluxes_after_moving_prep(chonk& this_chonk, int label_i
 
   //     case 9:
   //     // Cidre hillslope method, only on the sediment layer
-  //       this_chonk.CidreHillslopes(this->io_double_array["sed_height"][index], this->labelz_list_double["Cidre_HS_kappa_s"][label_id], 
+  //       this_chonk.CidreHillslopes(this->sed_height[index], this->labelz_list_double["Cidre_HS_kappa_s"][label_id], 
   //         0., this->labelz_list_double["Cidre_HS_critical_slope"][label_id],
   // label_id, these_sed_props, this->timestep, this->dx, this->dy, false, this->graph, 1e-6);
   //       break;
   //     case 10:
   //     // Cidre hillslope method, both sed and bedrock
-  //       this_chonk.CidreHillslopes(this->io_double_array["sed_height"][index], this->labelz_list_double["Cidre_HS_kappa_s"][label_id], 
+  //       this_chonk.CidreHillslopes(this->sed_height[index], this->labelz_list_double["Cidre_HS_kappa_s"][label_id], 
   //           this->labelz_list_double["Cidre_HS_kappa_r"][label_id], this->labelz_list_double["Cidre_HS_critical_slope"][label_id],
   //   label_id, these_sed_props, this->timestep, this->dx, this->dy, true, this->graph, 1e-6);
   //         break;

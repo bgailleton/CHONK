@@ -107,6 +107,10 @@ PYBIND11_MODULE(CHONK_cpp, m)
       .def("get_topography",&ModelRunner::get_topography)
       .def("get_active_nodes",&ModelRunner::get_active_nodes)
       .def("add_external_to_surface_elevation_tp1",&ModelRunner::add_external_to_surface_elevation_tp1)
+      .def("set_sed_height", &ModelRunner::set_sed_height)
+      .def("set_sed_height_tp1", &ModelRunner::set_sed_height_tp1)
+      .def("get_sed_height", &ModelRunner::get_sed_height)
+      .def("get_sed_height_tp1", &ModelRunner::get_sed_height_tp1)
 
     ;
     m.def("set_DEBUG_switch_nodegraph",set_DEBUG_switch_nodegraph);

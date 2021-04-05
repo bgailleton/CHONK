@@ -416,6 +416,8 @@ std::vector<double>& pre_sed, std::vector<double>& pre_water);
     xt::pytensor<double,1> get_surface_elevation_tp1(){return this->surface_elevation_tp1 ;}
     xt::pytensor<double,1> get_topography(){return this->topography ;}
     xt::pytensor<bool,1> get_active_nodes(){return this->active_nodes ;}
+    xt::pytensor<double,1> get_sed_height(){return this->sed_height ;}
+    xt::pytensor<double,1> get_sed_height_tp1(){return this->sed_height_tp1 ;}
 
 
 
