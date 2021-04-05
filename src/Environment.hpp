@@ -553,6 +553,15 @@ std::vector<double>& pre_sed, std::vector<double>& pre_water);
     double GLOB_GABUL;
     int n_outlets_remodelled;
 
+
+    // Time benchamrkers
+    std::vector<std::chrono::high_resolution_clock::time_point> CHRONO_start;
+    std::vector<std::chrono::high_resolution_clock::time_point> CHRONO_stop;
+    std::vector<double> CHRONO_mean;
+    std::vector<int> CHRONO_n_time;
+    std::vector<std::string> CHRONO_name;
+    int n_timers;
+
   private:
     // mirror of the constructors
     void create() {return;};

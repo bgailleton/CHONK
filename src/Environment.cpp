@@ -114,6 +114,13 @@ void EntryPoint::ingestNkill(EntryPoint& other)
 // Initialises the model object, actually Does not do much but is required.
 void ModelRunner::create(double ttimestep, std::vector<std::string> tordered_flux_methods, std::string tmove_method)
 { 
+  n_timers = 2;
+  CHRONO_start = std::vector<std::chrono::high_resolution_clock::time_point>(n_timers);
+  CHRONO_stop = std::vector<std::chrono::high_resolution_clock::time_point>(n_timers);
+  CHRONO_mean = std::vector<double>(n_timers,0.);
+  CHRONO_n_time = std::vector<int>(n_timers,0);
+  CHRONO_name = {"init_graph","total_run"};
+
   // std::cout << "THING1" << std::endl;
   // Saving all the attributes
   this->timestep = ttimestep;
@@ -136,6 +143,7 @@ void ModelRunner::create(double ttimestep, std::vector<std::string> tordered_flu
 // initialising the node graph and the chonk network
 void ModelRunner::initiate_nodegraph()
 {
+  CHRONO_start[0] = std::chrono::high_resolution_clock::now();
 
   // std::cout << "initiating nodegraph..." <<std::endl;
   // Creating the nodegraph and preprocessing the depression nodes
@@ -197,12 +205,16 @@ void ModelRunner::initiate_nodegraph()
 
   // ready to run this time step!
   // std::cout << "THING3" << std::endl;
+  CHRONO_stop[0] = std::chrono::high_resolution_clock::now();
+  CHRONO_n_time[0] ++;
+  CHRONO_mean[0] += std::chrono::duration<double>(CHRONO_stop[0] - CHRONO_start[0]).count();
 
 }
 
 // this is the main running function
 void ModelRunner::run()
 {
+  CHRONO_start[1] = std::chrono::high_resolution_clock::now();
 
   // Keeping track of which node is processed, for debugging and lake management
   is_processed = std::vector<bool>(io_int["n_elements"],false);
@@ -245,6 +257,13 @@ void ModelRunner::run()
   // Calling the finalising function: it applies the changes in topography and I think will apply the lake sedimentation
   this->finalise();
   // Done
+
+  CHRONO_stop[1] = std::chrono::high_resolution_clock::now();
+  CHRONO_n_time[1] ++;
+  CHRONO_mean[1] += std::chrono::duration<double>(CHRONO_stop[1] - CHRONO_start[1]).count();
+
+  for(int i=0; i< this->n_timers; i++)
+    std::cout << CHRONO_name[i] << " took " << double(CHRONO_mean[i])/CHRONO_n_time[i] << " seconds out of " << CHRONO_n_time[i] << " runs" << std::endl;
 
   // Old debug statement to let the model catch its breath when there is shit ton of cout statements 
   // std::this_thread::sleep_for(std::chrono::milliseconds(2000));
@@ -2377,29 +2396,32 @@ xt::pytensor<int,1> ModelRunner::get_debugint()
 void ModelRunner::manage_fluxes_before_moving_prep(chonk& this_chonk, int label_id)
 {
 
-  for(auto method:this->ordered_flux_methods)
-  {
-    if(method == "move")
-      break;
-    int this_case = intcorrespondance[method];
-
-    switch(this_case)
-    {
-      case 5:
-        this_chonk.inplace_only_drainage_area(this->dx, this->dy);
+  this_chonk.inplace_only_drainage_area(this->dx, this->dy);
         this->Qw_in += this->dx* this->dy;
-        break;
-      case 6:
-        this_chonk.inplace_precipitation_discharge(this->dx, this->dy,this->io_double_array["precipitation"]);
-        this->Qw_in += this->io_double_array["precipitation"][this_chonk.get_current_location()] * this->dx* this->dy;
-        break;
-      case 7:
-        this_chonk.inplace_infiltration(this->dx, this->dy, this->io_double_array["infiltration"]);
-        this->Qw_out += this->io_double_array["infiltration"][this_chonk.get_current_location()] * this->dx* this->dy;
-        break;
-    }
+  return;
+  // for(auto method:this->ordered_flux_methods)
+  // {
+  //   if(method == "move")
+  //     break;
+  //   int this_case = intcorrespondance[method];
 
-  }
+  //   switch(this_case)
+  //   {
+  //     case 5:
+  //       this_chonk.inplace_only_drainage_area(this->dx, this->dy);
+  //       this->Qw_in += this->dx* this->dy;
+  //       break;
+  //     case 6:
+  //       this_chonk.inplace_precipitation_discharge(this->dx, this->dy,this->io_double_array["precipitation"]);
+  //       this->Qw_in += this->io_double_array["precipitation"][this_chonk.get_current_location()] * this->dx* this->dy;
+  //       break;
+  //     case 7:
+  //       this_chonk.inplace_infiltration(this->dx, this->dy, this->io_double_array["infiltration"]);
+  //       this->Qw_out += this->io_double_array["infiltration"][this_chonk.get_current_location()] * this->dx* this->dy;
+  //       break;
+  //   }
+
+  // }
 }
 
 void ModelRunner::cancel_fluxes_before_moving_prep(chonk& this_chonk, int label_id)
