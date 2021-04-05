@@ -1046,93 +1046,93 @@ int NodeGraphV2::get_checker(int i, bool is_active)
   return checker;
 }
 
-void NodeGraphV2::get_D8_neighbors(int i, xt::pytensor<bool,1>& active_nodes, std::vector<int>& neightbouring_nodes, std::vector<double>& length2neigh)
-{
-  // these vectors are additioned to the node indice to test the neighbors
-  neightbouring_nodes = std::vector<int>();
-  length2neigh = std::vector<double>();
+// void NodeGraphV2::get_D8_neighbors(int i, xt::pytensor<bool,1>& active_nodes, std::vector<int>& neightbouring_nodes, std::vector<double>& length2neigh)
+// {
+//   // these vectors are additioned to the node indice to test the neighbors
+//   neightbouring_nodes = std::vector<int>();
+//   length2neigh = std::vector<double>();
 
 
-  // is my node active or not
-  // An active node at a boundary means periodic
-  bool isa = active_nodes[i];
+//   // is my node active or not
+//   // An active node at a boundary means periodic
+//   bool isa = active_nodes[i];
 
-  // To find the neighbours, code utilises premade looper with the value to add to the indice to get the valid neighbours
-  // Neighbourer indices
-  // internal node 0
-  // periodic_first_row 1
-  // periodic_last_row 2
-  // periodic_first_col 3
-  // periodic last_col 4
-  // normal_first_row 5
-  // normal_last_row 6
-  // normal_first_col 7
-  // normal_last_col 8
-  // normal_top_left 9
-  // normal_top_right 10
-  // normal_bottom_left 11
-  // normal_bottom_right 12
+//   // To find the neighbours, code utilises premade looper with the value to add to the indice to get the valid neighbours
+//   // Neighbourer indices
+//   // internal node 0
+//   // periodic_first_row 1
+//   // periodic_last_row 2
+//   // periodic_first_col 3
+//   // periodic last_col 4
+//   // normal_first_row 5
+//   // normal_last_row 6
+//   // normal_first_col 7
+//   // normal_last_col 8
+//   // normal_top_left 9
+//   // normal_top_right 10
+//   // normal_bottom_left 11
+//   // normal_bottom_right 12
 
-  // NOTE THAT ELEMENT ARE VECTORISED
+//   // NOTE THAT ELEMENT ARE VECTORISED
 
-  int checker = this->get_checker(i,isa);
+//   int checker = this->get_checker(i,isa);
 
-  // // first row
-  // if(i<ncols)
-  // {
-  //   if(isa)
-  //     checker = 1;
-  //   else
-  //   {
-  //     if(i > 0 && i < ncols - 1 )
-  //       checker = 5;
-  //     else if (i == 0)
-  //       checker = 9;
-  //     else
-  //       checker = 10;
-  //   }
-  // }
-  // // last row
-  // else if (i >= this->n_element - ncols)
-  // {
-  //   if(isa)
-  //     checker = 2;
-  //   else if(i > this->n_element - ncols && i < this->n_element - 1)
-  //     checker = 6;
-  //   else if (i == this->n_element - ncols)
-  //     checker = 11;
-  //   else
-  //     checker = 12;
-  // }
-  // // first col corners excluded
-  // else if(i % ncols == 0)
-  // {
-  //   if(isa)
-  //     checker = 3;
-  //   else
-  //     checker = 7;
-  // }
-  // else if((i + 1) % (ncols) == 0 )
-  // {
-  //   if(isa)
-  //     checker = 4;
-  //   else
-  //     checker = 8;
-  // }
-  // else
-  // {
-  //   checker = 0;
-  // }
+//   // // first row
+//   // if(i<ncols)
+//   // {
+//   //   if(isa)
+//   //     checker = 1;
+//   //   else
+//   //   {
+//   //     if(i > 0 && i < ncols - 1 )
+//   //       checker = 5;
+//   //     else if (i == 0)
+//   //       checker = 9;
+//   //     else
+//   //       checker = 10;
+//   //   }
+//   // }
+//   // // last row
+//   // else if (i >= this->n_element - ncols)
+//   // {
+//   //   if(isa)
+//   //     checker = 2;
+//   //   else if(i > this->n_element - ncols && i < this->n_element - 1)
+//   //     checker = 6;
+//   //   else if (i == this->n_element - ncols)
+//   //     checker = 11;
+//   //   else
+//   //     checker = 12;
+//   // }
+//   // // first col corners excluded
+//   // else if(i % ncols == 0)
+//   // {
+//   //   if(isa)
+//   //     checker = 3;
+//   //   else
+//   //     checker = 7;
+//   // }
+//   // else if((i + 1) % (ncols) == 0 )
+//   // {
+//   //   if(isa)
+//   //     checker = 4;
+//   //   else
+//   //     checker = 8;
+//   // }
+//   // else
+//   // {
+//   //   checker = 0;
+//   // }
 
-  int idL = -1;
-  for(auto& adder:this->neightbourer[checker])
-  {
-    int node = i+adder;
-    idL++;
-    neightbouring_nodes.push_back(node);
-    length2neigh.push_back(this->lengthener[idL]);
-  }
-}
+//   int idL = -1;
+//   for(auto& adder:this->neightbourer[checker])
+//   {
+//     int node = i+adder;
+//     idL++;
+//     neightbouring_nodes.push_back(node);
+//     length2neigh.push_back(this->lengthener[idL]);
+//   }
+// }
 
 std::vector<int> NodeGraphV2::get_all_flat_from_node(int i, xt::pytensor<double,1>& topography,  xt::pytensor<bool,1>& active_nodes)
 {
@@ -1168,7 +1168,7 @@ std::vector<int> NodeGraphV2::get_all_flat_from_node(int i, xt::pytensor<double,
 
 }
 
-void NodeGraphV2::get_D8_neighbors(int i, xt::pytensor<int,1>& active_nodes, std::vector<int>& neightbouring_nodes, std::vector<double>& length2neigh)
+void NodeGraphV2::get_D8_neighbors(int i, xt::pytensor<bool,1>& active_nodes, std::vector<int>& neightbouring_nodes, std::vector<double>& length2neigh)
 {
   // these vectors are additioned to the node indice to test the neighbors
   neightbouring_nodes = std::vector<int>();

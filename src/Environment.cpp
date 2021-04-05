@@ -397,8 +397,8 @@ void ModelRunner::iterative_lake_solver()
       
       entry_point.volume_sed = 0;
       
-      if(this->lakes[current_lake].volume_sed < 0)
-        throw std::runtime_error("CriticalLakeError:" + std::to_string(this->lakes[current_lake].volume_sed) + " is not a valid volume for lake sediments maybe " + std::to_string(save_volume_sed) + " is the problem");
+      // if(this->lakes[current_lake].volume_sed < 0)
+        // throw std::runtime_error("CriticalLakeError:" + std::to_string(this->lakes[current_lake].volume_sed) + " is not a valid volume for lake sediments maybe " + std::to_string(save_volume_sed) + " is the problem");
     }
 
 
@@ -454,13 +454,23 @@ void ModelRunner::iterative_lake_solver()
 
     // skiping to the next entry node
   }
-  std::cout << "I had " << negsumsed << " Sediments and " << negsumwat/this->timestep << " Water uncared of with " << has_outlet << "/" << no_has_outlet << " with valid outlet" << std::endl;
-  std::cout << "N OUTLET ROMOB::" << this->n_outlets_remodelled << std::endl;
+  // std::cout << "I had " << negsumsed << " Sediments and " << negsumwat/this->timestep << " Water uncared of with " << has_outlet << "/" << no_has_outlet << " with valid outlet" << std::endl;
+  // std::cout << "N OUTLET ROMOB::" << this->n_outlets_remodelled << std::endl;
 
   if(no_has_outlet > 0)
     std::cout << " Caught one lake who could have lost water" << std::endl;
 
   // And I am done with the iterative solver!
+  for (auto EP: this->lakes)
+  {
+    if(EP.is_now >= 0)
+    {
+      std::cout << "Lake " << EP.id << " has " << EP.volume_water << " Qw and " << EP.volume_sed << " Qs stored" << std::endl;
+      if(EP.volume_sed < -1000)
+        throw std::runtime_error("NegativeSedFinalLake");
+    }
+
+  }
 }
 
 
@@ -2459,11 +2469,13 @@ void ModelRunner::manage_fluxes_after_moving_prep(chonk& this_chonk, int label_i
     this->labelz_list[label_id].threshold_entrainment,label_id, these_sed_props, this->timestep,  this->dx, this->dy);
   }
 
+  // Hillslope routine
   if(this->CIDRE_HS)
   {
 
     double this_kappas = this->labelz_list[label_id].kappa_s_mod * this->labelz_list[label_id].kappa_base;
     double this_kappar = this->labelz_list[label_id].kappa_r_mod * this->labelz_list[label_id].kappa_base;
+    // std::cout << "kappe_r is " << this_kappar << " and kappa_s is " << this_kappas << " Sc = " << this->labelz_list[label_id].critical_slope << std::endl;
 
     this_chonk.CidreHillslopes(this->io_double_array["sed_height"][index], this_kappas, 
             this_kappar, this->labelz_list[label_id].critical_slope,

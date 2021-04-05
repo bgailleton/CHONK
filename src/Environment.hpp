@@ -438,7 +438,7 @@ std::vector<double>& pre_sed, std::vector<double>& pre_water);
     // if false: fluxes rerouted from flux bottom to outlet
     bool lake_solver;
     bool CHARLIE_I = true;
-    bool CIDRE_HS = false;
+    bool CIDRE_HS = true;
 
     // All the methods affecting the fluxes in the right order you want to apply it 
     // Important::it requires the strng "move" at the place at which the move method will be called
