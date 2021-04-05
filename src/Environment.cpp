@@ -114,12 +114,12 @@ void EntryPoint::ingestNkill(EntryPoint& other)
 // Initialises the model object, actually Does not do much but is required.
 void ModelRunner::create(double ttimestep, std::vector<std::string> tordered_flux_methods, std::string tmove_method)
 { 
-  n_timers = 2;
+  n_timers = 6;
   CHRONO_start = std::vector<std::chrono::high_resolution_clock::time_point>(n_timers);
   CHRONO_stop = std::vector<std::chrono::high_resolution_clock::time_point>(n_timers);
   CHRONO_mean = std::vector<double>(n_timers,0.);
   CHRONO_n_time = std::vector<int>(n_timers,0);
-  CHRONO_name = {"init_graph","total_run"};
+  CHRONO_name = {"init_graph","total_run", "passive", "active", "splitNmerge", "move_prep"};
 
   // std::cout << "THING1" << std::endl;
   // Saving all the attributes
@@ -262,9 +262,12 @@ void ModelRunner::run()
   CHRONO_n_time[1] ++;
   CHRONO_mean[1] += std::chrono::duration<double>(CHRONO_stop[1] - CHRONO_start[1]).count();
 
+
+
+  std::cout << std::endl << "--------------------- START OF TIME REPORT ---------------------" << std::endl;
   for(int i=0; i< this->n_timers; i++)
     std::cout << CHRONO_name[i] << " took " << double(CHRONO_mean[i])/CHRONO_n_time[i] << " seconds out of " << CHRONO_n_time[i] << " runs" << std::endl;
-
+  std::cout << "--------------------- END OF TIME REPORT ---------------------" << std::endl << std::endl;
   // Old debug statement to let the model catch its breath when there is shit ton of cout statements 
   // std::this_thread::sleep_for(std::chrono::milliseconds(2000));
 }
@@ -2005,8 +2008,12 @@ void ModelRunner::process_node(int& node, std::vector<bool>& is_processed, int& 
     // Fluxes after moving prep are active fluxes such as erosion or other thingies
     this->manage_fluxes_after_moving_prep(this->chonk_network[node],this->label_array[node]);
     // Apply the changes and propagate the fluxes downstream
+    CHRONO_start[4] = std::chrono::high_resolution_clock::now();
     this->chonk_network[node].split_and_merge_in_receiving_chonks(this->chonk_network, this->graph, this->surface_elevation_tp1, this->sed_height_tp1, this->timestep);
-}
+    CHRONO_stop[4] = std::chrono::high_resolution_clock::now();
+    CHRONO_n_time[4] ++;
+    CHRONO_mean[4] += std::chrono::duration<double>(CHRONO_stop[4] - CHRONO_start[4]).count();
+  }
 
 void ModelRunner::process_node_nolake_for_sure(int node, std::vector<bool>& is_processed,
   xt::pytensor<bool,1>& active_nodes, double& cellarea, xt::pytensor<double,1>& surface_elevation, bool need_move_prep, bool need_flux_before_move)
@@ -2395,9 +2402,15 @@ xt::pytensor<int,1> ModelRunner::get_debugint()
 
 void ModelRunner::manage_fluxes_before_moving_prep(chonk& this_chonk, int label_id)
 {
+  CHRONO_start[2] = std::chrono::high_resolution_clock::now();
+  
 
   this_chonk.inplace_only_drainage_area(this->dx, this->dy);
         this->Qw_in += this->dx* this->dy;
+
+  CHRONO_stop[2] = std::chrono::high_resolution_clock::now();
+  CHRONO_n_time[2] ++;
+  CHRONO_mean[2] += std::chrono::duration<double>(CHRONO_stop[2] - CHRONO_start[2]).count();
   return;
   // for(auto method:this->ordered_flux_methods)
   // {
@@ -2455,6 +2468,10 @@ void ModelRunner::cancel_fluxes_before_moving_prep(chonk& this_chonk, int label_
 
 void ModelRunner::manage_move_prep(chonk& this_chonk)
 {
+
+  CHRONO_start[5] = std::chrono::high_resolution_clock::now();
+
+
   int this_case = intcorrespondance[this->move_method];
 
   std::vector<int> rec = this_chonk.get_chonk_receivers_copy();
@@ -2475,10 +2492,16 @@ void ModelRunner::manage_move_prep(chonk& this_chonk)
     default:
       std::cout << "WARNING::move method name unrecognised, not sure what will happen now, probably crash" << std::endl;
   }
+
+  CHRONO_stop[5] = std::chrono::high_resolution_clock::now();
+  CHRONO_n_time[5] ++;
+  CHRONO_mean[5] += std::chrono::duration<double>(CHRONO_stop[5] - CHRONO_start[5]).count();
 }
 
 void ModelRunner::manage_fluxes_after_moving_prep(chonk& this_chonk, int label_id)
 {
+  CHRONO_start[3] = std::chrono::high_resolution_clock::now();
+
   int index = this_chonk.get_current_location();
   std::vector<double> these_sed_props(this->n_labels,0.);
   if(is_there_sed_here[index] && this->sed_prop_by_label[index].size()>0) // I SHOULD NOT NEED THE SECOND THING, WHY DO I FUTURE BORIS????
@@ -2508,6 +2531,10 @@ void ModelRunner::manage_fluxes_after_moving_prep(chonk& this_chonk, int label_i
             this_kappar, this->labelz_list[label_id].critical_slope,
     label_id, these_sed_props, this->timestep, this->dx, this->dy, true, this->graph, 1e-6);
   }
+
+  CHRONO_stop[3] = std::chrono::high_resolution_clock::now();
+  CHRONO_n_time[3] ++;
+  CHRONO_mean[3] += std::chrono::duration<double>(CHRONO_stop[3] - CHRONO_start[3]).count();
 
   return;
 

@@ -107,7 +107,7 @@ NodeGraphV2::NodeGraphV2(
 
     graph.reserve(un_element);
   for(int i=0; i<n_element;i++)
-    graph.emplace_back(Vertex(i));
+    graph.emplace_back(Vertex());
 
   // computing receivers and donors information, multi and SS flow
   this->compute_receveivers_and_donors(active_nodes,elevation);

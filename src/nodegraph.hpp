@@ -41,22 +41,22 @@ class Vertex
 {
 public:
   // Empty constructor
-  Vertex(){};
+  Vertex()
+  {
+    donors.reserve(8);
+    Sdonors.reserve(8);
+    receivers.reserve(8);
+    length2rec.reserve(8);
+    length2don.reserve(8);
+  };
   // Useful constructor
   Vertex(
-    int& val, // node ID
-    std::vector<int>& donors,  // child vertex in the donors direction
-    std::vector<int>& receivers, // child vertex in the receiver direction
-    std::vector<double>& length2rec, // length to each child vertex in the receiver direction
-    std::vector<double>& length2don // length to each child vertex in the receiver direction
-    ){this->val = val; this->donors = donors; this->receivers = receivers; this->length2rec = length2rec;this->length2don = length2don;}
-  // Useful constructor with no vector
-  Vertex(
-    int& val // node ID
-    ){this->val = val;}
+    std::vector<int> donors,  // child vertex in the donors direction
+    std::vector<int> receivers, // child vertex in the receiver direction
+    std::vector<double> length2rec, // length to each child vertex in the receiver direction
+    std::vector<double> length2don // length to each child vertex in the receiver direction
+    ){this->donors = donors; this->receivers = receivers; this->length2rec = length2rec;this->length2don = length2don;}
 
-
-  int val; //  ID in the node graph
   // bool visiting; // bool for DFS
   // bool visited; // bool for DFS
   std::vector<int> donors; // list of child nodes in teh donor direction
