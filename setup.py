@@ -85,7 +85,7 @@ class BuildExt(build_ext):
     """A custom build extension for adding compiler-specific options."""
     c_opts = {
         'msvc': ['/EHsc','/Ox'],
-        'unix': ['-O3'],
+        'unix': ['-O3', '-ffast-math'],
     }
 
     if sys.platform == 'darwin':
