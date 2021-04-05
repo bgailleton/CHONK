@@ -68,7 +68,6 @@ void chonk::create(int tchonkID, int tcurrent_node, bool tmemory_saver)
   this->sediment_flux = 0;
   this->deposition_flux = 0;
   this->sediment_creation_flux = 0;
-  this->other_attributes["height_lake_sediments_tp1"] = 0;
   this->fluvialprop_sedflux = 0;
 
   // required params
@@ -96,13 +95,12 @@ void chonk::reset()
   this->sediment_creation_flux = 0;
   this->sediment_flux = 0;
   this->fluvialprop_sedflux = 0;
-  this->other_attributes["height_lake_sediments_tp1"] = 0;
 
   this->receivers.clear();
   this->weigth_water_fluxes.clear();
   this->weigth_sediment_fluxes.clear();
   this->slope_to_rec.clear();
-  
+
   this->receivers.reserve(8);
   this->weigth_water_fluxes.reserve(8);
   this->weigth_sediment_fluxes.reserve(8);
@@ -133,7 +131,7 @@ void chonk::split_and_merge_in_receiving_chonks(std::vector<chonk>& chonkscape, 
 void chonk::split_and_merge_in_receiving_chonks(std::vector<chonk>& chonkscape, NodeGraphV2& graph, double dt)
 {
   // Iterating through the receivers
-  std::vector<double> oatalab = other_attributes_arrays["label_tracker"];
+  std::vector<double> oatalab = this->label_tracker;
   double sum_weight_sed = 0;
   double sum_outwat = 0;
 
@@ -202,7 +200,7 @@ void chonk::split_and_merge_in_receiving_chonks(std::vector<chonk>& chonkscape, 
 void chonk::cancel_split_and_merge_in_receiving_chonks(std::vector<chonk>& chonkscape, NodeGraphV2& graph, double dt)
 {
   // Iterating through the receivers
-  std::vector<double> oatalab = other_attributes_arrays["label_tracker"];
+  std::vector<double> oatalab = this->label_tracker;
   // for(auto& oat:oatalab)
   //   oat = -1 * oat;
 
@@ -241,7 +239,7 @@ void chonk::cancel_split_and_merge_in_receiving_chonks(std::vector<chonk>& chonk
 void chonk::split_and_merge_in_receiving_chonks_ignore_some(std::vector<chonk>& chonkscape, NodeGraphV2& graph, double dt, std::vector<int>& to_ignore)
 {
   
-  std::vector<double> oatalab = other_attributes_arrays["label_tracker"];
+  std::vector<double> oatalab = this->label_tracker;
 
   // Iterating through the receivers
   for(size_t i=0; i < this->receivers.size(); i++)
@@ -732,7 +730,7 @@ void chonk::set_sediment_flux(double value, std::vector<double> label_proportion
   }
 
   this->sediment_flux = value;
-  std::vector<double>& oatalab = other_attributes_arrays["label_tracker"];
+  std::vector<double>& oatalab = this->label_tracker;
   for(int i=0; i< int(label_proportions.size()); i++)
   {  
     oatalab[i] = label_proportions[i];
@@ -742,7 +740,7 @@ void chonk::set_sediment_flux(double value, std::vector<double> label_proportion
 
 void chonk::add_to_sediment_flux(double value, double prop_fluvial)
 {
-  this->add_to_sediment_flux(value, this->other_attributes_arrays["label_tracker"], prop_fluvial );
+  this->add_to_sediment_flux(value, this->label_tracker, prop_fluvial );
 }
 
 // Add a certain amount to the sediment flux
@@ -751,7 +749,7 @@ void chonk::add_to_sediment_flux(double value, std::vector<double> label_proport
   if(this->sediment_flux <0)
     std::cout << "WARNING:: IN Sediment flux <0 " << this->sediment_flux << std::endl;
 
-  // if I have no sediment: do nothing
+  // if I am adding no sediment: do nothing
   if(double_equals(value,0, 1e-8))
   {
     return;
@@ -762,7 +760,7 @@ void chonk::add_to_sediment_flux(double value, std::vector<double> label_proport
   if(double_equals(this->sediment_flux,0))
   {
     this->sediment_flux += value;
-    this->other_attributes_arrays["label_tracker"] = label_proportions;
+    this->label_tracker = label_proportions;
     this->fluvialprop_sedflux = prop_fluvial;
 
     if(this->sediment_flux <0)
@@ -776,8 +774,8 @@ void chonk::add_to_sediment_flux(double value, std::vector<double> label_proport
   }
 
 
-  // std::vector<double> newlabprop = mix_two_proportions(this->sediment_flux, this->other_attributes_arrays["label_tracker"], value, label_proportions);
-  this->other_attributes_arrays["label_tracker"] = mix_two_proportions(this->sediment_flux, this->other_attributes_arrays["label_tracker"], value, label_proportions);;
+  // std::vector<double> newlabprop = mix_two_proportions(this->sediment_flux, this->label_tracker, value, label_proportions);
+  this->label_tracker = mix_two_proportions(this->sediment_flux, this->label_tracker, value, label_proportions);;
   
   double fluvialsedfluxtot = value * prop_fluvial + this->fluvialprop_sedflux * this->sediment_flux;
   this->sediment_flux += value;
@@ -838,7 +836,7 @@ void chonk::active_simple_SPL(double n, double m, double K, double dt, double Xr
   //   this->erosion_flux_undifferentiated += this_eflux;
 
   //   // What has been eroded moves into the sediment flux (which needs to be converted into a volume)
-  //   std::vector<double> buluf(this->other_attributes_arrays["label_tracker"].size(), 0.);
+  //   std::vector<double> buluf(this->label_tracker.size(), 0.);
   //   buluf[label] = 1.;
   //   this->add_to_sediment_flux(this_eflux * Xres * Yres * dt, buluf);
   //   // recording the current flux 
@@ -868,7 +866,7 @@ void chonk::charlie_I_K_fQs(double n, double m, double K_r, double K_s,
   double mod = 0;
   for(size_t i=0; i<sed_label_prop.size(); i++)
   {
-    mod += this->other_attributes_arrays["label_tracker"][i] * Krmodifyer[i];
+    mod += this->label_tracker[i] * Krmodifyer[i];
   }
 
   if(mod <= 0)
@@ -982,7 +980,7 @@ void chonk::charlie_I(double n, double m, double K_r, double K_s,
   // Adding the eroded bedrock to the sediment flux
   
   //# label proportion for current bedrock
-  std::vector<double> buluf(this->other_attributes_arrays["label_tracker"].size(), 0.);
+  std::vector<double> buluf(this->label_tracker.size(), 0.);
   buluf[zone_label] = 1.;
 
   //# Depodivider is the analytical solution from sediment divergence (See equation 31 -> SPACE paper)
@@ -1004,7 +1002,7 @@ void chonk::charlie_I(double n, double m, double K_r, double K_s,
   double Qs = this->sediment_flux * this->fluvialprop_sedflux;  
   // COrrecting analytically THE DEPOSITION (see SPACE gmd paper equation 31)
   tadd = Qs/depodivider - Qs;
-  this->add_to_sediment_flux(tadd, this->other_attributes_arrays["label_tracker"], 1.);
+  this->add_to_sediment_flux(tadd, this->label_tracker, 1.);
   Qs += tadd;
 
   // # Deposition
@@ -1173,7 +1171,7 @@ void chonk::charlie_I(double n, double m, double K_r, double K_s,
 //   }
 
 //   // Adding the eroded bedrock to the sediment flux
-//   std::vector<double> buluf(this->other_attributes_arrays["label_tracker"].size(), 0.);
+//   std::vector<double> buluf(this->label_tracker.size(), 0.);
 
 
 //   buluf[zone_label] = 1.;
@@ -1189,7 +1187,7 @@ void chonk::charlie_I(double n, double m, double K_r, double K_s,
 
 //   // COrrecting analytically (see SPACE gmd paper equation 31)
 //   // tadd = total_fluvial_sedflux -  total_fluvial_sedflux/depodivider;
-//   // this->add_to_sediment_flux( -tadd, this->other_attributes_arrays["label_tracker"], 1.);
+//   // this->add_to_sediment_flux( -tadd, this->label_tracker, 1.);
 
 //   total_fluvial_sedflux = total_fluvial_sedflux/depodivider;
   
@@ -1209,7 +1207,7 @@ void chonk::charlie_I(double n, double m, double K_r, double K_s,
 //   }
 
 //   // std::cout << ratio_removersed << "||" << sum_vector(pre_sedfluxes)/depodivider << "||" << total_fluvial_sedflux << std::endl;
-//   this->add_to_sediment_flux(removersed, this->other_attributes_arrays["label_tracker"], 1.);
+//   this->add_to_sediment_flux(removersed, this->label_tracker, 1.);
 
 
 
@@ -1415,7 +1413,7 @@ void chonk::charlie_I(double n, double m, double K_r, double K_s,
 //   }
 
 //   // Adding the eroded bedrock to the sediment flux
-//   std::vector<double> buluf(this->other_attributes_arrays["label_tracker"].size(), 0.);
+//   std::vector<double> buluf(this->label_tracker.size(), 0.);
 
 
 //   buluf[zone_label] = 1.;
@@ -1431,7 +1429,7 @@ void chonk::charlie_I(double n, double m, double K_r, double K_s,
 
 //   // COrrecting analytically (see SPACE gmd paper equation 31)
 //   tadd = total_fluvial_sedflux -  total_fluvial_sedflux/depodivider;
-//   this->add_to_sediment_flux( -tadd, this->other_attributes_arrays["label_tracker"], 1.);
+//   this->add_to_sediment_flux( -tadd, this->label_tracker, 1.);
 //   total_fluvial_sedflux = total_fluvial_sedflux/depodivider;
 
 //   double sumweights = 0;
@@ -1464,7 +1462,7 @@ void chonk::charlie_I(double n, double m, double K_r, double K_s,
   
 
 //   Ds_tot += V_param * d_star * (total_fluvial_sedflux/ (this->water_flux * dt));
-//   // this->add_to_sediment_flux(-1 * Ds_tot * dt * Xres * Yres, this->other_attributes_arrays["label_tracker"], 1.);
+//   // this->add_to_sediment_flux(-1 * Ds_tot * dt * Xres * Yres, this->label_tracker, 1.);
 
 //   // removing the deposition from sediment flux
 
@@ -1644,7 +1642,7 @@ void chonk::CidreHillslopes(double this_sed_height, double kappa_s, double kappa
   if(bedrock && fraction_bedrock_exposed > 0)
   {
     double local_er = kappa_r * SS * fraction_bedrock_exposed;
-    std::vector<double> tlabprop = std::vector<double>(this->other_attributes_arrays["label_tracker"].size(),0);
+    std::vector<double> tlabprop = std::vector<double>(this->label_tracker.size(),0);
     tlabprop[zone_label] = 1;
     this->add_to_sediment_flux(local_er * dt * Xres * Yres,tlabprop, 0.);
     sum_added_HS += local_er* dt * Xres * Yres;
@@ -1691,7 +1689,7 @@ void chonk::CidreHillslopes(double this_sed_height, double kappa_s, double kappa
   }
   // Removing the deposited sediments from the global fluxes
   // std::cout << "bulf:" << - this_dep * dt * Xres * Yres << "|" << this->sediment_flux << std::endl;
-  this->add_to_sediment_flux(- this_dep * dt * Xres * Yres, this->other_attributes_arrays["label_tracker"],0);
+  this->add_to_sediment_flux(- this_dep * dt * Xres * Yres, this->label_tracker,0);
     sum_added_HS -= this_dep* dt * Xres * Yres;
   if(this->sediment_flux < 0 )
   {

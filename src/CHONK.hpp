@@ -136,11 +136,6 @@ class chonk
     bool check_if_empty(){return is_empty;};
     //# Check if depression solved
     bool is_depression_solved_at_this_timestep(){return depression_solved_at_this_timestep;};
-    //# other attribute
-    void set_other_attribute(std::string key, double val){other_attributes[key] = val;}
-    double get_other_attribute(std::string key){return other_attributes[key];}
-    std::vector<double> get_other_attribute_array(std::string key){return other_attributes_arrays[key];}
-    void set_other_attribute_array(std::string key, std::vector<double> val){ other_attributes_arrays[key] = val;}
 
     // receivers
     std::vector<int>& get_chonk_receivers(){return receivers;}
@@ -168,7 +163,9 @@ class chonk
          {rec = std::vector<int>(receivers); wwf = std::vector<double>(weigth_water_fluxes); wws = std::vector<double>(weigth_sediment_fluxes); strec = std::vector<double>(slope_to_rec); return;}
 
     // Tracking and labelling functions
-    void initialise_local_label_tracker_in_sediment_flux(int n_labels){other_attributes_arrays["label_tracker"] = std::vector<double>(n_labels,0.);}
+    void initialise_local_label_tracker_in_sediment_flux(int n_labels){this->label_tracker = std::vector<double>(n_labels,0.);}
+    std::vector<double> get_label_tracker(){return this->label_tracker;}
+    void set_label_tracker(std::vector<double> tlabtrack){this->label_tracker = tlabtrack;}
 
     // REinitialises all the "static" fluxes (erosion, deposition, ...)
     void reinitialise_static_fluxes(){erosion_flux_undifferentiated = 0;erosion_flux_only_sediments = 0;erosion_flux_only_bedrock = 0;deposition_flux = 0;sediment_creation_flux = 0;};
@@ -260,11 +257,7 @@ class chonk
 
 
     // Trackers
-    // I may have a wide range of variables here, variables that I am not sure I will often use.
-    // I think that if I systematically add them as attributes, I will loose some performance
-    // Instead I well assign a map of attribute so that I can add as many as I need, even if less explicit
-    std::map<std::string,double> other_attributes;
-    std::map<std::string,std::vector<double> > other_attributes_arrays;
+    std::vector<double> label_tracker;
 
 
   private:

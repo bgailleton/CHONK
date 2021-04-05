@@ -1015,7 +1015,7 @@ void ModelRunner::deprocess_local_stack(std::vector<int>& local_mstack, std::vec
     if ( this->has_been_outlet[tnode] != 'y' )
     {
       this->chonk_network[tnode].reset();
-      this->chonk_network[tnode].set_other_attribute_array("label_tracker", std::vector<double>(this->n_labels,0));
+      this->chonk_network[tnode].set_label_tracker(std::vector<double>(this->n_labels,0));
     }
     else
     {
@@ -1067,7 +1067,7 @@ void ModelRunner::check_what_give_to_existing_outlets(std::map<int,double>& WF_c
           SL_corrector[tnode] = {};
         }
         WF_corrector[tnode] -= tchonk_weight_water_recs[i] * tchonk.get_water_flux();
-        SL_corrector[tnode] = mix_two_proportions(SF_corrector[tnode],SL_corrector[tnode], -1 * tchonk_weight_sed_recs[i]* tchonk.get_sediment_flux(), tchonk.get_other_attribute_array("label_tracker"));
+        SL_corrector[tnode] = mix_two_proportions(SF_corrector[tnode],SL_corrector[tnode], -1 * tchonk_weight_sed_recs[i]* tchonk.get_sediment_flux(), tchonk.get_label_tracker());
         SF_corrector[tnode] -= tchonk_weight_sed_recs[i]* tchonk.get_sediment_flux();
         std::cout << "CORRECTOR ON " << tnode << " IS " << SF_corrector[tnode] << std::endl;
         
@@ -1105,7 +1105,7 @@ void ModelRunner::check_what_give_to_existing_lakes(std::vector<int>& local_msta
         {
           // Old debug statement
           // std::cout << "Adding " << tchonk_weight_water_recs[i] * tchonk.get_water_flux() << " to " << lakid << " from " << node << "->" << tnode << " Breakdown: " << tchonk_weight_water_recs[i] << " * " <<  tchonk.get_water_flux() << std::endl; ;
-          label_prop_of_this[lakid] = mix_two_proportions(this_sed[lakid],label_prop_of_this[lakid], tchonk_weight_sed_recs[i]* tchonk.get_sediment_flux(), tchonk.get_other_attribute_array("label_tracker"));
+          label_prop_of_this[lakid] = mix_two_proportions(this_sed[lakid],label_prop_of_this[lakid], tchonk_weight_sed_recs[i]* tchonk.get_sediment_flux(), tchonk.get_label_tracker());
           this_sed[lakid] += tchonk_weight_sed_recs[i] * tchonk.get_sediment_flux();
           this_water[lakid] += tchonk_weight_water_recs[i] * tchonk.get_water_flux();
           this_entry_node[lakid] = tnode;
@@ -1129,7 +1129,7 @@ chonk ModelRunner::preprocess_outletting_chonk(chonk tchonk, EntryPoint& entry_p
   // std::cout << "III WATER RATE IS " << water_rate << std::endl;
 
   // Dealing with sediments
-  std::vector<double> label_prop = entry_point.label_prop;//mix_two_proportions(entry_point.volume_sed,entry_point.label_prop, tchonk.get_sediment_flux(), tchonk.get_other_attribute_array("label_tracker"));
+  std::vector<double> label_prop = entry_point.label_prop;//mix_two_proportions(entry_point.volume_sed,entry_point.label_prop, tchonk.get_sediment_flux(), tchonk.get_label_tracker());
   
   double sedrate = entry_point.volume_sed + tchonk.get_sediment_flux() - local_Qs_production_for_lakes[outlet];
   std::cout << "Outlet = " << entry_point.volume_sed << " + " <<  \
@@ -1167,7 +1167,7 @@ chonk ModelRunner::preprocess_outletting_chonk(chonk tchonk, EntryPoint& entry_p
     {
       // yes, removing sed and water rate
       water_rate -= tchonk_weight_water_recs[i] * tchonk.get_water_flux();
-      // label_prop = mix_two_proportions(sedrate,  label_prop, -1 * tchonk_weight_water_recs[i] * tchonk.get_sediment_flux(),  tchonk.get_other_attribute_array("label_tracker"));
+      // label_prop = mix_two_proportions(sedrate,  label_prop, -1 * tchonk_weight_water_recs[i] * tchonk.get_sediment_flux(),  tchonk.get_label_tracker());
       // sedrate -= tchonk_weight_sed_recs[i] * tchonk.get_sediment_flux();
       // std::cout << "Subtracting II " << tchonk_weight_sed_recs[i] * tchonk.get_sediment_flux() << std::endl;; 
     }
@@ -1194,7 +1194,7 @@ chonk ModelRunner::preprocess_outletting_chonk(chonk tchonk, EntryPoint& entry_p
     if(topography[tnode] >= topography[outlet])
     {
       // double tsedfromdon = this->chonk_network[tnode].sed_flux_given_to_node(outlet);
-      // label_prop = mix_two_proportions(tsedfromdon, this->chonk_network[tnode].get_other_attribute_array("label_tracker"), sedrate, label_prop);
+      // label_prop = mix_two_proportions(tsedfromdon, this->chonk_network[tnode].get_label_tracker(), sedrate, label_prop);
       // sedrate += tsedfromdon;
       continue;
     }
@@ -1248,7 +1248,7 @@ chonk ModelRunner::preprocess_outletting_chonk(chonk tchonk, EntryPoint& entry_p
       if(j>=0)
       {
         WF_corrector[tnode] -= tchonk_weight_water_recs[j] * tchonk.get_water_flux();
-        SL_corrector[tnode] = mix_two_proportions(SF_corrector[tnode],SL_corrector[tnode], -1 * tchonk_weight_sed_recs[j]* tchonk.get_sediment_flux(), tchonk.get_other_attribute_array("label_tracker"));
+        SL_corrector[tnode] = mix_two_proportions(SF_corrector[tnode],SL_corrector[tnode], -1 * tchonk_weight_sed_recs[j]* tchonk.get_sediment_flux(), tchonk.get_label_tracker());
         SF_corrector[tnode] -= tchonk_weight_sed_recs[j]* tchonk.get_sediment_flux();
       }
     }
@@ -1260,7 +1260,7 @@ chonk ModelRunner::preprocess_outletting_chonk(chonk tchonk, EntryPoint& entry_p
       lakid = this->motherlake(lakid);
       if(lakid != current_lake)
       {
-        label_prop_of_pre[lakid] = mix_two_proportions(pre_sed[lakid],label_prop_of_pre[lakid], tchonk_weight_sed_recs[j]* tchonk.get_sediment_flux(), tchonk.get_other_attribute_array("label_tracker"));
+        label_prop_of_pre[lakid] = mix_two_proportions(pre_sed[lakid],label_prop_of_pre[lakid], tchonk_weight_sed_recs[j]* tchonk.get_sediment_flux(), tchonk.get_label_tracker());
         pre_sed[lakid] += tchonk_weight_sed_recs[j] * tchonk.get_sediment_flux() ;
         pre_water[lakid] += tchonk_weight_water_recs[j] * tchonk.get_water_flux();
         pre_entry_node[lakid] = tnode;
@@ -1473,7 +1473,7 @@ void ModelRunner::check_what_gives_to_lake(int entry_node, std::vector<int>& the
       these_lakid.emplace_back(this_lakid);
       twat.emplace_back(this->chonk_network[entry_node].get_water_flux() * WWC[idx_rec]);
       tsed.emplace_back(this->chonk_network[entry_node].get_sediment_flux() * WWS[idx_rec]);
-      tlab.emplace_back(this->chonk_network[entry_node].get_other_attribute_array("label_tracker"));
+      tlab.emplace_back(this->chonk_network[entry_node].get_label_tracker());
       these_ET.emplace_back(rec);
 
     }
@@ -1482,7 +1482,7 @@ void ModelRunner::check_what_gives_to_lake(int entry_node, std::vector<int>& the
       auto it = std::find(these_lakid.begin(), these_lakid.end(), this_lakid);
       index = std::distance(these_lakid.begin(), it);
 
-      tlab[index] = mix_two_proportions(tsed[index], tlab[index], this->chonk_network[entry_node].get_sediment_flux() * WWS[idx_rec],this->chonk_network[entry_node].get_other_attribute_array("label_tracker"));
+      tlab[index] = mix_two_proportions(tsed[index], tlab[index], this->chonk_network[entry_node].get_sediment_flux() * WWS[idx_rec],this->chonk_network[entry_node].get_label_tracker());
       twat[index] += this->chonk_network[entry_node].get_water_flux() * WWC[idx_rec];
       tsed[index] += this->chonk_network[entry_node].get_sediment_flux() * WWS[idx_rec];
       these_ET[index] = recs[idx_rec];
@@ -1876,7 +1876,7 @@ void ModelRunner::original_gathering_of_water_and_sed_from_pixel_or_flat_area(in
 {
   water_volume =  this->chonk_network[starting_node].get_water_flux() * this->timestep;
   sediment_volume = this->chonk_network[starting_node].get_sediment_flux();
-  label_prop = this->chonk_network[starting_node].get_other_attribute_array("label_tracker");
+  label_prop = this->chonk_network[starting_node].get_label_tracker();
   std::cout << "Originnal entry point is " << sediment_volume << std::endl;
   
   // return;
@@ -1909,7 +1909,7 @@ void ModelRunner::original_gathering_of_water_and_sed_from_pixel_or_flat_area(in
 
         if(this->lake_status[tnode] == 0)
         {
-          auto this_label_prop = this->chonk_network[tnode].get_other_attribute_array("label_tracker");
+          auto this_label_prop = this->chonk_network[tnode].get_label_tracker();
           label_prop = mix_two_proportions(sediment_volume, label_prop, this->chonk_network[tnode].get_sediment_flux(), this_label_prop);
           water_volume +=  this->chonk_network[tnode].get_water_flux()  * this->timestep;
           sediment_volume += this->chonk_network[tnode].get_sediment_flux();
@@ -2099,7 +2099,7 @@ void ModelRunner::finalise()
     // Getting the current chonk
     chonk& tchonk = this->chonk_network[i];
     // getting the current composition of the sediment flux
-    auto this_lab = tchonk.get_other_attribute_array("label_tracker");
+    auto this_lab = tchonk.get_label_tracker();
 
     // NANINF DEBUG CHECKER
     for(auto LAB:this_lab)
@@ -2874,12 +2874,13 @@ xt::pytensor<double,1> ModelRunner::get_sediment_flux()
 
 xt::pytensor<double,1> ModelRunner::get_other_attribute(std::string key)
 {
-  xt::pytensor<double,1> output = xt::zeros<double>({size_t(this->io_int["n_elements"])});
-  for(auto& tchonk:chonk_network)
-  {
-    output[tchonk.get_current_location()] = tchonk.get_other_attribute(key);
-  }
-  return output;
+  std::cout << "ModelRunner::get_other_attribute is deprecated" << std::endl;
+  // xt::pytensor<double,1> output = xt::zeros<double>({size_t(this->io_int["n_elements"])});
+  // for(auto& tchonk:chonk_network)
+  // {
+  //   output[tchonk.get_current_location()] = tchonk.get_other_attribute(key);
+  // }
+  // return output;
 }
 
 std::vector<xt::pytensor<double,1> > ModelRunner::get_label_tracking_results()
@@ -2896,7 +2897,7 @@ std::vector<xt::pytensor<double,1> > ModelRunner::get_label_tracking_results()
     chonk& tchonk =this->chonk_network[i];
     for(int j=0; j<this->n_labels; j++)
     {
-      output[j][i] = tchonk.get_other_attribute_array("label_tracker")[j];
+      output[j][i] = tchonk.get_label_tracker()[j];
     }
   }
 
@@ -2994,7 +2995,7 @@ void ModelRunner::drape_deposition_flux_to_chonks()
 
       chonk_network[no].add_sediment_creation_flux(slangh);
       chonk_network[no].add_deposition_flux(slangh); // <--- This is solely for balance calculation
-      chonk_network[no].set_other_attribute_array("label_tracker", loch.label_prop);
+      chonk_network[no].set_label_tracker(loch.label_prop);
 
     }
     // Seems fine here...
@@ -3433,7 +3434,7 @@ xt::pytensor<double,1> pop_elevation_to_SS_SF_SPIL(xt::pytensor<int,1>& stack, x
 
 //   double save_entering_water = water_volume;
 //   double save_preexistingwater = this->volume;
-//   int n_labels = int(chonk_network[originode].get_other_attribute_array("label_tracker").size());
+//   int n_labels = int(chonk_network[originode].get_label_tracker().size());
 
 //   // Some ongoing debugging
 //   // if(originode == 8371)
@@ -3644,7 +3645,7 @@ xt::pytensor<double,1> pop_elevation_to_SS_SF_SPIL(xt::pytensor<int,1>& stack, x
 //     node_in_lake[Unot] = this->lake_id;
 //     double temp_watflux = chonk_network[Unot].get_water_flux();
 //     double temp_sedflux = chonk_network[Unot].get_sediment_flux();
-//     std::vector<double> oatlab = chonk_network[Unot].get_other_attribute_array("label_tracker");
+//     std::vector<double> oatlab = chonk_network[Unot].get_label_tracker();
 //     chonk_network[Unot].reset();
 //     chonk_network[Unot].set_water_flux(temp_watflux);
 //     chonk_network[Unot].set_sediment_flux(temp_sedflux,oatlab);
@@ -3771,7 +3772,7 @@ xt::pytensor<double,1> pop_elevation_to_SS_SF_SPIL(xt::pytensor<int,1>& stack, x
 
 //       double temp_watflux = chonk_network[this->outlet_node].get_water_flux();
 //       double temp_sedflux = chonk_network[this->outlet_node].get_sediment_flux();
-//       std::vector<double> oatlab = chonk_network[this->outlet_node].get_other_attribute_array("label_tracker");
+//       std::vector<double> oatlab = chonk_network[this->outlet_node].get_label_tracker();
 //       chonk_network[this->outlet_node].reset();
 //       chonk_network[this->outlet_node].set_water_flux(temp_watflux);
 //       chonk_network[this->outlet_node].set_sediment_flux(temp_sedflux,oatlab);
@@ -3815,7 +3816,7 @@ xt::pytensor<double,1> pop_elevation_to_SS_SF_SPIL(xt::pytensor<int,1>& stack, x
 //     }
 //     else
 //     {
-//       std::vector<double> baluf_2 (chonk_network[originode].get_other_attribute_array("label_tracker").size(),0.);
+//       std::vector<double> baluf_2 (chonk_network[originode].get_label_tracker().size(),0.);
 //       this->outlet_chonk.set_sediment_flux(0.,baluf_2);
 //     }
 
@@ -3999,7 +4000,7 @@ xt::pytensor<double,1> pop_elevation_to_SS_SF_SPIL(xt::pytensor<int,1>& stack, x
 
 //     double slangh = ratio_of_dep * (this->water_elevation - surface_elevation[no]) / timestep;
 //     chonk_network[no].add_sediment_creation_flux(slangh);
-//     chonk_network[no].set_other_attribute_array("label_tracker", this->outlet_chonk.get_other_attribute_array("label_tracker"));
+//     chonk_network[no].set_other_attribute_array("label_tracker", this->outlet_chonk.get_label_tracker());
 
 //     pre = chonk_network[no].get_sediment_creation_flux();
 //     if(std::isfinite(pre) == false)
