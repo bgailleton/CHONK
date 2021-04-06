@@ -225,7 +225,14 @@ class CoreModel:
 	lake_solver = xs.variable(intent = 'inout', description = 'Switch on or off the lake management. True: the lake will be dynamically filled (or not) with water and sediment. False: water and sediment fluxes are rerouted from lake bottom to outlet.') #, default = True
 	n_depth_sed_tracking = xs.variable(intent = 'in', default = 50)
 	n_depths_recorded = xs.index(dims = 'n_depths_recorded')
-	
+	CHARLIE_I = xs.variable(intent = 'in', default = True)
+	CIDRE_HS = xs.variable(intent = 'in', default = True)
+	tool_effect_rock = xs.variable(intent = 'in', default = False)
+	tool_effect_sed = xs.variable(intent = 'in', default = False)
+	external_K = xs.variable(intent = 'in', default = False)
+	external_kappa = xs.variable(intent = 'in', default = False)
+
+
 	# what gets out
 	model = xs.any_object( description = "The main model object, controls the c++ part (I/O, results, run function, process order of execution, ...)")
 
@@ -298,6 +305,16 @@ class CoreModel:
 		# Setting the labelling
 		self.model.initialise_label_list(self.label_list)
 		self.model.update_label_array(self.label_array.ravel())
+
+		# Activating/deactivating compeonents
+		self.model.CHARLIE_I = self.CHARLIE_I
+		self.model.CIDRE_HS = self.CIDRE_HS
+		self.model.tool_effect_rock = self.tool_effect_rock
+		self.model.tool_effect_sed = self.tool_effect_sed
+		self.model.external_K = self.external_K
+		self.model.external_kappa = self.external_kappa
+
+
 		# input("BITE7")
 
 	@xs.runtime(args='step_delta')

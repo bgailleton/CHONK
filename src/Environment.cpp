@@ -2513,11 +2513,18 @@ void ModelRunner::manage_fluxes_after_moving_prep(chonk& this_chonk, int label_i
   if(is_there_sed_here[index] && this->sed_prop_by_label[index].size()>0) // I SHOULD NOT NEED THE SECOND THING, WHY DO I FUTURE BORIS????
     these_sed_props = this->sed_prop_by_label[index][this->sed_prop_by_label[index].size() - 1];
 
+  double this_Kr;
+  double this_Ks;
+  double this_kappar;
+  double this_kappas;
+  double S_c;
+  this->manage_K_kappa(label_id, this_chonk, this_Kr, this_Ks, this_kappar, this_kappas, S_c);
+
   if(this->CHARLIE_I)
   {
 
-    double this_Kr = this->labelz_list[label_id].Kr_modifyer * this->labelz_list[label_id].base_K;
-    double this_Ks = this->labelz_list[label_id].Ks_modifyer * this->labelz_list[label_id].base_K;
+    // double this_Kr = this->labelz_list[label_id].Kr_modifyer * this->labelz_list[label_id].base_K;
+    // double this_Ks = this->labelz_list[label_id].Ks_modifyer * this->labelz_list[label_id].base_K;
 
     this_chonk.charlie_I(this->labelz_list[label_id].n, this->labelz_list[label_id].m, this_Kr, this_Ks,
     this->labelz_list[label_id].dimless_roughness, this->sed_height[index], 
@@ -2529,12 +2536,12 @@ void ModelRunner::manage_fluxes_after_moving_prep(chonk& this_chonk, int label_i
   if(this->CIDRE_HS)
   {
 
-    double this_kappas = this->labelz_list[label_id].kappa_s_mod * this->labelz_list[label_id].kappa_base;
-    double this_kappar = this->labelz_list[label_id].kappa_r_mod * this->labelz_list[label_id].kappa_base;
+    // double this_kappas = this->labelz_list[label_id].kappa_s_mod * this->labelz_list[label_id].kappa_base;
+    // double this_kappar = this->labelz_list[label_id].kappa_r_mod * this->labelz_list[label_id].kappa_base;
     // std::cout << "kappe_r is " << this_kappar << " and kappa_s is " << this_kappas << " Sc = " << this->labelz_list[label_id].critical_slope << std::endl;
 
     this_chonk.CidreHillslopes(this->sed_height[index], this_kappas, 
-            this_kappar, this->labelz_list[label_id].critical_slope,
+            this_kappar, S_c,
     label_id, these_sed_props, this->timestep, this->dx, this->dy, true, this->graph, 1e-6);
   }
 
@@ -2608,6 +2615,50 @@ void ModelRunner::manage_fluxes_after_moving_prep(chonk& this_chonk, int label_i
   //   }
   // }
   // return;
+}
+
+// Calculates the local fluvial and hillslope coefficiant
+void ModelRunner::manage_K_kappa(int label_id, chonk& this_chonk, double& K_r, double& K_s, double& kappa_r, double& kappa_s, double& S_c)
+{
+
+  // K_ref =  Sqs / Sbed * (1-Qs/Qc) * k_process * K_efficiency
+
+
+  // First calculating the values depending on local conditions
+  K_r = this->labelz_list[label_id].Kr_modifyer * this->labelz_list[label_id].base_K;
+  K_s = this->labelz_list[label_id].Ks_modifyer * this->labelz_list[label_id].base_K;
+
+  kappa_s = this->labelz_list[label_id].kappa_s_mod * this->labelz_list[label_id].kappa_base;
+  kappa_r = this->labelz_list[label_id].kappa_r_mod * this->labelz_list[label_id].kappa_base;
+
+  S_c = this->labelz_list[label_id].critical_slope;
+
+  // Applying the tool effect
+  if(this->tool_effect_rock)
+  {  
+    int i = -1;
+    double tool_k = 0;
+    bool only_0 =true;
+    for( auto val: this_chonk.get_label_tracker())
+    {
+      i++;
+      if(val > 0)
+      {
+        only_0 = false;
+        tool_k += val * this->labelz_list[i].Kr_modifyer;
+      }
+    }
+    if(only_0 == false)
+    {
+      K_r = K_r *  tool_k;
+      if(this->tool_effect_sed)
+        K_s = K_s * tool_k;
+    }
+  }
+
+
+
+
 }
 
 // Initialise ad-hoc set of internal correspondance between process names and integer

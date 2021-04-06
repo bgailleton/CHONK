@@ -111,6 +111,12 @@ PYBIND11_MODULE(CHONK_cpp, m)
       .def("set_sed_height_tp1", &ModelRunner::set_sed_height_tp1)
       .def("get_sed_height", &ModelRunner::get_sed_height)
       .def("get_sed_height_tp1", &ModelRunner::get_sed_height_tp1)
+      .def_readwrite("CHARLIE_I", &ModelRunner::CHARLIE_I)
+      .def_readwrite("CIDRE_HS", &ModelRunner::CIDRE_HS)
+      .def_readwrite("tool_effect_rock", &ModelRunner::tool_effect_rock)
+      .def_readwrite("tool_effect_sed", &ModelRunner::tool_effect_sed)
+      .def_readwrite("external_K", &ModelRunner::external_K)
+      .def_readwrite("external_kappa", &ModelRunner::external_kappa)
 
     ;
     m.def("set_DEBUG_switch_nodegraph",set_DEBUG_switch_nodegraph);

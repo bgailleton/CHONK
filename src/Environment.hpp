@@ -420,6 +420,20 @@ std::vector<double>& pre_sed, std::vector<double>& pre_water);
     xt::pytensor<double,1> get_sed_height_tp1(){return this->sed_height_tp1 ;}
 
 
+    void manage_K_kappa(int label_id, chonk& this_chonk, double& K_r, double& K_s, double& kappa_r, double& kappa_s, double& S_c);
+
+
+
+
+    // I need some members to be public
+    bool CHARLIE_I = true;
+    bool CIDRE_HS = true;
+
+    // Parametrisation of law
+    bool tool_effect_rock = false;
+    bool tool_effect_sed = false;
+    bool external_K = false;
+    bool external_kappa = false;
 
   protected:
 
@@ -439,8 +453,7 @@ std::vector<double>& pre_sed, std::vector<double>& pre_water);
     // lake switch, if True: dynamic lake modelling
     // if false: fluxes rerouted from flux bottom to outlet
     bool lake_solver;
-    bool CHARLIE_I = true;
-    bool CIDRE_HS = true;
+
 
     // All the methods affecting the fluxes in the right order you want to apply it 
     // Important::it requires the strng "move" at the place at which the move method will be called
