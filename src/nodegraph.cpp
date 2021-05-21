@@ -1764,7 +1764,7 @@ void NodeGraphV2::compute_pits(xt::pytensor<bool,1>& active_nodes)
 }
 
 void NodeGraphV2::collapse_depression_tree(xt::pytensor<int,2>& conn_basins, xt::pytensor<int,2>& conn_nodes, 
-                                           xt::pytensor<double,1>& conn_weights, xt::pytensor<double,1>& elevation)
+                                           xt::pytensor<double,1>& conn_weights, xt::pytensor<double,1>& elevation, int& basin0)
 {
   // initialising all the connections
   std::vector<std::pair<int,int> > preoutput;
@@ -1782,13 +1782,11 @@ void NodeGraphV2::collapse_depression_tree(xt::pytensor<int,2>& conn_basins, xt:
     while(this->depression_tree[this_dep].has_children)
     {
       this_dep = this->depression_tree[this_dep].children.first;
-      preoutput.emplace_back( {this_dep, recdep} );
-      preoutput_nodes.emplace_back({this->depression_tree[this_dep].first, this_node_rec});
+      preoutput.emplace_back( std::make_pair(this_dep, recdep) );
+      preoutput_nodes.emplace_back(std::make_pair(this->depression_tree[this_dep].connections.first, this_node_rec) );
     }
   }
 
-  xt::pytensor<int,2> conn_basins = xt::pytensor<double,2>({preoutput.size(),2});
-  xt::pytensor<int,2> conn_nodes = xt::pytensor<double,2>({preoutput.size(),2});
   int i=0;
   for (int i = 0; i< preoutput.size(); i++)
   {
@@ -1799,8 +1797,6 @@ void NodeGraphV2::collapse_depression_tree(xt::pytensor<int,2>& conn_basins, xt:
     conn_weights[i] = std::max(elevation[conn_nodes(i,0)],elevation[conn_nodes(i,1)]);
     i++;
   }
-
-  return output;
 
 }
 
@@ -1814,7 +1810,7 @@ void NodeGraphV2::correct_flowrouting(xt::pytensor<bool,1>& active_nodes, xt::py
     // """
 
     if(this->depression_tree.size() == 0)
-      continue;
+      return;
 
     // I first need to collapse the depression tree to calculate the planar connections between basins
     xt::pytensor<int,2> conn_basins,conn_nodes;
@@ -1833,7 +1829,7 @@ void NodeGraphV2::correct_flowrouting(xt::pytensor<bool,1>& active_nodes, xt::py
     int g = 6;
 
     mstree = _compute_mst_kruskal(conn_basins, conn_weights);
-    this->_orient_basin_tree(conn_basins, conn_weights, basin0, mstree);
+    this->_orient_basin_tree(conn_basins, conn_nodes, basin0, mstree);
     this->_update_pits_receivers(conn_basins , conn_nodes, mstree, elevation);    
 }
 
