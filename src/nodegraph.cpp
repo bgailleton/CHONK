@@ -338,6 +338,8 @@ void NodeGraphV2::build_depression_tree(xt::pytensor<double,1>& elevation, xt::p
   if(this->npits == 0)
     return;
 
+  std::cout << "DEBUGDEP::building the Tree" << std::endl;
+
   // Initialising the potential volume vector
   this->potential_volume = std::vector<double>(this->n_element,0.);
   // this->depression_tree.reserve();
@@ -364,6 +366,7 @@ void NodeGraphV2::build_depression_tree(xt::pytensor<double,1>& elevation, xt::p
     //## Priority Flood - like algorithm to label the depression
     this->virtual_filling(elevation,active_nodes,current_ID,i);
   }
+  std::cout << "DEBUGDEP::1" << std::endl;
 
   // Init. a switch to detect when the processing is done
   bool keep_processing = true;
@@ -383,22 +386,35 @@ void NodeGraphV2::build_depression_tree(xt::pytensor<double,1>& elevation, xt::p
   {
     // Increasing depression level
     level++;
-    // Updating the fake topogrpahy for the next round
+    std::cout << "DEBUGDEP::2::level" << level << std::endl;
     this->update_fake_topography(topography);
 
     // Check whether there is a need to reprocess depressions
     std::vector<int> next_deps = this->get_next_building_round(topography);
+
+
+
     // If there is no more deps to process, I stop here
     if(next_deps.size() == 0)
       break;
 
+    // Updating the fake topogrpahy for the next round
+    this->update_topdep();
+
+    std::cout << "DEBUGDEP::2::GABUL" << level << std::endl;
+
     // Otherwise I start a new round
     for (auto depID : next_deps)
     {
+      std::cout << "!->" << this->depression_tree[depID].hw_max << std::endl;
       // Depressions will merge now, so I need to make sure I am not double processing them
       if(dep_is_done[depID] == 'y')
+      {
+        std::cout << "done" << std::endl;
         continue;
+      }
       dep_is_done[depID] = 'y';
+      dep_is_done[this->top_depression[this->depression_tree[depID].connections.second]] = 'y';
 
       //## Incrementing the ID
       current_ID++;
@@ -406,8 +422,11 @@ void NodeGraphV2::build_depression_tree(xt::pytensor<double,1>& elevation, xt::p
       this->depression_tree.emplace_back(Depression(current_ID,-1,level,this->depression_tree[depID].connections.first));
       dep_is_done.push_back('n');
 
+      if(this->top_depression[this->depression_tree[depID].connections.first] != depID)
+        std::cout << "ASJKDHLKSDFHL" << std::endl;
+
       // updating the parents of the child depressions
-      this->depression_tree[this->top_depression[this->depression_tree[depID].connections.first]].parent = current_ID;
+      this->depression_tree[depID].parent = current_ID;
       this->depression_tree[this->top_depression[this->depression_tree[depID].connections.second]].parent = current_ID;
       // And the children of the current one
       this->depression_tree[current_ID].children = {this->top_depression[this->depression_tree[depID].connections.first], this->top_depression[this->depression_tree[depID].connections.second]};
@@ -420,6 +439,8 @@ void NodeGraphV2::build_depression_tree(xt::pytensor<double,1>& elevation, xt::p
       this->virtual_filling(topography,active_nodes,current_ID,this->depression_tree[depID].connections.first);
     }
   }
+
+  std::cout << "DEBUGDEP::3" << std::endl;
 
   // After the previous loop, I can create a correspondance tree between basins
   for (auto& dep:this->depression_tree)
@@ -443,6 +464,8 @@ void NodeGraphV2::build_depression_tree(xt::pytensor<double,1>& elevation, xt::p
 
   }
   // This is me done
+  std::cout << "DEBUGDEP::Tree Builded" << std::endl;
+
 }
 
 
@@ -455,8 +478,10 @@ std::vector<int> NodeGraphV2::get_next_building_round(xt::pytensor<double,1>& to
     // checking whether top-depression
     if(dep.parent == -1)
     {
-      if(this->top_depression[dep.connections.second] >= 0)
+      if(this->top_depression[dep.connections.second] >= 0 && topography[dep.connections.second] == topography[dep.connections.first])
+      {
         output.push_back(dep.index);
+      }
 
     }
   }
@@ -469,10 +494,41 @@ void NodeGraphV2::update_fake_topography(xt::pytensor<double,1>& topography)
   {
     if(dep.parent == -1)
     {
+      // std::cout << "2.1" << std::endl;
       auto vec = this->get_all_childrens(dep.index);
+      // std::cout << "2.2" << std::endl;
       for (auto i : vec)
+      {
         for (auto n: this->depression_tree[i].nodes)
+        {
           topography[n] = dep.hw_max;
+          // this->top_depression[n] = dep.index;
+        }
+      }
+      // std::cout << "2.3" << std::endl;
+    }
+  }
+
+}
+
+void NodeGraphV2::update_topdep()
+{
+  for (auto& dep:this->depression_tree)
+  {
+    if(dep.parent == -1)
+    {
+      // std::cout << "2.1" << std::endl;
+      auto vec = this->get_all_childrens(dep.index);
+      // std::cout << "2.2" << std::endl;
+      for (auto i : vec)
+      {
+        for (auto n: this->depression_tree[i].nodes)
+        {
+          // topography[n] = dep.hw_max;
+          this->top_depression[n] = dep.index;
+        }
+      }
+      // std::cout << "2.3" << std::endl;
     }
   }
 
@@ -486,10 +542,15 @@ std::vector<int> NodeGraphV2::get_all_childrens(int dep)
   next.push(this->depression_tree[dep].index);
   while(next.size() > 0)
   {
-    for (auto child:this->depression_tree[next.front()].nodes)
+    // for (auto child:this->depression_tree[next.front()].children)
+    // {
+    if(this->depression_tree[next.front()].has_children)
     {
-      next.push(child);
+      next.push(this->depression_tree[next.front()].children.first);
+      next.push(this->depression_tree[next.front()].children.second);
     }
+    
+    // }
     output.push_back(next.front());
     next.pop();
   }
@@ -542,12 +603,12 @@ void NodeGraphV2::virtual_filling(xt::pytensor<double,1>& elevation, xt::pytenso
 
       // If flat or higher AND in the same depression system: I keep
       if(
-          elevation[tnode] >= elevation[next_node.node] && (
-          (
-            this->top_depression[next_node.node] == -1 || 
-            this->top_depression[next_node.node] == this->depression_tree[depression_ID].children.first || 
-            this->top_depression[next_node.node] == this->depression_tree[depression_ID].children.second
-          ) || this->depression_tree[depression_ID].has_children == false)
+          elevation[tnode] >= elevation[next_node.node] && ( this->top_depression[tnode] == -1 || (
+          ( 
+            this->top_depression[tnode] == this->depression_tree[depression_ID].children.first || 
+            this->top_depression[tnode] == this->depression_tree[depression_ID].children.second
+          ) && this->depression_tree[depression_ID].has_children == true) 
+          || this->depression_tree[depression_ID].has_children == false)
         )
       {
         depressionfiller.emplace(nodium(tnode, elevation[tnode]));
@@ -560,6 +621,8 @@ void NodeGraphV2::virtual_filling(xt::pytensor<double,1>& elevation, xt::pytenso
         // And registering the connections
         this->depression_tree[depression_ID].connections = {next_node.node, tnode};
         this->top_depression[outlet] = depression_ID; // Keeping track of the outlet aspart of the depression system, even if it has 0 volume to store
+        this->depression_tree[depression_ID].nodes.push_back(next_node.node);
+        std::cout<< "Dep is " << depression_ID << " and outlet is " << outlet << " which give in dep" << this->top_depression[tnode] << std::endl;
         break;
       }
     }
@@ -570,6 +633,7 @@ void NodeGraphV2::virtual_filling(xt::pytensor<double,1>& elevation, xt::pytenso
     double dV = (next_node.elevation - current_hw) * area_component_of_volume;
 
     current_hw = next_node.elevation;
+
     this->depression_tree[depression_ID].hw_max = current_hw;
 
     this->depression_tree[depression_ID].volume += dV;
@@ -581,6 +645,7 @@ void NodeGraphV2::virtual_filling(xt::pytensor<double,1>& elevation, xt::pytenso
       this->depression_tree[depression_ID].nodes.push_back(next_node.node);
     }
   }
+  std::cout << "OUT:" << outlet << std::endl;;
 
 }
 

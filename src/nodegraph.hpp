@@ -95,7 +95,8 @@ class Depression
 public:
 
   Depression(){return;};
-  Depression(int index, int parent, int level, int pit){this->index = index;this->parent = parent;this->level = level; this->volume = 0; this->hw_max = 0; this->pit;};//
+  Depression(int index, int parent, int level, int pit){this->index = index;this->parent = parent;this->level = level;
+   this->volume = 0; this->hw_max = 0; this->pit = pit;};//
   // ID in the depression tree
   int index;
   // parent depression (-1 is none)
@@ -247,6 +248,7 @@ std::vector<int> get_next_building_round(xt::pytensor<double,1>& topography);
 
 void collapse_depression_tree(xt::pytensor<int,2>& conn_basins, xt::pytensor<int,2>& conn_nodes, 
                                            xt::pytensor<double,1>& conn_weights, xt::pytensor<double,1>& elevation, int& basin0);
+void update_topdep();
 
 
 void recompute_multi_receveivers_and_donors(xt::pytensor<bool,1>& active_nodes, xt::pytensor<double,1>& elevation, std::vector<int>& nodes_to_compute);
