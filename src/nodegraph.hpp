@@ -95,7 +95,7 @@ class Depression
 public:
 
   Depression(){return;};
-  Depression(int index, int parent, int level){this->index = index;this->parent = parent;this->level = level; this->volume = 0;};
+  Depression(int index, int parent, int level){this->index = index;this->parent = parent;this->level = level; this->volume = 0; this->hw_max = 0;};
   // ID in the depression tree
   int index;
   // parent depression (-1 is none)
@@ -110,6 +110,9 @@ public:
   std::vector<int> nodes;
   // total Volume
   double volume;
+
+  // maximum height
+  double hw_max;
 };
 
 
@@ -234,6 +237,10 @@ std::vector<double> get_distance_to_receivers_custom(int node, std::vector<int> 
 
 void virtual_filling(xt::pytensor<double,1>& elevation, xt::pytensor<bool,1>& active_nodes, int depression_ID, int starting_node);
 void build_depression_tree(xt::pytensor<double,1>& elevation, xt::pytensor<bool,1>& active_nodes);
+std::vector<int> get_all_childrens(int dep);
+void update_fake_topography(xt::pytensor<double,1>& topography);
+std::vector<int> get_next_building_round(xt::pytensor<double,1>& topography);
+
 
 
 

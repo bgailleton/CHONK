@@ -363,10 +363,80 @@ void NodeGraphV2::build_depression_tree(xt::pytensor<double,1>& elevation, xt::p
 
     //## Priority Flood - like algorithm to label the depression
     this->virtual_filling(elevation,active_nodes,current_ID,i);
+  }
+
+  // Init. a switch to detect when the processing is done
+  bool keep_processing = true;
+  if(this->depression_tree.size() == 0)
+    keep_processing = false;
+
+  // Init a fake topography "filling" the lakes
+  auto topography = xt::pytensor<double,1>(elevation);
+
+  while(keep_processing)
+  {
+    // Updating the fake topogrpahy for the next round
+    this->update_fake_topography(topography);
+
+    // Check wheteher there is a need to reprocess depressions
+    std::vector<int> next_deps = this->get_next_building_round(topography);
+
 
   }
 
 
+
+}
+
+
+std::vector<int> NodeGraphV2::get_next_building_round(xt::pytensor<double,1>& topography)
+{
+  std::vector<int> output;
+  for (auto& dep:this->depression_tree)
+  {
+
+    // checking whether top-depression
+    if(dep.parent == -1)
+    {
+      if(this->top_depression[dep.connections.second] >= 0)
+        output.push_back(dep.index);
+
+    }
+  }
+  return output;
+}
+
+void NodeGraphV2::update_fake_topography(xt::pytensor<double,1>& topography)
+{
+  for (auto& dep:this->depression_tree)
+  {
+    if(dep.parent == -1)
+    {
+      auto vec = this->get_all_childrens(dep.index);
+      for (auto i : vec)
+        for (auto n: this->depression_tree[i].nodes)
+          topography[n] = dep.hw_max;
+    }
+  }
+
+}
+
+// gather all children (direct and indirect) of a depression
+std::vector<int> NodeGraphV2::get_all_childrens(int dep)
+{
+  std::vector<int> output;
+  std::queue<int> next;
+  next.push(this->depression_tree[dep].index);
+  while(next.size() > 0)
+  {
+    for (auto child:this->depression_tree[next.front()].nodes)
+    {
+      next.push(child);
+    }
+    output.push_back(next.front());
+    next.pop();
+  }
+  return output;
 }
 
 void NodeGraphV2::virtual_filling(xt::pytensor<double,1>& elevation, xt::pytensor<bool,1>& active_nodes, int depression_ID, int starting_node)
@@ -394,6 +464,7 @@ void NodeGraphV2::virtual_filling(xt::pytensor<double,1>& elevation, xt::pytenso
 
   // Current Water Elevation
   double current_hw = elevation[starting_node];
+  this->depression_tree[depression_ID].hw_max = current_hw;
 
   // Starting the main loop
   while(outlet < 0)
@@ -434,6 +505,7 @@ void NodeGraphV2::virtual_filling(xt::pytensor<double,1>& elevation, xt::pytenso
     double dV = (next_node.elevation - current_hw) * area_component_of_volume;
 
     current_hw = next_node.elevation;
+    this->depression_tree[depression_ID].hw_max = current_hw;
 
     this->depression_tree[depression_ID].volume += dV;
     this->potential_volume[this->depression_tree[depression_ID].nodes[this->depression_tree[depression_ID].nodes.size()-1]] = this->depression_tree[depression_ID].volume;
