@@ -95,18 +95,19 @@ class Depression
 public:
 
   Depression(){return;};
-  Depression(int index, int parent, int level){this->index = index;this->parent = parent;this->level = level; this->volume = 0; this->hw_max = 0;};
+  Depression(int index, int parent, int level, int pit){this->index = index;this->parent = parent;this->level = level; this->volume = 0; this->hw_max = 0; this->pit};
   // ID in the depression tree
   int index;
   // parent depression (-1 is none)
   int parent;
   // Children depressions (direct receivers in the tree)
   std::pair<int,int> children;
+  bool has_children = false;
   // Depression level (see the different shades of grey in Figure 3 of Barnes et al., 2020 https://doi.org/10.5194/esurf-8-431-2020) 
   int level;
   // Connections to other basins
   std::pair<int,int> connections;
-  std::vector<std::pair<int,int> > connections_bas;
+  std::pair<int,int> connections_bas;
   // nodes in the depressions
   std::vector<int> nodes;
   // total Volume
@@ -114,6 +115,8 @@ public:
 
   // maximum height
   double hw_max;
+  //pit
+  int pit;
 };
 
 
@@ -242,7 +245,8 @@ std::vector<int> get_all_childrens(int dep);
 void update_fake_topography(xt::pytensor<double,1>& topography);
 std::vector<int> get_next_building_round(xt::pytensor<double,1>& topography);
 
-
+void _connect_basins(xt::pytensor<int,2>& conn_basins, xt::pytensor<int,2>& conn_nodes, xt::pytensor<double,1>& conn_weights,          
+                   xt::pytensor<bool,1>& active_nodes, xt::pytensor<double,1>& elevation, int& nconn, int& basin0);
 
 
 void recompute_multi_receveivers_and_donors(xt::pytensor<bool,1>& active_nodes, xt::pytensor<double,1>& elevation, std::vector<int>& nodes_to_compute);

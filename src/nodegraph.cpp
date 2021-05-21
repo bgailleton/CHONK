@@ -357,7 +357,7 @@ void NodeGraphV2::build_depression_tree(xt::pytensor<double,1>& elevation, xt::p
     //## Incrementing the ID
     current_ID++;
     //## Building the depression with no parent and level 0
-    this->depression_tree.emplace_back(Depression(current_ID,-1,0));
+    this->depression_tree.emplace_back(Depression(current_ID,-1,0, i));
     //## Pushing the initial node in it
     this->depression_tree[current_ID].nodes.push_back(i);
 
@@ -403,7 +403,7 @@ void NodeGraphV2::build_depression_tree(xt::pytensor<double,1>& elevation, xt::p
       //## Incrementing the ID
       current_ID++;
       //## Building the depression with no parent and level 0
-      this->depression_tree.emplace_back(Depression(current_ID,-1,level));
+      this->depression_tree.emplace_back(Depression(current_ID,-1,level,this->depression_tree[depID].connections.first));
       dep_is_done.push_back('n');
 
       // updating the parents of the child depressions
@@ -411,7 +411,7 @@ void NodeGraphV2::build_depression_tree(xt::pytensor<double,1>& elevation, xt::p
       this->depression_tree[this->top_depression[this->depression_tree[depID].connections.second]].parent = current_ID;
       // And the children of the current one
       this->depression_tree[current_ID].children = {this->top_depression[this->depression_tree[depID].connections.first], this->top_depression[this->depression_tree[depID].connections.second]};
-
+      this->depression_tree[current_ID].has_children = true;
 
       //## Pushing the initial node in it, here it is by convention the outlet of the first depresiion (it does not matter much)
       this->depression_tree[current_ID].nodes.push_back(this->depression_tree[depID].connections.first);
@@ -427,7 +427,7 @@ void NodeGraphV2::build_depression_tree(xt::pytensor<double,1>& elevation, xt::p
     if(dep.parent > -1)
     {
       //# This is straightforward for child depression as their connections are already part of other depressions by definitions
-      dep.connections_bas.emplace_back( std::pair<int,int>({this->top_depression[dep.connections.first], this->top_depression[dep.connections.second]}) );
+      dep.connections_bas =  std::pair<int,int>({this->top_depression[dep.connections.first], this->top_depression[dep.connections.second]}) ;
     }
     else
     {
@@ -438,7 +438,7 @@ void NodeGraphV2::build_depression_tree(xt::pytensor<double,1>& elevation, xt::p
       {
         node = this->graph[node].Sreceivers;
       }
-      dep.connections_bas.emplace_back( std::pair<int,int>({this->top_depression[dep.connections.first], this->top_depression[node]}) );
+      dep.connections_bas =  std::pair<int,int>({this->top_depression[dep.connections.first], this->top_depression[node]}) ;
     }
 
   }
@@ -542,12 +542,12 @@ void NodeGraphV2::virtual_filling(xt::pytensor<double,1>& elevation, xt::pytenso
 
       // If flat or higher AND in the same depression system: I keep
       if(
-          elevation[tnode] >= elevation[next_node.node] && 
+          elevation[tnode] >= elevation[next_node.node] && (
           (
             this->top_depression[next_node.node] == -1 || 
             this->top_depression[next_node.node] == this->depression_tree[depression_ID].children.first || 
             this->top_depression[next_node.node] == this->depression_tree[depression_ID].children.second
-          )
+          ) || this->depression_tree[depression_ID].has_children == false)
         )
       {
         depressionfiller.emplace(nodium(tnode, elevation[tnode]));
@@ -1763,6 +1763,47 @@ void NodeGraphV2::compute_pits(xt::pytensor<bool,1>& active_nodes)
 
 }
 
+void NodeGraphV2::collapse_depression_tree(xt::pytensor<int,2>& conn_basins, xt::pytensor<int,2>& conn_nodes, 
+                                           xt::pytensor<double,1>& conn_weights, xt::pytensor<double,1>& elevation)
+{
+  // initialising all the connections
+  std::vector<std::pair<int,int> > preoutput;
+  std::vector<std::pair<int,int> > preoutput_nodes;
+  // preoutput.reserve(20); // arbitrary memory reserve
+
+  for (auto& dep: this->depression_tree)
+  {
+    preoutput.emplace_back( dep.connections_bas );
+    if(dep.connections_bas.second == -1 && basin0 == -1)
+      basin0 = dep.index;
+    int this_dep = dep.index;
+    int recdep = dep.connections_bas.second;
+    int this_node_rec = dep.connections.second;
+    while(this->depression_tree[this_dep].has_children)
+    {
+      this_dep = this->depression_tree[this_dep].children.first;
+      preoutput.emplace_back( {this_dep, recdep} );
+      preoutput_nodes.emplace_back({this->depression_tree[this_dep].first, this_node_rec});
+    }
+  }
+
+  xt::pytensor<int,2> conn_basins = xt::pytensor<double,2>({preoutput.size(),2});
+  xt::pytensor<int,2> conn_nodes = xt::pytensor<double,2>({preoutput.size(),2});
+  int i=0;
+  for (int i = 0; i< preoutput.size(); i++)
+  {
+    conn_basins(i,0) = preoutput[i].first;
+    conn_basins(i,1) = preoutput[i].second;
+    conn_nodes(i,0) = preoutput_nodes[i].first;
+    conn_nodes(i,1) = preoutput_nodes[i].second;
+    conn_weights[i] = std::max(elevation[conn_nodes(i,0)],elevation[conn_nodes(i,1)]);
+    i++;
+  }
+
+  return output;
+
+}
+
 void NodeGraphV2::correct_flowrouting(xt::pytensor<bool,1>& active_nodes, xt::pytensor<double,1>& elevation)
 {
     // """Ensure that no flow is captured in sinks.
@@ -1771,79 +1812,29 @@ void NodeGraphV2::correct_flowrouting(xt::pytensor<bool,1>& active_nodes, xt::py
     // `donors` and `stack`.
 
     // """
-    int& nnodes = this->n_element;
 
-    // # theory of planar graph -> max nb. of connections known
-    int nconn_max = this->nbasins * 7;
-    xt::pytensor<int,2> conn_basins = xt::zeros<int>({nconn_max,2}); // np.empty((nconn_max, 2), dtype=np.intp)
-    for(size_t i=0;i<nconn_max;i++)
-    {
-      conn_basins(i,1) = -2;
-      conn_basins(i,0) = -2;
-    }
-    xt::pytensor<int,2> conn_nodes = xt::zeros<int>({nconn_max,2}); //    conn_nodes = np.empty((nconn_max, 2), dtype=np.intp)
-    for(size_t i=0;i<nconn_max;i++)
-    {
-      conn_nodes(i,1) = -2;
-      conn_nodes(i,0) = -2;
-    }
-    xt::pytensor<double,1> conn_weights = xt::zeros<double>({nconn_max}); //conn_weights = np.empty(nconn_max, dtype=np.float64)
-    for(auto& v:conn_weights)
-      v = -2;
+    if(this->depression_tree.size() == 0)
+      continue;
 
-    int nconn, basin0;
-    this->_connect_basins(conn_basins, conn_nodes, conn_weights, active_nodes, elevation, nconn, basin0);
-    
-    int scb = nconn, scn = nconn, scw = nconn;
-    // for(size_t i=0;i<nconn_max;i++)
-    // {
-    //   if(scb == -1 && conn_basins(i,0) == -2)
-    //     scb = int(i);
-    //   if(scn == -1 && conn_nodes(i,0) == -2)
-    //     scn = int(i);
-    //   if(scw == -1 && conn_weights(i) == -2)
-    //     scw = int(i);
-    // }
+    // I first need to collapse the depression tree to calculate the planar connections between basins
+    xt::pytensor<int,2> conn_basins,conn_nodes;
+    xt::pytensor<double,1> conn_weights; //conn_weights = np.empty(nconn_max, dtype=np.float64)
+    int basin0;
+    this->collapse_depression_tree(conn_basins, conn_nodes, conn_weights, elevation,basin0); // (Although the tree collapses, the carbon balance os good because it has just grown)
 
-    xt::pytensor<int,2> conn_basins_2 = xt::zeros<int>({scb,2});
-    xt::pytensor<int,2> conn_nodes_2 = xt::zeros<int>({scn,2});
-    xt::pytensor<double,1> conn_weights_2 = xt::zeros<double>({scw}); //conn_weights = np.empty(nconn_max, dtype=np.float64)
+    int nconn = int(conn_weights.size());
 
-    for(size_t i=0; i<scb ; i++)
-    {
-      conn_basins_2(i,0) = conn_basins(i,0);
-      conn_basins_2(i,1) = conn_basins(i,1);
-      DEBUG_connbas.push_back({SBasinOutlets[conn_basins(i,0)],SBasinOutlets[conn_basins(i,1)]});
-    }
-    for(size_t i=0; i<scn ; i++)
-    {
-      conn_nodes_2(i,0) = conn_nodes(i,0);
-      conn_nodes_2(i,1) = conn_nodes(i,1);
-      DEBUG_connode.push_back({conn_nodes(i,0),conn_nodes(i,1)});
-    }
+    this->nbasins = int(this->depression_tree.size());
 
-    for(size_t i=0; i<scw ; i++)
-      conn_weights_2[i] = conn_weights[i];
+    // We do not need this anymore
+    // this->_connect_basins(conn_basins, conn_nodes, conn_weights, active_nodes, elevation, nconn, basin0);
 
+    // g = 6? I am not sure what is happening here
     int g = 6;
 
-    // if method == 'mst_linear':
-    //     mstree = _compute_mst_linear(conn_basins, conn_weights, nbasins)
-    // elif method == 'mst_kruskal':
-    //     mstree = _compute_mst_kruskal(conn_basins, conn_weights, nbasins)
-    // else:
-    //     raise ValueError("invalid flow correction method %r" % method)
-    mstree = _compute_mst_kruskal(conn_basins_2, conn_weights_2);
-
-    this->_orient_basin_tree(conn_basins_2,conn_nodes_2,basin0, mstree);
-    this->_update_pits_receivers(conn_basins_2, conn_nodes_2, mstree, elevation);    
-
-
-    // _update_pits_receivers(receivers, dist2receivers, outlets,
-    //                        conn_basins, conn_nodes,
-    //                        mstree, elevation, nx, dx, dy)
-    // compute_donors(ndonors, donors, receivers, nnodes)
-    // compute_stack(stack, ndonors, donors, receivers, nnodes)
+    mstree = _compute_mst_kruskal(conn_basins, conn_weights);
+    this->_orient_basin_tree(conn_basins, conn_weights, basin0, mstree);
+    this->_update_pits_receivers(conn_basins , conn_nodes, mstree, elevation);    
 }
 
 // """Connect adjacent basins together through their lowest pass.
@@ -2003,14 +1994,14 @@ void NodeGraphV2::_connect_basins(xt::pytensor<int,2>& conn_basins, xt::pytensor
 // """
 xt::xtensor<int,1> NodeGraphV2::_compute_mst_kruskal(xt::pytensor<int,2>& conn_basins, xt::pytensor<double,1>& conn_weights)
 {
-  xt::xtensor<int,1> mstree = xt::empty<int>({nbasins - 1});
+  xt::xtensor<int,1> mstree = xt::empty<int>({int(this->depression_tree.size()) - 1});
   int mstree_size = 0;
 
   // # sort edges
   auto sort_id = xt::argsort(conn_weights);
 
 
-  UnionFind uf(nbasins);
+  UnionFind uf(int(this->depression_tree.size()));
 
   for (auto eid : sort_id)
   {
@@ -2022,7 +2013,7 @@ xt::xtensor<int,1> NodeGraphV2::_compute_mst_kruskal(xt::pytensor<int,2>& conn_b
     if (uf.Find(b0) != uf.Find(b1))
     {
       mstree[mstree_size] = eid;
-      mstree_translated.emplace_back(std::initializer_list<int>{SBasinOutlets[b0],SBasinOutlets[b1]});
+      // mstree_translated.emplace_back(std::initializer_list<int>{this->depression_tree[b0].pit, this->depression_tree[b1].pit});
       mstree_size ++;
       uf.Union(b0, b1);
     }
@@ -2042,13 +2033,10 @@ void NodeGraphV2::_orient_basin_tree(xt::pytensor<int,2>& conn_basins, xt::pyten
   // # nodes connections
   xt::xtensor<int,1> nodes_connects_size = xt::zeros<int>({this->nbasins});
   xt::xtensor<int,1> nodes_connects_ptr = xt::empty<int>({this->nbasins});
-  // std::cout << "hereE4.1|" << basin0 << "|" << std::endl;
 
   // # parse the edges to compute the number of edges per node
   for (auto i : tree)
   {
-    // if(i<0)
-    //   // std::cout << i << "||";
     nodes_connects_size[conn_basins(i, 0)]++;
     nodes_connects_size[conn_basins(i, 1)]++;
   }
@@ -2082,7 +2070,7 @@ void NodeGraphV2::_orient_basin_tree(xt::pytensor<int,2>& conn_basins, xt::pyten
 
   // # depth-first parse of the tree, starting from basin0
   // # stack of node, parent
-  xt::xtensor<int,2> stack = xt::empty<int>({nbasins, 2});
+  xt::xtensor<int,2> stack = xt::empty<int>({this->nbasins, 2});
   int stack_size = 1;
   stack(0,0) = basin0;// (basin0, basin0)
   stack(0,1) = basin0;
