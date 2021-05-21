@@ -101,11 +101,12 @@ public:
   // parent depression (-1 is none)
   int parent;
   // Children depressions (direct receivers in the tree)
-  std::vector<int> children;
+  std::pair<int,int> children;
   // Depression level (see the different shades of grey in Figure 3 of Barnes et al., 2020 https://doi.org/10.5194/esurf-8-431-2020) 
   int level;
   // Connections to other basins
   std::pair<int,int> connections;
+  std::vector<std::pair<int,int> > connections_bas;
   // nodes in the depressions
   std::vector<int> nodes;
   // total Volume

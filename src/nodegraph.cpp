@@ -373,19 +373,76 @@ void NodeGraphV2::build_depression_tree(xt::pytensor<double,1>& elevation, xt::p
   // Init a fake topography "filling" the lakes
   auto topography = xt::pytensor<double,1>(elevation);
 
+  // Current depression level
+  int level = 0;
+
+  // Checking whether dep is done yet
+  std::vector<char> dep_is_done(this->depression_tree.size(), 'n');
+
   while(keep_processing)
   {
+    // Increasing depression level
+    level++;
     // Updating the fake topogrpahy for the next round
     this->update_fake_topography(topography);
 
-    // Check wheteher there is a need to reprocess depressions
+    // Check whether there is a need to reprocess depressions
     std::vector<int> next_deps = this->get_next_building_round(topography);
+    // If there is no more deps to process, I stop here
+    if(next_deps.size() == 0)
+      break;
+
+    // Otherwise I start a new round
+    for (auto depID : next_deps)
+    {
+      // Depressions will merge now, so I need to make sure I am not double processing them
+      if(dep_is_done[depID] == 'y')
+        continue;
+      dep_is_done[depID] = 'y';
+
+      //## Incrementing the ID
+      current_ID++;
+      //## Building the depression with no parent and level 0
+      this->depression_tree.emplace_back(Depression(current_ID,-1,level));
+      dep_is_done.push_back('n');
+
+      // updating the parents of the child depressions
+      this->depression_tree[this->top_depression[this->depression_tree[depID].connections.first]].parent = current_ID;
+      this->depression_tree[this->top_depression[this->depression_tree[depID].connections.second]].parent = current_ID;
+      // And the children of the current one
+      this->depression_tree[current_ID].children = {this->top_depression[this->depression_tree[depID].connections.first], this->top_depression[this->depression_tree[depID].connections.second]};
 
 
+      //## Pushing the initial node in it, here it is by convention the outlet of the first depresiion (it does not matter much)
+      this->depression_tree[current_ID].nodes.push_back(this->depression_tree[depID].connections.first);
+
+      //## Priority Flood - like algorithm to label the depression, but with the fake topo so that it is merging the two depressions
+      this->virtual_filling(topography,active_nodes,current_ID,this->depression_tree[depID].connections.first);
+    }
   }
 
+  // After the previous loop, I can create a correspondance tree between basins
+  for (auto& dep:this->depression_tree)
+  {
+    if(dep.parent > -1)
+    {
+      //# This is straightforward for child depression as their connections are already part of other depressions by definitions
+      dep.connections_bas.emplace_back( std::pair<int,int>({this->top_depression[dep.connections.first], this->top_depression[dep.connections.second]}) );
+    }
+    else
+    {
+      //# This operation is a tad more tedious for cases if the depression is an orphan, good new is that it should not matter to which depression it is linked as long as it is a DS one
+      //# So we can simply follow the steepest descent route until reaching another depression or an outlet downstream.
+      int node = dep.connections.second;
+      while (this->top_depression[node] == -1 && active_nodes[node])
+      {
+        node = this->graph[node].Sreceivers;
+      }
+      dep.connections_bas.emplace_back( std::pair<int,int>({this->top_depression[dep.connections.first], this->top_depression[node]}) );
+    }
 
-
+  }
+  // This is me done
 }
 
 
@@ -483,8 +540,15 @@ void NodeGraphV2::virtual_filling(xt::pytensor<double,1>& elevation, xt::pytenso
       if(is_in_queue[tnode] == 'y')
         continue;
 
-      // If flat or higher: I keep
-      if(elevation[tnode] >= elevation[next_node.node])
+      // If flat or higher AND in the same depression system: I keep
+      if(
+          elevation[tnode] >= elevation[next_node.node] && 
+          (
+            this->top_depression[next_node.node] == -1 || 
+            this->top_depression[next_node.node] == this->depression_tree[depression_ID].children.first || 
+            this->top_depression[next_node.node] == this->depression_tree[depression_ID].children.second
+          )
+        )
       {
         depressionfiller.emplace(nodium(tnode, elevation[tnode]));
         is_in_queue[tnode] = 'y';
@@ -495,6 +559,7 @@ void NodeGraphV2::virtual_filling(xt::pytensor<double,1>& elevation, xt::pytenso
         outlet = next_node.node;
         // And registering the connections
         this->depression_tree[depression_ID].connections = {next_node.node, tnode};
+        this->top_depression[outlet] = depression_ID; // Keeping track of the outlet aspart of the depression system, even if it has 0 volume to store
         break;
       }
     }
