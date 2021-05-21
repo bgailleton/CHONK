@@ -53,7 +53,7 @@ class BoundaryConditions:
 			self.active_nodes = np.zeros((self.ny, self.nx), dtype = np.int)
 			self.active_nodes[1:-1,1:-1] = 1
 		self.active_nodes = self.active_nodes.ravel()
-
+	
 
 @xs.process
 class Topography:
@@ -254,6 +254,7 @@ class CoreModel:
 	NodeID =  xs.on_demand(dims = ('y','x'))
 	debugint =  xs.on_demand(dims = ('y','x'))
 	full_sed_pile_prop = xs.on_demand(dims = ('y','x','n_depths_recorded','n_labels'))
+	Kr_eff =  xs.on_demand(dims = ('y','x'))
 	
 	Qw_in = xs.on_demand()
 	Qw_out = xs.on_demand()
@@ -351,6 +352,9 @@ class CoreModel:
 	@topo.compute
 	def _topo(self):
 		return self.model.get_surface_elevation().reshape(self.ny,self.nx)
+	@Kr_eff.compute
+	def _Kr_eff(self):
+		return self.model.get_K_calc().reshape(self.ny,self.nx)
 
 	@Q_water.compute
 	def _Q_water(self):

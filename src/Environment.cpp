@@ -50,15 +50,7 @@
 // it is required by all priority queues
 // lhs/rhs : left hand side, right hand side
 
-// nodiums are sorted by elevations for the depression filler
-bool operator>( const nodium& lhs, const nodium& rhs )
-{
-  return lhs.elevation > rhs.elevation;
-}
-bool operator<( const nodium& lhs, const nodium& rhs )
-{
-  return lhs.elevation < rhs.elevation;
-}
+// 
 
 // the nodes to reprocess are sorted by their index in the stack. Smaller = upstream
 bool operator>( const node_to_reproc& lhs, const node_to_reproc& rhs )
@@ -151,6 +143,7 @@ void ModelRunner::initiate_nodegraph()
   this->dx = this->io_double["dx"];
   this->dy = this->io_double["dy"];
   this->cellarea = this->dx * this->dy;
+  calculated_K = xt::zeros_like(this->topography);
 
 
   // Dat is the real stuff:
@@ -2513,6 +2506,15 @@ void ModelRunner::manage_fluxes_after_moving_prep(chonk& this_chonk, int label_i
   if(is_there_sed_here[index] && this->sed_prop_by_label[index].size()>0) // I SHOULD NOT NEED THE SECOND THING, WHY DO I FUTURE BORIS????
     these_sed_props = this->sed_prop_by_label[index][this->sed_prop_by_label[index].size() - 1];
 
+
+  // This is where the connectivity happens
+  double fluvprop = this_chonk.get_fluvialprop_sedflux();
+  fluvprop += this->hillslope2fluvial_connectivity;
+  if(fluvprop>1)
+    fluvprop = 1;
+  this_chonk.set_fluvialprop_sedflux(fluvprop);
+
+
   double this_Kr;
   double this_Ks;
   double this_kappar;
@@ -2645,7 +2647,7 @@ void ModelRunner::manage_K_kappa(int label_id, chonk& this_chonk, double& K_r, d
       if(val > 0)
       {
         only_0 = false;
-        tool_k += val * this->labelz_list[i].Kr_modifyer;
+        tool_k += val * std::pow((this->labelz_list[label_id].Kr_modifyer/this->labelz_list[i].Kr_modifyer), this->labelz_list[label_id].sensitivity_tool_effect);
       }
     }
     if(only_0 == false)
@@ -2656,6 +2658,8 @@ void ModelRunner::manage_K_kappa(int label_id, chonk& this_chonk, double& K_r, d
     }
   }
 
+  this->calculated_K[this_chonk.get_current_location()] = K_r;
+
 
 
 
@@ -2663,6 +2667,7 @@ void ModelRunner::manage_K_kappa(int label_id, chonk& this_chonk, double& K_r, d
 
 // Initialise ad-hoc set of internal correspondance between process names and integer
 // Again this is a small otpimisation that reduce the need to initialise and call maps for each nodes as maps are slower to access
+// DEPRECATED
 void ModelRunner::initialise_intcorrespondance()
 {
   intcorrespondance = std::map<std::string,int>();

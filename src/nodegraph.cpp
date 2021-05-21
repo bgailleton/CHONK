@@ -37,6 +37,16 @@
 bool SAFE_STACK_STOPPER = false;
 bool EXTENSIVE_STACK_INFO = false;
 
+// // nodiums are sorted by elevations for the depression filler
+// bool operator>( const nodium& lhs, const nodium& rhs )
+// {
+//   return lhs.elevation > rhs.elevation;
+// }
+// bool operator<( const nodium& lhs, const nodium& rhs )
+// {
+//   return lhs.elevation < rhs.elevation;
+// }
+
 void set_DEBUG_switch_nodegraph(std::vector<std::string> params, std::vector<bool> values )
 {
   for(size_t i=0; i<params.size();i++)
@@ -74,6 +84,9 @@ NodeGraphV2::NodeGraphV2(
   this->lake_solver = lake_solver;
 
   this->flat_mask = xt::zeros<int>({this->un_element}) - 1;
+  this->depression_tree = std::vector<Depression>();
+  // this->depression_tree.reserve(100);
+  this->top_depression = std::vector<int>(this->un_element,-1);
 
   // these vectors are additioned to the node indice to test the neighbors
   this->neightbourer.emplace_back(std::initializer_list<int>{-ncols - 1, - ncols, - ncols + 1, -1,1,ncols - 1, ncols, ncols + 1 }); // internal node 0
@@ -103,7 +116,7 @@ NodeGraphV2::NodeGraphV2(
 
   // Initialising the vector of pit to reroute. The pits to reroute are all the local minima that are rerouted to another basin/edge
   // It does not include non active nodes (i.e. base level of the model/output of the model)
-  pits_to_reroute = std::vector<bool>(un_element,false);
+  this->pits_to_reroute = std::vector<bool>(un_element,false);
 
     graph.reserve(un_element);
   for(int i=0; i<n_element;i++)
@@ -113,14 +126,6 @@ NodeGraphV2::NodeGraphV2(
   this->compute_receveivers_and_donors(active_nodes,elevation);
   // computing the original Single flow topological order
   this->Sstack = xt::zeros<int>({this->n_element});
-
-  // for(int i=0; i<n_element;i++)
-  // {
-  //   int rec = this->graph[i].Sreceivers;
-  //   for(auto neg :this->graph[i].Sdonors )
-  //     if(neg == rec)
-  //       throw std::runtime_error("Ambiguous Sdonors prebaslab");
-  // }
 
   this->compute_stack();
 
@@ -135,12 +140,14 @@ NodeGraphV2::NodeGraphV2(
     // If a pit is its single-flow receiver and an active node it is a pit to reroute
     if(this->graph[node].Sreceivers == node && active_nodes[node])
     {
-      pits_to_reroute[node] = true;
+      this->pits_to_reroute[node] = true;
     }
   }
 
+  this->build_depression_tree(elevation, active_nodes);
 
-    // Now I am labelling my basins
+
+  // Now I am labelling my basins
   //# Initialising the vector of basin labels
   std::vector<int> basin_labels(this->Sstack.size(),-1);
   //# Initialising the label to 0
@@ -323,6 +330,121 @@ std::vector<int> NodeGraphV2::get_Cordonnier_order()
       output.emplace_back(i);
   }
   return output;
+}
+
+void NodeGraphV2::build_depression_tree(xt::pytensor<double,1>& elevation, xt::pytensor<bool,1>& active_nodes)
+{
+  // I am not running this code if there is no piut to reroute
+  if(this->npits == 0)
+    return;
+
+  // Initialising the potential volume vector
+  this->potential_volume = std::vector<double>(this->n_element,0.);
+  // this->depression_tree.reserve();
+
+  // current depression ID
+  int current_ID = -1;
+
+  // initial build
+  //# Iterating through all nodes
+  for(int i = 0; i < this->n_element; i++)
+  {
+    // # is a pit?
+    if(this->pits_to_reroute[i] == false)
+      continue;
+    
+    //# Yes, then:
+    //## Incrementing the ID
+    current_ID++;
+    //## Building the depression with no parent and level 0
+    this->depression_tree.emplace_back(Depression(current_ID,-1,0));
+    //## Pushing the initial node in it
+    this->depression_tree[current_ID].nodes.push_back(i);
+
+    //## Priority Flood - like algorithm to label the depression
+    this->virtual_filling(elevation,active_nodes,current_ID,i);
+
+  }
+
+
+}
+
+void NodeGraphV2::virtual_filling(xt::pytensor<double,1>& elevation, xt::pytensor<bool,1>& active_nodes, int depression_ID, int starting_node)
+{
+  // priotrity queue to virtually fill the lake. This container stores elevation nodes and sort them on the go by
+  // elevation value. I am filling one node at a time and gathering all its neighbors in this queue
+  std::priority_queue< nodium, std::vector<nodium>, std::greater<nodium> > depressionfiller;
+
+  // Aliases and shortcups
+  double cellarea = this->dx * this->dy;
+
+  // Starting by adding the first node of the list
+  depressionfiller.emplace(nodium(starting_node, elevation[starting_node]));
+
+  // I also set the outlet to a values I can recognise as NO OUTLET
+  int outlet = -9999;
+
+  // is_in queue is an helper char array to check wether a node is already in the queue or not
+  // 'y' -> yes, 'n' -> no. Not using boolean for memory otpimisation. See std::vector<bool> on google for why
+  std::vector<char> is_in_queue(this->n_element,'n');
+  // My first node, is in that queue
+  is_in_queue[starting_node] = 'y';
+  // Similar helper here but for which node is in this lake
+  std::vector<char> is_in_lake(this->n_element,'n');
+
+  // Current Water Elevation
+  double current_hw = elevation[starting_node];
+
+  // Starting the main loop
+  while(outlet < 0)
+  {
+    // first get the next node in line. If first iteration, the entry node, else, the closest elevation
+    nodium next_node = depressionfiller.top();
+    // then pop the next node
+    depressionfiller.pop();
+    // go through neighbours manually and either feed the queue or detect an outlet
+    std::vector<int> neightbors; std::vector<double> dummy ; this->get_D8_neighbors(next_node.node, active_nodes, neightbors, dummy);
+
+    // For each of the neighbouring node: checking their status
+    for(auto tnode:neightbors)
+    {
+      // if already in the queue: I pass
+      if(is_in_queue[tnode] == 'y')
+        continue;
+
+      // If flat or higher: I keep
+      if(elevation[tnode] >= elevation[next_node.node])
+      {
+        depressionfiller.emplace(nodium(tnode, elevation[tnode]));
+        is_in_queue[tnode] = 'y';
+      }
+      else
+      {
+        // if a single neighbour is lower (and not in the queue!) then the current node is the outlet
+        outlet = next_node.node;
+        // And registering the connections
+        this->depression_tree[depression_ID].connections = {next_node.node, tnode};
+        break;
+      }
+    }
+
+    // calculating the xy surface of the lake
+    double area_component_of_volume = int(this->depression_tree[depression_ID].nodes.size()) * this->dx * this->dy;
+    // Calculating the maximum volume to add until next node
+    double dV = (next_node.elevation - current_hw) * area_component_of_volume;
+
+    current_hw = next_node.elevation;
+
+    this->depression_tree[depression_ID].volume += dV;
+    this->potential_volume[this->depression_tree[depression_ID].nodes[this->depression_tree[depression_ID].nodes.size()-1]] = this->depression_tree[depression_ID].volume;
+
+    if(outlet < 0)
+    {
+      this->top_depression[next_node.node] = depression_ID;
+      this->depression_tree[depression_ID].nodes.push_back(next_node.node);
+    }
+  }
+
 }
 
 

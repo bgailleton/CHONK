@@ -1021,13 +1021,15 @@ void chonk::charlie_I(double n, double m, double K_r, double K_s,
 
   // IMPORTANT to avoid numerical overflow, recasting H to 400 max for the exponential calculation
   double H_eq = this_sed_height;
-  if(H_eq > 500)
-    H_eq = 400;
+  if(H_eq > 100)
+    H_eq = 100;
+
+  double tempsedheight = H_eq;
 
   // Case 1 (32)
   if(Dsphi != E_cap_s && E_cap_s > 0)
   {
-    new_sed_height = dimless_roughness * std::log( 1/((Dsphi / E_cap_s) - 1) *  \
+    new_sed_height = dimless_roughness * std::log( 1/ ((Dsphi / E_cap_s) - 1) *  \
       ( std::exp( (Dsphi - E_cap_s) * dt/dimless_roughness ) * ( ( Dsphi/E_cap_s - 1 ) \
        * std::exp(H_eq/dimless_roughness) + 1 ) - 1 )  );
   }
@@ -1040,7 +1042,7 @@ void chonk::charlie_I(double n, double m, double K_r, double K_s,
     new_sed_height = this_sed_height + Dsphi * dt;
   }
 
-  double new_sedcrea = (new_sed_height - this_sed_height) / dt;
+  double new_sedcrea = (new_sed_height - tempsedheight) / dt;
 
   if(new_sedcrea > 0.01)
   {
@@ -1532,8 +1534,8 @@ void chonk::CidreHillslopes(double this_sed_height, double kappa_s, double kappa
   double sum_of_presedf = 0;
   for(auto v:presedfluv)
     sum_of_presedf += v;
-  if(double_equals(sum_of_presedf,this->sediment_flux * this->fluvialprop_sedflux,1e-3)==false)
-    throw std::runtime_error("wrong start");
+  // if(double_equals(sum_of_presedf,this->sediment_flux * this->fluvialprop_sedflux,1e-3)==false)
+  //   throw std::runtime_error("wrong start");
   
   double sed_HS_in = this->sediment_flux * (1 - this->fluvialprop_sedflux);
 

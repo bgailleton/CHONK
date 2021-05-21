@@ -117,6 +117,7 @@ PYBIND11_MODULE(CHONK_cpp, m)
       .def_readwrite("tool_effect_sed", &ModelRunner::tool_effect_sed)
       .def_readwrite("external_K", &ModelRunner::external_K)
       .def_readwrite("external_kappa", &ModelRunner::external_kappa)
+      .def("get_K_calc", &ModelRunner::get_K_calc)
 
     ;
     m.def("set_DEBUG_switch_nodegraph",set_DEBUG_switch_nodegraph);
@@ -150,6 +151,7 @@ PYBIND11_MODULE(CHONK_cpp, m)
       .def_readwrite("kappa_r_mod",&labelz::kappa_r_mod)
       .def_readwrite("kappa_s_mod",&labelz::kappa_s_mod)
       .def_readwrite("critical_slope",&labelz::critical_slope)
+      .def_readwrite("sensitivity_tool_effect",&labelz::sensitivity_tool_effect)
       // .def("get_MF_stack_full", &NodeGraphV2::get_MF_stack_full)
       ;
 

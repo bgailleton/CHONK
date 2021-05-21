@@ -33,6 +33,27 @@
 
 void set_DEBUG_switch_nodegraph(std::vector<std::string> params, std::vector<bool> values );
 
+// #####################################################
+// ############# Internal Node objects #################
+// #####################################################
+
+// the class nodium is just used for the priority queue struture when solving lakes.
+// it is a very small class that combine a node index and its elevation when I insert it within the PQ
+// The operators are defined in the cpp file.
+class nodium
+{
+  public:
+    // empty constructor
+    nodium(){};
+    // Constructor by default
+    nodium(int node,double elevation){this->node = node; this->elevation = elevation;};
+    // Elevation data
+    double elevation;
+    // Node index
+    int node;
+};
+
+
 
 
 // Vertx class: A class that manage one vertex: a node, its ID, receivers, length, donors, ...
@@ -67,6 +88,30 @@ public:
   double length2Srec; // length to steepest receiver node
   std::vector<double> length2don; // list of length to receiver node
 };
+
+// this class is a vertex and its informations for the depression tree
+class Depression
+{
+public:
+
+  Depression(){return;};
+  Depression(int index, int parent, int level){this->index = index;this->parent = parent;this->level = level; this->volume = 0;};
+  // ID in the depression tree
+  int index;
+  // parent depression (-1 is none)
+  int parent;
+  // Children depressions (direct receivers in the tree)
+  std::vector<int> children;
+  // Depression level (see the different shades of grey in Figure 3 of Barnes et al., 2020 https://doi.org/10.5194/esurf-8-431-2020) 
+  int level;
+  // Connections to other basins
+  std::pair<int,int> connections;
+  // nodes in the depressions
+  std::vector<int> nodes;
+  // total Volume
+  double volume;
+};
+
 
 
 //Deprecated
@@ -187,6 +232,8 @@ std::vector<std::vector<int> > get_mstree_translated(){return this->mstree_trans
 
 std::vector<double> get_distance_to_receivers_custom(int node, std::vector<int> list_of_receivers);
 
+void virtual_filling(xt::pytensor<double,1>& elevation, xt::pytensor<bool,1>& active_nodes, int depression_ID, int starting_node);
+void build_depression_tree(xt::pytensor<double,1>& elevation, xt::pytensor<bool,1>& active_nodes);
 
 
 
@@ -257,6 +304,13 @@ protected:
   std::vector<std::vector<int> > neightbourer;
   std::vector<double> lengthener;
 
+  // Depression management: modified from Barnes et al
+  std::vector<Depression> depression_tree;
+  std::vector<int> top_depression;
+  std::vector<double> potential_volume;
+
+
+
   // DEBUGGUER
   xt::pytensor<int,1> flat_mask;
 
@@ -316,7 +370,18 @@ class UnionFind
 };
 
 // Topological order algorithm for multiple receivers adapted from FORTRAN
-// Original author: Jean Braun
+// Original author: Jean Braun And Guillaume Cordonnier
 std::vector<int> multiple_stack_fastscape(int n_element, std::vector<Vertex>& graph, std::vector<int>& not_in_stack, bool& has_failed);
+
+
+// nodiums are sorted by elevations for the depression filler
+inline bool operator>( const nodium& lhs, const nodium& rhs )
+{
+  return lhs.elevation > rhs.elevation;
+}
+inline bool operator<( const nodium& lhs, const nodium& rhs )
+{
+  return lhs.elevation < rhs.elevation;
+}
 
 #endif

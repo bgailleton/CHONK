@@ -61,11 +61,11 @@ public:
     double dstar = 1;
     double threshold_incision = 0;
     double threshold_entrainment = 0;
-
     double kappa_base = 1e-5;
     double kappa_r_mod = 0.8;
     double kappa_s_mod = 1.5;
     double critical_slope = 0.6;
+    double sensitivity_tool_effect = 1;
 
     // Old stuffus  
     // integers attributes
@@ -88,25 +88,6 @@ public:
 };
 
 
-// #####################################################
-// ############# Internal Node objects #################
-// #####################################################
-
-// the class nodium is just used for the priority queue struture when solving lakes.
-// it is a very small class that combine a node index and its elevation when I insert it within the PQ
-// The operators are defined in the cpp file.
-class nodium
-{
-  public:
-    // empty constructor
-    nodium(){};
-    // Constructor by default
-    nodium(int node,double elevation){this->node = node; this->elevation = elevation;};
-    // Elevation data
-    double elevation;
-    // Node index
-    int node;
-};
 
 //This class is used to sort nodes by their stack ID when reprocessing a landscape
 class node_to_reproc
@@ -418,6 +399,7 @@ std::vector<double>& pre_sed, std::vector<double>& pre_water);
     xt::pytensor<bool,1> get_active_nodes(){return this->active_nodes ;}
     xt::pytensor<double,1> get_sed_height(){return this->sed_height ;}
     xt::pytensor<double,1> get_sed_height_tp1(){return this->sed_height_tp1 ;}
+    xt::pytensor<double,1> get_K_calc(){return this->calculated_K ;}
 
 
     void manage_K_kappa(int label_id, chonk& this_chonk, double& K_r, double& K_s, double& kappa_r, double& kappa_s, double& S_c);
@@ -434,6 +416,8 @@ std::vector<double>& pre_sed, std::vector<double>& pre_water);
     bool tool_effect_sed = false;
     bool external_K = false;
     bool external_kappa = false;
+
+    double hillslope2fluvial_connectivity = 0;
 
   protected:
 
@@ -491,6 +475,10 @@ std::vector<double>& pre_sed, std::vector<double>& pre_water);
     //sed_height
     xt::pytensor<double,1> sed_height;
     xt::pytensor<double,1> sed_height_tp1;
+
+
+    // Analyser (on demand)
+    xt::pytensor<double,1> calculated_K;
 
 
 
