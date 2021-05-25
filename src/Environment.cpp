@@ -183,7 +183,7 @@ void ModelRunner::initiate_nodegraph()
   this->lakes.clear();
   //# Labelling the nodes in the lake
   node_in_lake = std::vector<int>(this->io_int["n_elements"], -1);
-  for(auto& dep : depdepression_tree)
+  for(auto& dep : depression_tree)
   {
     if(dep.has_children == false)
       node_in_lake[dep.pit] = dep.index;
