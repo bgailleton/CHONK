@@ -129,120 +129,130 @@ NodeGraphV2::NodeGraphV2(
 
   this->compute_stack();
 
-
-  // Computing basin info from stack
-  this->compute_basins(active_nodes);
-  this->compute_pits(active_nodes);
-
-  //# Iterating through the nodes on the stack to gather all the pits
-  for(auto node:this->Sstack)
-  {
-    // If a pit is its single-flow receiver and an active node it is a pit to reroute
-    if(this->graph[node].Sreceivers == node && active_nodes[node])
-    {
-      this->pits_to_reroute[node] = true;
-    }
-  }
-
-  this->build_depression_tree(elevation, active_nodes);
-  std::cout << "DEBUGDEP:: flow corrr-1" << std::endl;
-
-
-  // Now I am labelling my basins
-  //# Initialising the vector of basin labels
-  std::vector<int> basin_labels(this->Sstack.size(),-1);
-  //# Initialising the label to 0
-  int label = 0;
-  //# Iterating through all my single-flow stack from bottom to top (see Braun and Willett 2013 for meaning of stack)
-  //# if a node is it's receiver then the label becomse that node. The resulting basin vector show which nodes are linked to which
-  for(auto node:this->Sstack)
-  {
-    if(node == this->graph[node].Sreceivers)
-    {
-      label = node;
-    }
-    basin_labels[node] = label;
-  }
-
-  std::cout << "DEBUGDEP:: flow corrr1" << std::endl;
-  this->correct_flowrouting(active_nodes, elevation);
-  std::cout << "DEBUGDEP:: flow corrrDONE" << std::endl;
-
   //# I will need a vector gathering the nodes I'll need to check for potential cyclicity
   std::vector<int> node_to_check;
   //# their target basin
   std::vector<int> force_target_basin;
   //# and the origin of the pit
   std::vector<int> origin_pit;
-  if(this->lake_solver == false)
-  {  // Initialising the node graph, a vector of Vertexes with their edges
 
-      //#Iterating through the nodes
-      for(int i=0; i<n_element;i++)
+  if(this->lake_solver == false)
+  {
+    // Computing basin info from stack
+      this->compute_basins(active_nodes);
+      this->compute_pits(active_nodes);
+  
+      //# Iterating through the nodes on the stack to gather all the pits
+      for(auto node:this->Sstack)
       {
-        // If this receiver is a pit to reroute, I need to add to the receiver list the receiver of the outlet
-        if(pits_to_reroute[i] == true)
+        // If a pit is its single-flow receiver and an active node it is a pit to reroute
+        if(this->graph[node].Sreceivers == node && active_nodes[node])
         {
-          //# Node I wanna add
-          int tgnode = this->graph[i].Sreceivers;
-          if(pits_to_reroute[tgnode] == false)
-            tgnode = this->graph[tgnode].Sreceivers;
-          //# Will be a receiver
-          this->graph[i].receivers.emplace_back(tgnode);
-          //# I will have to check its own receivers for potential cyclicity
-          node_to_check.emplace_back(tgnode);
-          //# Which pit is it connected to
-          origin_pit.emplace_back(i);
-          //# Arbitrary length
-          this->graph[i].length2rec.emplace_back(dx*10000.);
-          //# The basin I DONT want to reach
-          force_target_basin.emplace_back(i);
-  
-          // Keepign this check just in case, will remove later. Throw an error in case cyclicity is detected
-          if(basin_labels[tgnode] == basin_labels[i])
-          {
-  
-            throw std::runtime_error("Receiver in same basin! Node " + std::to_string(i) + " gives to " + std::to_string(this->graph[i].Sreceivers) + " gives to " + std::to_string(tgnode));
-          }
+          this->pits_to_reroute[node] = true;
         }
-  
-        // // I need these to initialise my Vertex
-        // bool false1 = false;
-        // bool false2 = false;
-        // // Constructing the vertex in place in the vector. More efficient according to the internet
-        // graph.emplace_back(Vertex(i,false1,false2,donors,receivers,length2rec));
       }
   
-      // Now I am correcting my outlet nodes:
-      // The idea is to force any of its node to be directed to the next basin and avoid any cyclicity. 
-      //# iterating through them
-      for(size_t i=0; i< node_to_check.size();i++)
-      { 
-        //# Gathering the node to check
-        int this_node_to_check = node_to_check[i];
-        //# The basin to avoid
-        int this_target_basin = force_target_basin[i];
-        // new list of receivers, I am only keeping the ones NOT draining to original basin
-        std::vector<int> new_rec;
-        std::vector<double> new_length;
-        int idL=0;
-        for(auto trec:graph[this_node_to_check].receivers)
+      // std::cout << "DEBUGDEP:: flow corrr-1" << std::endl;
+  
+  
+      // Now I am labelling my basins
+      //# Initialising the vector of basin labels
+      std::vector<int> basin_labels(this->Sstack.size(),-1);
+      //# Initialising the label to 0
+      int label = 0;
+      //# Iterating through all my single-flow stack from bottom to top (see Braun and Willett 2013 for meaning of stack)
+      //# if a node is it's receiver then the label becomse that node. The resulting basin vector show which nodes are linked to which
+      for(auto node:this->Sstack)
+      {
+        if(node == this->graph[node].Sreceivers)
         {
-          if(basin_labels[trec] != this_target_basin  || active_nodes[trec] == false) //|| trec == this_node_to_check??
-          {
-            new_rec.emplace_back(trec);
-            new_length.emplace_back(this->graph[this_node_to_check].length2rec[idL]);
-          }
-          idL++;
+          label = node;
         }
-        // Security check
-        if(new_rec.size()==0 && active_nodes[this_node_to_check] == 1 )
-          throw std::runtime_error("At node " + std::to_string(this_node_to_check) + " no receivers after corrections! it came from pit " + std::to_string(origin_pit[i]) +" and flat mask is " + std::to_string(this->flat_mask[this_node_to_check]));
-        // Correcting the rec
-        this->graph[this_node_to_check].receivers = new_rec;
-        this->graph[this_node_to_check].length2rec = new_length;
+        basin_labels[node] = label;
       }
+  
+      // std::cout << "DEBUGDEP:: flow corrr1" << std::endl;
+      this->correct_flowrouting(active_nodes, elevation);
+      // std::cout << "DEBUGDEP:: flow corrrDONE" << std::endl;
+  
+      if(this->lake_solver == false)
+      {  // Initialising the node graph, a vector of Vertexes with their edges
+  
+          //#Iterating through the nodes
+          for(int i=0; i<n_element;i++)
+          {
+            // If this receiver is a pit to reroute, I need to add to the receiver list the receiver of the outlet
+            if(pits_to_reroute[i] == true)
+            {
+              //# Node I wanna add
+              int tgnode = this->graph[i].Sreceivers;
+              if(pits_to_reroute[tgnode] == false)
+                tgnode = this->graph[tgnode].Sreceivers;
+              //# Will be a receiver
+              this->graph[i].receivers.emplace_back(tgnode);
+              //# I will have to check its own receivers for potential cyclicity
+              node_to_check.emplace_back(tgnode);
+              //# Which pit is it connected to
+              origin_pit.emplace_back(i);
+              //# Arbitrary length
+              this->graph[i].length2rec.emplace_back(dx*10000.);
+              //# The basin I DONT want to reach
+              force_target_basin.emplace_back(i);
+      
+              // Keepign this check just in case, will remove later. Throw an error in case cyclicity is detected
+              if(basin_labels[tgnode] == basin_labels[i])
+              {
+      
+                throw std::runtime_error("Receiver in same basin! Node " + std::to_string(i) + " gives to " + std::to_string(this->graph[i].Sreceivers) + " gives to " + std::to_string(tgnode));
+              }
+            }
+      
+            // // I need these to initialise my Vertex
+            // bool false1 = false;
+            // bool false2 = false;
+            // // Constructing the vertex in place in the vector. More efficient according to the internet
+            // graph.emplace_back(Vertex(i,false1,false2,donors,receivers,length2rec));
+          }
+      
+          // Now I am correcting my outlet nodes:
+          // The idea is to force any of its node to be directed to the next basin and avoid any cyclicity. 
+          //# iterating through them
+          for(size_t i=0; i< node_to_check.size();i++)
+          { 
+            //# Gathering the node to check
+            int this_node_to_check = node_to_check[i];
+            //# The basin to avoid
+            int this_target_basin = force_target_basin[i];
+            // new list of receivers, I am only keeping the ones NOT draining to original basin
+            std::vector<int> new_rec;
+            std::vector<double> new_length;
+            int idL=0;
+            for(auto trec:graph[this_node_to_check].receivers)
+            {
+              if(basin_labels[trec] != this_target_basin  || active_nodes[trec] == false) //|| trec == this_node_to_check??
+              {
+                new_rec.emplace_back(trec);
+                new_length.emplace_back(this->graph[this_node_to_check].length2rec[idL]);
+              }
+              idL++;
+            }
+            // Security check
+            if(new_rec.size()==0 && active_nodes[this_node_to_check] == 1 )
+              throw std::runtime_error("At node " + std::to_string(this_node_to_check) + " no receivers after corrections! it came from pit " + std::to_string(origin_pit[i]) +" and flat mask is " + std::to_string(this->flat_mask[this_node_to_check]));
+            // Correcting the rec
+            this->graph[this_node_to_check].receivers = new_rec;
+            this->graph[this_node_to_check].length2rec = new_length;
+          }
+      }
+  
   }
+  else
+  {
+    // THIS IS WHAT HAPPENS WHEN THE LAKE SOVER IS EXPLICIT
+    this->build_depression_tree(elevation, active_nodes);
+
+  }
+
 
   // I am now ready to create my topological order utilising a c++ port of the fortran algorithm from Jean Braun
   bool has_failed = false;
@@ -1854,6 +1864,7 @@ void NodeGraphV2::compute_pits(xt::pytensor<bool,1>& active_nodes)
 void NodeGraphV2::collapse_depression_tree(xt::pytensor<int,2>& conn_basins, xt::pytensor<int,2>& conn_nodes, 
                                            xt::pytensor<double,1>& conn_weights, xt::pytensor<double,1>& elevation, int& basin0)
 {
+  // PROBS DEPRECATED
   // initialising all the connections
   std::vector<std::pair<int,int> > preoutput;
   std::vector<std::pair<int,int> > preoutput_nodes;
@@ -1913,50 +1924,79 @@ void NodeGraphV2::correct_flowrouting(xt::pytensor<bool,1>& active_nodes, xt::py
     // `donors` and `stack`.
 
     // """
+    int& nnodes = this->n_element;
 
-    if(this->depression_tree.size() == 0)
-      return;
-
-    // I first need to collapse the depression tree to calculate the planar connections between basins
-    xt::pytensor<int,2> conn_basins,conn_nodes;
-    xt::pytensor<double,1> conn_weights; //conn_weights = np.empty(nconn_max, dtype=np.float64)
-    int basin0;
-    std::cout << "DEBUGDEP:: flow corrr2" << std::endl;
-
-    this->collapse_depression_tree(conn_basins, conn_nodes, conn_weights, elevation,basin0); // (Although the tree collapses, the carbon balance os good because it has just grown)
-    std::cout << "DEBUGDEP:: flow corrr3" << std::endl;
-
-    int nconn = int(conn_weights.size());
-
-    this->nbasins = 0;
-    for(auto& dep:this->depression_tree)
+    // # theory of planar graph -> max nb. of connections known
+    int nconn_max = this->nbasins * 7;
+    xt::pytensor<int,2> conn_basins = xt::zeros<int>({nconn_max,2}); // np.empty((nconn_max, 2), dtype=np.intp)
+    for(size_t i=0;i<nconn_max;i++)
     {
-      if(dep.index == 0)
-        continue;
-      if(dep.has_children == false)
-        this->nbasins++;
+      conn_basins(i,1) = -2;
+      conn_basins(i,0) = -2;
+    }
+    xt::pytensor<int,2> conn_nodes = xt::zeros<int>({nconn_max,2}); //    conn_nodes = np.empty((nconn_max, 2), dtype=np.intp)
+    for(size_t i=0;i<nconn_max;i++)
+    {
+      conn_nodes(i,1) = -2;
+      conn_nodes(i,0) = -2;
+    }
+    xt::pytensor<double,1> conn_weights = xt::zeros<double>({nconn_max}); //conn_weights = np.empty(nconn_max, dtype=np.float64)
+    for(auto& v:conn_weights)
+      v = -2;
 
+    int nconn, basin0;
+    this->_connect_basins(conn_basins, conn_nodes, conn_weights, active_nodes, elevation, nconn, basin0);
+    
+    int scb = nconn, scn = nconn, scw = nconn;
+    // for(size_t i=0;i<nconn_max;i++)
+    // {
+    //   if(scb == -1 && conn_basins(i,0) == -2)
+    //     scb = int(i);
+    //   if(scn == -1 && conn_nodes(i,0) == -2)
+    //     scn = int(i);
+    //   if(scw == -1 && conn_weights(i) == -2)
+    //     scw = int(i);
+    // }
+
+    xt::pytensor<int,2> conn_basins_2 = xt::zeros<int>({scb,2});
+    xt::pytensor<int,2> conn_nodes_2 = xt::zeros<int>({scn,2});
+    xt::pytensor<double,1> conn_weights_2 = xt::zeros<double>({scw}); //conn_weights = np.empty(nconn_max, dtype=np.float64)
+
+    for(size_t i=0; i<scb ; i++)
+    {
+      conn_basins_2(i,0) = conn_basins(i,0);
+      conn_basins_2(i,1) = conn_basins(i,1);
+      DEBUG_connbas.push_back({SBasinOutlets[conn_basins(i,0)],SBasinOutlets[conn_basins(i,1)]});
+    }
+    for(size_t i=0; i<scn ; i++)
+    {
+      conn_nodes_2(i,0) = conn_nodes(i,0);
+      conn_nodes_2(i,1) = conn_nodes(i,1);
+      DEBUG_connode.push_back({conn_nodes(i,0),conn_nodes(i,1)});
     }
 
-    // We do not need this anymore
-    // this->_connect_basins(conn_basins, conn_nodes, conn_weights, active_nodes, elevation, nconn, basin0);
+    for(size_t i=0; i<scw ; i++)
+      conn_weights_2[i] = conn_weights[i];
 
-    // g = 6? I am not sure what is happening here
     int g = 6;
-    std::cout << "DEBUGDEP:: flow corrr4" << std::endl;
 
-    mstree = _compute_mst_kruskal(conn_basins, conn_weights);
-    //TO MONDAY/TUESDAY BORIS:
-    // you need to start again from kruskal to take advantage of both vertical and planar trees to orient the graph
-    // Kruskal gives a "stack" of basins by priority and now you need to like start from the edge (base of the stack) and orient basins 
-    // There might be a problem with the fact that multiple of your basins have multiple links at the same time
-    // You need to really have a look on the mstree structure
+    // if method == 'mst_linear':
+    //     mstree = _compute_mst_linear(conn_basins, conn_weights, nbasins)
+    // elif method == 'mst_kruskal':
+    //     mstree = _compute_mst_kruskal(conn_basins, conn_weights, nbasins)
+    // else:
+    //     raise ValueError("invalid flow correction method %r" % method)
+    mstree = _compute_mst_kruskal(conn_basins_2, conn_weights_2);
 
-    std::cout << "DEBUGDEP:: flow corrr5" << std::endl;
-    this->_orient_basin_tree(conn_basins, conn_nodes, basin0, mstree);
-    std::cout << "DEBUGDEP:: flow corrr6" << std::endl;
-    this->_update_pits_receivers(conn_basins , conn_nodes, mstree, elevation);    
-    std::cout << "DEBUGDEP:: flow corrr7" << std::endl;
+    this->_orient_basin_tree(conn_basins_2,conn_nodes_2,basin0, mstree);
+    this->_update_pits_receivers(conn_basins_2, conn_nodes_2, mstree, elevation);    
+
+
+    // _update_pits_receivers(receivers, dist2receivers, outlets,
+    //                        conn_basins, conn_nodes,
+    //                        mstree, elevation, nx, dx, dy)
+    // compute_donors(ndonors, donors, receivers, nnodes)
+    // compute_stack(stack, ndonors, donors, receivers, nnodes)
 }
 
 // """Connect adjacent basins together through their lowest pass.
@@ -2116,14 +2156,14 @@ void NodeGraphV2::_connect_basins(xt::pytensor<int,2>& conn_basins, xt::pytensor
 // """
 xt::xtensor<int,1> NodeGraphV2::_compute_mst_kruskal(xt::pytensor<int,2>& conn_basins, xt::pytensor<double,1>& conn_weights)
 {
-  xt::xtensor<int,1> mstree = xt::empty<int>({int(this->depression_tree.size()) - 1});
+  xt::xtensor<int,1> mstree = xt::empty<int>({nbasins - 1});
   int mstree_size = 0;
 
   // # sort edges
   auto sort_id = xt::argsort(conn_weights);
 
 
-  UnionFind uf(int(this->depression_tree.size()));
+  UnionFind uf(nbasins);
 
   for (auto eid : sort_id)
   {
@@ -2135,7 +2175,7 @@ xt::xtensor<int,1> NodeGraphV2::_compute_mst_kruskal(xt::pytensor<int,2>& conn_b
     if (uf.Find(b0) != uf.Find(b1))
     {
       mstree[mstree_size] = eid;
-      // mstree_translated.emplace_back(std::initializer_list<int>{this->depression_tree[b0].pit, this->depression_tree[b1].pit});
+      mstree_translated.emplace_back(std::initializer_list<int>{SBasinOutlets[b0],SBasinOutlets[b1]});
       mstree_size ++;
       uf.Union(b0, b1);
     }
@@ -2155,15 +2195,16 @@ void NodeGraphV2::_orient_basin_tree(xt::pytensor<int,2>& conn_basins, xt::pyten
   // # nodes connections
   xt::xtensor<int,1> nodes_connects_size = xt::zeros<int>({this->nbasins});
   xt::xtensor<int,1> nodes_connects_ptr = xt::empty<int>({this->nbasins});
+  // std::cout << "hereE4.1|" << basin0 << "|" << std::endl;
 
   // # parse the edges to compute the number of edges per node
-  std::cout << "DEBUGDEP:: flow corrr5.1" << std::endl;
   for (auto i : tree)
   {
+    // if(i<0)
+    //   // std::cout << i << "||";
     nodes_connects_size[conn_basins(i, 0)]++;
     nodes_connects_size[conn_basins(i, 1)]++;
   }
-  std::cout << "DEBUGDEP:: flow corrr5.2" << std::endl;
 
   // # compute the id of first edge in adjacency table
   nodes_connects_ptr[0] = 0;
@@ -2173,13 +2214,11 @@ void NodeGraphV2::_orient_basin_tree(xt::pytensor<int,2>& conn_basins, xt::pyten
     nodes_connects_ptr[i] = (nodes_connects_ptr[i - 1] + nodes_connects_size[i - 1]);
     nodes_connects_size[i - 1] = 0;
   }
-  std::cout << "DEBUGDEP:: flow corrr5.3" << std::endl;
 
   // # create the adjacency table
   int nodes_adjacency_size = nodes_connects_ptr[nbasins - 1] + nodes_connects_size[nbasins - 1];
   nodes_connects_size[this->nbasins -1] = 0;
   xt::xtensor<int,1> nodes_adjacency = xt::zeros<int>({nodes_adjacency_size});
-  std::cout << "DEBUGDEP:: flow corrr5.5" << std::endl;
 
   // # parse the edges to update the adjacency
   for (auto i : tree)
@@ -2193,36 +2232,31 @@ void NodeGraphV2::_orient_basin_tree(xt::pytensor<int,2>& conn_basins, xt::pyten
     nodes_connects_size[n2] ++;
   }
 
-  std::cout << "DEBUGDEP:: flow corrr5.6" << std::endl;
 
   // # depth-first parse of the tree, starting from basin0
   // # stack of node, parent
-  xt::xtensor<int,2> stack = xt::empty<int>({this->nbasins, 2});
+  xt::xtensor<int,2> stack = xt::empty<int>({nbasins, 2});
   int stack_size = 1;
   stack(0,0) = basin0;// (basin0, basin0)
   stack(0,1) = basin0;
 
-  std::cout << "DEBUGDEP:: flow corrr5.7" << std::endl;
   
   // CHEKCED UNTIL HERE
   int n_turn=0;
   while (stack_size > 0)
   {
-    std::cout << "DEBUGDEP:: flow corrr5.7.1:" << n_turn << std::endl;
-
     n_turn++;
     // # get parsed node
     stack_size = stack_size - 1;
     int node = stack(stack_size, 0);
     int parent = stack(stack_size, 1);
 
-    std::cout << "DEBUGDEP:: flow corrr5.7.2:" << std::endl;
     // # for each edge of the graph
     // for i in range(nodes_connects_ptr[node], nodes_connects_ptr[node] + nodes_connects_size[node])
     for( int i = nodes_connects_ptr[node]; i < (nodes_connects_ptr[node] + nodes_connects_size[node]); i++) 
     {
       int edge_id = nodes_adjacency[i];
-      std::cout << "DEBUGDEP:: flow corrr5.7.3:" << std::endl;
+
       // # the edge comming from the parent node has already been updated.
       // # in this case, the edge is (parent, node)
       if (conn_basins(edge_id, 0) == parent && node != parent)
@@ -2230,7 +2264,6 @@ void NodeGraphV2::_orient_basin_tree(xt::pytensor<int,2>& conn_basins, xt::pyten
           // std::cout << SBasinOutlets[conn_basins(edge_id, 0)] << "||" << SBasinOutlets[conn_basins(edge_id, 1)] << std::endl;
           continue;
       }
-      std::cout << "DEBUGDEP:: flow corrr5.7.4:" << std::endl;
       // std::cout << "GUR::" << SBasinOutlets[conn_basins(edge_id, 0)] << "||" << SBasinOutlets[conn_basins(edge_id, 1)] << std::endl;
 
       // # we want the edge to be (node, next)
@@ -2249,15 +2282,12 @@ void NodeGraphV2::_orient_basin_tree(xt::pytensor<int,2>& conn_basins, xt::pyten
         conn_nodes(edge_id, 0) = cb1;
         conn_nodes(edge_id, 1) = cb0;
       }
-      std::cout << "DEBUGDEP:: flow corrr5.7.5:edge_id" << edge_id << "," << stack_size << std::endl;
       // # add the opposite node to the stack
       stack(stack_size,0) = conn_basins(edge_id, 1);
       stack(stack_size,1) = node;
       stack_size ++;
-      std::cout << "DEBUGDEP:: flow corrr5.7.6:" << std::endl;
     }
   }
-  std::cout << "DEBUGDEP:: flow corrr5.DONE" << std::endl;
 
 }
 
@@ -2323,8 +2353,6 @@ void NodeGraphV2::_update_pits_receivers(xt::pytensor<int,2>& conn_basins,xt::py
 //   `- - ~ ~ -._|      /_ - ~ ~ ^|      /- _      `.
 //               |     /          |     /     ~-.     ~- _
 //               |_____|          |_____|         ~ - . _ _~_-_
-
-
 
 
 
