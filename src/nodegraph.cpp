@@ -145,6 +145,7 @@ NodeGraphV2::NodeGraphV2(
   }
 
   this->build_depression_tree(elevation, active_nodes);
+  std::cout << "DEBUGDEP:: flow corrr-1" << std::endl;
 
 
   // Now I am labelling my basins
@@ -163,7 +164,9 @@ NodeGraphV2::NodeGraphV2(
     basin_labels[node] = label;
   }
 
+  std::cout << "DEBUGDEP:: flow corrr1" << std::endl;
   this->correct_flowrouting(active_nodes, elevation);
+  std::cout << "DEBUGDEP:: flow corrrDONE" << std::endl;
 
   //# I will need a vector gathering the nodes I'll need to check for potential cyclicity
   std::vector<int> node_to_check;
@@ -345,7 +348,21 @@ void NodeGraphV2::build_depression_tree(xt::pytensor<double,1>& elevation, xt::p
   // this->depression_tree.reserve();
 
   // current depression ID
-  int current_ID = -1;
+  int current_ID = 0;
+
+  // THIS IS BASIN0, the original basin that represent the edges
+  int nodebasin0 = 0;
+  for (int i=0;i<this->n_element; i++)
+  {
+    if(active_nodes[i] == 0)
+    {
+      nodebasin0 = i;
+      break;
+    }
+  }
+  this->depression_tree.emplace_back(Depression(current_ID,0,0, nodebasin0));
+  this->depression_tree[0].connections_bas = std::make_pair(0,0);
+  this->depression_tree[0].connections = std::make_pair(nodebasin0,nodebasin0);
 
   // initial build
   //# Iterating through all nodes
@@ -443,23 +460,29 @@ void NodeGraphV2::build_depression_tree(xt::pytensor<double,1>& elevation, xt::p
   std::cout << "DEBUGDEP::3" << std::endl;
 
   // After the previous loop, I can create a correspondance tree between basins
-  for (auto& dep:this->depression_tree)
+  for (int i =0 ; i< this->depression_tree.size(); i++)
   {
-    if(dep.parent > -1)
+
+    if(this->depression_tree[i].parent > -1)
     {
       //# This is straightforward for child depression as their connections are already part of other depressions by definitions
-      dep.connections_bas =  std::pair<int,int>({this->top_depression[dep.connections.first], this->top_depression[dep.connections.second]}) ;
+      this->depression_tree[i].connections_bas =  std::pair<int,int>({this->top_depression[this->depression_tree[i].connections.first], this->top_depression[this->depression_tree[i].connections.second]}) ;
     }
     else
     {
       //# This operation is a tad more tedious for cases if the depression is an orphan, good new is that it should not matter to which depression it is linked as long as it is a DS one
       //# So we can simply follow the steepest descent route until reaching another depression or an outlet downstream.
-      int node = dep.connections.second;
+      int node = this->depression_tree[i].connections.second;
       while (this->top_depression[node] == -1 && active_nodes[node])
       {
         node = this->graph[node].Sreceivers;
       }
-      dep.connections_bas =  std::pair<int,int>({this->top_depression[dep.connections.first], this->top_depression[node]}) ;
+
+      int dat = this->top_depression[node];
+      if(dat == -1)
+        dat = 0;
+
+      this->depression_tree[i].connections_bas =  std::pair<int,int>({this->top_depression[this->depression_tree[i].connections.first], dat}) ;
     }
 
   }
@@ -1835,22 +1858,34 @@ void NodeGraphV2::collapse_depression_tree(xt::pytensor<int,2>& conn_basins, xt:
   std::vector<std::pair<int,int> > preoutput;
   std::vector<std::pair<int,int> > preoutput_nodes;
   // preoutput.reserve(20); // arbitrary memory reserve
-
-  for (auto& dep: this->depression_tree)
+  basin0 = 0;
+  std::cout << "collapse_depression_tree::A" << std::endl;
+  for (int i=1; i< this->depression_tree.size(); i++)
   {
-    preoutput.emplace_back( dep.connections_bas );
-    if(dep.connections_bas.second == -1 && basin0 == -1)
-      basin0 = dep.index;
-    int this_dep = dep.index;
-    int recdep = dep.connections_bas.second;
-    int this_node_rec = dep.connections.second;
-    while(this->depression_tree[this_dep].has_children)
+    auto this_cobas = this->depression_tree[i].connections_bas;
+    if(this_cobas.second == 0)
     {
-      this_dep = this->depression_tree[this_dep].children.first;
-      preoutput.emplace_back( std::make_pair(this_dep, recdep) );
-      preoutput_nodes.emplace_back(std::make_pair(this->depression_tree[this_dep].connections.first, this_node_rec) );
+      preoutput.emplace_back( std::make_pair(0,0) );
+      preoutput_nodes.emplace_back( std::make_pair(-1,-1) );
     }
+
+    // preoutput.emplace_back( this->depression_tree[i].connections_bas );
+    // preoutput_nodes.emplace_back( this->depression_tree[i].connections );
+
+    // if(dep.connections_bas.second == -1 && basin0 == -1)
+
+    int this_dep = this->depression_tree[i].index;
+    int recdep = this->depression_tree[i].connections_bas.second;
+    int this_node_rec = this->depression_tree[i].connections.second;
+    while(this->depression_tree[this_dep].has_children)
+      this_dep = this->depression_tree[this_dep].children.first;
+    while(this->depression_tree[recdep].has_children)
+      recdep = this->depression_tree[recdep].children.first;
+      
+    preoutput.emplace_back( std::make_pair(this_dep, recdep) );
+    preoutput_nodes.emplace_back(std::make_pair(this->depression_tree[i].connections.first, this_node_rec) );
   }
+  std::cout << "collapse_depression_tree::B" << std::endl;
 
   int i=0;
   for (int i = 0; i< preoutput.size(); i++)
@@ -1859,9 +1894,14 @@ void NodeGraphV2::collapse_depression_tree(xt::pytensor<int,2>& conn_basins, xt:
     conn_basins(i,1) = preoutput[i].second;
     conn_nodes(i,0) = preoutput_nodes[i].first;
     conn_nodes(i,1) = preoutput_nodes[i].second;
-    conn_weights[i] = std::max(elevation[conn_nodes(i,0)],elevation[conn_nodes(i,1)]);
+    if(conn_nodes(i,0) != -1 && conn_nodes(i,1) != -1)
+      conn_weights[i] = std::max(elevation[conn_nodes(i,0)],elevation[conn_nodes(i,1)]);
+    else
+      conn_weights[i] = -99999999;
     i++;
   }
+  std::cout << "collapse_depression_tree::C" << std::endl;
+
 
 }
 
@@ -1881,21 +1921,42 @@ void NodeGraphV2::correct_flowrouting(xt::pytensor<bool,1>& active_nodes, xt::py
     xt::pytensor<int,2> conn_basins,conn_nodes;
     xt::pytensor<double,1> conn_weights; //conn_weights = np.empty(nconn_max, dtype=np.float64)
     int basin0;
+    std::cout << "DEBUGDEP:: flow corrr2" << std::endl;
+
     this->collapse_depression_tree(conn_basins, conn_nodes, conn_weights, elevation,basin0); // (Although the tree collapses, the carbon balance os good because it has just grown)
+    std::cout << "DEBUGDEP:: flow corrr3" << std::endl;
 
     int nconn = int(conn_weights.size());
 
-    this->nbasins = int(this->depression_tree.size());
+    this->nbasins = 0;
+    for(auto& dep:this->depression_tree)
+    {
+      if(dep.index == 0)
+        continue;
+      if(dep.has_children == false)
+        this->nbasins++;
+
+    }
 
     // We do not need this anymore
     // this->_connect_basins(conn_basins, conn_nodes, conn_weights, active_nodes, elevation, nconn, basin0);
 
     // g = 6? I am not sure what is happening here
     int g = 6;
+    std::cout << "DEBUGDEP:: flow corrr4" << std::endl;
 
     mstree = _compute_mst_kruskal(conn_basins, conn_weights);
+    //TO MONDAY/TUESDAY BORIS:
+    // you need to start again from kruskal to take advantage of both vertical and planar trees to orient the graph
+    // Kruskal gives a "stack" of basins by priority and now you need to like start from the edge (base of the stack) and orient basins 
+    // There might be a problem with the fact that multiple of your basins have multiple links at the same time
+    // You need to really have a look on the mstree structure
+
+    std::cout << "DEBUGDEP:: flow corrr5" << std::endl;
     this->_orient_basin_tree(conn_basins, conn_nodes, basin0, mstree);
+    std::cout << "DEBUGDEP:: flow corrr6" << std::endl;
     this->_update_pits_receivers(conn_basins , conn_nodes, mstree, elevation);    
+    std::cout << "DEBUGDEP:: flow corrr7" << std::endl;
 }
 
 // """Connect adjacent basins together through their lowest pass.
@@ -2096,11 +2157,13 @@ void NodeGraphV2::_orient_basin_tree(xt::pytensor<int,2>& conn_basins, xt::pyten
   xt::xtensor<int,1> nodes_connects_ptr = xt::empty<int>({this->nbasins});
 
   // # parse the edges to compute the number of edges per node
+  std::cout << "DEBUGDEP:: flow corrr5.1" << std::endl;
   for (auto i : tree)
   {
     nodes_connects_size[conn_basins(i, 0)]++;
     nodes_connects_size[conn_basins(i, 1)]++;
   }
+  std::cout << "DEBUGDEP:: flow corrr5.2" << std::endl;
 
   // # compute the id of first edge in adjacency table
   nodes_connects_ptr[0] = 0;
@@ -2110,11 +2173,13 @@ void NodeGraphV2::_orient_basin_tree(xt::pytensor<int,2>& conn_basins, xt::pyten
     nodes_connects_ptr[i] = (nodes_connects_ptr[i - 1] + nodes_connects_size[i - 1]);
     nodes_connects_size[i - 1] = 0;
   }
+  std::cout << "DEBUGDEP:: flow corrr5.3" << std::endl;
 
   // # create the adjacency table
   int nodes_adjacency_size = nodes_connects_ptr[nbasins - 1] + nodes_connects_size[nbasins - 1];
   nodes_connects_size[this->nbasins -1] = 0;
   xt::xtensor<int,1> nodes_adjacency = xt::zeros<int>({nodes_adjacency_size});
+  std::cout << "DEBUGDEP:: flow corrr5.5" << std::endl;
 
   // # parse the edges to update the adjacency
   for (auto i : tree)
@@ -2128,6 +2193,7 @@ void NodeGraphV2::_orient_basin_tree(xt::pytensor<int,2>& conn_basins, xt::pyten
     nodes_connects_size[n2] ++;
   }
 
+  std::cout << "DEBUGDEP:: flow corrr5.6" << std::endl;
 
   // # depth-first parse of the tree, starting from basin0
   // # stack of node, parent
@@ -2136,23 +2202,27 @@ void NodeGraphV2::_orient_basin_tree(xt::pytensor<int,2>& conn_basins, xt::pyten
   stack(0,0) = basin0;// (basin0, basin0)
   stack(0,1) = basin0;
 
+  std::cout << "DEBUGDEP:: flow corrr5.7" << std::endl;
   
   // CHEKCED UNTIL HERE
   int n_turn=0;
   while (stack_size > 0)
   {
+    std::cout << "DEBUGDEP:: flow corrr5.7.1:" << n_turn << std::endl;
+
     n_turn++;
     // # get parsed node
     stack_size = stack_size - 1;
     int node = stack(stack_size, 0);
     int parent = stack(stack_size, 1);
 
+    std::cout << "DEBUGDEP:: flow corrr5.7.2:" << std::endl;
     // # for each edge of the graph
     // for i in range(nodes_connects_ptr[node], nodes_connects_ptr[node] + nodes_connects_size[node])
     for( int i = nodes_connects_ptr[node]; i < (nodes_connects_ptr[node] + nodes_connects_size[node]); i++) 
     {
       int edge_id = nodes_adjacency[i];
-
+      std::cout << "DEBUGDEP:: flow corrr5.7.3:" << std::endl;
       // # the edge comming from the parent node has already been updated.
       // # in this case, the edge is (parent, node)
       if (conn_basins(edge_id, 0) == parent && node != parent)
@@ -2160,6 +2230,7 @@ void NodeGraphV2::_orient_basin_tree(xt::pytensor<int,2>& conn_basins, xt::pyten
           // std::cout << SBasinOutlets[conn_basins(edge_id, 0)] << "||" << SBasinOutlets[conn_basins(edge_id, 1)] << std::endl;
           continue;
       }
+      std::cout << "DEBUGDEP:: flow corrr5.7.4:" << std::endl;
       // std::cout << "GUR::" << SBasinOutlets[conn_basins(edge_id, 0)] << "||" << SBasinOutlets[conn_basins(edge_id, 1)] << std::endl;
 
       // # we want the edge to be (node, next)
@@ -2178,12 +2249,15 @@ void NodeGraphV2::_orient_basin_tree(xt::pytensor<int,2>& conn_basins, xt::pyten
         conn_nodes(edge_id, 0) = cb1;
         conn_nodes(edge_id, 1) = cb0;
       }
+      std::cout << "DEBUGDEP:: flow corrr5.7.5:edge_id" << edge_id << "," << stack_size << std::endl;
       // # add the opposite node to the stack
       stack(stack_size,0) = conn_basins(edge_id, 1);
       stack(stack_size,1) = node;
       stack_size ++;
+      std::cout << "DEBUGDEP:: flow corrr5.7.6:" << std::endl;
     }
   }
+  std::cout << "DEBUGDEP:: flow corrr5.DONE" << std::endl;
 
 }
 
