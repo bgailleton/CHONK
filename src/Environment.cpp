@@ -50,8 +50,6 @@
 // it is required by all priority queues
 // lhs/rhs : left hand side, right hand side
 
-// 
-
 // the nodes to reprocess are sorted by their index in the stack. Smaller = upstream
 bool operator>( const node_to_reproc& lhs, const node_to_reproc& rhs )
 {
@@ -183,8 +181,13 @@ void ModelRunner::initiate_nodegraph()
   //# incrementor reset to 0
   lake_incrementor = 0;
   this->lakes.clear();
-  //# no nodes in lakes
+  //# Labelling the nodes in the lake
   node_in_lake = std::vector<int>(this->io_int["n_elements"], -1);
+  for(auto& dep : depdepression_tree)
+  {
+    if(dep.has_children == false)
+      node_in_lake[dep.pit] = dep.index;
+  }
 
   // I need the topoogical order of my depressions: which depressions will i get first
   this->lake_in_order = this->graph.get_Cordonnier_order();
@@ -238,14 +241,14 @@ void ModelRunner::run()
 
   // First pass is done, all my nodes have been processed once. The flux is done is lake solver is implicit and we can finalise.
 
-  // If the lake solver is explicit though, I can start the iterative process
-  if(this->lake_solver)
-  {
-    // Debug variable to ignore
-    DEBUG_GLOBDELT = 0;
-    // Running the iterative lake solver
-    this->iterative_lake_solver();
-  }
+  // // If the lake solver is explicit though, I can start the iterative process
+  // if(this->lake_solver)
+  // {
+  //   // Debug variable to ignore
+  //   DEBUG_GLOBDELT = 0;
+  //   // Running the iterative lake solver
+  //   this->iterative_lake_solver();
+  // }
 
   // Calling the finalising function: it applies the changes in topography and I think will apply the lake sedimentation
   this->finalise();
@@ -1944,12 +1947,12 @@ void ModelRunner::process_node(int& node, std::vector<bool>& is_processed, int& 
       // 1) checking if my node has a lake ID  
       int lakeid = this->node_in_lake[node];
 
-      // if it has no lake id (ie is not a lake) and is not the bottom of an active depression then I skip that part 
-      if(lakeid == -1 && this->graph.is_depression(node) == false)
-      {
-        goto nolake;
-        return;
-      }
+      // // if it has no lake id (ie is not a lake) and is not the bottom of an active depression then I skip that part 
+      // if(lakeid == -1 && this->graph.is_depression(node) == false)
+      // {
+      //   goto nolake;
+      //   return;
+      // }
       
     }
     else

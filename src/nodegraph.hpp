@@ -131,6 +131,9 @@ public:
   double hw_max;
   //pit
   int pit;
+
+  bool is_processed = false;
+
 };
 
 
@@ -286,6 +289,9 @@ int get_checker(int i, bool is_active);
 // Return the upstream to downstream order of depressionns to solve according to Cordonnier et al., 2019
 std::vector<int> get_Cordonnier_order();
 
+
+std::vector<Depression> depression_tree;
+
 protected:
 
   // Node graph: vector of all vertexes in the DEM
@@ -333,7 +339,6 @@ protected:
   std::vector<double> lengthener;
 
   // Depression management: modified from Barnes et al
-  std::vector<Depression> depression_tree;
   std::vector<int> top_depression;
   std::vector<double> potential_volume;
 
