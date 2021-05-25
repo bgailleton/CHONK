@@ -53,6 +53,19 @@ class nodium
     int node;
 };
 
+template<class T, class U>
+class PQ_helper
+{
+  public:
+    // empty constructor
+    PQ_helper(){};
+    // Constructor by default
+    PQ_helper(T node,U score){this->node = node; this->score = score;};
+    // Elevation data
+    U score;
+    // Node index
+    T node;
+};
 
 
 
@@ -249,6 +262,7 @@ std::vector<int> get_next_building_round(xt::pytensor<double,1>& topography);
 void collapse_depression_tree(xt::pytensor<int,2>& conn_basins, xt::pytensor<int,2>& conn_nodes, 
                                            xt::pytensor<double,1>& conn_weights, xt::pytensor<double,1>& elevation, int& basin0);
 void update_topdep();
+std::vector<int> update_receivers_explicit();
 
 
 void recompute_multi_receveivers_and_donors(xt::pytensor<bool,1>& active_nodes, xt::pytensor<double,1>& elevation, std::vector<int>& nodes_to_compute);
@@ -396,6 +410,17 @@ inline bool operator>( const nodium& lhs, const nodium& rhs )
 inline bool operator<( const nodium& lhs, const nodium& rhs )
 {
   return lhs.elevation < rhs.elevation;
+}
+
+template<class T, class U>
+inline bool operator>( const PQ_helper<T,U>& lhs, const PQ_helper<T,U>& rhs )
+{
+  return lhs.score > rhs.score;
+}
+template<class T, class U>
+inline bool operator<( const PQ_helper<T,U>& lhs, const PQ_helper<T,U>& rhs )
+{
+  return lhs.score < rhs.score;
 }
 
 #endif

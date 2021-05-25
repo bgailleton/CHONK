@@ -10,6 +10,7 @@
 #include <fstream>
 #include <functional>
 #include <queue>
+#include <stack>
 #include <limits>
 #include <chrono>
 #include "xtensor-python/pyarray.hpp"
@@ -251,6 +252,8 @@ NodeGraphV2::NodeGraphV2(
     // THIS IS WHAT HAPPENS WHEN THE LAKE SOVER IS EXPLICIT
     this->build_depression_tree(elevation, active_nodes);
 
+    node_to_check = this->update_receivers_explicit();
+
   }
 
 
@@ -261,7 +264,8 @@ NodeGraphV2::NodeGraphV2(
 
   // DEBUG CHECKING
   // this->is_MF_outet_SF_outlet(); 
-  if(this->lake_solver == false)
+  // if(this->lake_solver == false)
+  if(true)
   {
     // I got my topological order, I can now restore the corrupted receiver I had
     for(size_t i=0; i<node_to_check.size(); i++)
@@ -351,28 +355,29 @@ void NodeGraphV2::build_depression_tree(xt::pytensor<double,1>& elevation, xt::p
   if(this->npits == 0)
     return;
 
-  std::cout << "DEBUGDEP::building the Tree" << std::endl;
+  // std::cout << "DEBUGDEP::building the Tree" << std::endl;
 
   // Initialising the potential volume vector
   this->potential_volume = std::vector<double>(this->n_element,0.);
   // this->depression_tree.reserve();
 
   // current depression ID
-  int current_ID = 0;
+  int current_ID = -1;
 
-  // THIS IS BASIN0, the original basin that represent the edges
-  int nodebasin0 = 0;
-  for (int i=0;i<this->n_element; i++)
-  {
-    if(active_nodes[i] == 0)
-    {
-      nodebasin0 = i;
-      break;
-    }
-  }
-  this->depression_tree.emplace_back(Depression(current_ID,0,0, nodebasin0));
-  this->depression_tree[0].connections_bas = std::make_pair(0,0);
-  this->depression_tree[0].connections = std::make_pair(nodebasin0,nodebasin0);
+  // // THIS IS BASIN0, the original basin that represent the edges
+  // DEPRECATED
+  // int nodebasin0 = 0;
+  // for (int i=0;i<this->n_element; i++)
+  // {
+  //   if(active_nodes[i] == 0)
+  //   {
+  //     nodebasin0 = i;
+  //     break;
+  //   }
+  // }
+  // this->depression_tree.emplace_back(Depression(current_ID,0,0, nodebasin0));
+  // this->depression_tree[0].connections_bas = std::make_pair(0,0);
+  // this->depression_tree[0].connections = std::make_pair(nodebasin0,nodebasin0);
 
   // initial build
   //# Iterating through all nodes
@@ -393,7 +398,7 @@ void NodeGraphV2::build_depression_tree(xt::pytensor<double,1>& elevation, xt::p
     //## Priority Flood - like algorithm to label the depression
     this->virtual_filling(elevation,active_nodes,current_ID,i);
   }
-  std::cout << "DEBUGDEP::1" << std::endl;
+  // std::cout << "DEBUGDEP::1" << std::endl;
 
   // Init. a switch to detect when the processing is done
   bool keep_processing = true;
@@ -413,7 +418,7 @@ void NodeGraphV2::build_depression_tree(xt::pytensor<double,1>& elevation, xt::p
   {
     // Increasing depression level
     level++;
-    std::cout << "DEBUGDEP::2::level" << level << std::endl;
+    // std::cout << "DEBUGDEP::2::level" << level << std::endl;
     this->update_fake_topography(topography);
 
     // Check whether there is a need to reprocess depressions
@@ -428,16 +433,16 @@ void NodeGraphV2::build_depression_tree(xt::pytensor<double,1>& elevation, xt::p
     // Updating the fake topogrpahy for the next round
     this->update_topdep();
 
-    std::cout << "DEBUGDEP::2::GABUL" << level << std::endl;
+    // std::cout << "DEBUGDEP::2::GABUL" << level << std::endl;
 
     // Otherwise I start a new round
     for (auto depID : next_deps)
     {
-      std::cout << "!->" << this->depression_tree[depID].hw_max << std::endl;
+      // std::cout << "!->" << this->depression_tree[depID].hw_max << std::endl;
       // Depressions will merge now, so I need to make sure I am not double processing them
       if(dep_is_done[depID] == 'y')
       {
-        std::cout << "done" << std::endl;
+        // std::cout << "done" << std::endl;
         continue;
       }
       dep_is_done[depID] = 'y';
@@ -449,8 +454,8 @@ void NodeGraphV2::build_depression_tree(xt::pytensor<double,1>& elevation, xt::p
       this->depression_tree.emplace_back(Depression(current_ID,-1,level,this->depression_tree[depID].connections.first));
       dep_is_done.push_back('n');
 
-      if(this->top_depression[this->depression_tree[depID].connections.first] != depID)
-        std::cout << "ASJKDHLKSDFHL" << std::endl;
+      // if(this->top_depression[this->depression_tree[depID].connections.first] != depID)
+      //   std::cout << "ASJKDHLKSDFHL" << std::endl;
 
       // updating the parents of the child depressions
       this->depression_tree[depID].parent = current_ID;
@@ -467,7 +472,7 @@ void NodeGraphV2::build_depression_tree(xt::pytensor<double,1>& elevation, xt::p
     }
   }
 
-  std::cout << "DEBUGDEP::3" << std::endl;
+  // std::cout << "DEBUGDEP::3" << std::endl;
 
   // After the previous loop, I can create a correspondance tree between basins
   for (int i =0 ; i< this->depression_tree.size(); i++)
@@ -497,7 +502,7 @@ void NodeGraphV2::build_depression_tree(xt::pytensor<double,1>& elevation, xt::p
 
   }
   // This is me done
-  std::cout << "DEBUGDEP::Tree Builded" << std::endl;
+  // std::cout << "DEBUGDEP::Tree Builded" << std::endl;
 
 }
 
@@ -655,7 +660,7 @@ void NodeGraphV2::virtual_filling(xt::pytensor<double,1>& elevation, xt::pytenso
         this->depression_tree[depression_ID].connections = {next_node.node, tnode};
         this->top_depression[outlet] = depression_ID; // Keeping track of the outlet aspart of the depression system, even if it has 0 volume to store
         this->depression_tree[depression_ID].nodes.push_back(next_node.node);
-        std::cout<< "Dep is " << depression_ID << " and outlet is " << outlet << " which give in dep" << this->top_depression[tnode] << std::endl;
+        // std::cout<< "Dep is " << depression_ID << " and outlet is " << outlet << " which give in dep" << this->top_depression[tnode] << std::endl;
         break;
       }
     }
@@ -678,8 +683,73 @@ void NodeGraphV2::virtual_filling(xt::pytensor<double,1>& elevation, xt::pytenso
       this->depression_tree[depression_ID].nodes.push_back(next_node.node);
     }
   }
-  std::cout << "OUT:" << outlet << std::endl;;
+  // std::cout << "OUT:" << outlet << std::endl;;
 
+}
+
+std::vector<int> NodeGraphV2::update_receivers_explicit()
+{
+  std::vector<char> is_processed(this->depression_tree.size(), 'n');
+  std::vector<PQ_helper<int,int> > temppq(this->depression_tree.size());
+
+  for(size_t i = 0; i < this->depression_tree.size(); i++)
+  {
+    temppq[i] = PQ_helper<int,int>(int(i),this->depression_tree[i].level);
+  }
+
+  std::priority_queue< PQ_helper<int,int> , std::vector<PQ_helper<int,int> >, std::greater<PQ_helper<int,int> > > depression_order(temppq.begin(), temppq.end());
+
+  std::vector<int> output;
+
+  while(depression_order.empty() == false)
+  {
+    int current = depression_order.top().node;
+    depression_order.pop();
+    if(is_processed[current] == 'y')
+      continue;
+    is_processed[current] = 'y';
+
+
+    int from,to;
+
+
+    // get the twins
+    int twin = this->depression_tree[current].connections_bas.second;
+
+    // If the twin is into the edge basin
+    if(twin > -1)
+    {
+      // Is processed
+      is_processed[twin] = 'y';
+
+      // Determining the order
+      if(this->depression_tree[current].volume > this->depression_tree[twin].volume)
+      {
+        from = this->depression_tree[current].pit;
+        to = this->depression_tree[current].connections.second;
+        this->depression_tree[this->depression_tree[current].parent].pit = this->depression_tree[twin].pit;
+      }
+      else
+      {
+        from = this->depression_tree[twin].pit;
+        to = this->depression_tree[twin].connections.second;
+        this->depression_tree[this->depression_tree[current].parent].pit = this->depression_tree[current].pit;
+      }
+    }
+    else
+    {
+      from = this->depression_tree[current].pit;
+      to = this->depression_tree[current].connections.second;
+    }
+
+    output.push_back(from);
+
+    this->graph[from].receivers = {to};
+    this->graph[from].length2rec = {this->dx * this->dy * 1e6};
+
+  }
+
+  return output;
 }
 
 
