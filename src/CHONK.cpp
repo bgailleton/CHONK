@@ -265,6 +265,35 @@ void chonk::split_and_merge_in_receiving_chonks_ignore_some(std::vector<chonk>& 
 
 }
 
+void chonk::split_and_merge_in_receiving_chonks_ignore_but_one(std::vector<chonk>& chonkscape, NodeGraphV2& graph, double dt, int the_one)
+{
+  
+  std::vector<double> oatalab = this->label_tracker;
+
+  // Iterating through the receivers
+  for(size_t i=0; i < this->receivers.size(); i++)
+  {
+    // if this is in the ignoring list then
+    if(this->receivers[i] != the_one)
+      continue;
+    // Adressing the chonk
+    chonk& other_chonk = chonkscape[this->receivers[i]];
+    // Adding the fluxes*modifyer
+    // std::cout << this->chonkID << " gives to " << this->receivers[i] << " " << this->water_flux * this->weigth_water_fluxes[i] << " it had before " << chonkscape[this->receivers[i]].get_water_flux() << std::endl; 
+    other_chonk.add_to_water_flux(this->water_flux * this->weigth_water_fluxes[i]);
+
+
+    // std::cout << "COR";
+    other_chonk.add_to_sediment_flux(this->sediment_flux * this->weigth_sediment_fluxes[i], oatalab, this->fluvialprop_sedflux);
+    // std::cout << "kar";
+  }
+
+  // and kill this chonk is memory saving is activated
+  if(memory_saver)
+    this->reset();
+
+}
+
 
 
 

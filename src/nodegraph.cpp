@@ -390,8 +390,10 @@ void NodeGraphV2::build_depression_tree(xt::pytensor<double,1>& elevation, xt::p
     //# Yes, then:
     //## Incrementing the ID
     current_ID++;
+
     //## Building the depression with no parent and level 0
     this->depression_tree.emplace_back(Depression(current_ID,-1,0, i));
+
     //## Pushing the initial node in it
     this->depression_tree[current_ID].nodes.push_back(i);
 
@@ -460,6 +462,12 @@ void NodeGraphV2::build_depression_tree(xt::pytensor<double,1>& elevation, xt::p
       // updating the parents of the child depressions
       this->depression_tree[depID].parent = current_ID;
       this->depression_tree[this->top_depression[this->depression_tree[depID].connections.second]].parent = current_ID;
+
+      // Adding up the vo;ume of each dep
+      this->depression_tree[current_ID].volume += this->depression_tree[depID].volume;
+      this->depression_tree[current_ID].volume += this->depression_tree[this->top_depression[this->depression_tree[depID].connections.second]].volume;
+      this->depression_tree[current_ID].min_volume_to_start = this->depression_tree[current_ID].volume;
+
       // And the children of the current one
       this->depression_tree[current_ID].children = {this->top_depression[this->depression_tree[depID].connections.first], this->top_depression[this->depression_tree[depID].connections.second]};
       this->depression_tree[current_ID].has_children = true;
@@ -551,19 +559,19 @@ void NodeGraphV2::update_fake_topography(xt::pytensor<double,1>& topography)
 
 void NodeGraphV2::update_topdep()
 {
-  for (auto& dep:this->depression_tree)
+  for (size_t i =0;i < this->depression_tree.size(); i++)
   {
-    if(dep.parent == -1)
+    if(this->depression_tree[i].parent == -1)
     {
       // std::cout << "2.1" << std::endl;
-      auto vec = this->get_all_childrens(dep.index);
+      auto vec = this->get_all_childrens(this->depression_tree[i].index);
       // std::cout << "2.2" << std::endl;
       for (auto i : vec)
       {
         for (auto n: this->depression_tree[i].nodes)
         {
           // topography[n] = dep.hw_max;
-          this->top_depression[n] = dep.index;
+          this->top_depression[n] = this->depression_tree[i].index;
         }
       }
       // std::cout << "2.3" << std::endl;
@@ -594,6 +602,8 @@ std::vector<int> NodeGraphV2::get_all_childrens(int dep)
   }
   return output;
 }
+
+
 
 void NodeGraphV2::virtual_filling(xt::pytensor<double,1>& elevation, xt::pytensor<bool,1>& active_nodes, int depression_ID, int starting_node)
 {

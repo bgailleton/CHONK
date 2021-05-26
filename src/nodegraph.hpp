@@ -102,7 +102,7 @@ public:
   std::vector<double> length2don; // list of length to receiver node
 };
 
-// this class is a vertex and its informations for the depression tree
+// This class is managing the depression 
 class Depression
 {
 public:
@@ -126,13 +126,18 @@ public:
   std::vector<int> nodes;
   // total Volume
   double volume;
+  double min_volume_to_start = 0;
 
   // maximum height
   double hw_max;
   //pit
   int pit;
 
-  bool is_processed = false;
+  bool processed = false;
+
+  double volume_water = 0;
+  double volume_sed = 0;
+  double hw = 0;
 
 };
 
@@ -288,6 +293,8 @@ int get_checker(int i, bool is_active);
 
 // Return the upstream to downstream order of depressionns to solve according to Cordonnier et al., 2019
 std::vector<int> get_Cordonnier_order();
+
+double get_potential_depression_volume_at_node(int i){return this->potential_volume[i];};
 
 
 std::vector<Depression> depression_tree;
