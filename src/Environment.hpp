@@ -403,7 +403,7 @@ std::vector<double>& pre_sed, std::vector<double>& pre_water);
 
 
     void manage_K_kappa(int label_id, chonk& this_chonk, double& K_r, double& K_s, double& kappa_r, double& kappa_s, double& S_c);
-
+    void lake_solver_v3(int node);
 
 
 
