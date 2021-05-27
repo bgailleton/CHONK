@@ -134,6 +134,7 @@ public:
   int pit;
 
   bool processed = false;
+  bool final = false;
 
   double volume_water = 0;
   double volume_sed = 0;

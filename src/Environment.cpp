@@ -2414,23 +2414,40 @@ void ModelRunner::lake_solver_v3(int node)
   for (size_t i = 0; i < dep_2_proc.size(); i++)
   {
     int dep = dep_2_proc[i];
+    this->graph.depression_tree[dep].processed = true;
     double volume_water = corresponding_volume_of_water[i];
     double volume_sed = corresponding_volume_of_water[i];
-    int last_node = 0;
+    int last = 0;
+    double hw = this->topography[this->graph.depression_tree[dep][0]];
 
-    for(auto n : this->graph.depression_tree[dep].nodes)
+    for(int j = 0; j< this->graph.depression_tree[dep].nodes.size() - 1; j++)
     {
+      int n = this->graph.depression_tree[dep].nodes[j];
       // if still enough water and node is not the outlet
       if(this->graph.get_potential_depression_volume_at_node(n) >= volume_water && n != this->graph.depression_tree[dep].connections.first)
       {
         // marking as belonging to the dep
         this->node_in_lake[n] = dep;
         this->chonk_network[n].reset();
-        last_node = n;
+        hw = this->topography[this->graph.depression_tree[dep].nodes[j] + 1];
+        last = j;
+      }
+      else
+      {
+        // NEED BACKCALCULATE STUFF HERE WHEN PARTIALLY FILLED LAKE
+        break;
       }
     }
     // stop_lake_node_vector[dep] = last_node;
+    for(int j = 0; j< this->graph.depression_tree[dep].nodes.size(); j++)
+    {
+      int n = this->graph.depression_tree[dep].nodes[j];
+      this->topography[n] = hw;
 
+      if(n == this->graph.depression_tree[dep].nodes[last] )
+      {
+        break;
+      }
 
   }
 
@@ -2447,6 +2464,7 @@ void ModelRunner::lake_solver_v3(int node)
     // Reprocessing the outlet
     if(volume_water > this->graph.depression_tree[dep].volume)
     {
+
       this->chonk_network[outlet].reset();
       std::vector<int> dons = this->graph.get_MF_donors_at_node(outlet);
       for(auto n : dons)
@@ -3336,12 +3354,11 @@ void ModelRunner::drape_deposition_flux_to_chonks()
   std::vector<char> isinhere(this->io_int["n_elements"],'n');
 
 
-  for(auto& loch:this->lakes)
+  for(size_t i = 0; i< this->graph.depression_tree.size(); i++)
   { 
+    auto& loch = this->graph.depression_tree[i];
     // Checking if this is a main lake
-    if(loch.is_now >= 0)
-      continue;
-    if(loch.volume_sed == 0)
+    if(loch.processed == false)
       continue;
 
     double ratio_of_dep = loch.volume_sed/loch.volume_water;
