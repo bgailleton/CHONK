@@ -351,6 +351,17 @@ std::vector<int> NodeGraphV2::get_Cordonnier_order()
   return output;
 }
 
+bool NodeGraphV2::is_flat_draining(int node, xt::pytensor<double,1>& elevation, xt::pytensor<bool,1>& active_nodes)
+{
+  std::vector<int> neightbors; std::vector<double> dummy ; this->get_D8_neighbors(node, active_nodes, neightbors, dummy);
+  for(auto tnode:neightbors)
+  {
+    if(elevation[tnode] < elevation[node])
+      return false;
+  }
+  return true;
+}
+
 void NodeGraphV2::build_depression_tree(xt::pytensor<double,1>& elevation, xt::pytensor<bool,1>& active_nodes)
 {
   // I am not running this code if there is no piut to reroute
@@ -367,7 +378,7 @@ void NodeGraphV2::build_depression_tree(xt::pytensor<double,1>& elevation, xt::p
   int current_ID = -1;
 
   // // THIS IS BASIN0, the original basin that represent the edges
-  // DEPRECATED
+  // DEPRECATEDd
   // int nodebasin0 = 0;
   // for (int i=0;i<this->n_element; i++)
   // {
@@ -402,7 +413,7 @@ void NodeGraphV2::build_depression_tree(xt::pytensor<double,1>& elevation, xt::p
 
     //## Priority Flood - like algorithm to label the depression
     this->virtual_filling(elevation,active_nodes,current_ID,i);
-    std::cout << current_ID << " has " << this->depression_tree[current_ID].volume << " | " << this->depression_tree[current_ID].nodes.size() << "||" << elevation[this->depression_tree[current_ID].pit] << std::endl;
+    // std::cout << current_ID << " has " << this->depression_tree[current_ID].volume << " | " << this->depression_tree[current_ID].nodes.size() << "|| pitelev: " << elevation[this->depression_tree[current_ID].pit] << std::endl;
   }
   // std::cout << "DEBUGDEP::1" << std::endl;
 
@@ -499,23 +510,23 @@ void NodeGraphV2::build_depression_tree(xt::pytensor<double,1>& elevation, xt::p
     if(this->depression_tree[i].parent > -1)
     {
       //# This is straightforward for child depression as their connections are already part of other depressions by definitions
-      this->depression_tree[i].connections_bas =  std::pair<int,int>({this->top_depression[this->depression_tree[i].connections.first], this->top_depression[this->depression_tree[i].connections.second]}) ;
+      this->depression_tree[i].connections_bas =  std::pair<int,int>({this->top_depression[i], this->top_depression[this->depression_tree[i].connections.second]}) ;
     }
     else
     {
       //# This operation is a tad more tedious for cases if the depression is an orphan, good new is that it should not matter to which depression it is linked as long as it is a DS one
       //# So we can simply follow the steepest descent route until reaching another depression or an outlet downstream.
       int node = this->depression_tree[i].connections.second;
-      while (this->top_depression[node] == -1 && active_nodes[node])
-      {
-        node = this->graph[node].Sreceivers;
-      }
+      // while (this->top_depression[node] == -1 && active_nodes[node])
+      // {
+      //   node = this->graph[node].Sreceivers;
+      // }
 
       int dat = this->top_depression[node];
-      if(dat == -1)
-        dat = 0;
+      // if(dat == -1)
+      //   dat = 0;
 
-      this->depression_tree[i].connections_bas =  std::pair<int,int>({this->top_depression[this->depression_tree[i].connections.first], dat}) ;
+      this->depression_tree[i].connections_bas =  std::pair<int,int>({this->top_depression[i], dat}) ;
     }
 
   }
@@ -648,7 +659,7 @@ void NodeGraphV2::virtual_filling(xt::pytensor<double,1>& elevation, xt::pytenso
   // Starting the main loop
   while(outlet < 0)
   {
-    if(starting_node == 1699)
+    if(false)
       std::cout << depression_ID << "::" << this->depression_tree[depression_ID].volume << " for " << this->depression_tree[depression_ID].nodes.size() << " nodes cause " << current_hw << " vs " << elevation[starting_node] << std::endl;
 
     // first get the next node in line. If first iteration, the entry node, else, the closest elevation
@@ -665,13 +676,24 @@ void NodeGraphV2::virtual_filling(xt::pytensor<double,1>& elevation, xt::pytenso
       if(is_in_queue[tnode] == 'y')
         continue;
 
+      int tdep = this->top_depression[tnode];
+      bool garg = false;
+      if(tdep > -1)
+      {
+        if(this->depression_tree[tdep].parent == depression_ID)
+          garg = true;
+      }
+      else
+        garg = true;
+
       if(
         
         elevation[tnode] < elevation[next_node.node] ||
           (
-            (elevation[tnode] <= elevation[next_node.node]) &&
-            (this->top_depression[tnode] > -1 && (this->top_depression[next_node.node] == this->depression_tree[depression_ID].children.first && this->top_depression[tnode] == this->depression_tree[depression_ID].children.second) && (this->depression_tree[depression_ID].children.first != -111 && this->depression_tree[depression_ID].children.second != -111))
-          )
+            (elevation[tnode] == elevation[next_node.node]  && garg == false)
+            // (this->top_depression[tnode] > -1 && (this->top_depression[next_node.node] == this->depression_tree[depression_ID].children.first && this->top_depression[tnode] == this->depression_tree[depression_ID].children.second) && (this->depression_tree[depression_ID].children.first != -111 && this->depression_tree[depression_ID].children.second != -111))
+          ) 
+
 
         )
       {
@@ -682,14 +704,16 @@ void NodeGraphV2::virtual_filling(xt::pytensor<double,1>& elevation, xt::pytenso
         this->top_depression[outlet] = depression_ID; // Keeping track of the outlet aspart of the depression system, even if it has 0 volume to store
         this->depression_tree[depression_ID].nodes.push_back(next_node.node);
         // std::cout<< "Dep is " << depression_ID<< " and outlet is " << outlet << " which give in dep" << this->top_depression[tnode] << std::endl;
-        if(starting_node == 1699)
+        if(false)
           std::cout << "NODE OUTLETTED: " << tnode << " -> " << elevation[tnode] << " [dep:"<< this->top_depression[tnode] << "]" << " vs " <<  elevation[next_node.node] << std::endl;
         break;
       }
       else
       {
-        if(starting_node == 1699)
+        if(false)
           std::cout << "NODE IMPLACED: " << tnode << std::endl;
+
+
         depressionfiller.emplace(nodium(tnode, elevation[tnode]));
         is_in_queue[tnode] = 'y';
       }
@@ -735,7 +759,8 @@ void NodeGraphV2::virtual_filling(xt::pytensor<double,1>& elevation, xt::pytenso
     this->depression_tree[depression_ID].hw_max = current_hw;
 
     this->depression_tree[depression_ID].volume += dV;
-    this->potential_volume[this->depression_tree[depression_ID].nodes[this->depression_tree[depression_ID].nodes.size()-1]] = this->depression_tree[depression_ID].volume;
+    if(this->potential_volume[this->depression_tree[depression_ID].nodes[this->depression_tree[depression_ID].nodes.size()-1]] == 0)
+      this->potential_volume[this->depression_tree[depression_ID].nodes[this->depression_tree[depression_ID].nodes.size()-1]] = this->depression_tree[depression_ID].volume;
 
     if(outlet < 0)
     {
@@ -757,17 +782,22 @@ void NodeGraphV2::virtual_filling(xt::pytensor<double,1>& elevation, xt::pytenso
           continue;
 
         // If flat or higher AND in the same depression system: I keep
-        if(
-            elevation[tnode] == elevation[next_node.node] && ( this->top_depression[tnode] == -1 || (
-            ( 
-              this->top_depression[tnode] == this->depression_tree[depression_ID].children.first || 
-              this->top_depression[tnode] == this->depression_tree[depression_ID].children.second
-            ) && this->depression_tree[depression_ID].has_children == true) 
-            || this->depression_tree[depression_ID].has_children == false)
-          )
+        if(elevation[tnode] == elevation[next_node.node])
         {
-          depressionfiller.emplace(nodium(tnode, elevation[tnode]));
-          is_in_queue[tnode] = 'y';
+          int tdep = this->top_depression[tnode];
+          bool gor = false;
+          if(tdep > -1)
+          {
+            if(this->depression_tree[tdep].parent == depression_ID)
+              gor = true;
+          }
+
+          if(tdep == -1 || gor &&)
+          {
+            depressionfiller.emplace(nodium(tnode, elevation[tnode]));
+            is_in_queue[tnode] = 'y';
+          }
+          
         }
       }
 
@@ -779,30 +809,38 @@ void NodeGraphV2::virtual_filling(xt::pytensor<double,1>& elevation, xt::pytenso
         depressionfiller.pop();
 
         this->depression_tree[depression_ID].nodes.push_back(tnext_node.node);
+        this->top_depression[tnext_node.node] = depression_ID;
+
         std::vector<int> neightbors; std::vector<double> dummy ; this->get_D8_neighbors(tnext_node.node, active_nodes, neightbors, dummy);
 
         // For each of the neighbouring node: checking their status
-        for(auto tnode:neightbors)
-        {
-          // if already in the queue: I pass
-          if(is_in_queue[tnode] == 'y')
-            continue;
-
-          // If flat or higher AND in the same depression system: I keep
-          if(
-              elevation[tnode] == elevation[tnext_node.node] && ( this->top_depression[tnode] == -1 || (
-              ( 
-                this->top_depression[tnode] == this->depression_tree[depression_ID].children.first || 
-                this->top_depression[tnode] == this->depression_tree[depression_ID].children.second
-              ) && this->depression_tree[depression_ID].has_children == true) 
-              || this->depression_tree[depression_ID].has_children == false)
-            )
+        // For each of the neighbouring node: checking their status
+          for(auto tnode:neightbors)
           {
-            depressionfiller.emplace(nodium(tnode, elevation[tnode]));
-            is_in_queue[tnode] = 'y';
+            // if already in the queue: I pass
+            if(is_in_queue[tnode] == 'y')
+              continue;
+
+            // If flat or higher AND in the same depression system: I keep
+            if(elevation[tnode] == elevation[tnext_node.node])
+            {
+              int tdep = this->top_depression[tnode];
+              bool gor = false;
+              if(tdep > -1)
+              {
+                if(this->depression_tree[tdep].parent == depression_ID)
+                  gor == true;
+              }
+
+              if(tdep == -1 || gor)
+              {
+                depressionfiller.emplace(nodium(tnode, elevation[tnode]));
+                is_in_queue[tnode] = 'y';
+              }
+              
+            }
           }
         }
-      }
 
 
     }

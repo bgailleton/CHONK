@@ -263,6 +263,7 @@ class CoreModel:
 	water_balance_checker = xs.on_demand()
 	Qs_mass_balance_checker = xs.on_demand()
 	top_depression = xs.on_demand(dims = ('y','x'))
+	potential_volume = xs.on_demand(dims = ('y','x'))
 
 	def initialize(self):
 		self.n_depths_recorded = np.arange(0,self.depths_res_sed_proportions * self.n_depth_sed_tracking,self.depths_res_sed_proportions)
@@ -360,6 +361,9 @@ class CoreModel:
 	def _top_depression(self):
 		return self.model.get_top_depression().reshape(self.ny,self.nx)
 		
+	@potential_volume.compute
+	def _potential_volume(self):
+		return self.model.get_potential_volume().reshape(self.ny,self.nx)
 
 	@Q_water.compute
 	def _Q_water(self):

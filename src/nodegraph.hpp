@@ -231,6 +231,7 @@ int get_Srec(int i) {return this->graph[i].Sreceivers;}
 double get_length2Srec(int i) {return this->graph[i].length2Srec;}
 
 std::vector<int> get_broken_nodes(){return not_in_stack;}
+bool is_flat_draining(int node, xt::pytensor<double,1>& elevation, xt::pytensor<bool,1>& active_nodes);
 
 void fix_cyclicity(
   std::vector<int>& node_to_check,

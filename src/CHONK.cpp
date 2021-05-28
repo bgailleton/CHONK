@@ -1073,12 +1073,12 @@ void chonk::charlie_I(double n, double m, double K_r, double K_s,
 
   double new_sedcrea = (new_sed_height - tempsedheight) / dt;
 
-  if(new_sedcrea > 0.01)
-  {
-    std::cout << "DEBUG::Sedcrea in Charlie_I very high:";
-    std::cout << new_sed_height << "|" << this_sed_height << "|" << Ds_tot << "|" << Es_tot << "|" << Er_tot << "|" \
-     << this->fluvialprop_sedflux << "|" << Qs << "|" << this->water_flux << "|"  << std::endl;
-  }
+  // if(new_sedcrea > 0.01)
+  // {
+  //   std::cout << "DEBUG::Sedcrea in Charlie_I very high:";
+  //   std::cout << new_sed_height << "|" << this_sed_height << "|" << Ds_tot << "|" << Es_tot << "|" << Er_tot << "|" \
+  //    << this->fluvialprop_sedflux << "|" << Qs << "|" << this->water_flux << "|"  << std::endl;
+  // }
 
   this->add_sediment_creation_flux(new_sedcrea);
 

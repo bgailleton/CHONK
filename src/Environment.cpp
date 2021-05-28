@@ -187,8 +187,9 @@ void ModelRunner::initiate_nodegraph()
   {
     if(this->graph.depression_tree[i].has_children == false)
     {
-      // std::cout << "Depression " << i << " registered" << std::endl; 
-      node_in_lake[this->graph.depression_tree[i].pit] = this->graph.depression_tree[i].index;
+      std::cout << "Depression " << this->graph.top_depression[this->graph.depression_tree[i].pit] << " registered" << std::endl; 
+      // node_in_lake[this->graph.depression_tree[i].pit] = this->graph.depression_tree[i].index;
+      this->node_in_lake[this->graph.depression_tree[i].pit] = this->graph.top_depression[this->graph.depression_tree[i].pit];
     }
 
   }
@@ -1905,7 +1906,8 @@ void ModelRunner::process_node(int& node, std::vector<bool>& is_processed, int& 
   xt::pytensor<bool,1>& active_nodes, double& cellarea, xt::pytensor<double,1>& surface_elevation, bool need_move_prep)
 {
     // Just a check: if the lake solver is not activated, I have no reason to reprocess node
-    if(this->lake_solver == false && is_processed[node])
+    // if(this->lake_solver == false && is_processed[node])
+    if(is_processed[node])
       return;
 
     // if I reach this stage, this node can be labelled as processed
@@ -2198,9 +2200,9 @@ void ModelRunner::finalise()
 
 void ModelRunner::lake_solver_v3(int node)
 {
-  // std::cout << "IS_CALLED" << std::endl;
   // First I am getting hte depression
   int this_dep = this->node_in_lake[node];
+  std::cout << "IS_CALLED:: " << this_dep << std::endl;
 
   // Then I am marking it as processed
   this->graph.depression_tree[this_dep].processed = true;
@@ -2217,7 +2219,7 @@ void ModelRunner::lake_solver_v3(int node)
   double water_volume = 0;
 
   // Checking that all nodes of that depression have been processed, and processing them in case
-  for(int i = int(this->graph.depression_tree[this_dep].nodes.size() - 1); i >=0; i--)
+  for(int i = int(this->graph.depression_tree[this_dep].nodes.size()) - 1; i >=0; i--)
   {
     int tnode = this->graph.depression_tree[this_dep].nodes[i];
     if(this->is_processed[tnode])
@@ -2232,8 +2234,10 @@ void ModelRunner::lake_solver_v3(int node)
   std::vector<int> all_children = this->graph.get_all_childrens(this_dep);
   std::vector<PQ_helper<int,int> > dep_by_level;
   std::unordered_map<int,bool> hvrstr_stlln;
+  std::cout << "processing:";
   for(auto i : all_children)
   {
+    std::cout << i << "|";
     // if(this->graph.depression_tree[i].processed)
     // {
     //   water_already_there += this->graph.depression_tree[i].volume_water;
@@ -2248,6 +2252,7 @@ void ModelRunner::lake_solver_v3(int node)
     dep_by_level.emplace_back(PQ_helper<int,int>(i,this->graph.depression_tree[i].level));
     representative_chonk[i] = chonk();
   }
+  std::cout << std::endl;
 
   // sorting me depressions by lower level first
   std::priority_queue< PQ_helper<int,int>, std::vector<PQ_helper<int,int> >, std::greater<PQ_helper<int,int> > > maPQ(dep_by_level.begin(), dep_by_level.end() );
@@ -2258,6 +2263,7 @@ void ModelRunner::lake_solver_v3(int node)
   std::map<int,double> dep_adder_wat;
   std::map<int,double> dep_adder_sed;
   std::map<int,std::vector<double> > dep_adder_lab;
+  double total_water = 0, total_sed = 0;
 
   while(maPQ.empty() == false)
   {
@@ -2274,7 +2280,6 @@ void ModelRunner::lake_solver_v3(int node)
     hvrstr_stlln[i] = true;
     hvrstr_stlln[twin] = true;
 
-    double total_water = 0, total_sed = 0;
     std::map<int,double> local_water, local_sed;
 
     for(auto j : {i,twin} )
@@ -2289,6 +2294,8 @@ void ModelRunner::lake_solver_v3(int node)
       {
         local_water[j] = this->chonk_network[this->graph.depression_tree[j].pit].get_water_flux() * this->cellarea * this->timestep;
         local_sed[j] = this->chonk_network[this->graph.depression_tree[j].pit].get_sediment_flux() * this->cellarea;
+        this->graph.depression_tree[j].volume_water += local_water[j];
+        this->graph.depression_tree[j].volume_sed += local_sed[j];
         representative_chonk[j].add_to_water_flux(this->chonk_network[this->graph.depression_tree[j].pit].get_water_flux());
         representative_chonk[j].add_to_sediment_flux(this->chonk_network[this->graph.depression_tree[j].pit].get_sediment_flux(), this->chonk_network[this->graph.depression_tree[j].pit].get_label_tracker(), this->chonk_network[this->graph.depression_tree[j].pit].get_fluvialprop_sedflux());
 
@@ -2301,7 +2308,16 @@ void ModelRunner::lake_solver_v3(int node)
 
       total_water += local_water[j];
       total_sed += local_sed[j];
+
+      if(local_water[j] < 0)
+      {
+        std::cout << "NEGATIVE_WATER::" << local_water[j] << "|" << this->graph.depression_tree[j].volume_water;
+      }
+
+
     }
+
+    std::cout << "I have " << total_water  << " water in total" << std::endl;
 
     //case 1 I have enough water between the twins to fill it all
 
@@ -2313,6 +2329,8 @@ void ModelRunner::lake_solver_v3(int node)
 
     if( volvol < total_water && this->graph.depression_tree[i].parent != -1)
     {
+      // std::cout << "FILLING whole LAKE " << std::endl;
+
       // then I give to my parent the water and sed
       int parent = this->graph.depression_tree[i].parent;
       this->graph.depression_tree[parent].volume_water += this->graph.depression_tree[i].volume_water;
@@ -2417,6 +2435,8 @@ void ModelRunner::lake_solver_v3(int node)
   {
     int dep = dep_2_proc[i];
 
+    std::cout << "Filling " << dep << std::endl;
+
     this->graph.depression_tree[dep].label_prop = representative_chonk[dep].get_label_tracker();
 
     this->graph.depression_tree[dep].processed = true;
@@ -2425,17 +2445,37 @@ void ModelRunner::lake_solver_v3(int node)
     int last = 0;
     double hw = this->topography[this->graph.depression_tree[dep].nodes[0]];
 
-    for(int j = 0; j< this->graph.depression_tree[dep].nodes.size() - 1; j++)
+    // OK I COULD OPTIMISE THAT A LOT IF I HAVE TIME BUT FOR NOW IT JUST WORKS
+    std::vector<PQ_helper<int,double> > volvo;
+    for(int j = 0; j< this->graph.depression_tree[dep].nodes.size(); j++)
     {
       int n = this->graph.depression_tree[dep].nodes[j];
-      // if still enough water and node is not the outlet
-      if(this->graph.get_potential_depression_volume_at_node(n) >= volume_water && n != this->graph.depression_tree[dep].connections.first)
+      volvo.emplace_back(PQ_helper<int,double>(n,this->graph.get_potential_depression_volume_at_node(n)));
+    } 
+
+    std::priority_queue< PQ_helper<int,double>, std::vector<PQ_helper<int,double> >, std::greater<PQ_helper<int,double> > > PQfill(volvo.begin(), volvo.end() );
+    double max_vol = 0;
+    while(PQfill.empty() == false)
+    {
+      int n = PQfill.top().node;
+      double VOL = PQfill.top().score;
+      PQfill.pop();
+      // if(this->)
+        // std::cout << "n = " << n << " score = " << VOL << " VW: " << volume_water << std::endl;
+
+      if(VOL <= volume_water)
       {
         // marking as belonging to the dep
         this->node_in_lake[n] = dep;
+
         this->chonk_network[n].reset();
-        hw = this->topography[this->graph.depression_tree[dep].nodes[j+1]];
-        last = j;
+
+        if(PQfill.size()>0)
+          hw = this->topography[PQfill.top().node];
+        else
+          hw = this->graph.depression_tree[dep].hw_max;
+
+        max_vol = VOL;
       }
       else
       {
@@ -2443,18 +2483,43 @@ void ModelRunner::lake_solver_v3(int node)
         break;
       }
     }
+
+    // for(int j = 0; j< this->graph.depression_tree[dep].nodes.size() - 1; j++)
+    // {
+    //   int n = this->graph.depression_tree[dep].nodes[j];
+    //   // if still enough water and node is not the outlet
+    //   if(this->graph.get_potential_depression_volume_at_node(n) >= volume_water && n != this->graph.depression_tree[dep].connections.first)
+    //   {
+    //     // marking as belonging to the dep
+    //     this->node_in_lake[n] = dep;
+    //     this->chonk_network[n].reset();
+    //     hw = this->topography[this->graph.depression_tree[dep].nodes[j+1]];
+    //     last = j;
+    //   }
+    //   else
+    //   {
+    //     // NEED BACKCALCULATE STUFF HERE WHEN PARTIALLY FILLED LAKE
+    //     break;
+    //   }
+    // }
+
     // stop_lake_node_vector[dep] = last_node;
+    int nfd = 0;
     for(int j = 0; j< this->graph.depression_tree[dep].nodes.size(); j++)
     {
       int n = this->graph.depression_tree[dep].nodes[j];
-      // std::cout << "raising topo at " << n << " to " << hw << " from " << this->topography[n] << std::endl;
-      this->topography[n] = hw;
-
-      if(n == this->graph.depression_tree[dep].nodes[last] )
+      if(this->graph.get_potential_depression_volume_at_node(n) <= max_vol)
       {
-        break;
+        // std::cout << "raising topo at " << n << " to " << hw << " from " << this->topography[n] << std::endl;
+        this->topography[n] = hw;
       }
+
+      // if(n == this->graph.depression_tree[dep].nodes[last] )
+      // {
+      //   break;
+      // }
     }
+    std::cout << "NFD IS " << nfd << std::endl;
 
   }
 

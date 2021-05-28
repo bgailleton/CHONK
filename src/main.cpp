@@ -119,6 +119,7 @@ PYBIND11_MODULE(CHONK_cpp, m)
       .def_readwrite("external_kappa", &ModelRunner::external_kappa)
       .def("get_K_calc", &ModelRunner::get_K_calc)
       .def("get_top_depression", &ModelRunner::get_top_depression)
+      .def("get_potential_volume", &ModelRunner::get_potential_volume)
 
     ;
     m.def("set_DEBUG_switch_nodegraph",set_DEBUG_switch_nodegraph);

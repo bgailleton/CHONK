@@ -406,6 +406,7 @@ std::vector<double>& pre_sed, std::vector<double>& pre_water);
     void lake_solver_v3(int node);
 
     xt::pytensor<int,1> get_top_depression(){return xt::adapt(this->graph.top_depression);};
+    xt::pytensor<int,1> get_potential_volume(){return xt::adapt(this->graph.potential_volume);};
 
 
 
