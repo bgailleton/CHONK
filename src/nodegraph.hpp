@@ -115,7 +115,7 @@ public:
   // parent depression (-1 is none)
   int parent;
   // Children depressions (direct receivers in the tree)
-  std::pair<int,int> children;
+  std::pair<int,int> children = {-111,-111};
   bool has_children = false;
   // Depression level (see the different shades of grey in Figure 3 of Barnes et al., 2020 https://doi.org/10.5194/esurf-8-431-2020) 
   int level;
@@ -135,6 +135,8 @@ public:
 
   bool processed = false;
   bool final = false;
+
+  std::vector<double> label_prop;
 
   double volume_water = 0;
   double volume_sed = 0;
@@ -299,6 +301,8 @@ double get_potential_depression_volume_at_node(int i){return this->potential_vol
 
 
 std::vector<Depression> depression_tree;
+std::vector<int> top_depression;
+std::vector<double> potential_volume;
 
 protected:
 
@@ -347,8 +351,6 @@ protected:
   std::vector<double> lengthener;
 
   // Depression management: modified from Barnes et al
-  std::vector<int> top_depression;
-  std::vector<double> potential_volume;
 
 
 

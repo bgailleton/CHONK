@@ -187,6 +187,7 @@ void ModelRunner::initiate_nodegraph()
   {
     if(this->graph.depression_tree[i].has_children == false)
     {
+      // std::cout << "Depression " << i << " registered" << std::endl; 
       node_in_lake[this->graph.depression_tree[i].pit] = this->graph.depression_tree[i].index;
     }
 
@@ -2197,15 +2198,16 @@ void ModelRunner::finalise()
 
 void ModelRunner::lake_solver_v3(int node)
 {
+  // std::cout << "IS_CALLED" << std::endl;
   // First I am getting hte depression
   int this_dep = this->node_in_lake[node];
 
   // Then I am marking it as processed
   this->graph.depression_tree[this_dep].processed = true;
-
   while(this->graph.depression_tree[this_dep].parent > -1)
   {
     this_dep = this->graph.depression_tree[this_dep].parent;
+    this->graph.depression_tree[this_dep].processed = true;
     // else
     //   break;
   }
@@ -2414,11 +2416,14 @@ void ModelRunner::lake_solver_v3(int node)
   for (size_t i = 0; i < dep_2_proc.size(); i++)
   {
     int dep = dep_2_proc[i];
+
+    this->graph.depression_tree[dep].label_prop = representative_chonk[dep].get_label_tracker();
+
     this->graph.depression_tree[dep].processed = true;
     double volume_water = corresponding_volume_of_water[i];
     double volume_sed = corresponding_volume_of_water[i];
     int last = 0;
-    double hw = this->topography[this->graph.depression_tree[dep][0]];
+    double hw = this->topography[this->graph.depression_tree[dep].nodes[0]];
 
     for(int j = 0; j< this->graph.depression_tree[dep].nodes.size() - 1; j++)
     {
@@ -2429,7 +2434,7 @@ void ModelRunner::lake_solver_v3(int node)
         // marking as belonging to the dep
         this->node_in_lake[n] = dep;
         this->chonk_network[n].reset();
-        hw = this->topography[this->graph.depression_tree[dep].nodes[j] + 1];
+        hw = this->topography[this->graph.depression_tree[dep].nodes[j+1]];
         last = j;
       }
       else
@@ -2442,12 +2447,14 @@ void ModelRunner::lake_solver_v3(int node)
     for(int j = 0; j< this->graph.depression_tree[dep].nodes.size(); j++)
     {
       int n = this->graph.depression_tree[dep].nodes[j];
+      // std::cout << "raising topo at " << n << " to " << hw << " from " << this->topography[n] << std::endl;
       this->topography[n] = hw;
 
       if(n == this->graph.depression_tree[dep].nodes[last] )
       {
         break;
       }
+    }
 
   }
 
@@ -3373,16 +3380,19 @@ void ModelRunner::drape_deposition_flux_to_chonks()
     double total = loch.volume_sed;
     for(auto no:loch.nodes)
     {
-      if(isinhere[no] == 'y')
-        throw std::runtime_error("Double lakecognition");
+      // if(isinhere[no] == 'y')
+      // {
+      //   // throw std::runtime_error("Double lakecognition");
+      //   std::cout << "Double lakecognition" << std::endl/
+      // }
       isinhere[no] = 'y';
 
       total -= ratio_of_dep * (topography[no] - surface_elevation[no]) * cellarea;
       double slangh = ratio_of_dep * (topography[no] - surface_elevation[no]) / timestep;
       if(!std::isfinite(slangh))
       {
-        std::cout << "WARNING:: NAN IN SED CREA DURING LAKE DRAPING" << std::endl;
-        std::cout << ratio_of_dep << "/" << (topography[no] - surface_elevation[no]) << std::endl;
+        // std::cout << "WARNING:: NAN IN SED CREA DURING LAKE DRAPING" << std::endl;
+        // std::cout << ratio_of_dep << "/" << (topography[no] - surface_elevation[no]) << std::endl;
         slangh = 0;
       }
 

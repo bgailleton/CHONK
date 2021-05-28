@@ -262,6 +262,7 @@ class CoreModel:
 	Ql_out = xs.on_demand()
 	water_balance_checker = xs.on_demand()
 	Qs_mass_balance_checker = xs.on_demand()
+	top_depression = xs.on_demand(dims = ('y','x'))
 
 	def initialize(self):
 		self.n_depths_recorded = np.arange(0,self.depths_res_sed_proportions * self.n_depth_sed_tracking,self.depths_res_sed_proportions)
@@ -355,6 +356,10 @@ class CoreModel:
 	@Kr_eff.compute
 	def _Kr_eff(self):
 		return self.model.get_K_calc().reshape(self.ny,self.nx)
+	@top_depression.compute
+	def _top_depression(self):
+		return self.model.get_top_depression().reshape(self.ny,self.nx)
+		
 
 	@Q_water.compute
 	def _Q_water(self):

@@ -405,6 +405,8 @@ std::vector<double>& pre_sed, std::vector<double>& pre_water);
     void manage_K_kappa(int label_id, chonk& this_chonk, double& K_r, double& K_s, double& kappa_r, double& kappa_s, double& S_c);
     void lake_solver_v3(int node);
 
+    xt::pytensor<int,1> get_top_depression(){return xt::adapt(this->graph.top_depression);};
+
 
 
     // I need some members to be public
