@@ -24,6 +24,8 @@
 #include "xtensor/xtensor.hpp" // same
 
 #include "nodegraph.hpp"
+#include "chonkutils.hpp"
+
 
 #pragma once
 template<typename T>

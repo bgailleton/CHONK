@@ -33,51 +33,6 @@
 
 void set_DEBUG_switch_nodegraph(std::vector<std::string> params, std::vector<bool> values );
 
-// #####################################################
-// ############# Internal Node objects #################
-// #####################################################
-
-// the class nodium is just used for the priority queue struture when solving lakes.
-// it is a very small class that combine a node index and its elevation when I insert it within the PQ
-// The operators are defined in the cpp file.
-class nodium
-{
-  public:
-    // empty constructor
-    nodium(){};
-    // Constructor by default
-    nodium(int node,double elevation){this->node = node; this->elevation = elevation;};
-    // Elevation data
-    double elevation;
-    // Node index
-    int node;
-};
-
-template<class T, class U>
-class PQ_helper
-{
-  public:
-    // empty constructor
-    PQ_helper(){};
-    // Constructor by default
-    PQ_helper(T node,U score){this->node = node; this->score = score;};
-    // Elevation data
-    U score;
-    // Node index
-    T node;
-};
-
-
-// Hack the container behind
-template <class T, class S, class C>
-    S& Container(priority_queue<T, S, C>& q) {
-        struct HackedQueue : private priority_queue<T, S, C> {
-            static S& Container(priority_queue<T, S, C>& q) {
-                return q.*&HackedQueue::c;
-            }
-        };
-    return HackedQueue::Container(q);
-}
 
 // Vertx class: A class that manage one vertex: a node, its ID, receivers, length, donors, ...
 // Anything useful to generate a graph
@@ -314,6 +269,8 @@ std::vector<int> get_Cordonnier_order();
 
 double get_potential_depression_volume_at_node(int i){return this->potential_volume[i];};
 
+void build_depression_tree_v2(xt::pytensor<double,1>& elevation, xt::pytensor<bool,1>& active_nodes);
+
 
 std::vector<Depression> depression_tree;
 std::vector<int> top_depression;
@@ -432,26 +389,5 @@ class UnionFind
 // Original author: Jean Braun And Guillaume Cordonnier
 std::vector<int> multiple_stack_fastscape(int n_element, std::vector<Vertex>& graph, std::vector<int>& not_in_stack, bool& has_failed);
 
-
-// nodiums are sorted by elevations for the depression filler
-inline bool operator>( const nodium& lhs, const nodium& rhs )
-{
-  return lhs.elevation > rhs.elevation;
-}
-inline bool operator<( const nodium& lhs, const nodium& rhs )
-{
-  return lhs.elevation < rhs.elevation;
-}
-
-template<class T, class U>
-inline bool operator>( const PQ_helper<T,U>& lhs, const PQ_helper<T,U>& rhs )
-{
-  return lhs.score > rhs.score;
-}
-template<class T, class U>
-inline bool operator<( const PQ_helper<T,U>& lhs, const PQ_helper<T,U>& rhs )
-{
-  return lhs.score < rhs.score;
-}
 
 #endif

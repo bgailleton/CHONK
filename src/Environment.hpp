@@ -33,6 +33,7 @@
 // Other modules of the model
 #include "nodegraph.hpp" // everything related to the node structure and relationships between them
 #include "CHONK.hpp" // The particles object
+#include "chonkutils.hpp"
 
 
 // #####################################################
