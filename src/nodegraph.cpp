@@ -85,10 +85,10 @@ NodeGraphV2::NodeGraphV2(
   this->lake_solver = lake_solver;
 
   this->flat_mask = xt::zeros<int>({this->un_element}) - 1;
-  this->depression_tree = std::vector<Depression>();
+  // this->depression_tree = std::vector<Depression>();
   // this->depression_tree.reserve(100);
-  this->top_depression = std::vector<int>(this->un_element,-1);
-  this->bottom_depression = std::vector<int>(this->un_element,-1);
+  // this->top_depression = std::vector<int>(this->un_element,-1);
+  // this->bottom_depression = std::vector<int>(this->un_element,-1);
 
   // these vectors are additioned to the node indice to test the neighbors
   this->neightbourer.emplace_back(std::initializer_list<int>{-ncols - 1, - ncols, - ncols + 1, -1,1,ncols - 1, ncols, ncols + 1 }); // internal node 0
@@ -253,7 +253,7 @@ NodeGraphV2::NodeGraphV2(
   else
   {
     // THIS IS WHAT HAPPENS WHEN THE LAKE SOVER IS EXPLICIT
-    this->build_depression_tree(elevation, active_nodes);
+    this->build_depression_tree_v2(elevation, active_nodes);
 
     node_to_check = this->update_receivers_explicit();
 
@@ -367,40 +367,125 @@ bool NodeGraphV2::is_flat_draining(int node, xt::pytensor<double,1>& elevation, 
 void NodeGraphV2::build_depression_tree_v2(xt::pytensor<double,1>& elevation, xt::pytensor<bool,1>& active_nodes)
 {
 
-  // // Initialising the potential volume vector
-  // this->potential_volume = std::vector<double>(this->n_element,0.);
+  // Initialising the depression tree objecty
+  this->depression_tree = DepressionTree(this->n_element);
 
-  // // current depression ID
-  // int current_ID = -1;
+  // fake_topo to fill lakes
+  auto fake_topography = xt::pytensor<double,1>(elevation);
 
-  // // and the is_in_queue
-  // std::vector<char> is_in_queue(this->un_element, 'n');
+  // Initial build
+  this->depression_initialisation(fake_topography);
 
-  // // initial build
-  // //# Iterating through all nodes
-  // for(int i = 0; i < this->n_element; i++)
-  // {
-  //   // # is a pit?
-  //   if(this->pits_to_reroute[i] == false || this->top_depression[i] > -1 )
-  //     continue;
-  //   // Yes -> incrementing the depression incrementor
-  //   current_ID ++;
+  // Starting with all the parent-free depressions
+  std::vector<int> next_to_check = this->depression_tree.get_all_parentfree_depressions();
 
-  //   // this is where you left Boris
-  //   // You need to find an alternative way based on labelling rather than neighbours
-  //   // fill depression and fake topo until you reach an outlet or until your node already belongs to another depression. 
-  //   // then merge the 2 and start again
-  //   // once you'll have something that works, you'll be more fancy with optimisations
-  //   // Consider making a nice class for the depression tree, this might help.
-  //   // maybe have a top_depression_tree that has size of the depression tree but tells you the ID of the top depression.
-  // }
+  // Fill the depressions
+  if(next_to_check.size() > 0)
+  {
+    // First step: filling all the depressions
+    this->fill_the_depressions(next_to_check, elevation, active_nodes);
 
-
+  }
 
 }
 
+void NodeGraphV2::fill_the_depressions(std::vector<int>& next_to_check, xt::pytensor<double,1>& elevation, xt::pytensor<bool,1>& active_nodes)
+{
 
+  // Iterating through the depressions
+  for(auto dep:next_to_check)
+  {
+    if(this->depression_tree.get_ultimate_parent(dep) != dep)
+      continue;
 
+    std::vector<bool>  is_in_queue = this->depression_tree.get_isinQ4dep(dep);
+
+    while(this->depression_tree.filler[dep].empty() == false)
+    {
+      // getting next nodes
+      int next_node = this->depression_tree.filler[dep].top().node;
+      this->depression_tree.filler[dep].pop();
+
+      if(this->depression_tree.get_ultimate_parent(next_node) == dep)
+        continue;
+
+      std::vector<int> neightbors; std::vector<double> dummy ; this->get_D8_neighbors(next_node, active_nodes, neightbors, dummy);
+
+      // if my node is not belonging to my children but in a depression system
+      if(this->depression_tree.is_child_of(this->depression_tree.node2tree[next_node],dep) == false && this->depression_tree.node2tree[next_node] > -1)
+      {
+        this->raise_dep_to_new_node( dep, next_node, elevation, active_nodes, false);
+        int bro = this->depression_tree.get_ultimate_parent(this->depression_tree.node2tree[next_node]);
+        this->depression_tree.register_new_depression(elevation,this->depression_tree.pitnode[dep]);
+        this->depression_tree.merge_children_to_parent({dep,bro}, this->depression_tree.get_last_id(), next_node, neightbors, elevation);
+        dep = this->depression_tree.get_last_id();
+        continue;
+      } 
+
+      bool double_break = false;
+      // Checking neightbour
+      for(auto n:neightbors)
+      {
+        if(is_in_queue[n])
+          continue;
+
+        if(this->depression_tree.is_child_of(this->depression_tree.node2tree[n],dep) || elevation[n] >= elevation[next_node])
+        {
+          this->depression_tree.filler[dep].emplace(n,elevation[n]);
+          is_in_queue[n] = true;
+          continue;
+        }
+
+        double_break = true;
+        this->depression_tree.tippingnode[dep] = next_node;
+        if(this->depression_tree.externode[dep] == -1)
+          this->depression_tree.externode[dep] = n;
+        else if(elevation[this->depression_tree.externode[dep]] > elevation[n] )
+          this->depression_tree.externode[dep] = n;
+      }
+
+      this->raise_dep_to_new_node( dep, next_node, elevation, active_nodes, true);
+
+    }
+
+  }
+
+}
+
+void NodeGraphV2::raise_dep_to_new_node(int dep, int node, xt::pytensor<double,1>& elevation, xt::pytensor<bool,1>& active_nodes, bool integrate_node)
+{
+  int nbeef = int(this->depression_tree.nodes[dep].size());
+  int last_node = -1;
+  if(nbeef>0)
+    last_node = this->depression_tree.nodes[dep][nbeef - 1];
+  this->depression_tree.hw_max[dep] = elevation[node];
+
+  if(last_node == -1)
+  {
+    if(integrate_node)
+      this->depression_tree.nodes[dep].emplace_back(node);
+    return;
+  }
+
+  double dz = elevation[node] - elevation[last_node];
+  double dV = nbeef * dz * this->dx * this->dy;
+  this->depression_tree.volume[dep] += dV;
+  this->depression_tree.potential_volume[last_node] = this->depression_tree.volume[dep];
+
+  if(integrate_node)
+    this->depression_tree.nodes[dep].emplace_back(node);
+  return;
+
+}
+
+void NodeGraphV2::depression_initialisation(xt::pytensor<double,1>& elevation)
+{
+  for(int i = 0; i < this->n_element; i++)
+  {
+    if(this->is_depression(i))
+     this->depression_tree.register_new_depression(elevation, i);
+  }
+}
 
 void NodeGraphV2::build_depression_tree(xt::pytensor<double,1>& elevation, xt::pytensor<bool,1>& active_nodes)
 {

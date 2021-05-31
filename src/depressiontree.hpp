@@ -23,9 +23,11 @@
 #include "xtensor/xmath.hpp" // Array-wise math functions
 #include "xtensor/xarray.hpp"// manages the xtensor array (lower level than the numpy one)
 #include "xtensor/xtensor.hpp" // same
+
+
 class DepressionTree
 {
-
+public:
 	//  ___________________
 	// |                   |
 	// |     Attributes    |
@@ -43,8 +45,10 @@ class DepressionTree
 	//# tree connections
 	std::vector<std::vector<int> > treeceivers;
 	std::vector<int> parentree;
-	std::vector<std::priority_queue< PQ_helper<int,int>, std::vector<PQ_helper<int,int> >, std::greater<PQ_helper<int,int> > > > fillers;
+	std::vector<std::priority_queue< PQ_helper<int, double>, std::vector<PQ_helper<int, double> >, std::greater<PQ_helper<int, double> > > > filler;
 	std::vector<std::vector<int> > nodes;
+	std::vector<std::vector<double> > label_prop;
+	std::vector<bool> active;
 
 	//# Node connections 
 	std::vector<int> internode;
@@ -83,11 +87,12 @@ class DepressionTree
 	//            / 　 づ
 
 	// Registering depression
-	void register_new_depression(xt::pytensor<double,1>& elevation,int pitnode, std::vector<int> children)
+	void register_new_depression(xt::pytensor<double,1>& elevation, int pitnode, std::vector<int> children)
 	{
 		this->treeceivers.emplace_back(children);
 		this->parentree.emplace_back(-1);
 		this->nodes.emplace_back(std::vector<int>());
+		this->label_prop.emplace_back(std::vector<double>());
 		this->internode.emplace_back(-1);
 		this->tippingnode.emplace_back(-1);
 		this->externode.emplace_back(-1);
@@ -97,10 +102,14 @@ class DepressionTree
 		this->volume_water.emplace_back(0);
 		this->hw_max.emplace_back(elevation[pitnode]);
 		this->hw.emplace_back(0);
-		this->fillers.emplace_back(std::vector<std::priority_queue< PQ_helper<int,int>, std::vector<PQ_helper<int,int> >, std::greater<PQ_helper<int,int> > > >());
+		this->filler.emplace_back(std::priority_queue< PQ_helper<int,double>, std::vector<PQ_helper<int,double> >, std::greater<PQ_helper<int,double> > >());
+		this->active.emplace_back(false);
 	}
 
-	void register_new_depression(xt::pytensor<double,1>& elevation, int pitnode) {this->register_new_depression(xt::pytensor<double,1>& elevation,int pitnode, {-1,-1});}
+	void register_new_depression(xt::pytensor<double,1>& elevation, int pitnode) 
+	{
+		this->register_new_depression(elevation,pitnode, {-1,-1});
+	}
 
 
 
@@ -182,16 +191,120 @@ class DepressionTree
 		return output;
 	}
 
+	std::vector<int> get_all_parentfree_depressions()
+	{
+		std::vector<int> output;
+		for (int i = 0; i< int(this->parentree.size()); i++ )
+		{
+			if(parentree[i] == -1)
+				output.emplace_back(i);
+		}
+		return output;
+	}
+
+
+	int get_last_id(){return int(this->parentree.size()) - 1;}
+
+	bool has_children(int dep)
+	{
+		for(auto i: this->treeceivers[dep])
+		{
+			if(i != -1)
+				return true;
+		}
+		return false;
+	}
+
+	int get_n_dep(){return int(this->parentree.size());}
 
   //  ___________________
 	// |                   |
-	// | Filling functions |
+	// | Filling helpers   |
 	// |___________________| 
 	//            (\__/)||
 	//            (•ㅅ•) ||
 	//            / 　 づ
 
-	// to come
+	std::vector<bool> get_isinQ4dep(int node)
+	{
+		std::vector<bool> is_in_queue(this->node2tree.size(), false);
+		std::vector<PQ_helper<int,double> >&  vecfrompq = Container(this->filler[node]);
+		for(auto& erm: vecfrompq)
+			is_in_queue[erm.node] = true;
+		return is_in_queue;
+	}
+
+	bool is_direct_child_of(int is_child, int of){if(this->parentree[is_child] == of) {return true;}else{return false;};}
+	bool is_direct_child_of_from_node(int is_child, int of)
+	{
+		if(this->node2tree[is_child] == -1 || this->node2tree[of] ==-1){return false;}
+	  if(this->parentree[this->node2tree[is_child]] == this->node2tree[of]) {return true;}
+	  else{return false;};
+	}
+	bool is_child_of(int is_child, int of)
+	{
+		std::queue<int> children; children.emplace(of);
+		while(children.empty() == false)
+		{
+			int next = children.front();  children.pop();
+
+			for(auto i : this->treeceivers[next])
+			{
+				if(i != -1)
+					children.emplace(next);
+				if(i == is_child)
+					return true;
+			}
+		}
+		return false;
+	}
+
+	void merge_children_to_parent(std::vector<int> children, int parent, int outlet_node, std::vector<int>& neightbors, xt::pytensor<double,1>& elevation)
+	{
+
+		this->treeceivers[parent] = children;
+
+		std::vector<PQ_helper<int,double> > c1 = Container(this->filler[children[0]]);
+		std::vector<PQ_helper<int,double> > c2 = Container(this->filler[children[1]]);
+		std::vector<PQ_helper<int,double> > concat; concat.reserve(c1.size() + c2.size());
+		for(auto n:c1) 
+			concat.emplace_back(n);
+		for(auto n:c2) 
+			concat.emplace_back(n);
+
+		// merging the PQs
+		this->filler[parent] = std::priority_queue< PQ_helper<int, double>, std::vector<PQ_helper<int, double> >, std::greater<PQ_helper<int, double> > >(concat.begin(), concat.end());
+
+
+		int lower_elev_c1,lower_elev_c2;
+		double vlower_elev_c1 = 1e36,vlower_elev_c2 = 1e36;
+		for(auto n:neightbors)
+		{
+			int tdep = this->node2tree[n];
+			if(tdep == -1 )
+				continue;
+			tdep = this->get_ultimate_parent(tdep);
+
+			if(elevation[n] >= vlower_elev_c1 && tdep == children[0])
+				lower_elev_c1 = n;
+			if(elevation[n] >= vlower_elev_c2 && tdep == children[1])
+				lower_elev_c2 = n;
+		}
+
+		this->externode[children[0]] = lower_elev_c2;
+		this->externode[children[1]] = lower_elev_c1;
+
+		for(auto i:children)
+		{
+			this->parentree[i] = parent;
+			this->filler[i] = std::priority_queue< PQ_helper<int, double>, std::vector<PQ_helper<int, double> >, std::greater<PQ_helper<int, double> > >();
+			this->volume[parent] += this->volume[i];
+			this->tippingnode[i] = outlet_node;
+		}
+
+	}
+
+
 
 
 };

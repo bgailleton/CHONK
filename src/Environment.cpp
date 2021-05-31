@@ -183,13 +183,13 @@ void ModelRunner::initiate_nodegraph()
   this->lakes.clear();
   //# Labelling the nodes in the lake
   node_in_lake = std::vector<int>(this->io_int["n_elements"], -1);
-  for(size_t i = 0; i < this->graph.depression_tree.size(); i++)
+  for(int i = 0; i < this->graph.depression_tree.get_n_dep(); i++)
   {
-    if(this->graph.depression_tree[i].has_children == false)
+    if(this->graph.depression_tree.has_children(i) == false)
     {
-      std::cout << "Depression " << this->graph.top_depression[this->graph.depression_tree[i].pit] << " registered" << std::endl; 
+      // std::cout << "Depression " << this->graph.top_depression[this->graph.depression_tree[i].pit] << " registered" << std::endl; 
       // node_in_lake[this->graph.depression_tree[i].pit] = this->graph.depression_tree[i].index;
-      this->node_in_lake[this->graph.depression_tree[i].pit] = this->graph.top_depression[this->graph.depression_tree[i].pit];
+      this->node_in_lake[this->graph.depression_tree.pitnode[i]] = i;
     }
 
   }
@@ -3426,24 +3426,24 @@ void ModelRunner::drape_deposition_flux_to_chonks()
   std::vector<char> isinhere(this->io_int["n_elements"],'n');
 
 
-  for(size_t i = 0; i< this->graph.depression_tree.size(); i++)
+  for(size_t i = 0; i< this->graph.depression_tree.get_n_dep(); i++)
   { 
-    auto& loch = this->graph.depression_tree[i];
+    // auto& loch = this->graph.depression_tree[i];
     // Checking if this is a main lake
-    if(loch.processed == false)
+    if(this->graph.depression_tree.active[i] == false)
       continue;
 
-    double ratio_of_dep = loch.volume_sed/loch.volume_water;
+    double ratio_of_dep = this->graph.depression_tree.volume_sed[i]/this->graph.depression_tree.volume_water[i];
 
     // NEED TO DEAL WITH THAT BOBO
     if(ratio_of_dep > 1)
     {
-      std::cout << "POSSIBLY MISSING " << loch.volume_sed * (ratio_of_dep - 1) << std::endl;
+      std::cout << "POSSIBLY MISSING " << this->graph.depression_tree.volume_sed[i] * (ratio_of_dep - 1) << std::endl;
       ratio_of_dep = 1;
     }
 
-    double total = loch.volume_sed;
-    for(auto no:loch.nodes)
+    double total = this->graph.depression_tree.volume_sed[i];
+    for(auto no:this->graph.depression_tree.nodes[i])
     {
       // if(isinhere[no] == 'y')
       // {
@@ -3463,11 +3463,11 @@ void ModelRunner::drape_deposition_flux_to_chonks()
 
       chonk_network[no].add_sediment_creation_flux(slangh);
       chonk_network[no].add_deposition_flux(slangh); // <--- This is solely for balance calculation
-      chonk_network[no].set_label_tracker(loch.label_prop);
+      chonk_network[no].set_label_tracker(this->graph.depression_tree.label_prop[i]);
 
     }
     // Seems fine here...
-    std::cout << "BALANCE LAKE = " << total << " out of " << loch.volume_sed << std::endl;
+    std::cout << "BALANCE LAKE = " << total << " out of " << this->graph.depression_tree.volume_sed[i] << std::endl;
   }
 
 }

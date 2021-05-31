@@ -14,6 +14,8 @@
 #include <numeric>
 #include <cmath>
 #include <initializer_list>
+#include "chonkutils.hpp"
+#include "depressiontree.hpp"
 
 
 // All the xtensor requirements
@@ -267,15 +269,20 @@ int get_checker(int i, bool is_active);
 // Return the upstream to downstream order of depressionns to solve according to Cordonnier et al., 2019
 std::vector<int> get_Cordonnier_order();
 
-double get_potential_depression_volume_at_node(int i){return this->potential_volume[i];};
+double get_potential_depression_volume_at_node(int i){return this->depression_tree.potential_volume[i];};
 
 void build_depression_tree_v2(xt::pytensor<double,1>& elevation, xt::pytensor<bool,1>& active_nodes);
+void raise_dep_to_new_node(int dep, int node, xt::pytensor<double,1>& elevation, xt::pytensor<bool,1>& active_nodes, bool integrate_node);
+void fill_the_depressions(std::vector<int>& next_to_check, xt::pytensor<double,1>& elevation, xt::pytensor<bool,1>& active_nodes);
+void depression_initialisation(xt::pytensor<double,1>& elevation);
 
 
-std::vector<Depression> depression_tree;
-std::vector<int> top_depression;
-std::vector<int> bottom_depression;
-std::vector<double> potential_volume;
+
+DepressionTree depression_tree;
+
+// std::vector<int> top_depression;
+// std::vector<int> bottom_depression;
+// std::vector<double> potential_volume;
 
 protected:
 
