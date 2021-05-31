@@ -99,7 +99,7 @@ class DepressionTree
 		this->hw.emplace_back(0);
 		this->fillers.emplace_back(std::vector<std::priority_queue< PQ_helper<int,int>, std::vector<PQ_helper<int,int> >, std::greater<PQ_helper<int,int> > > >());
 	}
-	
+
 	void register_new_depression(xt::pytensor<double,1>& elevation, int pitnode) {this->register_new_depression(xt::pytensor<double,1>& elevation,int pitnode, {-1,-1});}
 
 
@@ -183,37 +183,47 @@ class DepressionTree
 	}
 
 
+  //  ___________________
+	// |                   |
+	// | Filling functions |
+	// |___________________| 
+	//            (\__/)||
+	//            (•ㅅ•) ||
+	//            / 　 づ
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+	// to come
 
 
 };
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 #endif
