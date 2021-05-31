@@ -88,6 +88,7 @@ NodeGraphV2::NodeGraphV2(
   this->depression_tree = std::vector<Depression>();
   // this->depression_tree.reserve(100);
   this->top_depression = std::vector<int>(this->un_element,-1);
+  this->bottom_depression = std::vector<int>(this->un_element,-1);
 
   // these vectors are additioned to the node indice to test the neighbors
   this->neightbourer.emplace_back(std::initializer_list<int>{-ncols - 1, - ncols, - ncols + 1, -1,1,ncols - 1, ncols, ncols + 1 }); // internal node 0
@@ -362,35 +363,53 @@ bool NodeGraphV2::is_flat_draining(int node, xt::pytensor<double,1>& elevation, 
   return true;
 }
 
-void NodeGraphV2::build_depression_tree(xt::pytensor<double,1>& elevation, xt::pytensor<bool,1>& active_nodes)
-{
-  // I am not running this code if there is no piut to reroute
-  // if(this->npits == 0)
-  //   return;
 
-  // std::cout << "DEBUGDEP::building the Tree" << std::endl;
+void build_depression_tree_v2(xt::pytensor<double,1>& elevation, xt::pytensor<bool,1>& active_nodes)
+{
 
   // Initialising the potential volume vector
   this->potential_volume = std::vector<double>(this->n_element,0.);
-  // this->depression_tree.reserve();
 
   // current depression ID
   int current_ID = -1;
 
-  // // THIS IS BASIN0, the original basin that represent the edges
-  // DEPRECATEDd
-  // int nodebasin0 = 0;
-  // for (int i=0;i<this->n_element; i++)
-  // {
-  //   if(active_nodes[i] == 0)
-  //   {
-  //     nodebasin0 = i;
-  //     break;
-  //   }
-  // }
-  // this->depression_tree.emplace_back(Depression(current_ID,0,0, nodebasin0));
-  // this->depression_tree[0].connections_bas = std::make_pair(0,0);
-  // this->depression_tree[0].connections = std::make_pair(nodebasin0,nodebasin0);
+  // and the is_in_queue
+  std::vector<char> is_in_queue(this->un_element, 'n');
+
+  // initial build
+  //# Iterating through all nodes
+  for(int i = 0; i < this->n_element; i++)
+  {
+    // # is a pit?
+    if(this->pits_to_reroute[i] == false || this->top_depression[i] > -1 )
+      continue;
+    // Yes -> incrementing the depression incrementor
+    current_ID ++;
+
+    // this is where you left Boris
+    // You need to find an alternative way based on labelling rather than neighbours
+    // fill depression and fake topo until you reach an outlet or until your node already belongs to another depression. 
+    // then merge the 2 and start again
+    // once you'll have something that works, you'll be more fancy with optimisations
+    // Consider making a nice class for the depression tree, this might help.
+    // maybe have a top_depression_tree that has size of the depression tree but tells you the ID of the top depression.
+  }
+
+
+
+}
+
+
+
+
+void NodeGraphV2::build_depression_tree(xt::pytensor<double,1>& elevation, xt::pytensor<bool,1>& active_nodes)
+{
+
+  // Initialising the potential volume vector
+  this->potential_volume = std::vector<double>(this->n_element,0.);
+
+  // current depression ID
+  int current_ID = -1;
 
   // initial build
   //# Iterating through all nodes

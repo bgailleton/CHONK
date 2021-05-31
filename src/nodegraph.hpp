@@ -68,6 +68,16 @@ class PQ_helper
 };
 
 
+// Hack the container behind
+template <class T, class S, class C>
+    S& Container(priority_queue<T, S, C>& q) {
+        struct HackedQueue : private priority_queue<T, S, C> {
+            static S& Container(priority_queue<T, S, C>& q) {
+                return q.*&HackedQueue::c;
+            }
+        };
+    return HackedQueue::Container(q);
+}
 
 // Vertx class: A class that manage one vertex: a node, its ID, receivers, length, donors, ...
 // Anything useful to generate a graph
@@ -116,12 +126,16 @@ public:
   int parent;
   // Children depressions (direct receivers in the tree)
   std::pair<int,int> children = {-111,-111};
+
+  int twin = -1;
+
   bool has_children = false;
   // Depression level (see the different shades of grey in Figure 3 of Barnes et al., 2020 https://doi.org/10.5194/esurf-8-431-2020) 
   int level;
   // Connections to other basins
-  std::pair<int,int> connections;
-  std::pair<int,int> connections_bas;
+  int outlet;
+  int external_connection;
+  int internal_connection;
   // nodes in the depressions
   std::vector<int> nodes;
   // total Volume
@@ -303,6 +317,7 @@ double get_potential_depression_volume_at_node(int i){return this->potential_vol
 
 std::vector<Depression> depression_tree;
 std::vector<int> top_depression;
+std::vector<int> bottom_depression;
 std::vector<double> potential_volume;
 
 protected:
