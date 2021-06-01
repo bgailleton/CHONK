@@ -74,7 +74,7 @@ public:
 	//            / 　 づ
 
 	DepressionTree() {;};
-	DepressionTree(int n_elements) {this->node2tree = std::vector<int>(n_elements, -1);this->node2outlet = std::vector<int>(n_elements, -1);};
+	DepressionTree(int n_elements) {this->node2tree = std::vector<int>(n_elements, -1);this->node2outlet = std::vector<int>(n_elements, -1);this->potential_volume = std::vector<double>(n_elements, -1);};
 
 
 	//  ___________________
@@ -163,10 +163,14 @@ public:
 
 	int get_ultimate_parent(int node)
 	{ 
+		if(node == -1)
+			return node;
 		while(this->parentree[node] != -1)
 			{node = this->parentree[node];}
 	  return node;
   }
+
+
 
 	std::vector<int> get_all_nodes(int node)
 	{
@@ -237,21 +241,25 @@ public:
 	bool is_direct_child_of(int is_child, int of){if(this->parentree[is_child] == of) {return true;}else{return false;};}
 	bool is_direct_child_of_from_node(int is_child, int of)
 	{
-		if(this->node2tree[is_child] == -1 || this->node2tree[of] ==-1){return false;}
+		if(this->node2tree[is_child] == -1 || this->node2tree[of] == -1){return false;}
 	  if(this->parentree[this->node2tree[is_child]] == this->node2tree[of]) {return true;}
 	  else{return false;};
 	}
+
+
 	bool is_child_of(int is_child, int of)
 	{
+		if(is_child == -1 || of == -1){return false;}
+
 		std::queue<int> children; children.emplace(of);
 		while(children.empty() == false)
 		{
 			int next = children.front();  children.pop();
-
+			std::cout << next << "|";
 			for(auto i : this->treeceivers[next])
 			{
 				if(i != -1)
-					children.emplace(next);
+					children.emplace(i);
 				if(i == is_child)
 					return true;
 			}
@@ -263,6 +271,8 @@ public:
 	{
 
 		this->treeceivers[parent] = children;
+		if(parent == children[0] || parent == children[1])
+			throw std::runtime_error("PARENTAL ISSUE");
 
 		std::vector<PQ_helper<int,double> > c1 = Container(this->filler[children[0]]);
 		std::vector<PQ_helper<int,double> > c2 = Container(this->filler[children[1]]);
@@ -303,6 +313,29 @@ public:
 		}
 
 	}
+
+
+  //  ___________________
+	// |                   |
+	// |      other        |
+	// |___________________| 
+	//            (\__/)||
+	//            (•ㅅ•) ||
+	//            / 　 づ
+
+
+	void printree()
+	{
+		std::string gabul = "Printing the depression tree... \n";
+		std::cout << gabul << std::endl;
+
+		for (size_t i=0; i<this->parentree.size() ; i++)
+		{
+			std::cout << "Dep. " << i << ": children: {" << this->treeceivers[i][0] << "," <<  this->treeceivers[i][1] << "} -> pot. V:" << this->volume[i] << std::endl;
+		}
+
+	}
+
 
 
 
