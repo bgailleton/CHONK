@@ -45,6 +45,7 @@ public:
 	//# tree connections
 	std::vector<std::vector<int> > treeceivers;
 	std::vector<int> parentree;
+	std::vector<int> level;
 	std::vector<std::priority_queue< PQ_helper<int, double>, std::vector<PQ_helper<int, double> >, std::greater<PQ_helper<int, double> > > > filler;
 	std::vector<std::vector<int> > nodes;
 	std::vector<std::vector<double> > label_prop;
@@ -91,6 +92,7 @@ public:
 	{
 		this->treeceivers.emplace_back(children);
 		this->parentree.emplace_back(-1);
+		this->level.emplace_back(0);
 		this->nodes.emplace_back(std::vector<int>());
 		this->label_prop.emplace_back(std::vector<double>());
 		this->internode.emplace_back(-1);
@@ -195,6 +197,65 @@ public:
 		return output;
 	}
 
+	std::vector<int> get_all_nodes_bottom2top(int node, xt::pytensor<double,1>& elevation)
+	{
+
+		std::priority_queue< PQ_helper<int,double>, std::vector<PQ_helper<int,double> >, std::greater<PQ_helper<int,double> > > sorter;
+		std::vector<int> alldeps = this->get_all_children( node, true), output;
+
+		size_t totsize = 0;
+		for(auto i: alldeps)
+		{
+			totsize += this->nodes[i].size();
+			sorter.emplace(PQ_helper<int,double>(i,elevation[this->nodes[i][0]]));
+		}
+
+		output.reserve(totsize);
+		
+		while(sorter.empty() == 0)
+		{
+			int i = sorter.top().node;
+			sorter.pop();
+			for(auto j:this->nodes[i])
+			{
+				output.emplace_back(j);
+			}
+		}
+
+		return output;
+	}
+
+	std::vector<int> get_treestack()
+	{
+		std::priority_queue< PQ_helper<int,int>, std::vector<PQ_helper<int,int> >, std::greater<PQ_helper<int,int> > > sorter;
+		for(size_t i=0; i<this->treeceivers.size(); i++)
+			sorter.emplace(PQ_helper<int,int>(i,this->level[i]));
+		std::vector<int> stack(this->treeceivers.size());
+		while(sorter.size()>0)
+		{
+			stack.emplace_back(sorter.top().node);
+			sorter.pop();
+		}
+		return stack;
+	}
+
+	std::vector<int> get_local_treestack(int dep)
+	{
+		std::priority_queue< PQ_helper<int,int>, std::vector<PQ_helper<int,int> >, std::greater<PQ_helper<int,int> > > sorter;
+		std::vector<int> these_seps = this->get_all_children(this->get_ultimate_parent(dep));
+		for(size_t i=0; i<these_seps.size(); i++)
+			sorter.emplace(PQ_helper<int,int>(these_seps[i],this->level[these_seps[i]]));
+
+		std::vector<int> stack(these_seps.size());
+		while(sorter.size()>0)
+		{
+			stack.emplace_back(sorter.top().node);
+			sorter.pop();
+		}
+		return stack;
+	}
+
+
 	std::vector<int> get_all_parentfree_depressions()
 	{
 		std::vector<int> output;
@@ -255,7 +316,6 @@ public:
 		while(children.empty() == false)
 		{
 			int next = children.front();  children.pop();
-			std::cout << next << "|";
 			for(auto i : this->treeceivers[next])
 			{
 				if(i != -1)
@@ -271,6 +331,7 @@ public:
 	{
 
 		this->treeceivers[parent] = children;
+		this->level[parent] = std::max(this->level[children[0]], this->level[children[0]]) + 1;
 		if(parent == children[0] || parent == children[1])
 			throw std::runtime_error("PARENTAL ISSUE");
 
@@ -315,6 +376,36 @@ public:
 	}
 
 
+
+  //  ___________________
+	// |                   |
+	// |   Postprocessing  |
+	// |___________________| 
+	//            (\__/)||
+	//            (•ㅅ•) ||
+	//            / 　 づ
+
+
+	std::vector<int> dep2top()
+	{
+		std::vector<int> output(this->treeceivers.size(),-1);
+		for(int i = 0; i < int(this->treeceivers.size()); i++)
+			output[i] = this->get_ultimate_parent(i);
+		return output;
+	}	
+
+	std::vector<int> node2top()
+	{
+		std::vector<int> output(this->node2tree.size(),-1), deptop = this->dep2top();
+		for(int i = 0; i < int(this->node2tree.size()); i++)
+		{
+			if(this->node2tree[i] == -1)
+				continue;
+			output[i] = deptop[this->node2tree[i]];
+		}
+		return output;
+	}	
+
   //  ___________________
 	// |                   |
 	// |      other        |
@@ -335,10 +426,6 @@ public:
 		}
 
 	}
-
-
-
-
 
 };
 

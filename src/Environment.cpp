@@ -187,8 +187,6 @@ void ModelRunner::initiate_nodegraph()
   {
     if(this->graph.depression_tree.has_children(i) == false)
     {
-      // std::cout << "Depression " << this->graph.top_depression[this->graph.depression_tree[i].pit] << " registered" << std::endl; 
-      // node_in_lake[this->graph.depression_tree[i].pit] = this->graph.depression_tree[i].index;
       this->node_in_lake[this->graph.depression_tree.pitnode[i]] = i;
     }
 
@@ -2201,33 +2199,61 @@ void ModelRunner::finalise()
 void ModelRunner::lake_solver_v3(int node)
 {
   // // First I am getting hte depression
-  // int this_dep = this->node_in_lake[node];
-  // std::cout << "IS_CALLED:: " << this_dep << std::endl;
+  int this_dep = this->node_in_lake[node];
 
-  // // Then I am marking it as processed
-  // this->graph.depression_tree[this_dep].processed = true;
-  // while(this->graph.depression_tree[this_dep].parent > -1)
-  // {
-  //   this_dep = this->graph.depression_tree[this_dep].parent;
-  //   this->graph.depression_tree[this_dep].processed = true;
-  //   // else
-  //   //   break;
-  // }
+  // Getting all nodes of the depression
+  std::vector<int> nodes = this->graph.depression_tree.get_all_nodes_bottom2top(this_dep, this->topography);
 
-  //   // Checking if I have enough water to fill it and potentially parents too
-  // // double water_volume = this->chonk_network[node].get_water_flux() * this->cellarea * this->timestep;
-  // double water_volume = 0;
+  // Checking that all nodes of that depression have been processed, and processing them in case
+  for(int i = int(nodes.size()) - 1; i >=0; i--)
+  {
+    int tnode = nodes[i];
+    if(this->is_processed[tnode])
+      continue;
+    this->process_node_nolake_for_sure(tnode, this->is_processed, this->active_nodes, this->cellarea, this->topography, true, true);
+  }
 
-  // // Checking that all nodes of that depression have been processed, and processing them in case
-  // for(int i = int(this->graph.depression_tree[this_dep].nodes.size()) - 1; i >=0; i--)
-  // {
-  //   int tnode = this->graph.depression_tree[this_dep].nodes[i];
-  //   if(this->is_processed[tnode])
-  //     continue;
-  //   this->process_node_nolake_for_sure(tnode, this->is_processed, this->active_nodes, this->cellarea, this->topography, true, true);
-  // }
+  // Get the topological order of depressions
+  std::vector<int> treestak = this->graph.depression_tree.get_local_treestack(this_dep);
+  
+  // Water - Sed and prop available for filling
+  double tot_water_volume = 0;
+  double tot_sed_volume = 0;
+  chonk tot_representative_chonk(-1,-1,false);
+  std::map<int,double> water_volume;
+  std::map<int,double> sed_volume;
+  std::map<int,chonk> representative_chonk;
 
-  // std::map<int,chonk> representative_chonk;
+  for(int i=0; i<int(treestak.size());i++)
+  {
+    int this_dep = treestak[i];
+    water_volume[this_dep] = 0;
+    sed_volume[this_dep] = 0;
+    representative_chonk[this_dep] = chonk(-1,-1,false);;;;;;
+  }
+
+  for(int i=0; i<int(treestak.size());i++)
+  {
+    int this_dep = treestak[i];
+    if(this->graph.depression_tree.level[this_dep] == 0)
+    {
+      int pit = this->graph.depression_tree.pitnode[this_dep];
+      tot_water_volume += this->chonk_network[pit].get_water_flux();
+      tot_sed_volume += this->chonk_network[pit].get_sediment_flux();
+      tot_representative_chonk.add_to_sediment_flux(
+        this->chonk_network[pit].get_sediment_flux(), 
+        this->chonk_network[pit].get_label_tracker(),
+        this->chonk_network[pit].get_fluvialprop_sedflux()
+        );
+      water_volume[this_dep] += this->chonk_network[pit].get_water_flux();
+      sed_volume[this_dep] += this->chonk_network[pit].get_sediment_flux();
+      representative_chonk[this_dep].add_to_sediment_flux(
+        this->chonk_network[pit].get_sediment_flux(), 
+        this->chonk_network[pit].get_label_tracker(),
+        this->chonk_network[pit].get_fluvialprop_sedflux()
+        );
+    }
+  }
 
 
   // // marking all children as processed and gather their water
