@@ -404,8 +404,11 @@ void NodeGraphV2::fill_the_depressions(std::vector<int>& next_to_check, xt::pyte
     if(this->depression_tree.get_ultimate_parent(dep) != dep)
       continue;
 
-    std::vector<bool>  is_in_queue = this->depression_tree.get_isinQ4dep(dep);
-
+    std::vector<bool> is_in_queue = this->depression_tree.get_isinQ4dep(dep);
+    std::vector<int> chill_drenz = this->depression_tree.get_all_children(dep);
+    int n_nodes_in_children = 0;
+    for(auto i:chill_drenz)
+      n_nodes_in_children += int(this->depression_tree.nodes[i].size());
     // std::cout << "checker_filling 1" << std::endl;
 
     while(this->depression_tree.filler[dep].empty() == false)
@@ -424,7 +427,7 @@ void NodeGraphV2::fill_the_depressions(std::vector<int>& next_to_check, xt::pyte
       // if my node is not belonging to my children but in a depression system
       if(this->depression_tree.is_child_of(this->depression_tree.node2tree[next_node],dep) == false && this->depression_tree.node2tree[next_node] > -1  )
       {
-        this->raise_dep_to_new_node( dep, next_node, elevation, active_nodes, false);
+        this->raise_dep_to_new_node( dep, next_node, elevation, active_nodes, false, n_nodes_in_children);
         int bro = this->depression_tree.get_ultimate_parent(this->depression_tree.node2tree[next_node]);
         this->depression_tree.register_new_depression(elevation,this->depression_tree.pitnode[dep]);
         this->depression_tree.merge_children_to_parent({dep,bro}, this->depression_tree.get_last_id(), next_node, neightbors, elevation);
@@ -440,7 +443,7 @@ void NodeGraphV2::fill_the_depressions(std::vector<int>& next_to_check, xt::pyte
       // Checking neightbour
       for(auto n:neightbors)
       {
-        if(is_in_queue[n])
+        if(is_in_queue[n] || this->depression_tree.node2tree[n] == dep)
           continue;
 
         if(this->depression_tree.is_child_of(this->depression_tree.node2tree[n],dep) || elevation[n] >= elevation[next_node])
@@ -460,8 +463,10 @@ void NodeGraphV2::fill_the_depressions(std::vector<int>& next_to_check, xt::pyte
           this->depression_tree.externode[dep] = n;
       }
       // std::cout << "checker_filling 5" << std::endl;
-
-      this->raise_dep_to_new_node( dep, next_node, elevation, active_nodes, true);
+      // bool insert = true;
+      // if(next_node == this->depression_tree.pitnode[dep])
+      //   insert = false;
+      this->raise_dep_to_new_node( dep, next_node, elevation, active_nodes, true, n_nodes_in_children);
       // std::cout << "checker_filling 6" << std::endl;
 
       if(double_break)
@@ -477,19 +482,21 @@ void NodeGraphV2::fill_the_depressions(std::vector<int>& next_to_check, xt::pyte
 }
 
 // This function is a helper for the filling of a depression. It raises the water level in the depression and calculated the increase of the volume
-void NodeGraphV2::raise_dep_to_new_node(int dep, int node, xt::pytensor<double,1>& elevation, xt::pytensor<bool,1>& active_nodes, bool integrate_node)
+void NodeGraphV2::raise_dep_to_new_node(int dep, int node, xt::pytensor<double,1>& elevation,
+ xt::pytensor<bool,1>& active_nodes, bool integrate_node, int n_nodes_in_children)
 {
 
-  int nbeef = int(this->depression_tree.nodes[dep].size());
+  int nbeef = int(this->depression_tree.nodes[dep].size()) + n_nodes_in_children;
   int last_node = -1;
-  if(nbeef>0)
-    last_node = this->depression_tree.nodes[dep][nbeef - 1];
+  if(this->depression_tree.nodes[dep].size()>0)
+    last_node = this->depression_tree.nodes[dep][this->depression_tree.nodes[dep].size() - 1];
 
   this->depression_tree.hw_max[dep] = elevation[node];
 
+  // if(true)
   if(last_node == -1)
   {
-    if(integrate_node)
+    if(integrate_node )
     {
       this->depression_tree.node2tree[node] = dep;
 
@@ -524,6 +531,7 @@ void NodeGraphV2::depression_initialisation(xt::pytensor<double,1>& elevation)
     {
       this->depression_tree.register_new_depression(elevation, i);
       this->depression_tree.filler[this->depression_tree.get_last_id()].emplace(PQ_helper<int, double>(i, elevation[i]));
+      // this->depression_tree.node2tree[i] = this->depression_tree.get_last_id();
     }
   }
 }

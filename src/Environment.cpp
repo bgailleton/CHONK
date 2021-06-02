@@ -258,6 +258,15 @@ void ModelRunner::run()
   this->finalise();
   // Done
 
+  int ndfgs=0;
+  for( size_t i=0; i< is_processed.size() ; i++)
+  {
+    if(is_processed[i] == false)
+      ndfgs++;
+  }
+  if(ndfgs>0)
+    throw std::runtime_error("NODE UNPROCESSED::" + std::to_string(ndfgs));
+
   CHRONO_stop[1] = std::chrono::high_resolution_clock::now();
   CHRONO_n_time[1] ++;
   CHRONO_mean[1] += std::chrono::duration<double>(CHRONO_stop[1] - CHRONO_start[1]).count();
@@ -2011,6 +2020,8 @@ void ModelRunner::process_node_nolake_for_sure(int node, std::vector<bool>& is_p
 {
   local_Qs_production_for_lakes[node] = -1 * this->chonk_network[node].get_sediment_flux() ;
 
+  if(this->is_processed[node])
+    return;
 
   this->is_processed[node] = true;
   
@@ -2222,28 +2233,60 @@ void ModelRunner::lake_solver_v3(int node)
   std::cout << "lake_solver_v3 -> starting " << this_dep << std::endl;
   int master_dep = this->graph.depression_tree.get_ultimate_parent(this_dep);
 
-  // std::cout << "DLAKESv3::A" << std::endl;
+  std::cout << "DLAKESv3::A" << std::endl;
 
   // Getting all nodes of the depression
-  std::vector<int> nodes = this->graph.depression_tree.get_all_nodes_bottom2top(this_dep, this->topography);
+  std::vector<int> lstack = this->graph.depression_tree.get_all_nodes(master_dep);
+  std::vector<int> nodes; nodes.reserve(lstack.size());
+
+  std::priority_queue< PQ_helper<int,int>, std::vector<PQ_helper<int,int> >, std::greater<PQ_helper<int,int> > > PQstack;
+  for(auto n: lstack)
+    PQstack.emplace(PQ_helper<int,int>(n,this->graph.get_index_MF_stack_at_i(n)));
+
+  while(PQstack.empty() == false)
+  {
+    nodes.emplace_back(PQstack.top().node);
+    PQstack.pop();
+  }
 
 
-  // std::cout << "DLAKESv3::B" << std::endl;
+  std::cout << "DLAKESv3::B" << std::endl;
 
   // Checking that all nodes of that depression have been processed, and processing them in case
-  for(int i = int(nodes.size()) - 1; i >=0; i--)
+  for(size_t i = 0; i < nodes.size(); i++)
   {
     int tnode = nodes[i];
-    if(this->is_processed[tnode])
+    if(this->is_processed[tnode] == true)
       continue;
+
     this->process_node_nolake_for_sure(tnode, this->is_processed, this->active_nodes, this->cellarea, this->topography, true, true);
   }
-  // std::cout << "DLAKESv3::C" << std::endl;
+
+  // for(auto dep:this->graph.depression_tree.get_all_children(master_dep,true))
+  // {
+  //   if(std::find(nodes.begin(),nodes.end(),this->graph.depression_tree.pitnode[dep]) == nodes.end())
+  //     throw std::runtime_error("PIT NOT IN NODES");
+  //   ;
+  // }
+
 
   // Get the topological order of depressions
-  std::vector<int> treestak = this->graph.depression_tree.get_local_treestack(this_dep);
+  std::vector<int> treestak = this->graph.depression_tree.get_local_treestack(master_dep);
 
+  // for(auto dep:this->graph.depression_tree.get_all_children(master_dep,true))
+  // {
+  //   if(std::find(treestak.begin(),treestak.end(),dep) == treestak.end())
+  //     throw std::runtime_error("TREESTACK ISSUE");
+    
+  // }
+  // auto gfjkl = this->graph.depression_tree.get_all_children(master_dep,true);
+  // for(auto dep:treestak)
+  // {
+  //   if(std::find(gfjkl.begin(),gfjkl.end(),dep) == gfjkl.end())
+  //     throw std::runtime_error("TREESTACK ISSUE2:" + std::to_string(dep));
 
+  //   ;
+  // }
   
   // Water - Sed and prop available for filling
   double tot_water_volume = 0;
@@ -2253,7 +2296,9 @@ void ModelRunner::lake_solver_v3(int node)
   std::map<int,double> sed_volume;
   std::map<int,bool> is_processed;
   std::map<int,chonk> representative_chonk;
-  // std::cout << "DLAKESv3::D" << std::endl;
+
+
+  std::cout << "DLAKESv3::D" << std::endl;
 
   for(int i=0; i<int(treestak.size());i++)
   {
@@ -2263,7 +2308,7 @@ void ModelRunner::lake_solver_v3(int node)
     representative_chonk[this_dep] = chonk(-1,-1,false);
     is_processed[this_dep] = false;;;;;
   }
-  // std::cout << "DLAKESv3::E" << std::endl;
+  std::cout << "DLAKESv3::E" << std::endl;
 
   // Gathering all the water/sed/prop of the depression
 
@@ -2273,6 +2318,10 @@ void ModelRunner::lake_solver_v3(int node)
     if(this->graph.depression_tree.level[this_dep] == 0)
     {
       int pit = this->graph.depression_tree.pitnode[this_dep];
+
+      if(this->is_processed[pit] == false)
+        throw std::runtime_error("PIT NOT PROC");
+
       tot_water_volume += this->chonk_network[pit].get_water_flux() * this->timestep * this->dx * this->dy;
       tot_sed_volume += this->chonk_network[pit].get_sediment_flux() * this->timestep;
       tot_representative_chonk.add_to_sediment_flux(
@@ -2292,7 +2341,7 @@ void ModelRunner::lake_solver_v3(int node)
     }
   }
 
-  // std::cout << "DLAKESv3::F" << std::endl;
+  std::cout << "DLAKESv3::F" << std::endl;
 
 // Calculating which dep to reproc
   std::vector<int> local_deps2reproc;
@@ -2327,13 +2376,16 @@ void ModelRunner::lake_solver_v3(int node)
     // }
     return; // TO BE REMOVED AFTER
   }
-  // std::cout << "DLAKESv3::G" << std::endl;
+  std::cout << "DLAKESv3::G" << std::endl;
 
 
   // Processing the depressions
 
   for(auto dep: local_deps2reproc)
   {
+
+    std::cout << "DLAKESv3::H" << std::endl;
+
     // finding the outlet
     int outlet = this->graph.depression_tree.tippingnode[dep];
     // And their receiver
@@ -2346,49 +2398,82 @@ void ModelRunner::lake_solver_v3(int node)
     std::vector<int> recs = this->graph.get_MF_receivers_at_node(outlet);
     for(auto r : recs)
     {
-      if(std::find(children.begin(), children.end(), r) != children.end())
-        this->chonk_network[outlet].get_what_was_given_to(r, corrwat, corrsed, corrlabprop, corrFP);
+      if(std::find(children.begin(), children.end(), this->graph.depression_tree.node2tree[r]) != children.end())
+      {
+        double tcorrwat,tcorrsed;
+        this->chonk_network[outlet].get_what_was_given_to(r, tcorrwat, tcorrsed, corrlabprop, corrFP);
+        corrwat += tcorrwat * this->timestep * this->cellarea;
+        corrsed += tcorrsed * this->timestep;    
+      }
     }
-    corrwat = corrwat * this->timestep * this->cellarea;
-    corrsed = corrsed * this->timestep;    
+    std::cout << "DLAKESv3::I" << std::endl;
+
 
     // resetting the outlet
+    this->cancel_fluxes_before_moving_prep(this->chonk_network[outlet], outlet);
+    this->chonk_network[outlet].cancel_split_and_merge_in_receiving_chonks(this->chonk_network, this->graph, this->timestep);
     this->chonk_network[outlet].reset();
+    std::cout << "DLAKESv3::I.1" << std::endl;
     // Redonning what its donors gave it
     std::vector<int> dons = this->graph.get_MF_donors_at_node(outlet);
     for(auto n : dons)
       this->chonk_network[n].split_and_merge_in_receiving_chonks_ignore_but_one(this->chonk_network,this->graph, this->timestep, outlet);
+    std::cout << "DLAKESv3::I.2" << std::endl;
 
-    double extra_water = (water_volume[dep] - this->graph.depression_tree.volume[dep] - corrwat)/(this->timestep * this->cellarea);
-    double extra_sed = (sed_volume[dep] - this->graph.depression_tree.volume[dep] - corrwat)/(this->timestep);
+    double extra_water = (water_volume[dep] - this->graph.depression_tree.volume_water[dep] - corrwat)/(this->timestep * this->cellarea);
+    double extra_sed = (sed_volume[dep] - this->graph.depression_tree.volume_sed[dep] - corrsed)/(this->timestep);
+    std::cout << "DLAKESv3::I.3" << std::endl;
 
     if(extra_water < 0){extra_water = 0;}
     if(extra_sed < 0){extra_sed = 0;}
+    std::cout << "DLAKESv3::I.4::" << outlet << "|" << rec << std::endl;
 
     this->chonk_network[outlet].external_moving_prep({rec},{1},{1}, {(this->topography[outlet] - this->topography[rec])/this->dx });
-    this->chonk_network[outlet].add_to_water_flux(extra_water/(this->cellarea * this->timestep));
-    this->chonk_network[outlet].add_to_sediment_flux(extra_sed/(this->cellarea), representative_chonk[dep].get_label_tracker(), 1.);
-    is_processed[outlet] = false;
+    this->chonk_network[outlet].add_to_water_flux(extra_water);
+    this->chonk_network[outlet].add_to_sediment_flux(extra_sed, representative_chonk[dep].get_label_tracker(), 1.);
+    this->is_processed[outlet] = false;
+    // is_processed[rec] = false;
+    std::cout << "DLAKESv3::I.5" << std::endl;
     this->process_node_nolake_for_sure(outlet, this->is_processed, this->active_nodes, this->cellarea, this->topography, false, true);
+    std::cout << "DLAKESv3::J" << std::endl;
 
-    this->print_debug_are_rec_proc(outlet);
+    // // this->print_debug_are_rec_proc(outlet);
+    // std::cout << dep << " IS RECOUT PROC?? -> " << this->is_processed[rec]  << " GIVING " << extra_water << " To " << rec
+    //  << " Which is potentially in " << this->graph.depression_tree.node2tree[rec] << " AND REC OF DEP IS " << this->graph.depression_tree.externode[dep] << std::endl;
+    // // this->print_debug_are_rec_proc(rec);
+    // // HERE LIEs THE ROUTINGS TO REPROCESS THE THINGIES WHN DONE
+    // std::cout << "Are in the local tree ";
+    // for(auto ch:treestak)
+    //   std::cout << ch << "|";
+    // std::cout << std::endl;
 
-    // HERE LIEs THE ROUTINGS TO REPROCESS THE THINGIES WHN DONE
-
+    // std::cout << "Are in the chlidren ";
+    // for(auto ch:children)
+    //   std::cout << ch << "|";
+    // std::cout << std::endl;
 
 
     // Now I am post-processing the lakes: adding the lake depth, and ID and all
+    // std::cout << "Are raised to " << this->graph.depression_tree.hw[dep] << ":";
     for (auto n:nodes)
     {
+      // std::cout << n << "|" << this->graph.depression_tree.node2tree[n] << "|";
       if(std::find(children.begin(), children.end(), this->graph.depression_tree.node2tree[n]) != children.end())
       {
         if(this->graph.depression_tree.potential_volume[n] <= this->graph.depression_tree.volume_water[dep])
         {
           this->topography[n] = this->graph.depression_tree.hw[dep];
           this->node_in_lake[n] = dep;
+
         }
+
+
       }
+
+
     }
+    // std::cout << std::endl;
+    std::cout << "DLAKESv3::K" << std::endl;
 
 
 
@@ -2941,7 +3026,7 @@ void ModelRunner::manage_fluxes_before_moving_prep(chonk& this_chonk, int label_
   
 
   this_chonk.inplace_only_drainage_area(this->dx, this->dy);
-        this->Qw_in += this->dx* this->dy;
+  this->Qw_in += this->dx* this->dy;
 
   CHRONO_stop[2] = std::chrono::high_resolution_clock::now();
   CHRONO_n_time[2] ++;

@@ -93,7 +93,9 @@ public:
 		this->treeceivers.emplace_back(children);
 		this->parentree.emplace_back(-1);
 		this->level.emplace_back(0);
-		this->nodes.emplace_back(std::vector<int>());
+		this->nodes.emplace_back( std::vector<int>()) ;
+		// this->nodes.emplace_back( std::vector<int>({pitnode})) ;
+
 		this->label_prop.emplace_back(std::vector<double>());
 		this->internode.emplace_back(-1);
 		this->tippingnode.emplace_back(-1);
@@ -262,12 +264,14 @@ public:
 		for(size_t i=0; i<these_seps.size(); i++)
 			sorter.emplace(PQ_helper<int,int>(these_seps[i],this->level[these_seps[i]]));
 
-		std::vector<int> stack(these_seps.size());
+		std::vector<int> stack; stack.reserve(these_seps.size());
+
 		while(sorter.size()>0)
 		{
 			stack.emplace_back(sorter.top().node);
 			sorter.pop();
 		}
+
 		return stack;
 	}
 

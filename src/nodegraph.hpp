@@ -263,7 +263,7 @@ std::vector<int> get_Cordonnier_order();
 double get_potential_depression_volume_at_node(int i){return this->depression_tree.potential_volume[i];};
 
 void build_depression_tree_v2(xt::pytensor<double,1>& elevation, xt::pytensor<bool,1>& active_nodes);
-void raise_dep_to_new_node(int dep, int node, xt::pytensor<double,1>& elevation, xt::pytensor<bool,1>& active_nodes, bool integrate_node);
+void raise_dep_to_new_node(int dep, int node, xt::pytensor<double,1>& elevation, xt::pytensor<bool,1>& active_nodes, bool integrate_node, int n_nodes_in_children);
 void fill_the_depressions(std::vector<int>& next_to_check, xt::pytensor<double,1>& elevation, xt::pytensor<bool,1>& active_nodes);
 void depression_initialisation(xt::pytensor<double,1>& elevation);
 
