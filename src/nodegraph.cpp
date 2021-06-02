@@ -254,7 +254,7 @@ NodeGraphV2::NodeGraphV2(
   {
     // THIS IS WHAT HAPPENS WHEN THE LAKE SOVER IS EXPLICIT
     this->build_depression_tree_v2(elevation, active_nodes);
-    this->depression_tree.printree();
+    // this->depression_tree.printree();
 
     node_to_check = this->update_receivers_explicit();
 
@@ -398,7 +398,7 @@ void NodeGraphV2::fill_the_depressions(std::vector<int>& next_to_check, xt::pyte
   for(auto dep:next_to_check)
   {
 
-    std::cout << " Filling " << dep << " | " << this->depression_tree.filler[dep].empty() << std::endl;
+    // std::cout << " Filling " << dep << " | " << this->depression_tree.filler[dep].empty() << std::endl;
 
     if(this->depression_tree.get_ultimate_parent(dep) != dep)
       continue;
@@ -996,68 +996,68 @@ void NodeGraphV2::virtual_filling(xt::pytensor<double,1>& elevation, xt::pytenso
 
 std::vector<int> NodeGraphV2::update_receivers_explicit()
 {
-  // std::vector<char> is_processed(this->depression_tree.size(), 'n');
-  // std::vector<PQ_helper<int,int> > temppq(this->depression_tree.size());
+  std::vector<char> is_processed(this->depression_tree.treeceivers.size(), 'n');
+  std::vector<PQ_helper<int,int> > temppq(this->depression_tree.treeceivers.size());
 
-  // for(size_t i = 0; i < this->depression_tree.size(); i++)
-  // {
-  //   temppq[i] = PQ_helper<int,int>(int(i),this->depression_tree[i].level);
-  // }
+  for(size_t i = 0; i < this->depression_tree.treeceivers.size(); i++)
+  {
+    temppq[i] = PQ_helper<int,int>(int(i),this->depression_tree.level[i]);
+  }
 
-  // std::priority_queue< PQ_helper<int,int> , std::vector<PQ_helper<int,int> >, std::greater<PQ_helper<int,int> > > depression_order(temppq.begin(), temppq.end());
+  std::priority_queue< PQ_helper<int,int> , std::vector<PQ_helper<int,int> >, std::greater<PQ_helper<int,int> > > depression_order(temppq.begin(), temppq.end());
 
-  // std::vector<int> output;
+  std::vector<int> output;
 
-  // while(depression_order.empty() == false)
-  // {
-  //   int current = depression_order.top().node;
-  //   depression_order.pop();
-  //   if(is_processed[current] == 'y')
-  //     continue;
-  //   is_processed[current] = 'y';
-
-
-  //   int from,to;
+  while(depression_order.empty() == false)
+  {
+    int current = depression_order.top().node;
+    depression_order.pop();
+    if(is_processed[current] == 'y')
+      continue;
+    is_processed[current] = 'y';
 
 
-  //   // get the twins
-  //   int twin = this->depression_tree[current].connections_bas.second;
+    int from,to;
 
-  //   // If the twin is into the edge basin
-  //   if(twin > -1)
-  //   {
-  //     // Is processed
-  //     is_processed[twin] = 'y';
 
-  //     // Determining the order
-  //     if(this->depression_tree[current].volume > this->depression_tree[twin].volume)
-  //     {
-  //       from = this->depression_tree[current].pit;
-  //       to = this->depression_tree[current].connections.second;
-  //       this->depression_tree[this->depression_tree[current].parent].pit = this->depression_tree[twin].pit;
-  //     }
-  //     else
-  //     {
-  //       from = this->depression_tree[twin].pit;
-  //       to = this->depression_tree[twin].connections.second;
-  //       this->depression_tree[this->depression_tree[current].parent].pit = this->depression_tree[current].pit;
-  //     }
-  //   }
-  //   else
-  //   {
-  //     from = this->depression_tree[current].pit;
-  //     to = this->depression_tree[current].connections.second;
-  //   }
+    // get the twins
+    int twin = this->depression_tree.get_twin(current);
 
-  //   output.push_back(from);
+    // If the twin is into the edge basin
+    if(twin > -1)
+    {
+      // Is processed
+      is_processed[twin] = 'y';
 
-  //   this->graph[from].receivers = {to};
-  //   this->graph[from].length2rec = {this->dx * this->dy * 1e6};
+      // Determining the order
+      if(this->depression_tree.volume[current] > this->depression_tree.volume[twin])
+      {
+        from = this->depression_tree.pitnode[current];
+        to = this->depression_tree.externode[current];
+        this->depression_tree.pitnode[this->depression_tree.parentree[current]] = this->depression_tree.pitnode[current];
+      }
+      else
+      {
+        from = this->depression_tree.pitnode[twin];
+        to = this->depression_tree.externode[twin];
+        this->depression_tree.pitnode[this->depression_tree.parentree[twin]] = this->depression_tree.pitnode[twin];
+      }
+    }
+    else
+    {
+      from = this->depression_tree.pitnode[current];
+      to = this->depression_tree.externode[current];
+    }
 
-  // }
+    output.push_back(from);
 
-  // return output;
-  return std::vector<int>();
+    this->graph[from].receivers = {to};
+    this->graph[from].length2rec = {this->dx * this->dy * 1e6};
+
+  }
+
+  return output;
+  // return std::vector<int>();
 }
 
 

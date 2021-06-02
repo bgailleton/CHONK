@@ -463,6 +463,7 @@ std::vector<double>& pre_sed, std::vector<double>& pre_water);
     //# This increments the lake vector
     int lake_incrementor;
     std::vector<int> node_in_lake;
+    std::vector<int> lake_to_process;
     std::vector<char> has_been_outlet;
 
     std::vector<double> gave_to_lake_water;

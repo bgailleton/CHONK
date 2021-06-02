@@ -98,7 +98,7 @@ public:
 		this->internode.emplace_back(-1);
 		this->tippingnode.emplace_back(-1);
 		this->externode.emplace_back(-1);
-		this->pitnode.emplace_back(-1);
+		this->pitnode.emplace_back(pitnode);
 		this->volume.emplace_back(0);
 		this->volume_sed.emplace_back(0);
 		this->volume_water.emplace_back(0);
@@ -163,13 +163,20 @@ public:
 
 	}
 
-	int get_ultimate_parent(int node)
+	int get_ultimate_parent(int dep)
 	{ 
-		if(node == -1)
-			return node;
-		while(this->parentree[node] != -1)
-			{node = this->parentree[node];}
-	  return node;
+		if(dep == -1)
+			return dep;
+		while(this->parentree[dep] != -1)
+			{dep = this->parentree[dep];}
+	  return dep;
+  }
+
+  int get_twin(int dep)
+  {
+  	if(this->parentree[dep] == -1) {return -1;}
+  	for(auto i:this->treeceivers[this->parentree[dep]]){if(i != dep) {return i;} ;};
+  	return -1;
   }
 
 

@@ -197,6 +197,24 @@ void chonk::split_and_merge_in_receiving_chonks(std::vector<chonk>& chonkscape, 
     this->reset();
 }
 
+void chonk::get_what_was_given_to(int to, double& water, double& sed, std::vector<double>& lapprop, double& proflu)
+{
+  water = 0;
+  sed = 0;
+  lapprop = this->label_tracker;
+  proflu = this->fluvialprop_sedflux;
+  for(size_t i = 0; i < this->receivers.size(); i++)
+  {
+    int r = this->receivers[i];
+    if(r == to)
+    {
+      water += this->get_water_flux() * this->weigth_water_fluxes[i];
+      sed += this->get_sediment_flux() * this->weigth_sediment_fluxes[i];
+    }
+  }
+
+}
+
 void chonk::cancel_split_and_merge_in_receiving_chonks(std::vector<chonk>& chonkscape, NodeGraphV2& graph, double dt)
 {
   // Iterating through the receivers
