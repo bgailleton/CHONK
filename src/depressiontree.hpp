@@ -148,15 +148,19 @@ public:
 		std::queue<int> children; children.emplace(node);
 		while(children.empty() == false)
 		{
-			int next = children.front();  children.pop();
+			int next = children.front();  
+			children.pop();
 			if( ((next == node) && include_node)  || (next != node))
 				output.emplace_back(next);
 
 
-			for(auto i : this->treeceivers[next])
+			for(size_t k=0; k <  this->treeceivers[next].size(); k++)
 			{
+				int i = this->treeceivers[next][k];
 				if(i != -1)
-					children.emplace(next);
+				{
+					children.emplace(i);
+				}
 			}
 		}
 		return output;
@@ -214,7 +218,8 @@ public:
 		for(auto i: alldeps)
 		{
 			totsize += this->nodes[i].size();
-			sorter.emplace(PQ_helper<int,double>(i,elevation[this->nodes[i][0]]));
+			if(this->nodes[i].size()>0)
+				sorter.emplace(PQ_helper<int,double>(i,elevation[this->nodes[i][0]]));
 		}
 
 		output.reserve(totsize);
@@ -249,7 +254,11 @@ public:
 	std::vector<int> get_local_treestack(int dep)
 	{
 		std::priority_queue< PQ_helper<int,int>, std::vector<PQ_helper<int,int> >, std::greater<PQ_helper<int,int> > > sorter;
-		std::vector<int> these_seps = this->get_all_children(this->get_ultimate_parent(dep));
+		// std::cout << "blag1 " << std::endl;
+		auto daft = this->get_ultimate_parent(dep);
+		// std::cout << "blag2 " << daft << std::endl;
+		std::vector<int> these_seps = this->get_all_children(daft, true);
+		// std::cout << "blag2 " << these_seps.size() << std::endl;
 		for(size_t i=0; i<these_seps.size(); i++)
 			sorter.emplace(PQ_helper<int,int>(these_seps[i],this->level[these_seps[i]]));
 

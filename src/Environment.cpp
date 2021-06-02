@@ -2222,11 +2222,13 @@ void ModelRunner::lake_solver_v3(int node)
   std::cout << "lake_solver_v3 -> starting " << this_dep << std::endl;
   int master_dep = this->graph.depression_tree.get_ultimate_parent(this_dep);
 
-  std::cout << "DLAKESv3::A" << std::endl;
+  // std::cout << "DLAKESv3::A" << std::endl;
 
   // Getting all nodes of the depression
   std::vector<int> nodes = this->graph.depression_tree.get_all_nodes_bottom2top(this_dep, this->topography);
-  std::cout << "DLAKESv3::B" << std::endl;
+
+
+  // std::cout << "DLAKESv3::B" << std::endl;
 
   // Checking that all nodes of that depression have been processed, and processing them in case
   for(int i = int(nodes.size()) - 1; i >=0; i--)
@@ -2236,10 +2238,12 @@ void ModelRunner::lake_solver_v3(int node)
       continue;
     this->process_node_nolake_for_sure(tnode, this->is_processed, this->active_nodes, this->cellarea, this->topography, true, true);
   }
-  std::cout << "DLAKESv3::C" << std::endl;
+  // std::cout << "DLAKESv3::C" << std::endl;
 
   // Get the topological order of depressions
   std::vector<int> treestak = this->graph.depression_tree.get_local_treestack(this_dep);
+
+
   
   // Water - Sed and prop available for filling
   double tot_water_volume = 0;
@@ -2249,7 +2253,7 @@ void ModelRunner::lake_solver_v3(int node)
   std::map<int,double> sed_volume;
   std::map<int,bool> is_processed;
   std::map<int,chonk> representative_chonk;
-  std::cout << "DLAKESv3::D" << std::endl;
+  // std::cout << "DLAKESv3::D" << std::endl;
 
   for(int i=0; i<int(treestak.size());i++)
   {
@@ -2259,7 +2263,7 @@ void ModelRunner::lake_solver_v3(int node)
     representative_chonk[this_dep] = chonk(-1,-1,false);
     is_processed[this_dep] = false;;;;;
   }
-  std::cout << "DLAKESv3::E" << std::endl;
+  // std::cout << "DLAKESv3::E" << std::endl;
 
   // Gathering all the water/sed/prop of the depression
 
@@ -2288,7 +2292,7 @@ void ModelRunner::lake_solver_v3(int node)
     }
   }
 
-  std::cout << "DLAKESv3::F" << std::endl;
+  // std::cout << "DLAKESv3::F" << std::endl;
 
 // Calculating which dep to reproc
   std::vector<int> local_deps2reproc;
@@ -2319,11 +2323,11 @@ void ModelRunner::lake_solver_v3(int node)
     // {
     //   int this_dep = treestak[i];
     //   int twin_dep = this->graph.depression_tree.get_twin(this_dep);
-
+    std::cout << "LAKE " << this_dep  << " IGNORED" << std::endl;
     // }
     return; // TO BE REMOVED AFTER
   }
-  std::cout << "DLAKESv3::G" << std::endl;
+  // std::cout << "DLAKESv3::G" << std::endl;
 
 
   // Processing the depressions
@@ -2364,7 +2368,10 @@ void ModelRunner::lake_solver_v3(int node)
     this->chonk_network[outlet].external_moving_prep({rec},{1},{1}, {(this->topography[outlet] - this->topography[rec])/this->dx });
     this->chonk_network[outlet].add_to_water_flux(extra_water/(this->cellarea * this->timestep));
     this->chonk_network[outlet].add_to_sediment_flux(extra_sed/(this->cellarea), representative_chonk[dep].get_label_tracker(), 1.);
-  
+    is_processed[outlet] = false;
+    this->process_node_nolake_for_sure(outlet, this->is_processed, this->active_nodes, this->cellarea, this->topography, false, true);
+
+    this->print_debug_are_rec_proc(outlet);
 
     // HERE LIEs THE ROUTINGS TO REPROCESS THE THINGIES WHN DONE
 
@@ -2382,6 +2389,7 @@ void ModelRunner::lake_solver_v3(int node)
         }
       }
     }
+
 
 
   }

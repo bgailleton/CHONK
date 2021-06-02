@@ -255,8 +255,9 @@ NodeGraphV2::NodeGraphV2(
     // THIS IS WHAT HAPPENS WHEN THE LAKE SOVER IS EXPLICIT
     this->build_depression_tree_v2(elevation, active_nodes);
     // this->depression_tree.printree();
-
+    std::cout << "A" << std::endl;
     node_to_check = this->update_receivers_explicit();
+    std::cout << "B" << std::endl;
 
   }
 
@@ -996,142 +997,63 @@ void NodeGraphV2::virtual_filling(xt::pytensor<double,1>& elevation, xt::pytenso
 
 std::vector<int> NodeGraphV2::update_receivers_explicit()
 {
-  std::vector<char> is_processed(this->depression_tree.treeceivers.size(), 'n');
-  std::vector<PQ_helper<int,int> > temppq(this->depression_tree.treeceivers.size());
 
-  for(size_t i = 0; i < this->depression_tree.treeceivers.size(); i++)
-  {
-    temppq[i] = PQ_helper<int,int>(int(i),this->depression_tree.level[i]);
-  }
-
-  std::priority_queue< PQ_helper<int,int> , std::vector<PQ_helper<int,int> >, std::greater<PQ_helper<int,int> > > depression_order(temppq.begin(), temppq.end());
-
+  std::vector<bool> is_processed(this->depression_tree.parentree.size(), false);
   std::vector<int> output;
 
-  while(depression_order.empty() == false)
+  for(int i = 0; i < this->depression_tree.treeceivers.size(); i++)
   {
-    int current = depression_order.top().node;
-    depression_order.pop();
-    if(is_processed[current] == 'y')
+
+    int current = i;
+    if(is_processed[current])
       continue;
-    is_processed[current] = 'y';
-
-
-    int from,to;
-
-
-    // get the twins
-    int twin = this->depression_tree.get_twin(current);
-
-    // If the twin is into the edge basin
-    if(twin > -1)
+    int parent = this->depression_tree.get_ultimate_parent(current), to;
+    // std::cout << parent << " || "<< current << std::endl;
+    
+    if(parent > -1)
     {
-      // Is processed
-      is_processed[twin] = 'y';
-
-      // Determining the order
-      if(this->depression_tree.volume[current] > this->depression_tree.volume[twin])
-      {
-        from = this->depression_tree.pitnode[current];
-        to = this->depression_tree.externode[current];
-        this->depression_tree.pitnode[this->depression_tree.parentree[current]] = this->depression_tree.pitnode[current];
-      }
-      else
-      {
-        from = this->depression_tree.pitnode[twin];
-        to = this->depression_tree.externode[twin];
-        this->depression_tree.pitnode[this->depression_tree.parentree[twin]] = this->depression_tree.pitnode[twin];
-      }
+      // std::cout << "1POPOPOPO" << std::endl;
+      to = this->depression_tree.externode[parent];
     }
     else
     {
-      from = this->depression_tree.pitnode[current];
+      // std::cout << "2POPOPOPO" << std::endl;
       to = this->depression_tree.externode[current];
     }
+    // std::cout << parent << " | "<< to << std::endl;
 
-    output.push_back(from);
+    std::vector<int> children = this->depression_tree.get_all_children(parent, true);
+    // std::cout << "gaft" << std::endl;
 
-    this->graph[from].receivers = {to};
-    this->graph[from].length2rec = {this->dx * this->dy * 1e6};
-
-  }
-
-  return output;
-  // return std::vector<int>();
-}
-
-
-void NodeGraphV2::fix_cyclicity(
-  std::vector<int>& node_to_check,
-  xt::pytensor<int,1>& Sstack,
-  xt::pytensor<int,1>& Srec,
-  xt::pytensor<int,1>& Prec,
-  xt::pytensor<int,2>& Mrec,
-  int correction_level
-
-
-  )
-{
-  std::vector<bool> is_not_in_stack(this->un_element,false);
-  for(auto& node:this->not_in_stack)
-    is_not_in_stack[node] = true;
-
-  std::vector<int> nodes_to_double_check;
-
-
-  // TRY 2:
-  // Label the basins and identify the pits in the nodes to correct
-  std::vector<int> baslab(this->un_element);
-  int tlabel = Sstack[0];
-  for(size_t i=0; i< this->un_element; i++)
-  {
-    if(Sstack[i] == Srec[Sstack[i]])
+    for(size_t k=0; k<children.size(); k++)
     {
-      tlabel = Sstack[i];
-      nodes_to_double_check.emplace_back(Sstack[i]);
+
+      int j = children[k];
+      // std::cout << "d:" << j << std::endl;
+      // std::cout << "e:" << this->depression_tree.pitnode[j] << std::endl;
+
+      is_processed[j] = true;
+      if(this->depression_tree.level[j] == 0)
+      {
+        this->graph[this->depression_tree.pitnode[j]].receivers = {to};
+        this->graph[this->depression_tree.pitnode[j]].length2rec = {this->dx};
+        output.push_back(this->depression_tree.pitnode[j]);
+      }
+      // std::cout << "f:" << output.size() << std::endl;
+
 
     }
-    baslab[Sstack[i]] = tlabel;
-  }
 
-  for(auto node:nodes_to_double_check)
-  {
-    int new_rec = node;
-    // std::cout << "2::" << new_rec << std::endl;
-
-    for(int i=1;i<=correction_level;i++)
-    {
-      new_rec = Prec[new_rec];
-      if(i<correction_level)
-      {
-        std::vector<int> gurg;
-        for(size_t j =0 ; j<8;j++)
-        {
-          if(Mrec(new_rec,j)>=0)
-            gurg.emplace_back(Mrec(new_rec,j));
-        }
-        this->graph[new_rec].receivers = gurg;
-      }
-      else
-      {
-        int target_basin = baslab[target_basin];
-        std::vector<int> gurg;
-        for(auto rec:this->graph[new_rec].receivers)
-        {
-          if(baslab[rec] == target_basin)
-            gurg.emplace_back(rec);
-        }
-        this->graph[new_rec].receivers = gurg;
-        this->graph[node].receivers = {new_rec};
-      }
-    }
+    // std::cout << " Done with " << parent << std::endl;
 
   }
+  // std::cout << " Done with  all " << std::endl;
 
 
   //identify the pits 
 
-  std::cout << "I tried something, it should work." << std::endl;
+  // std::cout << "I tried something, it should work." << std::endl;
+  return output;
 }
 
 // This function correct the multiple flow receivers and donrs which end up with some duplicates probably linked to my homemade corrections.

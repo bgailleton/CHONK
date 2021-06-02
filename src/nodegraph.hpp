@@ -204,15 +204,6 @@ double get_length2Srec(int i) {return this->graph[i].length2Srec;}
 std::vector<int> get_broken_nodes(){return not_in_stack;}
 bool is_flat_draining(int node, xt::pytensor<double,1>& elevation, xt::pytensor<bool,1>& active_nodes);
 
-void fix_cyclicity(
-  std::vector<int>& node_to_check,
-  xt::pytensor<int,1>& Sstack,
-  xt::pytensor<int,1>& Srec,
-  xt::pytensor<int,1>& Prec,
-  xt::pytensor<int,2>& Mrec,
-  int correction_level
-  );
-
 // Single flow stack
 // # Main function
 void compute_stack();

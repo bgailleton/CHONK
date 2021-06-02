@@ -409,6 +409,12 @@ std::vector<double>& pre_sed, std::vector<double>& pre_water);
     xt::pytensor<int,1> get_top_depression(){return xt::adapt(this->graph.depression_tree.node2tree);};
     xt::pytensor<int,1> get_potential_volume(){return xt::adapt(this->graph.depression_tree.potential_volume);};
 
+    void print_debug_are_rec_proc(int node)
+    {
+        std::cout << "Recs of " << node << ":" << std::endl;
+        for(auto r: this->graph.get_MF_receivers_at_node(node))
+            std::cout << "-->" << r << ":" <<  this->is_processed[r] << std::endl;
+    }
 
 
     // I need some members to be public
