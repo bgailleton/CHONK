@@ -419,6 +419,9 @@ std::vector<double>& pre_sed, std::vector<double>& pre_water);
     double get_sum_of_all_volume_full_lake(){this->graph.depression_tree.get_sum_of_all_volume_full_lake();}
 
 
+    // DEBUGGER
+    int NTIMEPREFLUXCALLED;
+
     // I need some members to be public
     bool CHARLIE_I = true;
     bool CIDRE_HS = true;

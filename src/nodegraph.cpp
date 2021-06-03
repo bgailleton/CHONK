@@ -390,6 +390,21 @@ void NodeGraphV2::build_depression_tree_v2(xt::pytensor<double,1>& elevation, xt
 
   }
 
+
+  // DEBUG CHECKERZ
+  std::vector<int> globga(this->un_element, 0);
+  for(size_t i=0; i< this->depression_tree.parentree.size(); i++)
+  {
+    for(auto j: this->depression_tree.nodes[i])
+    {
+      globga[j]++;
+      if(globga[j] > 1)
+        throw std::runtime_error("Node multiple time in depression tree");
+    }
+  }
+
+  this->depression_tree.compile_n_0_level_children();
+
 }
 
 void NodeGraphV2::fill_the_depressions(std::vector<int>& next_to_check, xt::pytensor<double,1>& elevation, xt::pytensor<bool,1>& active_nodes)
@@ -405,7 +420,7 @@ void NodeGraphV2::fill_the_depressions(std::vector<int>& next_to_check, xt::pyte
       continue;
 
     std::vector<bool> is_in_queue = this->depression_tree.get_isinQ4dep(dep);
-    std::vector<int> chill_drenz = this->depression_tree.get_all_children(dep);
+    std::vector<int> chill_drenz = this->depression_tree.get_all_children(dep, false);
     int n_nodes_in_children = 0;
     for(auto i:chill_drenz)
       n_nodes_in_children += int(this->depression_tree.nodes[i].size());
@@ -413,6 +428,7 @@ void NodeGraphV2::fill_the_depressions(std::vector<int>& next_to_check, xt::pyte
 
     while(this->depression_tree.filler[dep].empty() == false)
     {
+      // std::cout << dep << " dep start volume is " << this->depression_tree.volume[dep] << std::endl;
       // getting next nodes
       int next_node = this->depression_tree.filler[dep].top().node;
       this->depression_tree.filler[dep].pop();
@@ -427,25 +443,45 @@ void NodeGraphV2::fill_the_depressions(std::vector<int>& next_to_check, xt::pyte
       // if my node is not belonging to my children but in a depression system
       if(this->depression_tree.is_child_of(this->depression_tree.node2tree[next_node],dep) == false && this->depression_tree.node2tree[next_node] > -1  )
       {
+        // triggering the merging of two depressions
+        // # 1) updating the depression hw and volume to the current elevation (but not ingesting the node)
         this->raise_dep_to_new_node( dep, next_node, elevation, active_nodes, false, n_nodes_in_children);
+        // # 2) Getting ht etwin depression
         int bro = this->depression_tree.get_ultimate_parent(this->depression_tree.node2tree[next_node]);
+        // # 3) Registering the parent depression and merging children info in it
         this->depression_tree.register_new_depression(elevation,this->depression_tree.pitnode[dep]);
         this->depression_tree.merge_children_to_parent({dep,bro}, this->depression_tree.get_last_id(), next_node, neightbors, elevation);
+
+        // # 4) Switching the filling to the new depression
         dep = this->depression_tree.get_last_id();
+        // std::cout << dep << " just merged and vol is  " << this->depression_tree.volume[dep] << std::endl;
+
+
+        is_in_queue = this->depression_tree.get_isinQ4dep(dep);
+        chill_drenz = this->depression_tree.get_all_children(dep, false);
+        n_nodes_in_children = 0;
+        for(auto i:chill_drenz)
+          n_nodes_in_children += int(this->depression_tree.nodes[i].size());
+
+
+
+
+
+        // this continue statement run the next iteration of the while loop but with the new dep
         continue;
       } 
 
-
-
-      // std::cout << "checker_filling 4" << std::endl;
-
+      // Switch that gets triggered if an outlet is found
       bool double_break = false;
+
       // Checking neightbour
       for(auto n:neightbors)
       {
+        // Already in this lake system
         if(is_in_queue[n] || this->depression_tree.node2tree[n] == dep)
           continue;
 
+        // if the node is a child or above the current elev -> gather it
         if(this->depression_tree.is_child_of(this->depression_tree.node2tree[n],dep) || elevation[n] >= elevation[next_node])
         {
           this->depression_tree.filler[dep].emplace(n,elevation[n]);
@@ -454,20 +490,22 @@ void NodeGraphV2::fill_the_depressions(std::vector<int>& next_to_check, xt::pyte
           continue;
         }
 
-        // std::cout << "DOUBLE BREAK" << std::endl;
+        // If none of the above, Iz an outlet
+        // #1) double break activated (will break the main loop after looping through all neighbors)
         double_break = true;
+        // #2) registering the outlet, or tipping node
         this->depression_tree.tippingnode[dep] = next_node;
+        // #3) if no receiver detected or lower than the existing one -> registering it
         if(this->depression_tree.externode[dep] == -1)
           this->depression_tree.externode[dep] = n;
         else if(elevation[this->depression_tree.externode[dep]] > elevation[n] )
           this->depression_tree.externode[dep] = n;
       }
-      // std::cout << "checker_filling 5" << std::endl;
-      // bool insert = true;
-      // if(next_node == this->depression_tree.pitnode[dep])
-      //   insert = false;
+
+      // Even if the current node is 
       this->raise_dep_to_new_node( dep, next_node, elevation, active_nodes, true, n_nodes_in_children);
       // std::cout << "checker_filling 6" << std::endl;
+      // std::cout << dep << " dep end volume is " << this->depression_tree.volume[dep] << std::endl;
 
       if(double_break)
         break;
@@ -487,30 +525,36 @@ void NodeGraphV2::raise_dep_to_new_node(int dep, int node, xt::pytensor<double,1
 {
 
   int nbeef = int(this->depression_tree.nodes[dep].size()) + n_nodes_in_children;
-  int last_node = -1;
-  if(this->depression_tree.nodes[dep].size()>0)
-    last_node = this->depression_tree.nodes[dep][this->depression_tree.nodes[dep].size() - 1];
+  
+  // if(this->depression_tree.nodes[dep].size()>0)
+  //   last_node = this->depression_tree.nodes[dep][this->depression_tree.nodes[dep].size() - 1];
+  double last_elev = this->depression_tree.hw_max[dep];
 
   this->depression_tree.hw_max[dep] = elevation[node];
 
   // if(true)
-  if(last_node == -1)
-  {
-    if(integrate_node )
-    {
-      this->depression_tree.node2tree[node] = dep;
+  // if(last_node == -1)
+  // {
+  //   if(integrate_node )
+  //   {
+  //     this->depression_tree.node2tree[node] = dep;
 
-      this->depression_tree.nodes[dep].emplace_back(node);
-    }
+  //     this->depression_tree.nodes[dep].emplace_back(node);
+  //   }
 
-    return;
-  }
+  //   return;
+  // }
 
-  double dz = elevation[node] - elevation[last_node];
-  double dV = nbeef * dz * this->dx * this->dy;
+  double dz = elevation[node] - last_elev;
+  double dV = nbeef * dz * this->cellarea;
 
   this->depression_tree.volume[dep] += dV;
-  this->depression_tree.potential_volume[last_node] = this->depression_tree.volume[dep];
+  if(this->depression_tree.nodes[dep].size()>0)
+    this->depression_tree.potential_volume[this->depression_tree.nodes[dep].size()-1] = this->depression_tree.volume[dep];
+  else if(this->depression_tree.treeceivers[dep][0] != -1)
+    this->depression_tree.potential_volume[this->depression_tree.tippingnode[this->depression_tree.treeceivers[dep][0]]] = this->depression_tree.volume[dep];
+
+
 
   if(integrate_node)
   {

@@ -65,6 +65,10 @@ public:
 	std::vector<double> hw;
 	int indexer = 0;
 
+	// Checkers
+	std::vector<int> n_0level_children_in_total;
+	std::vector<int> n_0level_children_in_total_done;
+
 
   //  ___________________
 	// |                   |
@@ -95,6 +99,9 @@ public:
 		this->level.emplace_back(0);
 		this->nodes.emplace_back( std::vector<int>()) ;
 		// this->nodes.emplace_back( std::vector<int>({pitnode})) ;
+		this->n_0level_children_in_total.emplace_back(0);
+		this->n_0level_children_in_total_done.emplace_back(0);
+
 
 		this->label_prop.emplace_back(std::vector<double>());
 		this->internode.emplace_back(-1);
@@ -133,6 +140,22 @@ public:
 	}
 
 	void linkhood(int node,int in, int tip, int out) {this->internode[node] = in; this->tippingnode[node] = tip; this->externode[node] = out;}; 
+
+	void compile_n_0_level_children()
+	{
+		for(int i = 0; i < int(this->parentree.size()); i++)
+		{
+			if(this->parentree[i] == -1)
+			{
+				std::vector<int> chilll = this->get_all_children(i,true);
+				for(auto U:chilll)
+				{
+					if(this->level[U] == 0)
+						this->n_0level_children_in_total[i] ++;
+				}
+			}
+		}
+	}
 
 
   //  ___________________
@@ -351,7 +374,9 @@ public:
 	{
 
 		this->treeceivers[parent] = children;
-		this->level[parent] = std::max(this->level[children[0]], this->level[children[0]]) + 1;
+		this->hw_max[parent] = this->hw_max[children[0]];
+		this->level[parent] = std::max(this->level[children[0]], this->level[children[1]]) + 1;
+
 		if(parent == children[0] || parent == children[1])
 			throw std::runtime_error("PARENTAL ISSUE");
 
@@ -377,9 +402,15 @@ public:
 			tdep = this->get_ultimate_parent(tdep);
 
 			if(elevation[n] >= vlower_elev_c1 && tdep == children[0])
+			{
 				lower_elev_c1 = n;
+				vlower_elev_c1 = elevation[n];
+			}
 			if(elevation[n] >= vlower_elev_c2 && tdep == children[1])
+			{
 				lower_elev_c2 = n;
+				vlower_elev_c2 = elevation[n];
+			}
 		}
 
 		this->externode[children[0]] = lower_elev_c2;
@@ -455,6 +486,7 @@ public:
 			if(this->parentree[i] == -1)
 				tot += this->volume[i];
 		}
+		std::cout << tot << std::endl;
 		return tot;
 	}
 

@@ -389,8 +389,8 @@ class CoreModel:
 		lake = self.model.get_lake_ID_array_raw().reshape(self.ny,self.nx)
 		return lake
 
-	@lake_id_raw.compute
-	def _lake_id_raw(self):
+	@tot_volake_tree.compute
+	def _tot_volake_tree(self):
 		return self.model.get_sum_of_all_volume_full_lake()
 		
 
