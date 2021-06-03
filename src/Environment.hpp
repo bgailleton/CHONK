@@ -416,6 +416,8 @@ std::vector<double>& pre_sed, std::vector<double>& pre_water);
             std::cout << "-->" << r << ":" <<  this->is_processed[r] << std::endl;
     }
 
+    double get_sum_of_all_volume_full_lake(){this->graph.depression_tree.get_sum_of_all_volume_full_lake();}
+
 
     // I need some members to be public
     bool CHARLIE_I = true;

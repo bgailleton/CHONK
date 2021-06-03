@@ -447,6 +447,17 @@ public:
 
 	}
 
+	double get_sum_of_all_volume_full_lake()
+	{
+		double tot = 0;
+		for (size_t i=0 ; i<this->parentree.size(); i++)
+		{
+			if(this->parentree[i] == -1)
+				tot += this->volume[i];
+		}
+		return tot;
+	}
+
 };
 
 
