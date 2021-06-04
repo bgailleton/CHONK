@@ -2234,27 +2234,34 @@ void ModelRunner::finalise()
 
 void ModelRunner::lake_solver_v3(int node)
 {
-  // return;
 
-
-
-  // // First I am getting hte depression
+  // First I am getting hte depression
   int this_dep = this->node_in_lake[node];
+  
+  // Deug statement -> to remove once efixed
   std::cout << "lake_solver_v3 -> starting " << this_dep << std::endl;
 
+  // Getting the top depression of the local tree
   int master_dep = this->graph.depression_tree.get_ultimate_parent(this_dep);
 
+  // Checking how many of the level 0 depressions have been oprocessed
+  // This is to ensure that all nodes above the depression have been processed
   if( this->graph.depression_tree.n_0level_children_in_total_done[master_dep] <  this->graph.depression_tree.n_0level_children_in_total[master_dep])
   {
+    // Adding to the count
     this->graph.depression_tree.n_0level_children_in_total_done[master_dep]++;
     // std::cout << master_dep << ":" << this->graph.depression_tree.n_0level_children_in_total[master_dep] << "/" << this->graph.depression_tree.n_0level_children_in_total_done[master_dep] << std::endl;
+    
+    // if not all dep level0 have been processed ---> not ready yet and pass
     if( this->graph.depression_tree.n_0level_children_in_total_done[master_dep] <  this->graph.depression_tree.n_0level_children_in_total[master_dep])
       return;
   }
 
-  std::cout << "DLAKESv3::A" << std::endl;
+  // If I reach here: all the depressions of the system have been proc and the lake solver is ready to roll
 
-  // Getting all nodes of the depression
+  // std::cout << "DLAKESv3::A" << std::endl;
+
+  // Getting all nodes of the depression and sorting them accordingly (Probs deprecated)
   std::vector<int> lstack = this->graph.depression_tree.get_all_nodes(master_dep);
   std::vector<int> nodes; nodes.reserve(lstack.size());
 
@@ -2271,7 +2278,7 @@ void ModelRunner::lake_solver_v3(int node)
 
   // std::cout << "DLAKESv3::B" << std::endl;
 
-  // Checking that all nodes of that depression have been processed, and processing them in case
+  // Checking that all nodes of that depression have been processed, and processing them in case (Probs deprecate dnow)
   for(size_t i = 0; i < nodes.size(); i++)
   {
     int tnode = nodes[i];
@@ -2289,7 +2296,7 @@ void ModelRunner::lake_solver_v3(int node)
   // }
 
 
-  // Get the topological order of depressions
+  // Get the topological order of depressions - > depressions from bottom to top
   std::vector<int> treestak = this->graph.depression_tree.get_local_treestack(master_dep);
 
   // for(auto dep:this->graph.depression_tree.get_all_children(master_dep,true))
@@ -2307,10 +2314,15 @@ void ModelRunner::lake_solver_v3(int node)
   //   ;
   // }
   
-  // Water - Sed and prop available for filling
+  // Getting ready to gather the water and sediment fluxes I will have for that depression
+  // Water for the whole system
   double tot_water_volume = 0;
+  // sed for the whole system
   double tot_sed_volume = 0;
+  // representative chonk for the whole system (I am lazily managing label prop and tracking here)
   chonk tot_representative_chonk(-1,-1,false);
+
+  // Same as above but by local depression
   std::map<int,double> water_volume;
   std::map<int,double> sed_volume;
   std::map<int,bool> is_processed;
@@ -2319,6 +2331,7 @@ void ModelRunner::lake_solver_v3(int node)
 
   // std::cout << "DLAKESv3::D" << std::endl;
 
+  // Going a first time throught the local stack to initialise everything
   for(int i=0; i<int(treestak.size());i++)
   {
     int this_dep = treestak[i];
@@ -2330,17 +2343,21 @@ void ModelRunner::lake_solver_v3(int node)
   // std::cout << "DLAKESv3::E" << std::endl;
 
   // Gathering all the water/sed/prop of the depression
-
   for(int i=0; i<int(treestak.size());i++)
   {
+    // local dep ID
     int this_dep = treestak[i];
+    // Only gathering if level 0 (will spread upstream if needed later)
     if(this->graph.depression_tree.level[this_dep] == 0)
     {
+      // Node ID of the local pit
       int pit = this->graph.depression_tree.pitnode[this_dep];
 
+      // DEBUG CHECKER TO REMOVE IF NOT TRIGGERD DURING EXTENSIVE TESTS
       if(this->is_processed[pit] == false)
         throw std::runtime_error("PIT NOT PROC");
 
+      // gathering local water/sed/prop and adding to the top and...
       tot_water_volume += this->chonk_network[pit].get_water_flux() * this->timestep;
       tot_sed_volume += this->chonk_network[pit].get_sediment_flux();
       tot_representative_chonk.add_to_sediment_flux(
@@ -2349,6 +2366,7 @@ void ModelRunner::lake_solver_v3(int node)
         this->chonk_network[pit].get_fluvialprop_sedflux()
         );
 
+      // ... in the local depressions
       water_volume[this_dep] += this->chonk_network[pit].get_water_flux() * this->timestep;
       sed_volume[this_dep] += this->chonk_network[pit].get_sediment_flux();
       representative_chonk[this_dep].add_to_sediment_flux(
@@ -2360,30 +2378,40 @@ void ModelRunner::lake_solver_v3(int node)
     }
   }
 
+  // Done with the gathering phase
+  // Let's fill the depression for real now
+
+
   // std::cout << "DLAKESv3::F" << std::endl;
 
-// Calculating which dep to reproc
+  // Calculating which dep to reproc -> not all depression will need processing
   std::vector<int> local_deps2reproc;
 
+  // CASE 1: I have more water than the total volume of the depression
   if(tot_water_volume >= this->graph.depression_tree.volume[master_dep])
   {
+    // I save  the master depression as sole one to reproc
     local_deps2reproc.emplace_back(master_dep);
+    // water/sed/prop volume to store in this dep is the total
     water_volume[master_dep] = tot_water_volume;
     sed_volume[master_dep] = tot_sed_volume;
     representative_chonk[master_dep] = tot_representative_chonk;
 
+    // DEBUG STATEMENT TO REMOVE ONCE EXTENSIVELY TESTED
     std::cout<< "WATER IN DEP " << tot_water_volume/(this->timestep) << std::endl;
-
+    //
+    // Pushing the volume in the depression tree
     this->graph.depression_tree.volume_water[master_dep] = this->graph.depression_tree.volume[master_dep];
+    // DOing the same for sed with a bit of manipulations to check wether I have enough to give
     if(sed_volume[master_dep] < this->graph.depression_tree.volume[master_dep])
       this->graph.depression_tree.volume_sed[master_dep] = sed_volume[master_dep];
     else
       this->graph.depression_tree.volume_sed[master_dep] = this->graph.depression_tree.volume[master_dep];
 
+    // raising the depression level to the max level
     this->graph.depression_tree.hw[master_dep] = this->graph.depression_tree.hw_max[master_dep];
+    // Saving the local tracker (this will be used for deiment deposioion)
     this->graph.depression_tree.label_prop[master_dep] = representative_chonk[master_dep].get_label_tracker();
-
-
   }
   else
   {
@@ -2400,6 +2428,7 @@ void ModelRunner::lake_solver_v3(int node)
   // std::cout << "DLAKESv3::G" << std::endl;
 
 
+  // I know now which depression to reprocess
   // Processing the depressions
 
   for(auto dep: local_deps2reproc)
@@ -2411,10 +2440,15 @@ void ModelRunner::lake_solver_v3(int node)
     int outlet = this->graph.depression_tree.tippingnode[dep];
     // And their receiver
     int rec = this->graph.depression_tree.externode[dep];
-
+    // getting all children depressions (and self)
     std::vector<int> children = this->graph.depression_tree.get_all_children(dep, true);
 
-    //receivers of the outlet to check what it gave to the lake
+    // CORRECTING FOR DONORS AND RECEIVERS
+
+
+    // My outlet gave to the lake, and the water it gave to the lake will be reoutletted to it.
+    // I need to substract it somehow not to give twice
+    // POTENTIAL LABPROP MISSING HERE??
     double corrwat = 0, corrsed = 0, corrFP = 0; std::vector<double> corrlabprop;
     std::vector<int> recs = this->graph.get_MF_receivers_at_node(outlet);
     for(auto r : recs)
@@ -2431,10 +2465,10 @@ void ModelRunner::lake_solver_v3(int node)
     }
     // std::cout << "DLAKESv3::I" << std::endl;
 
-
+    // Now I can deprocess/reprocess the outlet
     // resetting the outlet
-    this->cancel_fluxes_before_moving_prep(this->chonk_network[outlet], outlet);
     this->chonk_network[outlet].cancel_split_and_merge_in_receiving_chonks(this->chonk_network, this->graph, this->timestep);
+    this->cancel_fluxes_before_moving_prep(this->chonk_network[outlet], outlet);
     this->chonk_network[outlet].reset();
     // std::cout << "DLAKESv3::I.1" << std::endl;
     // Redonning what its donors gave it
