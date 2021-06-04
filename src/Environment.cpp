@@ -2583,6 +2583,7 @@ void ModelRunner::lake_solver_v3(int node)
         {
           this->topography[n] = this->graph.depression_tree.hw[dep];
           this->node_in_lake[n] = dep;
+          // HERE I WILL NEED TO REMOVE THE SED FROM EROSION?DEP WITH THE RIGHT PROPORTIONS
 
         }
 

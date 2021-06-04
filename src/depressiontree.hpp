@@ -1,4 +1,12 @@
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+/*
+Header-only code for the binary tree sorting out the depressions in the landscapes
+On itself it only contains the data structure and functions to manage the tree,
+as well as functions to navigate through it or inserting elements.
+The actual building happens in the nodegraph file
+B.G. - June 2021
+*/
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 #ifndef depressiontree_HPP
 #define depressiontree_HPP
 
@@ -13,7 +21,6 @@
 #include <iostream>
 #include <numeric>
 #include <cmath>
-
 #include "chonkutils.hpp"
 // All the xtensor requirements
 #include "xtensor-python/pyarray.hpp" // manage the I/O of numpy array
@@ -25,8 +32,12 @@
 #include "xtensor/xtensor.hpp" // same
 
 
+// Single class hosting everything
 class DepressionTree
 {
+
+// Everything is public cause I have bad coding habits but it's fine
+
 public:
 	//  ___________________
 	// |                   |
@@ -37,32 +48,53 @@ public:
 	//            / 　 づ
 
 	// Size: number of nodes in the landscapes
+	// index node ID -> value: index in the depression tree (-1 if no depression)
 	std::vector<int> node2tree;
+	// index node ID -> value: node id of the outlet (DEPRECATED?? I think)
 	std::vector<int> node2outlet;
+	// index node ID -> value: the potential volume the depression can fit in. 
+	// Constructed in ascedeing order from pit bottom 
 	std::vector<double> potential_volume;
 
 	// Size: number of depressions in the tree
-	//# tree connections
-	std::vector<std::vector<int> > treeceivers;
+	// index: depression ID -> value: the two children in the binary tree ({-1,-1} if no children)
+	std::vector<std::vector<int> > treeceivers; 
+	// index: depression id -> value: the parent in the binary tree, -1 if no parent
 	std::vector<int> parentree;
+	// index = depression ID -> value: level of the depression (increment by 1 from the bottom depression to the top of each local tree, maximum value prevail in case of different level merging)
 	std::vector<int> level;
+	// index: depression ID -> value: priority queue utilised by the filling processes
+	// When a parent depression is created it merges their PQ 
 	std::vector<std::priority_queue< PQ_helper<int, double>, std::vector<PQ_helper<int, double> >, std::greater<PQ_helper<int, double> > > > filler;
+	// index: depression ID -> value: vector of nodes in the depression
 	std::vector<std::vector<int> > nodes;
+	// index: depression ID -> value: vector of proportion of labels in the sediment flux
 	std::vector<std::vector<double> > label_prop;
+	// index Depression ID -> value: I am not sure...
 	std::vector<bool> active;
 
 	//# Node connections 
+	// index: depression ID -> value: an internode connected to the outlet
 	std::vector<int> internode;
+	// index: depression ID -> value: tipping node, or outlet of the depression. if twin, will be the same for 2 depressions and that is how the tree is built.
 	std::vector<int> tippingnode;
+	// index: depression ID -> value: a receiver of the outlet outside of the current basin 
 	std::vector<int> externode;
+	// index: depression ID -> value: pit of the depression (ie bottom node). THis is mostly important for childless depressions, the parent depressions have a random pit being one of its children pits
 	std::vector<int> pitnode;
 
 	//# Depression characteristics
+	// index: depression ID -> value: total volume of the depression 
 	std::vector<double> volume;
+	// index: depression ID -> value: volume of actual sediment hosted in the depression 
 	std::vector<double> volume_sed;
+	// index: depression ID -> value: volume of actual water hosted in the depression 
 	std::vector<double> volume_water;
+	// index: depression ID -> value: maximum water height of the depression (in absolute elevation)
 	std::vector<double> hw_max;
+	// index: depression ID -> value: actual water height of the depression (in absolute elevation)
 	std::vector<double> hw;
+	// indexer used to do stuff, not sure. Might be deprecated.
 	int indexer = 0;
 
 	// Checkers
