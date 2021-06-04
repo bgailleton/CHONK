@@ -120,9 +120,10 @@ NodeGraphV2::NodeGraphV2(
   // It does not include non active nodes (i.e. base level of the model/output of the model)
   this->pits_to_reroute = std::vector<bool>(un_element,false);
 
-    graph.reserve(un_element);
-  for(int i=0; i<n_element;i++)
-    graph.emplace_back(Vertex());
+  this->graph = std::vector<Vertex>();
+  this->graph.reserve(un_element);
+  for(int i=0; i<this->n_element;i++)
+    this->graph.emplace_back(Vertex());
 
   // computing receivers and donors information, multi and SS flow
   this->compute_receveivers_and_donors(active_nodes,elevation);
@@ -255,9 +256,9 @@ NodeGraphV2::NodeGraphV2(
     // THIS IS WHAT HAPPENS WHEN THE LAKE SOVER IS EXPLICIT
     this->build_depression_tree_v2(elevation, active_nodes);
     // this->depression_tree.printree();
-    std::cout << "A" << std::endl;
+    // std::cout << "A" << std::endl;
     node_to_check = this->update_receivers_explicit();
-    std::cout << "B" << std::endl;
+    // std::cout << "B" << std::endl;
 
   }
 
@@ -391,17 +392,17 @@ void NodeGraphV2::build_depression_tree_v2(xt::pytensor<double,1>& elevation, xt
   }
 
 
-  // DEBUG CHECKERZ
-  std::vector<int> globga(this->un_element, 0);
-  for(size_t i=0; i< this->depression_tree.parentree.size(); i++)
-  {
-    for(auto j: this->depression_tree.nodes[i])
-    {
-      globga[j]++;
-      if(globga[j] > 1)
-        throw std::runtime_error("Node multiple time in depression tree");
-    }
-  }
+  // // DEBUG CHECKERZ
+  // std::vector<int> globga(this->un_element, 0);
+  // for(size_t i=0; i< this->depression_tree.parentree.size(); i++)
+  // {
+  //   for(auto j: this->depression_tree.nodes[i])
+  //   {
+  //     globga[j]++;
+  //     if(globga[j] > 1)
+  //       throw std::runtime_error("Node multiple time in depression tree");
+  //   }
+  // }
 
   this->depression_tree.compile_n_0_level_children();
 

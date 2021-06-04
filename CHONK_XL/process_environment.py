@@ -383,7 +383,7 @@ class CoreModel:
 	def _lake_depth(self):
 		lake = self.model.get_array_double_param("lake_depth").reshape(self.ny,self.nx)
 		lake = np.abs(lake)
-		lake[lake<=0] = np.nan
+		# lake[lake<=0] = np.nan
 		return lake
 	@lake_id_raw.compute
 	def _lake_id_raw(self):

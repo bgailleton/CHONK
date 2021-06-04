@@ -148,11 +148,8 @@ void ModelRunner::initiate_nodegraph()
   calculated_K = xt::zeros_like(this->topography);
 
 
-  // Dat is the real stuff:
-  // Initialising the graph
-  this->graph = NodeGraphV2(this->surface_elevation, this->active_nodes,this->dx, this->dy,
-                            this->io_int["n_rows"], this->io_int["n_cols"], this->lake_solver);
-  lake_to_process = std::vector<int>();
+
+
   // Chonkification: initialising chonk network
   //# clearing the chonk network
   if(this->chonk_network.size()>0)
@@ -180,6 +177,12 @@ void ModelRunner::initiate_nodegraph()
 
   // Processes preexisting water from previous time steps, so far: lakes
   this->process_inherited_water();
+
+  // Dat is the real stuff:
+  // Initialising the graph
+  this->graph = NodeGraphV2(this->surface_elevation, this->active_nodes,this->dx, this->dy,
+                            this->io_int["n_rows"], this->io_int["n_cols"], this->lake_solver);
+  this->lake_to_process = std::vector<int>();
 
   // Also initialising the Lake graph
   //# incrementor reset to 0
@@ -2434,7 +2437,7 @@ void ModelRunner::lake_solver_v3(int node)
 
   for(auto dep: local_deps2reproc)
   {
-
+    this->lake_to_process.push_back(dep);
     // std::cout << "DLAKESv3::H" << std::endl;
 
     // finding the outlet
@@ -2475,77 +2478,77 @@ void ModelRunner::lake_solver_v3(int node)
     std::priority_queue< node_to_reproc, std::vector<node_to_reproc>, std::greater<node_to_reproc> > ORDEEEEEER; // I am not politically aligned with John Bercow, this is jsut for the joke haha
 
 
-    // //----------------------------------------------------
-    // //------- FORMING THE STACK OF NODE TO REPROC --------
-    // //----------------------------------------------------
-    // // This section aims to gather all nodes to reprocess. All node of the landscape have a type sort them by type: 
-    // // # 'n' if not concerned, 'l' if in lake, 'd' if donor, 'r' if potential reproc and 'y' if in stack
-    // std::vector<int> local_mstack;
-    // // keeping track of which nodes are already in teh queue (or more generally to avoid) and which one have receivers in the local stack
-    // std::vector<char> is_in_queue(this->io_int["n_elements"],'n');
-    // // Before starting to gather the nodes downstream of me outlet, let's gather mark the node in me lake as not available (as if already in the queue)
-    // // Avoinding nodes in the lakes
-    // lstack = this->graph.depression_tree.get_all_nodes(dep);
-    // nodes; nodes.reserve(lstack.size());
+    //----------------------------------------------------
+    //------- FORMING THE STACK OF NODE TO REPROC --------
+    //----------------------------------------------------
+    // This section aims to gather all nodes to reprocess. All node of the landscape have a type sort them by type: 
+    // # 'n' if not concerned, 'l' if in lake, 'd' if donor, 'r' if potential reproc and 'y' if in stack
+    std::vector<int> local_mstack;
+    // keeping track of which nodes are already in teh queue (or more generally to avoid) and which one have receivers in the local stack
+    std::vector<char> is_in_queue(this->io_int["n_elements"],'n');
+    // Before starting to gather the nodes downstream of me outlet, let's gather mark the node in me lake as not available (as if already in the queue)
+    // Avoinding nodes in the lakes
+    lstack = this->graph.depression_tree.get_all_nodes(dep);
+    nodes; nodes.reserve(lstack.size());
 
-    // PQstack = std::priority_queue< PQ_helper<int,int>, std::vector<PQ_helper<int,int> >, std::greater<PQ_helper<int,int> > >() ;
-    // for(auto n: lstack)
-    //   PQstack.emplace(PQ_helper<int,int>(n,this->graph.get_index_MF_stack_at_i(n)));
+    PQstack = std::priority_queue< PQ_helper<int,int>, std::vector<PQ_helper<int,int> >, std::greater<PQ_helper<int,int> > >() ;
+    for(auto n: lstack)
+      PQstack.emplace(PQ_helper<int,int>(n,this->graph.get_index_MF_stack_at_i(n)));
 
-    // while(PQstack.empty() == false)
-    // {
-    //   nodes.emplace_back(PQstack.top().node);
-    //   PQstack.pop();
-    // }
+    while(PQstack.empty() == false)
+    {
+      nodes.emplace_back(PQstack.top().node);
+      PQstack.pop();
+    }
 
-    // for(auto tnode:nodes)
-    // {
-    //   is_in_queue[tnode] = 'l';
-    // }
+    for(auto tnode:nodes)
+    {
+      is_in_queue[tnode] = 'l';
+    }
 
-    // // This function gathers all the nodes to be reprocessed. Including their donor which will be partially reprocessed
-    // // This function is only geometrical, it does not assume any existing transfer of sed/water
-    // this->gather_nodes_to_reproc(local_mstack,  ORDEEEEEER,  is_in_queue,  outlet);
-    // this->deprocess_local_stack(local_mstack, is_in_queue);
+    // This function gathers all the nodes to be reprocessed. Including their donor which will be partially reprocessed
+    // This function is only geometrical, it does not assume any existing transfer of sed/water
+    this->gather_nodes_to_reproc(local_mstack,  ORDEEEEEER,  is_in_queue,  outlet);
+    this->deprocess_local_stack(local_mstack, is_in_queue);
     
-    // // Now reprocessing the stack of stuff
+    // Now reprocessing the stack of stuff
 
-    // // Iterating through the local stack
-    // for(auto tnode:local_mstack)
-    // {
-    //   // Discriminating between the donors and the receivers
-    //   if(is_in_queue[tnode] == 'd')
-    //   {
-    //     // # I am a donor, I just need to regive the sed/water without other reproc
-    //     // # Let me just just check which of my receivers I need to give fluxes (I shall not regive to the nodes not in my local stack)
-    //     std::vector<int> ignore_some; 
-    //     for(auto ttnode: this->chonk_network[tnode].get_chonk_receivers_copy())
-    //     {
-    //       // if the node is the outlet, or not a 'y', I ignore it
-    //       if(is_in_queue[ttnode] != 'y' || ttnode == outlet)
-    //       {          
-    //         ignore_some.emplace_back(ttnode);
-    //         continue;
-    //       }
-    //       // I also ignore the nodes in the current lake (they have a 'y' signature)
-    //       else if (this->node_in_lake[ttnode] >= 0)
-    //       {
-    //         ignore_some.emplace_back(ttnode);
-    //         continue;
-    //       }
-    //     }
+    // Iterating through the local stack
+    for(auto tnode:local_mstack)
+    {
+      // Discriminating between the donors and the receivers
+      if(is_in_queue[tnode] == 'd')
+      {
+        // # I am a donor, I just need to regive the sed/water without other reproc
+        // # Let me just just check which of my receivers I need to give fluxes (I shall not regive to the nodes not in my local stack)
+        std::vector<int> ignore_some; 
+        for(auto ttnode: this->chonk_network[tnode].get_chonk_receivers_copy())
+        {
+          // if the node is the outlet, or not a 'y', I ignore it
+          if(is_in_queue[ttnode] != 'y' || ttnode == outlet)
+          {          
+            ignore_some.emplace_back(ttnode);
+            continue;
+          }
+          // I also ignore the nodes in the current lake (they have a 'y' signature)
+          else if (this->node_in_lake[ttnode] >= 0)
+          {
+            ignore_some.emplace_back(ttnode);
+            continue;
+          }
+        }
 
-    //     // # Ignore_some has the node i so not want
-    //     // # So I transmit my fluxes to the nodes I do not ignore
-    //     this->chonk_network[tnode].split_and_merge_in_receiving_chonks_ignore_some(this->chonk_network, this->graph, this->timestep, ignore_some);
+        // # Ignore_some has the node i so not want
+        // # So I transmit my fluxes to the nodes I do not ignore
+        this->chonk_network[tnode].split_and_merge_in_receiving_chonks_ignore_some(this->chonk_network, this->graph, this->timestep, ignore_some);
 
-    //   }
-    //   else
-    //   {
-    //     // # I am not a nodor:
-    //     this->process_node_nolake_for_sure(tnode, this->is_processed, this->active_nodes, this->cellarea,this->topography, true, true);
-    //   }
-    // }
+      }
+      else
+      {
+        // # I am not a nodor:
+        this->process_node_nolake_for_sure(tnode, this->is_processed, this->active_nodes, this->cellarea,this->topography, true, true);
+      }
+    }
   
 
     // Now I can deprocess/reprocess the outlet
@@ -2565,6 +2568,29 @@ void ModelRunner::lake_solver_v3(int node)
       this->chonk_network[n].split_and_merge_in_receiving_chonks_ignore_but_one(this->chonk_network,this->graph, this->timestep, outlet);
     }
     // std::cout << "DLAKESv3::I.2" << std::endl;
+
+
+    // Need to "cancel" erosion and deposition to backcalculate the sediment in the lake
+
+    // Now I am post-processing the lakes: adding the lake depth, and ID and all
+    // std::cout << "Are raised to " << this->graph.depression_tree.hw[dep] << ":";
+    for (auto n:nodes)
+    {
+      // std::cout << n << "|" << this->graph.depression_tree.node2tree[n] << "|";
+      if(std::find(children.begin(), children.end(), this->graph.depression_tree.node2tree[n]) != children.end())
+      {
+        if(this->graph.depression_tree.potential_volume[n] <= this->graph.depression_tree.volume_water[dep])
+        {
+          this->topography[n] = this->graph.depression_tree.hw[dep];
+          this->node_in_lake[n] = dep;
+
+        }
+
+
+      }
+
+
+    }
 
 
     // Calculating what needs to be given to it:
@@ -2587,7 +2613,7 @@ void ModelRunner::lake_solver_v3(int node)
     // Setting it as not processed
     this->is_processed[outlet] = false;
 
-    std::cout<< "WATER OUT DEP " << extra_water << " leaving " << this->graph.depression_tree.volume_water[dep] << std::endl;
+    std::cout<< "WATER OUT DEP " << extra_water << " leaving " << this->graph.depression_tree.volume_water[dep]/this->timestep << std::endl;
 
     // std::cout << "DLAKESv3::I.5" << std::endl;
     // Reprocessing the node, without move prep
@@ -2613,25 +2639,7 @@ void ModelRunner::lake_solver_v3(int node)
     // std::cout << std::endl;
 
 
-    // Now I am post-processing the lakes: adding the lake depth, and ID and all
-    // std::cout << "Are raised to " << this->graph.depression_tree.hw[dep] << ":";
-    for (auto n:nodes)
-    {
-      // std::cout << n << "|" << this->graph.depression_tree.node2tree[n] << "|";
-      if(std::find(children.begin(), children.end(), this->graph.depression_tree.node2tree[n]) != children.end())
-      {
-        if(this->graph.depression_tree.potential_volume[n] <= this->graph.depression_tree.volume_water[dep])
-        {
-          this->topography[n] = this->graph.depression_tree.hw[dep];
-          this->node_in_lake[n] = dep;
 
-        }
-
-
-      }
-
-
-    }
     // std::cout << std::endl;
     // std::cout << "DLAKESv3::K" << std::endl;
 
@@ -3605,13 +3613,12 @@ void ModelRunner::initialise_label_list(std::vector<labelz> these_labelz)
 // POSSIBLE OPTIMISATION::Recreating lake objects, but I would need a bit of refactoring the Lake object. Will seee if this is very slow
 void ModelRunner::process_inherited_water()
 {
-  for(auto& tlake:this->lakes)
+  for(auto tlake : this->lake_to_process)
   {
-    if(tlake.is_now >= 0)
-      continue;
+
 
     // getting node underwater
-    std::vector<int>& unodes = tlake.nodes;
+    std::vector<int> unodes = this->graph.depression_tree.get_all_nodes(tlake);
 
 
     double minelev = std::numeric_limits<double>::max();
@@ -3627,7 +3634,7 @@ void ModelRunner::process_inherited_water()
       // sumwat += this->io_double_array["lake_depth"][node] * this->dx * this->dy / this->timestep ;
     }
 
-    this->chonk_network[minnodor].add_to_water_flux(tlake.volume_water/this->timestep);
+    this->chonk_network[minnodor].add_to_water_flux(this->graph.depression_tree.volume_water[tlake]/this->timestep);
 
   }
 
