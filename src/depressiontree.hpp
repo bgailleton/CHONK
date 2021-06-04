@@ -181,15 +181,21 @@ public:
 	//            (•ㅅ•) ||
 	//            / 　 づ
 
+	// register parent-children relationship. Sort of birth certificate.
 	void parenthood(int parent, std::vector<int> children)
 	{
+		// Children to parent
 		this->treeceivers[parent] = children;
+		// Parent to children 
 		for(auto i:children)
 			this->parentree[i] = parent; 
 	}
 
+	// linking depression to nodes
 	void linkhood(int node,int in, int tip, int out) {this->internode[node] = in; this->tippingnode[node] = tip; this->externode[node] = out;}; 
 
+	// Static compilation of depressioj level, to be run after the building of the tree.
+	// Iterates through depressions and for each orphan goes through all children and increment for each level 0 ones
 	void compile_n_0_level_children()
 	{
 		for(int i = 0; i < int(this->parentree.size()); i++)
@@ -215,9 +221,10 @@ public:
 	//            (•ㅅ•) ||
 	//            / 　 づ
 
+	// Simple Breadth first traversal to get all children, include_node determinesif the mother dep must be included or not in the outputs
 	std::vector<int> get_all_children(int node, bool include_node = false)
 	{
-		// Initialising the output and reserving an arbitrary size
+		// Initialising the output and reserving an arbitrary capacity, it does not matter much
 		std::vector<int> output; output.reserve(std::round(this->parentree.size()/2));
 		std::queue<int> children; children.emplace(node);
 		while(children.empty() == false)
@@ -226,8 +233,6 @@ public:
 			children.pop();
 			if( ((next == node) && include_node)  || (next != node))
 				output.emplace_back(next);
-
-
 			for(size_t k=0; k <  this->treeceivers[next].size(); k++)
 			{
 				int i = this->treeceivers[next][k];
@@ -238,9 +243,9 @@ public:
 			}
 		}
 		return output;
-
 	}
 
+	// Returns the topmost parent linked to a depression
 	int get_ultimate_parent(int dep)
 	{ 
 		if(dep == -1)
@@ -250,6 +255,7 @@ public:
 	  return dep;
   }
 
+  // Returns the twin of a depression if it has one, or -1
   int get_twin(int dep)
   {
   	if(this->parentree[dep] == -1) {return -1;}
@@ -257,20 +263,16 @@ public:
   	return -1;
   }
 
-
-
+  // Returns all the ndoes of the depression (includes the ones from the child depressions)
 	std::vector<int> get_all_nodes(int node)
 	{
 		std::vector<int> alldeps = this->get_all_children( node, true), output;
-
 		size_t totsize = 0;
 		for(auto i: alldeps)
 		{
 			totsize += this->nodes[i].size();
 		}
-
 		output.reserve(totsize);
-		
 		for(auto i: alldeps)
 		{
 			for(auto j:this->nodes[i])
@@ -278,16 +280,15 @@ public:
 				output.emplace_back(j);
 			}
 		}
-
 		return output;
 	}
 
+	//same than above but takes time and effort to sort the depressions by elevation of their pit for some reason. I think I am not using this anymorel.
 	std::vector<int> get_all_nodes_bottom2top(int node, xt::pytensor<double,1>& elevation)
 	{
 
 		std::priority_queue< PQ_helper<int,double>, std::vector<PQ_helper<int,double> >, std::greater<PQ_helper<int,double> > > sorter;
 		std::vector<int> alldeps = this->get_all_children( node, true), output;
-
 		size_t totsize = 0;
 		for(auto i: alldeps)
 		{
@@ -295,9 +296,7 @@ public:
 			if(this->nodes[i].size()>0)
 				sorter.emplace(PQ_helper<int,double>(i,elevation[this->nodes[i][0]]));
 		}
-
 		output.reserve(totsize);
-		
 		while(sorter.empty() == 0)
 		{
 			int i = sorter.top().node;
@@ -307,10 +306,10 @@ public:
 				output.emplace_back(j);
 			}
 		}
-
 		return output;
 	}
 
+	// Returns a topological order of the treebased on the level of the depression in order to process the 0 level first and their ultimate parents last
 	std::vector<int> get_treestack()
 	{
 		std::priority_queue< PQ_helper<int,int>, std::vector<PQ_helper<int,int> >, std::greater<PQ_helper<int,int> > > sorter;
@@ -325,6 +324,7 @@ public:
 		return stack;
 	}
 
+	// Same than above but just for a local tree
 	std::vector<int> get_local_treestack(int dep)
 	{
 		std::priority_queue< PQ_helper<int,int>, std::vector<PQ_helper<int,int> >, std::greater<PQ_helper<int,int> > > sorter;
@@ -335,19 +335,16 @@ public:
 		// std::cout << "blag2 " << these_seps.size() << std::endl;
 		for(size_t i=0; i<these_seps.size(); i++)
 			sorter.emplace(PQ_helper<int,int>(these_seps[i],this->level[these_seps[i]]));
-
 		std::vector<int> stack; stack.reserve(these_seps.size());
-
 		while(sorter.size()>0)
 		{
 			stack.emplace_back(sorter.top().node);
 			sorter.pop();
 		}
-
 		return stack;
 	}
 
-
+	// Getting all top level depressions, orphan, parentestest, which ever term you prefer
 	std::vector<int> get_all_parentfree_depressions()
 	{
 		std::vector<int> output;
@@ -359,9 +356,10 @@ public:
 		return output;
 	}
 
-
+	// retunrs the last ID used 
 	int get_last_id(){return int(this->parentree.size()) - 1;}
 
+	// check if a depression has chilfren
 	bool has_children(int dep)
 	{
 		for(auto i: this->treeceivers[dep])
@@ -372,6 +370,7 @@ public:
 		return false;
 	}
 
+	// returns the number of depressions in the whole tree
 	int get_n_dep(){return int(this->parentree.size());}
 
   //  ___________________
