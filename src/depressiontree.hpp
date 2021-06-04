@@ -98,7 +98,11 @@ public:
 	int indexer = 0;
 
 	// Checkers
+	// These checker are important during the process phase of the model: a master depression cannot be processed
+	// before all of its level0 children have been.
+	// index: depression ID -> value: N level 0 depression in this whole system
 	std::vector<int> n_0level_children_in_total;
+	// index: depression ID -> value: N level 0 depression in this whole system that have been processed
 	std::vector<int> n_0level_children_in_total_done;
 
 
@@ -110,7 +114,9 @@ public:
 	//            (•ㅅ•) ||
 	//            / 　 づ
 
+	// Default constructor, does not do much and should not be used
 	DepressionTree() {;};
+	// Initiate a depression tree and create the global vector to the full size.
 	DepressionTree(int n_elements) {this->node2tree = std::vector<int>(n_elements, -1);this->node2outlet = std::vector<int>(n_elements, -1);this->potential_volume = std::vector<double>(n_elements, -1);};
 
 
@@ -123,38 +129,49 @@ public:
 	//            (•ㅅ•) ||
 	//            / 　 づ
 
-	// Registering depression
+	// Registering depression: creating a new depression in the tree, it mostly makes sure the size of all the vectors are rightly expended
+	// Also registers the right pit node to the depression 
 	void register_new_depression(xt::pytensor<double,1>& elevation, int pitnode, std::vector<int> children)
 	{
+		// eventually registering children there
 		this->treeceivers.emplace_back(children);
+		// No parent if just created
 		this->parentree.emplace_back(-1);
+		// level 0 by default, get calculated dynamically in the building process
 		this->level.emplace_back(0);
+		// no nodes yet, the first one gets added later
 		this->nodes.emplace_back( std::vector<int>()) ;
-		// this->nodes.emplace_back( std::vector<int>({pitnode})) ;
+
+		//same here, nothing by defautl, gets calculated statically at the end
 		this->n_0level_children_in_total.emplace_back(0);
 		this->n_0level_children_in_total_done.emplace_back(0);
 
-
+		// No label at first
 		this->label_prop.emplace_back(std::vector<double>());
+		// connecting nodes are calculated when a depression outlets/merges
 		this->internode.emplace_back(-1);
 		this->tippingnode.emplace_back(-1);
 		this->externode.emplace_back(-1);
+		// Pit node given at first
 		this->pitnode.emplace_back(pitnode);
+		// No volumes at first
 		this->volume.emplace_back(0);
 		this->volume_sed.emplace_back(0);
 		this->volume_water.emplace_back(0);
+		// Initial hw is the one of the pits
 		this->hw_max.emplace_back(elevation[pitnode]);
 		this->hw.emplace_back(0);
+		// Empty PQ
 		this->filler.emplace_back(std::priority_queue< PQ_helper<int,double>, std::vector<PQ_helper<int,double> >, std::greater<PQ_helper<int,double> > >());
+		// whatever that is, that is false RN
 		this->active.emplace_back(false);
 	}
 
+	// registering new depression without bothering about children
 	void register_new_depression(xt::pytensor<double,1>& elevation, int pitnode) 
 	{
 		this->register_new_depression(elevation,pitnode, {-1,-1});
 	}
-
-
 
   //  ___________________
 	// |                   |
