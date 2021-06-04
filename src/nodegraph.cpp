@@ -1059,37 +1059,56 @@ std::vector<int> NodeGraphV2::update_receivers_explicit()
     int current = i;
     if(is_processed[current])
       continue;
-    int parent = this->depression_tree.get_ultimate_parent(current), to;
+    int parent = this->depression_tree.get_ultimate_parent(current);
+    std::vector<int> children = this->depression_tree.get_all_children(parent, true);
+    std::vector<int> nrecs;
+    for(auto r: this->graph[this->depression_tree.tippingnode[parent]].receivers)
+    {
+      if(std::find(children.begin(),children.end(), this->depression_tree.node2tree[r]) == children.end())
+      {
+        nrecs.emplace_back(r);
+        // std::cout << "DSKLFJSLKDJFLJSDLFJSLDJFLJ:" << r << std::endl;
+      }
+    }
+
+    
     // std::cout << parent << " || "<< current << std::endl;
     
-    if(parent > -1)
-    {
-      // std::cout << "1POPOPOPO" << std::endl;
-      to = this->depression_tree.externode[parent];
-    }
-    else
-    {
-      // std::cout << "2POPOPOPO" << std::endl;
-      to = this->depression_tree.externode[current];
-    }
+    // if(parent > -1)
+    // {
+    //   // std::cout << "1POPOPOPO" << std::endl;
+    //   to = this->depression_tree.externode[parent];
+    // }
+    // else
+    // {
+    //   // std::cout << "2POPOPOPO" << std::endl;
+    //   to = this->depression_tree.externode[current];
+    // }
     // std::cout << parent << " | "<< to << std::endl;
 
-    std::vector<int> children = this->depression_tree.get_all_children(parent, true);
     // std::cout << "gaft" << std::endl;
 
     for(size_t k=0; k<children.size(); k++)
     {
 
       int j = children[k];
+      // is_processed[k] = true;
       // std::cout << "d:" << j << std::endl;
       // std::cout << "e:" << this->depression_tree.pitnode[j] << std::endl;
 
       is_processed[j] = true;
       if(this->depression_tree.level[j] == 0)
       {
-        this->graph[this->depression_tree.pitnode[j]].receivers = {to};
-        this->graph[this->depression_tree.pitnode[j]].length2rec = {this->dx};
-        output.push_back(this->depression_tree.pitnode[j]);
+        for(auto r: nrecs)
+        {
+
+          this->graph[this->depression_tree.pitnode[j]].receivers.emplace_back(r);
+          this->graph[this->depression_tree.pitnode[j]].length2rec.emplace_back(this->dx);
+          output.push_back(this->depression_tree.pitnode[j]);
+        
+        }
+
+        
       }
       // std::cout << "f:" << output.size() << std::endl;
 

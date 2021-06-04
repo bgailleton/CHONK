@@ -121,6 +121,7 @@ PYBIND11_MODULE(CHONK_cpp, m)
       .def("get_top_depression", &ModelRunner::get_top_depression)
       .def("get_potential_volume", &ModelRunner::get_potential_volume)
       .def("get_sum_of_all_volume_full_lake", &ModelRunner::get_sum_of_all_volume_full_lake)
+      .def("get_fluvlabprop",&ModelRunner::get_fluvlabprop)
 
     ;
     m.def("set_DEBUG_switch_nodegraph",set_DEBUG_switch_nodegraph);

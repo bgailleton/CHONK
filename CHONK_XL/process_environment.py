@@ -264,6 +264,7 @@ class CoreModel:
 	Qs_mass_balance_checker = xs.on_demand()
 	top_depression = xs.on_demand(dims = ('y','x'))
 	potential_volume = xs.on_demand(dims = ('y','x'))
+	fluvprop = xs.on_demand(dims = ('y','x'))
 	tot_volake_tree = xs.on_demand()
 
 	def initialize(self):
@@ -461,6 +462,10 @@ class CoreModel:
 	@flat_mask.compute
 	def _flat_mask(self):
 		return self.model.get_flat_mask().reshape(self.ny,self.nx);
+
+	@fluvprop.compute
+	def _fluvprop(self):
+		return self.model.get_fluvlabprop().reshape(self.ny,self.nx);
 
 	@NodeID.compute
 	def _NodeID(self):

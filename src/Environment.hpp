@@ -416,6 +416,8 @@ std::vector<double>& pre_sed, std::vector<double>& pre_water);
             std::cout << "-->" << r << ":" <<  this->is_processed[r] << std::endl;
     }
 
+    xt::pytensor<double,1> get_fluvlabprop(){xt::pytensor<double,1> output = xt::zeros<double>({this->chonk_network.size()}); for(size_t i=0; i< this->chonk_network.size();i++){output[i] = this->chonk_network[i].get_fluvialprop_sedflux();}; }
+
     double get_sum_of_all_volume_full_lake(){this->graph.depression_tree.get_sum_of_all_volume_full_lake();}
 
 
