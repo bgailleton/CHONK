@@ -380,7 +380,9 @@ public:
 	//            (\__/)||
 	//            (•ㅅ•) ||
 	//            / 　 づ
+	// ; ;
 
+	//returns a is in queue raster for the filling process
 	std::vector<bool> get_isinQ4dep(int node)
 	{
 		std::vector<bool> is_in_queue(this->node2tree.size(), false);
@@ -390,7 +392,9 @@ public:
 		return is_in_queue;
 	}
 
+	// Check if the depression is the direct child of another 
 	bool is_direct_child_of(int is_child, int of){if(this->parentree[is_child] == of) {return true;}else{return false;};}
+	// Check if the depression is the direct child of another, from node ID (no depression = false)
 	bool is_direct_child_of_from_node(int is_child, int of)
 	{
 		if(this->node2tree[is_child] == -1 || this->node2tree[of] == -1){return false;}
@@ -398,11 +402,10 @@ public:
 	  else{return false;};
 	}
 
-
+  // Check wether the thingy is a child (direct or not) of another thingy
 	bool is_child_of(int is_child, int of)
 	{
 		if(is_child == -1 || of == -1){return false;}
-
 		std::queue<int> children; children.emplace(of);
 		while(children.empty() == false)
 		{
@@ -418,16 +421,23 @@ public:
 		return false;
 	}
 
+	// Merge children into parents, to transmit info upwardp
 	void merge_children_to_parent(std::vector<int> children, int parent, int outlet_node, std::vector<int>& neightbors, xt::pytensor<double,1>& elevation)
 	{
 
+		// parent has these children
 		this->treeceivers[parent] = children;
+		// base hw of parent is the one of children
 		this->hw_max[parent] = this->hw_max[children[0]];
+
+		// Level is set to max of level of each child + 1
 		this->level[parent] = std::max(this->level[children[0]], this->level[children[1]]) + 1;
 
+		// DEBUG STATEMENT
 		if(parent == children[0] || parent == children[1])
 			throw std::runtime_error("PARENTAL ISSUE");
 
+		// Hacking the underlying container of the PQ of children, and merging them into a single one for the parent
 		std::vector<PQ_helper<int,double> > c1 = Container(this->filler[children[0]]);
 		std::vector<PQ_helper<int,double> > c2 = Container(this->filler[children[1]]);
 		std::vector<PQ_helper<int,double> > concat; concat.reserve(c1.size() + c2.size());
@@ -436,12 +446,14 @@ public:
 		for(auto n:c2) 
 			concat.emplace_back(n);
 
-		// merging the PQs
+		// initialising the parent PQ with the main one
 		this->filler[parent] = std::priority_queue< PQ_helper<int, double>, std::vector<PQ_helper<int, double> >, std::greater<PQ_helper<int, double> > >(concat.begin(), concat.end());
 
-
+		// Children are merging which means I need to determine their externodeand make sure they are in each other
+		// By convention, picking the lowest one of the neightbour of the tipping node
 		int lower_elev_c1,lower_elev_c2;
 		double vlower_elev_c1 = 1e36,vlower_elev_c2 = 1e36;
+		// looping thourgh neighbours and getting it
 		for(auto n:neightbors)
 		{
 			int tdep = this->node2tree[n];
@@ -461,14 +473,20 @@ public:
 			}
 		}
 
+		// actually saving them
 		this->externode[children[0]] = lower_elev_c2;
 		this->externode[children[1]] = lower_elev_c1;
 
+		// each children needs to know their parents	
 		for(auto i:children)
 		{
+			// Your parent is
 			this->parentree[i] = parent;
+			// Your filler is reinnit
 			this->filler[i] = std::priority_queue< PQ_helper<int, double>, std::vector<PQ_helper<int, double> >, std::greater<PQ_helper<int, double> > >();
+			// Volume transferred to parent
 			this->volume[parent] += this->volume[i];
+			// my tipping node is the one of me twin
 			this->tippingnode[i] = outlet_node;
 		}
 
@@ -484,7 +502,7 @@ public:
 	//            (•ㅅ•) ||
 	//            / 　 づ
 
-
+	// return a vector depression ID -> ultimate parent
 	std::vector<int> dep2top()
 	{
 		std::vector<int> output(this->treeceivers.size(),-1);
@@ -493,6 +511,7 @@ public:
 		return output;
 	}	
 
+	// Return a vector node ID -> ultimate parent -> -1 if not in depression
 	std::vector<int> node2top()
 	{
 		std::vector<int> output(this->node2tree.size(),-1), deptop = this->dep2top();
@@ -513,7 +532,7 @@ public:
 	//            (•ㅅ•) ||
 	//            / 　 づ
 
-
+	// Print the tree in a rather rudimentary way
 	void printree()
 	{
 		std::string gabul = "Printing the depression tree... \n";
@@ -526,6 +545,7 @@ public:
 
 	}
 
+	//
 	double get_sum_of_all_volume_full_lake()
 	{
 		double tot = 0;
