@@ -5,6 +5,20 @@ On itself it only contains the data structure and functions to manage the tree,
 as well as functions to navigate through it or inserting elements.
 The actual building happens in the nodegraph file
 B.G. - June 2021
+
+     
+Example of tree Structure:
+        6
+        /\
+       /  \
+      /    \
+     /      5
+		/	      /\
+   4       /  \
+  /\      2    3
+ /  \
+0    1
+
 */
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 #ifndef depressiontree_HPP
@@ -22,6 +36,7 @@ B.G. - June 2021
 #include <numeric>
 #include <cmath>
 #include "chonkutils.hpp"
+
 // All the xtensor requirements
 #include "xtensor-python/pyarray.hpp" // manage the I/O of numpy array
 #include "xtensor-python/pytensor.hpp" // same
@@ -283,7 +298,7 @@ public:
 		return output;
 	}
 
-	//same than above but takes time and effort to sort the depressions by elevation of their pit for some reason. I think I am not using this anymorel.
+	// Same than above but takes time and effort to sort the depressions by elevation of their pit for some reason. I think I am not using this anymorel.
 	std::vector<int> get_all_nodes_bottom2top(int node, xt::pytensor<double,1>& elevation)
 	{
 
@@ -545,7 +560,7 @@ public:
 
 	}
 
-	//
+	// sum the total volume of all master description
 	double get_sum_of_all_volume_full_lake()
 	{
 		double tot = 0;
@@ -563,7 +578,13 @@ public:
 
 
 
-
+  //  ___________________
+	// |                   |
+	// |      Done!        |
+	// |___________________| 
+  //      ||  (\__/)
+  //       \\ (•ㅅ•) 
+  //        ||C 　 \
 
 
 

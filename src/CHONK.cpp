@@ -107,7 +107,17 @@ void chonk::reset()
   this->slope_to_rec.reserve(8);
 }
 
-
+void chonk::reset_sed_fluxes()
+{
+  this->erosion_flux_undifferentiated = 0;
+  this->erosion_flux_only_bedrock = 0;
+  this->erosion_flux_only_sediments = 0;
+  this->deposition_flux = 0;
+  this->sediment_creation_flux = 0;
+  this->sediment_flux = 0;
+  this->fluvialprop_sedflux = 0;
+  this->weigth_sediment_fluxes = std::vector<double> (this->weigth_water_fluxes.size(),0.);
+}
 
 //####################################################
 //####################################################

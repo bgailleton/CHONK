@@ -49,9 +49,11 @@ class chonk
     chonk() { create(); };
     // Normal constructor
     chonk(int tchonkID, int tcurrent_node, bool tmemory_saver){create(tchonkID, tcurrent_node, tmemory_saver);};
-    // Reset function
+    // Reset functions
+    //# reset it all
     void reset();
-
+    //# reset only the sed fluxes
+    void reset_sed_fluxes();
 
     // Merge function(s)
     void split_and_merge_in_receiving_chonks(std::vector<chonk>& chonkscape, NodeGraphV2& graph, xt::pytensor<double,1>& surface_elevation_tp1, xt::pytensor<double,1>& sed_height_tp1, double dt);

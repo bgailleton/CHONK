@@ -2574,6 +2574,9 @@ void ModelRunner::lake_solver_v3(int node)
 
     // Now I am post-processing the lakes: adding the lake depth, and ID and all
     // std::cout << "Are raised to " << this->graph.depression_tree.hw[dep] << ":";
+
+    double defluvialisation_of_sed = 0;
+    std::vector<double> defluvialisation_of_sed_label_edition(this->n_labels,0.);
     for (auto n:nodes)
     {
       // std::cout << n << "|" << this->graph.depression_tree.node2tree[n] << "|";
@@ -2584,7 +2587,29 @@ void ModelRunner::lake_solver_v3(int node)
           this->topography[n] = this->graph.depression_tree.hw[dep];
           this->node_in_lake[n] = dep;
           // HERE I WILL NEED TO REMOVE THE SED FROM EROSION?DEP WITH THE RIGHT PROPORTIONS
+          double tsed = 0;
 
+          // REMOVING EROSION OF BEDROCK
+          tsed = this->chonk_network[n].get_erosion_flux_only_bedrock() * this->timestep * this->cellarea;
+          std::vector<double> temp(this->n_labels,0.); temp[this->label_array[n]] = 1.;
+          defluvialisation_of_sed_label_edition = mix_two_proportions(tsed,temp,defluvialisation_of_sed,defluvialisation_of_sed_label_edition);
+          defluvialisation_of_sed += tsed;
+          // REMOVING EROSION OF SEDIMENT LAYER
+          if(this->is_there_sed_here[n])
+          {
+            tsed = this->chonk_network[n].get_erosion_flux_only_sediments() * this->timestep * this->cellarea;
+            temp = this->sed_prop_by_label[n][this->sed_prop_by_label[n].size() - 1];
+            defluvialisation_of_sed_label_edition = mix_two_proportions(tsed,temp,defluvialisation_of_sed,defluvialisation_of_sed_label_edition);
+            defluvialisation_of_sed += tsed;
+          }
+          // REMOVING DEPOSITION
+          tsed = -1 * this->chonk_network[n].get_deposition_flux() * this->timestep * this->cellarea;
+          temp = this->chonk_network[n].get_label_tracker();
+          defluvialisation_of_sed_label_edition = mix_two_proportions(tsed,temp,defluvialisation_of_sed,defluvialisation_of_sed_label_edition);
+          defluvialisation_of_sed += tsed;
+
+          // And finaly resetting the sediment flux of the chonk
+          this->chonk_network[n].reset_sed_fluxes();
         }
 
 
