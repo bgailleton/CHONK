@@ -254,7 +254,7 @@ NodeGraphV2::NodeGraphV2(
   else
   {
     // THIS IS WHAT HAPPENS WHEN THE LAKE SOVER IS EXPLICIT
-    this->build_depression_tree_v2(elevation, active_nodes);
+    this->grow_depression_tree_v2(elevation, active_nodes);
     // this->depression_tree.printree();
     // std::cout << "A" << std::endl;
     node_to_check = this->update_receivers_explicit();
@@ -367,7 +367,7 @@ bool NodeGraphV2::is_flat_draining(int node, xt::pytensor<double,1>& elevation, 
 }
 
 
-void NodeGraphV2::build_depression_tree_v2(xt::pytensor<double,1>& elevation, xt::pytensor<bool,1>& active_nodes)
+void NodeGraphV2::grow_depression_tree_v2(xt::pytensor<double,1>& elevation, xt::pytensor<bool,1>& active_nodes)
 {
 
   // Initialising the depression tree objecty
