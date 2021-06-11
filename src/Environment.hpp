@@ -524,6 +524,7 @@ std::vector<double>& pre_sed, std::vector<double>& pre_water);
     double sed_already_outletted;
     double sed_added_by_donors;
     double sed_outletting_system;
+    std::vector<double> inherited_water_added;
 
 
     //Labellisation:

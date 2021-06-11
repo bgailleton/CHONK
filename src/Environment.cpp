@@ -182,6 +182,7 @@ void ModelRunner::initiate_nodegraph()
   // Initialising the graph
   this->graph = NodeGraphV2(this->surface_elevation, this->active_nodes,this->dx, this->dy,
                             this->io_int["n_rows"], this->io_int["n_cols"], this->lake_solver);
+
   this->lake_to_process = std::vector<int>();
 
   // Also initialising the Lake graph
@@ -2402,7 +2403,7 @@ void ModelRunner::lake_solver_v3(int node)
     representative_chonk[master_dep] = tot_representative_chonk;
 
     // DEBUG STATEMENT TO REMOVE ONCE EXTENSIVELY TESTED
-    std::cout<< "WATER IN DEP " << tot_water_volume/(this->timestep) << std::endl;
+    std::cout<< "WATER IN DEP " << tot_water_volume/(this->timestep) << " PIT IS " << this->graph.depression_tree.pitnode[master_dep] << std::endl;
     //
     // Pushing the volume in the depression tree
     this->graph.depression_tree.volume_water[master_dep] = this->graph.depression_tree.volume[master_dep];
@@ -2419,15 +2420,91 @@ void ModelRunner::lake_solver_v3(int node)
   }
   else
   {
-    // OTHER STUFF TO BE CALCULATED HERE
-    // Processing the tree bottom->up
-    // for(int i=0; i<int(treestak.size());i++)
-    // {
-    //   int this_dep = treestak[i];
-    //   int twin_dep = this->graph.depression_tree.get_twin(this_dep);
-    std::cout << "LAKE " << this_dep  << " IGNORED!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" << std::endl;
-    // }
-    return; // TO BE REMOVED AFTER
+    std::cout << "GARGALAGOUOIGSJDKSLLSJKDC!!!@!@!@!@!@!@!@!!@!@!@!@!@!@!@!@!@!@!@!@!@!@" << std::endl;
+
+    // I do not have enough water to fill the depression... Need to go through the stack and gather the one I can process and redistribute water
+    // # array of bool to check which depression is done
+    std::map<int,bool> treestak_done_question_mark;
+    for (auto dep : treestak){treestak_done_question_mark[dep] = false;};
+
+    // iterating through depressions
+    for (auto dep : treestak)
+    {
+      // if the depression is done -> ignore
+      // This can happen because I am processing twins together
+      if( treestak_done_question_mark[dep]){continue;}
+      // getting the twin ID
+      int twin = this->graph.depression_tree.get_twin(dep);
+      treestak_done_question_mark[twin] = true;
+      treestak_done_question_mark[dep] = true;
+
+      // Calculating the water/sed/prop volume
+      this->graph.depression_tree.volume_water[dep] += water_volume[dep]; 
+      this->graph.depression_tree.label_prop[dep] = mix_two_proportions(this->graph.depression_tree.volume_sed[dep], this->graph.depression_tree.label_prop[dep],
+                  sed_volume[dep],representative_chonk[dep].get_label_tracker());
+      this->graph.depression_tree.volume_sed[dep] += sed_volume[dep]; 
+
+      if(twin > -1)
+      {
+        this->graph.depression_tree.volume_water[twin] += water_volume[twin]; 
+        this->graph.depression_tree.label_prop[twin] = mix_two_proportions(this->graph.depression_tree.volume_sed[twin], this->graph.depression_tree.label_prop[twin],
+                 sed_volume[twin],representative_chonk[twin].get_label_tracker());
+        this->graph.depression_tree.volume_sed[twin] += sed_volume[twin]; 
+      }
+
+      // comparign with the volume total of the twin depression
+      double volmax = this->graph.depression_tree.volume[dep];
+      double this_total_water = this->graph.depression_tree.volume_water[dep];
+      if(twin > -1)
+      {
+        volmax += this->graph.depression_tree.volume[twin];
+        this_total_water += this->graph.depression_tree.volume_water[twin];
+      }
+
+      // if no water: stop here
+      if(this_total_water == 0)
+        continue;
+
+      // If I can fill the whole thingy -> transferring water and sed volumes upstream
+      if(this_total_water > volmax)
+      {
+        int parent = this->graph.depression_tree.parentree[dep];
+        this->graph.depression_tree.volume_water[parent] += this->graph.depression_tree.volume_water[dep];
+        this->graph.depression_tree.label_prop[parent] = mix_two_proportions(this->graph.depression_tree.volume_sed[dep], this->graph.depression_tree.label_prop[twin],
+                 this->graph.depression_tree.volume_sed[parent], this->graph.depression_tree.label_prop[parent]);
+        this->graph.depression_tree.volume_sed[parent] += this->graph.depression_tree.volume_sed[dep];
+        if(twin > -1)
+        {
+          this->graph.depression_tree.volume_water[parent] += this->graph.depression_tree.volume_water[twin];
+          this->graph.depression_tree.label_prop[parent] = mix_two_proportions(this->graph.depression_tree.volume_sed[twin], this->graph.depression_tree.label_prop[twin],
+                   this->graph.depression_tree.volume_sed[parent], this->graph.depression_tree.label_prop[parent]);
+          this->graph.depression_tree.volume_sed[parent] += this->graph.depression_tree.volume_sed[twin];
+        }
+      }
+      else
+      {
+        // otherwise, let's check wether I have enough water to fill me twin
+        if(twin > -1)
+        {
+          // redistributing water in case one twin can be filled but not the other
+          if(this->graph.depression_tree.volume_water[dep] > this->graph.depression_tree.volume[dep])
+          {
+            this->graph.depression_tree.volume_water[twin] += this->graph.depression_tree.volume_water[dep] - this->graph.depression_tree.volume[dep];
+            this->graph.depression_tree.volume_water[dep] = this->graph.depression_tree.volume[dep];
+
+          }
+          else if(this->graph.depression_tree.volume_water[twin] > this->graph.depression_tree.volume[twin])
+          {
+            this->graph.depression_tree.volume_water[dep] += this->graph.depression_tree.volume_water[twin] - this->graph.depression_tree.volume[twin];
+            this->graph.depression_tree.volume_water[twin] += this->graph.depression_tree.volume[twin];
+          }
+          local_deps2reproc.emplace_back(twin);
+        }
+        local_deps2reproc.emplace_back(dep);
+
+      }
+    }
+
   }
   // std::cout << "DLAKESv3::G" << std::endl;
 
@@ -2439,7 +2516,8 @@ void ModelRunner::lake_solver_v3(int node)
   {
     this->lake_to_process.push_back(dep);
     // std::cout << "DLAKESv3::H" << std::endl;
-
+    // Activate the lake for deposition
+    this->graph.depression_tree.active[dep] = true;
     // finding the outlet
     int outlet = this->graph.depression_tree.tippingnode[dep];
     // And their receiver
@@ -2516,6 +2594,7 @@ void ModelRunner::lake_solver_v3(int node)
     // Iterating through the local stack
     for(auto tnode:local_mstack)
     {
+      // std::cout << "REPROCESSING NODES::" << tnode << "--" << this->inherited_water_added[tnode] << " OO " << is_in_queue[tnode]  << std::endl;
       // Discriminating between the donors and the receivers
       if(is_in_queue[tnode] == 'd')
       {
@@ -2537,6 +2616,8 @@ void ModelRunner::lake_solver_v3(int node)
             continue;
           }
         }
+        if(ignore_some.size() == this->chonk_network[tnode].get_chonk_receivers_copy().size())
+          // std::cout << "LDKFJKLDFDSFHJKLDF" << std::endl;
 
         // # Ignore_some has the node i so not want
         // # So I transmit my fluxes to the nodes I do not ignore
@@ -2559,6 +2640,7 @@ void ModelRunner::lake_solver_v3(int node)
     this->cancel_fluxes_before_moving_prep(this->chonk_network[outlet], outlet);
     // # resetting the chonk totally
     this->chonk_network[outlet].reset();
+    std::cout << "Is outlet part of inherited water? " << this->inherited_water_added[outlet] << std::endl;; 
 
     // std::cout << "DLAKESv3::I.1" << std::endl;
     // Redonning what its donors gave it
@@ -2606,7 +2688,7 @@ void ModelRunner::lake_solver_v3(int node)
           tsed = -1 * this->chonk_network[n].get_deposition_flux() * this->timestep * this->cellarea;
           temp = this->chonk_network[n].get_label_tracker();
           defluvialisation_of_sed_label_edition = mix_two_proportions(tsed,temp,defluvialisation_of_sed,defluvialisation_of_sed_label_edition);
-          defluvialisation_of_sed += tsed;
+          defluvialisation_of_sed -= tsed;
 
           // And finaly resetting the sediment flux of the chonk
           this->chonk_network[n].reset_sed_fluxes();
@@ -2622,7 +2704,10 @@ void ModelRunner::lake_solver_v3(int node)
     // Calculating what needs to be given to it:
     // -> what the depression received in total -  what the depression holds - the correcttions corrected for the time step
     double extra_water = (water_volume[dep] - this->graph.depression_tree.volume_water[dep] - corrwat)/(this->timestep);
-    double extra_sed = (sed_volume[dep] - this->graph.depression_tree.volume_sed[dep] - corrsed);
+    double extra_sed = (sed_volume[dep] - this->graph.depression_tree.volume_sed[dep] - corrsed - defluvialisation_of_sed);
+    //NEED TO GIVE THE DEFLUVIALISATION TO THE LABELS TOO
+    representative_chonk[dep].add_to_sediment_flux_no_tracking(-1 * corrsed);
+    representative_chonk[dep].add_to_sediment_flux(-1 * defluvialisation_of_sed, defluvialisation_of_sed_label_edition, 1.);
     // std::cout << "DLAKESv3::I.3" << std::endl;
 
     // if <0 -> 0 (hoepefully useless)
@@ -3639,6 +3724,7 @@ void ModelRunner::initialise_label_list(std::vector<labelz> these_labelz)
 // POSSIBLE OPTIMISATION::Recreating lake objects, but I would need a bit of refactoring the Lake object. Will seee if this is very slow
 void ModelRunner::process_inherited_water()
 {
+  this->inherited_water_added = std::vector<double>(this->io_int["n_elements"],0.);
   for(auto tlake : this->lake_to_process)
   {
 
@@ -3659,9 +3745,9 @@ void ModelRunner::process_inherited_water()
       }
       // sumwat += this->io_double_array["lake_depth"][node] * this->dx * this->dy / this->timestep ;
     }
-
+    std::cout << "INHERITED WATER AT " << minnodor << " : " << this->graph.depression_tree.volume_water[tlake]/this->timestep << std::endl;
     this->chonk_network[minnodor].add_to_water_flux(this->graph.depression_tree.volume_water[tlake]/this->timestep);
-
+    this->inherited_water_added[minnodor] += this->graph.depression_tree.volume_water[tlake]/this->timestep;
   }
 
   // Done with reshuffling the water
