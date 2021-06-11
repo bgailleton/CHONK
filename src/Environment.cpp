@@ -3924,7 +3924,7 @@ void ModelRunner::drape_deposition_flux_to_chonks()
   std::vector<char> isinhere(this->io_int["n_elements"],'n');
 
 
-  for(size_t i = 0; i< this->graph.depression_tree.get_n_dep(); i++)
+  for(int i = 0; i< this->graph.depression_tree.get_n_dep(); i++)
   { 
     // auto& loch = this->graph.depression_tree[i];
     // Checking if this is a main lake
@@ -3941,7 +3941,7 @@ void ModelRunner::drape_deposition_flux_to_chonks()
     }
 
     double total = this->graph.depression_tree.volume_sed[i];
-    for(auto no:this->graph.depression_tree.nodes[i])
+    for(auto no:this->graph.depression_tree.get_all_nodes(int(i)))
     {
       // if(isinhere[no] == 'y')
       // {
