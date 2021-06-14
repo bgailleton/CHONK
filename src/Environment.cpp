@@ -2664,7 +2664,10 @@ void ModelRunner::lake_solver_v3(int node)
       // std::cout << n << "|" << this->graph.depression_tree.node2tree[n] << "|";
       if(std::find(children.begin(), children.end(), this->graph.depression_tree.node2tree[n]) != children.end())
       {
-        if(this->graph.depression_tree.potential_volume[n] <= this->graph.depression_tree.volume_water[dep])
+        if(n ==  outlet)
+          continue;
+        // if(this->graph.depression_tree.potential_volume[n] <= this->graph.depression_tree.volume_water[dep])
+        if(true)
         {
           this->topography[n] = this->graph.depression_tree.hw[dep];
           this->node_in_lake[n] = dep;
@@ -2705,6 +2708,7 @@ void ModelRunner::lake_solver_v3(int node)
     // -> what the depression received in total -  what the depression holds - the correcttions corrected for the time step
     double extra_water = (water_volume[dep] - this->graph.depression_tree.volume_water[dep] - corrwat)/(this->timestep);
     double extra_sed = (sed_volume[dep] - this->graph.depression_tree.volume_sed[dep] - corrsed - defluvialisation_of_sed);
+
     //NEED TO GIVE THE DEFLUVIALISATION TO THE LABELS TOO
     representative_chonk[dep].add_to_sediment_flux_no_tracking(-1 * corrsed);
     representative_chonk[dep].add_to_sediment_flux(-1 * defluvialisation_of_sed, defluvialisation_of_sed_label_edition, 1.);
@@ -2714,6 +2718,7 @@ void ModelRunner::lake_solver_v3(int node)
     if(extra_water < 0){extra_water = 0;  std::cout << "NEGEXTRAWATER" << std::endl;}
     if(extra_sed < 0){extra_sed = 0;}
     // std::cout << "DLAKESv3::I.4::" << outlet << "|" << rec << std::endl;
+    std::cout << "Gibing " << extra_sed << "to outlet" << std::endl;
 
     // Forcing the outlet to only have the receiver out of the lake
     this->chonk_network[outlet].external_moving_prep({rec},{1},{1}, {(this->topography[outlet] - this->topography[rec])/this->dx });
@@ -3931,41 +3936,51 @@ void ModelRunner::drape_deposition_flux_to_chonks()
     if(this->graph.depression_tree.active[i] == false)
       continue;
 
+
     double ratio_of_dep = this->graph.depression_tree.volume_sed[i]/this->graph.depression_tree.volume_water[i];
+    std::cout << "Gougnge:" <<i << " rat : " << ratio_of_dep << std::endl;
 
     // NEED TO DEAL WITH THAT BOBO
     if(ratio_of_dep > 1)
     {
-      std::cout << "POSSIBLY MISSING " << this->graph.depression_tree.volume_sed[i] * (ratio_of_dep - 1) << std::endl;
+      // std::cout << "POSSIBLY MISSING " << this->graph.depression_tree.volume_sed[i] * (ratio_of_dep - 1) << std::endl;
       ratio_of_dep = 1;
     }
 
     double total = this->graph.depression_tree.volume_sed[i];
-    for(auto no:this->graph.depression_tree.get_all_nodes(int(i)))
+    for(auto no:this->graph.depression_tree.get_all_nodes(i))
     {
-      // if(isinhere[no] == 'y')
-      // {
-      //   // throw std::runtime_error("Double lakecognition");
-      //   std::cout << "Double lakecognition" << std::endl/
-      // }
+      if(isinhere[no] == 'y')
+      {
+        throw std::runtime_error("Double lakecognition");
+        // std::cout << "Double lakecognition" << std::endl/
+      }
       isinhere[no] = 'y';
+
+      if(this->node_in_lake[no] == -1)
+        continue;
+        // throw std::runtime_error("afshdffdaglui;regji;");
 
       total -= ratio_of_dep * (topography[no] - surface_elevation[no]) * cellarea;
       double slangh = ratio_of_dep * (topography[no] - surface_elevation[no]) / timestep;
       if(!std::isfinite(slangh))
       {
-        // std::cout << "WARNING:: NAN IN SED CREA DURING LAKE DRAPING" << std::endl;
-        // std::cout << ratio_of_dep << "/" << (topography[no] - surface_elevation[no]) << std::endl;
+        std::cout << "WARNING:: NAN IN SED CREA DURING LAKE DRAPING" << std::endl;
+        std::cout << ratio_of_dep << "/" << (topography[no] - surface_elevation[no]) << std::endl;
         slangh = 0;
       }
+      std::cout << "SLANGH IS " << slangh << " VS " << chonk_network[no].get_erosion_flux_only_bedrock() << "|" << chonk_network[no].get_erosion_flux_only_sediments() << std::endl;
+      
+
 
       chonk_network[no].add_sediment_creation_flux(slangh);
       chonk_network[no].add_deposition_flux(slangh); // <--- This is solely for balance calculation
       chonk_network[no].set_label_tracker(this->graph.depression_tree.label_prop[i]);
-
+      
+      // chonk_network[no].reset_sed_fluxes();
     }
     // Seems fine here...
-    std::cout << "BALANCE LAKE = " << total << " out of " << this->graph.depression_tree.volume_sed[i] << std::endl;
+    // std::cout << "BALANCE LAKE = " << total << " out of " << this->graph.depression_tree.volume_sed[i] << std::endl;
   }
 
 }
