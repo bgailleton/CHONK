@@ -329,7 +329,7 @@ class ModelRunner
     double get_Qw_out() {return Qw_out;};
     double get_Ql_in() {return Ql_in;};
     double get_Ql_out() {return Ql_out;};
-    double get_Qs_mass_balance() {return this->Qs_mass_balance;};
+    double get_Qs_mass_balance() {return this->Qs_mass_balance/this->timestep;};
 
     xt::pytensor<int,1> get_flat_mask(){return this->graph.get_flat_mask();};
     void print_chonk_info(int node);

@@ -553,8 +553,10 @@ void NodeGraphV2::raise_dep_to_new_node(int dep, int node, xt::pytensor<double,1
   if(this->depression_tree.nodes[dep].size()>0)
     this->depression_tree.potential_volume[this->depression_tree.nodes[dep].size()-1] = this->depression_tree.volume[dep];
   else if(this->depression_tree.treeceivers[dep][0] != -1)
+  {
     this->depression_tree.potential_volume[this->depression_tree.tippingnode[this->depression_tree.treeceivers[dep][0]]] = this->depression_tree.volume[dep];
-
+    // this->depression_tree.potential_volume[this->depression_tree.tippingnode[this->depression_tree.treeceivers[dep][1]]] = this->depression_tree.volume[dep];
+  }
 
 
   if(integrate_node)

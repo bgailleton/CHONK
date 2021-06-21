@@ -175,7 +175,7 @@ public:
 		this->volume_water.emplace_back(0);
 		// Initial hw is the one of the pits
 		this->hw_max.emplace_back(elevation[pitnode]);
-		this->hw.emplace_back(0);
+		this->hw.emplace_back(elevation[pitnode]);
 		// Empty PQ
 		this->filler.emplace_back(std::priority_queue< PQ_helper<int,double>, std::vector<PQ_helper<int,double> >, std::greater<PQ_helper<int,double> > >());
 		// whatever that is, that is false RN
@@ -492,6 +492,8 @@ public:
 		this->externode[children[0]] = lower_elev_c2;
 		this->externode[children[1]] = lower_elev_c1;
 
+
+
 		// each children needs to know their parents	
 		for(auto i:children)
 		{
@@ -504,6 +506,9 @@ public:
 			// my tipping node is the one of me twin
 			this->tippingnode[i] = outlet_node;
 		}
+
+		// taking care of the volume incrementation for the new parent
+		this->potential_volume[outlet_node] = this->volume[parent];
 
 	}
 
