@@ -1030,9 +1030,9 @@ void ModelRunner::deprocess_local_stack(std::vector<int>& local_mstack, std::vec
     // # Cancelling the fluxes before moving prep (i.e. the precipitation, infiltrations, ...)
     // # This is not for water purposes as it gets reproc anyway, but for mass balance calculation
     this->cancel_fluxes_before_moving_prep(this->chonk_network[tnode], tnode);
-    this->chonk_network[tnode].reset();
-    this->chonk_network[tnode].set_label_tracker(std::vector<double>(this->n_labels,0));
-    this->is_processed[tnode] = false;
+    // this->chonk_network[tnode].reset();
+    // this->chonk_network[tnode].set_label_tracker(std::vector<double>(this->n_labels,0));
+    // this->is_processed[tnode] = false;
 
   }
 }
@@ -2584,12 +2584,10 @@ void ModelRunner::lake_solver_v3(int node)
     {
       is_in_queue[tnode] = 'l';
     }
-
     // This function gathers all the nodes to be reprocessed. Including their donor which will be partially reprocessed
     // This function is only geometrical, it does not assume any existing transfer of sed/water
     this->gather_nodes_to_reproc(local_mstack,  ORDEEEEEER,  is_in_queue,  outlet);
     this->deprocess_local_stack(local_mstack, is_in_queue);
-    
 
 
     // Now I can deprocess/reprocess the outlet
@@ -2600,6 +2598,16 @@ void ModelRunner::lake_solver_v3(int node)
     this->cancel_fluxes_before_moving_prep(this->chonk_network[outlet], outlet);
     // # resetting the chonk totally
     this->chonk_network[outlet].reset();
+
+    for(auto n: local_mstack)
+    {
+      if(is_in_queue[n] == 'y')
+      {
+        this->chonk_network[n].reset();
+        this->chonk_network[n].set_label_tracker(std::vector<double>(this->n_labels,0));
+        this->is_processed[n] = false;
+      }
+    }
     // std::cout << "Is outlet part of inherited water? " << this->inherited_water_added[outlet] << std::endl;; 
 
     // std::cout << "DLAKESv3::I.1" << std::endl;
@@ -2621,7 +2629,7 @@ void ModelRunner::lake_solver_v3(int node)
     std::vector<double> defluvialisation_of_sed_label_edition(this->n_labels,0.);
     for (auto n:this->graph.depression_tree.get_all_nodes(dep))
     {
-      std::cout << n << "-" << this->graph.depression_tree.node2tree[n] << "-";
+      // std::cout << n << "-" << this->graph.depression_tree.node2tree[n] << "-";
       if(std::find(children.begin(), children.end(), this->graph.depression_tree.node2tree[n]) != children.end())
       {
         if(n ==  outlet)
@@ -2642,10 +2650,14 @@ void ModelRunner::lake_solver_v3(int node)
           defluvialisation_of_sed += tsed;
           // REMOVING EROSION OF SEDIMENT LAYER
           // if(this->is_there_sed_here[n])
-          if(this->is_there_sed_here[n])
+          if(true)
           {
             tsed = this->chonk_network[n].get_erosion_flux_only_sediments() * this->timestep * this->cellarea;
-            temp = this->sed_prop_by_label[n][this->sed_prop_by_label[n].size() - 1];
+            if(this->sed_prop_by_label[n].size() > 0)
+              temp = this->sed_prop_by_label[n][this->sed_prop_by_label[n].size() - 1];
+            else
+              temp = this->chonk_network[n].get_label_tracker();
+
             defluvialisation_of_sed_label_edition = mix_two_proportions(tsed,temp,defluvialisation_of_sed,defluvialisation_of_sed_label_edition);
             defluvialisation_of_sed += tsed;
           }
@@ -2661,7 +2673,7 @@ void ModelRunner::lake_solver_v3(int node)
 
 
       }
-      std::cout << defluvialisation_of_sed << "|" << std::endl;
+      // std::cout << defluvialisation_of_sed << "|" << std::endl;
 
 
     }
