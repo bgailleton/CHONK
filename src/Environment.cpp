@@ -2618,6 +2618,7 @@ void ModelRunner::lake_solver_v3(int node)
 
       sed_volume[dep] -= sed2remove;
       this->graph.depression_tree.volume_sed[dep] -= sed2remove;
+
       std::cout << "Removing " << sed2remove << " from what the outlet were giving to the lake " << std::endl;
       // water_volume[dep] -= wat2remove;
       // water_volume[dep] += wat2add;
@@ -2689,7 +2690,7 @@ void ModelRunner::lake_solver_v3(int node)
           tsed = -1 * this->chonk_network[n].get_deposition_flux() * this->timestep * this->cellarea;
           temp = this->chonk_network[n].get_label_tracker();
           defluvialisation_of_sed_label_edition = mix_two_proportions(tsed,temp,defluvialisation_of_sed,defluvialisation_of_sed_label_edition);
-          defluvialisation_of_sed -= tsed;
+          defluvialisation_of_sed += tsed;
 
           // And finally resetting the sediment flux of the chonk
           this->chonk_network[n].reset_sed_fluxes();
@@ -2736,6 +2737,7 @@ void ModelRunner::lake_solver_v3(int node)
           int ttnode = rec[cat];
           if(ttnode == outlet)
           {
+            std::cout << "OUTLETFLUX::" << this->chonk_network[outlet].get_sediment_flux() << std::endl;
             this->chonk_network[outlet].add_to_sediment_flux(this->chonk_network[tnode].get_sediment_flux() * wws[cat],
              this->chonk_network[tnode].get_label_tracker(), 1.);
             ignore_some.emplace_back(ttnode);
