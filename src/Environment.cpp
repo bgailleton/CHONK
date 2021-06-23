@@ -4155,6 +4155,17 @@ xt::pytensor<double,1> ModelRunner::get_erosion_sed_only_flux()
 
 }
 
+xt::pytensor<double,1> ModelRunner::get_deposition_flux()
+{
+  xt::pytensor<double,1> output = xt::zeros<double>({size_t(this->io_int["n_elements"])});
+  for(auto& tchonk:chonk_network)
+  {
+    output[tchonk.get_current_location()] = tchonk.get_deposition_flux() ;
+  }
+  return output;
+
+}
+
 xt::pytensor<double,1> ModelRunner::get_sediment_creation_flux()
 {
   xt::pytensor<double,1> output = xt::zeros<double>({size_t(this->io_int["n_elements"])});

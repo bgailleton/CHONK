@@ -247,6 +247,7 @@ class CoreModel:
 	labprop_superficial_layer = xs.on_demand(dims = ('n_labels','y','x'))
 	E_r = xs.on_demand(dims = ('y','x'))
 	E_s = xs.on_demand(dims = ('y','x'))
+	D_s = xs.on_demand(dims = ('y','x'))
 	sed_div = xs.on_demand(dims = ('y','x'))
 	lake_id_raw = xs.on_demand(dims = ('y','x'))
 	mstack_checker = xs.on_demand(dims = ('y','x'))
@@ -430,6 +431,10 @@ class CoreModel:
 	@E_s.compute
 	def _E_s(self):
 		return self.model.get_erosion_sed_only_flux().reshape(self.ny,self.nx)
+
+	@D_s.compute
+	def _D_s(self):
+		return self.model.get_deposition_flux().reshape(self.ny,self.nx)
 
 	@sed_div.compute
 	def _sed_div(self):
