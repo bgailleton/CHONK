@@ -2433,10 +2433,10 @@ void ModelRunner::lake_solver_v3(int node)
     // Pushing the volume in the depression tree
     this->graph.depression_tree.volume_water[master_dep] = this->graph.depression_tree.volume[master_dep];
     // DOing the same for sed with a bit of manipulations to check wether I have enough to give
-    if(sed_volume[master_dep] < this->graph.depression_tree.volume[master_dep])
-      this->graph.depression_tree.volume_sed[master_dep] = sed_volume[master_dep];
-    else
-      this->graph.depression_tree.volume_sed[master_dep] = this->graph.depression_tree.volume[master_dep];
+    // if(sed_volume[master_dep] < this->graph.depression_tree.volume[master_dep])
+    //   this->graph.depression_tree.volume_sed[master_dep] = sed_volume[master_dep];
+    // else
+    //   this->graph.depression_tree.volume_sed[master_dep] = this->graph.depression_tree.volume[master_dep];
 
     // raising the depression level to the max level
     this->graph.depression_tree.hw[master_dep] = this->graph.depression_tree.hw_max[master_dep];
@@ -2614,10 +2614,23 @@ void ModelRunner::lake_solver_v3(int node)
       // std::cout << "THIS:" << wat2add + wat2remove << " = " << this->chonk_network[trec].get_water_flux() * this->timestep << std::endl;
 
 
-      representative_chonk[dep].add_to_sediment_flux(sed2remove,labrador,1.);
 
+
+      // std::cout << "BEEF sed_volume[dep] " << sed_volume[dep] << " this->graph.depression_tree.volume_sed[dep] " << this->graph.depression_tree.volume_sed[dep] << std::endl;
+
+      representative_chonk[dep].add_to_sediment_flux(sed2remove,labrador,1.);
       sed_volume[dep] -= sed2remove;
-      this->graph.depression_tree.volume_sed[dep] -= sed2remove;
+      // if(sed_volume[dep] < this->graph.depression_tree.volume_sed[dep])
+      //   this->graph.depression_tree.volume_sed[dep] -= std::abs(sed2remove - this->graph.depression_tree.volume_sed[dep]);
+
+
+      // std::cout << "AFATT sed_volume[dep] " << sed_volume[dep] << " this->graph.depression_tree.volume_sed[dep] " << this->graph.depression_tree.volume_sed[dep] << std::endl;
+
+      if(sed_volume[dep] < 0)
+        throw std::runtime_error("sed_volume[dep] < 0");
+      if(this->graph.depression_tree.volume_sed[dep] < 0)
+        throw std::runtime_error("depression_tree < 0");
+
 
       std::cout << "Removing " << sed2remove << " from what the outlet were giving to the lake " << std::endl;
       // water_volume[dep] -= wat2remove;
@@ -2701,15 +2714,23 @@ void ModelRunner::lake_solver_v3(int node)
       // std::cout << defluvialisation_of_sed << "|" << std::endl;
     }
 
-    representative_chonk[dep].add_to_sediment_flux(defluvialisation_of_sed,defluvialisation_of_sed_label_edition,1.);
+
+    representative_chonk[dep].add_to_sediment_flux(-1 * defluvialisation_of_sed,defluvialisation_of_sed_label_edition,1.);
     sed_volume[dep] -= defluvialisation_of_sed;
-    this->graph.depression_tree.volume_sed[dep] -= defluvialisation_of_sed;
+    
+    if(sed_volume[dep] < this->graph.depression_tree.volume[dep])
+      this->graph.depression_tree.volume_sed[dep] = sed_volume[dep];
+    else
+      this->graph.depression_tree.volume_sed[dep] = this->graph.depression_tree.volume[dep] ;
+    
+
+
     std::cout << "Amount of defluvialisation_of_sed:" << defluvialisation_of_sed/ this->timestep << std::endl;
 
     double extra_sed = sed_volume[dep] - this->graph.depression_tree.volume_sed[dep];
     double extra_wat = (water_volume[dep] - this->graph.depression_tree.volume_water[dep] + wat2add)/this->timestep;
 
-    if(extra_sed > 0)
+    if(extra_sed < 0)
       extra_sed = 0;
 
     if(extra_wat < 0)
@@ -4306,12 +4327,16 @@ void ModelRunner::drape_deposition_flux_to_chonks()
       }
       isinhere[no] = 'y';
 
+      if(this->graph.depression_tree.tippingnode[i] == no)
+        continue;
+
       if(this->node_in_lake[no] == -1)
         continue;
         // throw std::runtime_error("afshdffdaglui;regji;");
 
       totsed += ratio_of_dep * (topography[no] - surface_elevation[no]) * cellarea;
       double slangh = ratio_of_dep * (topography[no] - surface_elevation[no]) / timestep;
+
       if(!std::isfinite(slangh))
       {
         std::cout << "WARNING:: NAN IN SED CREA DURING LAKE DRAPING" << std::endl;
