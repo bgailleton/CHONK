@@ -149,9 +149,9 @@ NodeGraphV2::NodeGraphV2(
     }
   }
 
-  bool flatp = this->are_there_flat_pits(elevation, active_nodes);
+  
 
-  if(this->lake_solver == false || flatp)
+  if(this->lake_solver == false)
   {
     // Computing basin info from stack
       this->compute_basins(active_nodes);
@@ -181,38 +181,6 @@ NodeGraphV2::NodeGraphV2(
       // std::cout << "DEBUGDEP:: flow corrr1" << std::endl;
       this->correct_flowrouting(active_nodes, elevation);
       // std::cout << "DEBUGDEP:: flow corrrDONE" << std::endl;
-
-      // resolving flats for explicits
-      if(flatp && this->lake_solver)
-      {
-        std::cout << "AKSJDHFLKJHLKJSDHFLKJHKJLHKLSHDJKFHKJLHKJLSHDFKLJHKJLHSKDF" << std::endl;
-        xt::pytensor<double,1> temp_elev(elevation);
-        for(int k = this->n_element -1; k >= 0; k--)
-        {
-          int i = this->Sstack[k];
-
-          if(this->graph[i].Sreceivers == i)
-            continue;
-
-          double telev = elevation[i];
-          if(elevation[this->graph[i].Sreceivers] == telev)
-          {
-            std::cout << "BABEL:" << i << std::endl;
-            temp_elev[this->graph[i].Sreceivers] = temp_elev[this->graph[i].Sreceivers] - 1e7;
-            this->pits_to_reroute[i] = false;
-          }
-          // else if(this->pits_to_reroute[i])
-          // {
-          //   auto dat = std::vector<int>({i});
-          //   this->recompute_multi_receveivers_and_donors(active_nodes, temp_elev,dat );
-          //   std::cout << "BAgoul:" << i << std::endl;
-          //   // for(size_t j = 0)
-          // }
-        }
-        elevation = std::move(temp_elev); 
-        this->compute_receveivers_and_donors( active_nodes, elevation);
-      }
-
   
       if(this->lake_solver == false)
       {  // Initialising the node graph, a vector of Vertexes with their edges
@@ -241,6 +209,7 @@ NodeGraphV2::NodeGraphV2(
               // Keepign this check just in case, will remove later. Throw an error in case cyclicity is detected
               if(basin_labels[tgnode] == basin_labels[i])
               {
+      
                 throw std::runtime_error("Receiver in same basin! Node " + std::to_string(i) + " gives to " + std::to_string(this->graph[i].Sreceivers) + " gives to " + std::to_string(tgnode));
               }
             }
@@ -284,8 +253,7 @@ NodeGraphV2::NodeGraphV2(
       }
   
   }
-  
-  if(this->lake_solver)
+  else
   {
     // THIS IS WHAT HAPPENS WHEN THE LAKE SOVER IS EXPLICIT
     this->grow_depression_tree_v2(elevation, active_nodes);
@@ -398,21 +366,6 @@ bool NodeGraphV2::is_flat_draining(int node, xt::pytensor<double,1>& elevation, 
       return false;
   }
   return true;
-}
-
-bool NodeGraphV2::are_there_flat_pits(xt::pytensor<double,1>& elevation, xt::pytensor<bool,1>& active_nodes)
-{
-
-  for (size_t i = 0 ; i< this->un_element; i++)
-  {
-    if(this->pits_to_reroute[i] == true)
-    {
-      std::vector<int> flatn =  this->get_all_flat_from_node(int(i), elevation, active_nodes);
-      if(flatn.size() > 1)
-        return true;
-    }
-  }
-  return false;
 }
 
 
