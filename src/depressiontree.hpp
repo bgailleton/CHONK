@@ -544,6 +544,18 @@ public:
 		return output;
 	}	
 
+
+	double get_volume_of_children(int dep)
+	{
+		double totvol = 0;
+		for(auto ch: this->treeceivers[dep])
+		{
+			if(ch>=0)
+				totvol += this->volume[ch];
+		}
+		return totvol;
+	}
+
   //  ___________________
 	// |                   |
 	// |      other        |

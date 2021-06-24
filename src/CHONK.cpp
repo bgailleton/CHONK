@@ -188,7 +188,7 @@ void chonk::split_and_merge_in_receiving_chonks(std::vector<chonk>& chonkscape, 
     // std::cout << std::endl;
     // this->print_status();
     if(this->receivers.size() > 0)
-      throw std::runtime_error("WaterFluxError::Some water is lost in the splitting process");
+      throw std::runtime_error("WaterFluxError::Some water is lost in the splitting process: " + std::to_string(sum_outwat) + " vs " + std::to_string(this->water_flux) );
     // std::cout << "GULUUUUUUUUUB::::::::::" << this->water_flux - sum_outwat << std::endl;
   }
 
