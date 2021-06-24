@@ -2507,126 +2507,127 @@ void ModelRunner::lake_solver_v3(int node)
       );
     }
 
-
   }
 
 
+  if(false)
+  {
+    // // CASE 1: I have more water than the total volume of the depression
+    // if(tot_water_volume >= this->graph.depression_tree.volume[master_dep])
+    // {
+    //   // I save  the master depression as sole one to reproc
+    //   local_deps2reproc.emplace_back(master_dep);
+    //   // water/sed/prop volume to store in this dep is the total
+    //   water_volume[master_dep] = tot_water_volume;
+    //   sed_volume[master_dep] = tot_sed_volume;
+    //   representative_chonk[master_dep] = tot_representative_chonk;
 
-  // // CASE 1: I have more water than the total volume of the depression
-  // if(tot_water_volume >= this->graph.depression_tree.volume[master_dep])
-  // {
-  //   // I save  the master depression as sole one to reproc
-  //   local_deps2reproc.emplace_back(master_dep);
-  //   // water/sed/prop volume to store in this dep is the total
-  //   water_volume[master_dep] = tot_water_volume;
-  //   sed_volume[master_dep] = tot_sed_volume;
-  //   representative_chonk[master_dep] = tot_representative_chonk;
+    //   // DEBUG STATEMENT TO REMOVE ONCE EXTENSIVELY TESTED
+    //   std::cout<< "WATER IN DEP " << tot_water_volume/(this->timestep) << " PIT IS " << this->graph.depression_tree.pitnode[master_dep] << std::endl;
+    //   std::cout<< "SED IN DEP " << tot_sed_volume << " PIT IS " << this->graph.depression_tree.pitnode[master_dep] << std::endl;
+    //   //
+    //   // Pushing the volume in the depression tree
+    //   this->graph.depression_tree.volume_water[master_dep] = this->graph.depression_tree.volume[master_dep];
+    //   // DOing the same for sed with a bit of manipulations to check wether I have enough to give
+    //   // if(sed_volume[master_dep] < this->graph.depression_tree.volume[master_dep])
+    //   //   this->graph.depression_tree.volume_sed[master_dep] = sed_volume[master_dep];
+    //   // else
+    //   //   this->graph.depression_tree.volume_sed[master_dep] = this->graph.depression_tree.volume[master_dep];
 
-  //   // DEBUG STATEMENT TO REMOVE ONCE EXTENSIVELY TESTED
-  //   std::cout<< "WATER IN DEP " << tot_water_volume/(this->timestep) << " PIT IS " << this->graph.depression_tree.pitnode[master_dep] << std::endl;
-  //   std::cout<< "SED IN DEP " << tot_sed_volume << " PIT IS " << this->graph.depression_tree.pitnode[master_dep] << std::endl;
-  //   //
-  //   // Pushing the volume in the depression tree
-  //   this->graph.depression_tree.volume_water[master_dep] = this->graph.depression_tree.volume[master_dep];
-  //   // DOing the same for sed with a bit of manipulations to check wether I have enough to give
-  //   // if(sed_volume[master_dep] < this->graph.depression_tree.volume[master_dep])
-  //   //   this->graph.depression_tree.volume_sed[master_dep] = sed_volume[master_dep];
-  //   // else
-  //   //   this->graph.depression_tree.volume_sed[master_dep] = this->graph.depression_tree.volume[master_dep];
+    //   // raising the depression level to the max level
+    //   this->graph.depression_tree.hw[master_dep] = this->graph.depression_tree.hw_max[master_dep];
+    //   // Saving the local tracker (this will be used for deiment deposioion)
+    //   this->graph.depression_tree.label_prop[master_dep] = representative_chonk[master_dep].get_label_tracker();
+    // }
+    // else
+    // {
+    //   std::cout << "GARGALAGOUOIGSJDKSLLSJKDC!!!@!@!@!@!@!@!@!!@!@!@!@!@!@!@!@!@!@!@!@!@!@" << std::endl;
 
-  //   // raising the depression level to the max level
-  //   this->graph.depression_tree.hw[master_dep] = this->graph.depression_tree.hw_max[master_dep];
-  //   // Saving the local tracker (this will be used for deiment deposioion)
-  //   this->graph.depression_tree.label_prop[master_dep] = representative_chonk[master_dep].get_label_tracker();
-  // }
-  // else
-  // {
-  //   std::cout << "GARGALAGOUOIGSJDKSLLSJKDC!!!@!@!@!@!@!@!@!!@!@!@!@!@!@!@!@!@!@!@!@!@!@" << std::endl;
+    //   // I do not have enough water to fill the depression... Need to go through the stack and gather the one I can process and redistribute water
+    //   // # array of bool to check which depression is done
+    //   std::map<int,bool> treestak_done_question_mark;
+    //   for (auto dep : treestak){treestak_done_question_mark[dep] = false;};
 
-  //   // I do not have enough water to fill the depression... Need to go through the stack and gather the one I can process and redistribute water
-  //   // # array of bool to check which depression is done
-  //   std::map<int,bool> treestak_done_question_mark;
-  //   for (auto dep : treestak){treestak_done_question_mark[dep] = false;};
+    //   // iterating through depressions
+    //   for (auto dep : treestak)
+    //   {
+    //     // if the depression is done -> ignore
+    //     // This can happen because I am processing twins together
+    //     if( treestak_done_question_mark[dep]){continue;}
+    //     // getting the twin ID
+    //     int twin = this->graph.depression_tree.get_twin(dep);
+    //     treestak_done_question_mark[twin] = true;
+    //     treestak_done_question_mark[dep] = true;
 
-  //   // iterating through depressions
-  //   for (auto dep : treestak)
-  //   {
-  //     // if the depression is done -> ignore
-  //     // This can happen because I am processing twins together
-  //     if( treestak_done_question_mark[dep]){continue;}
-  //     // getting the twin ID
-  //     int twin = this->graph.depression_tree.get_twin(dep);
-  //     treestak_done_question_mark[twin] = true;
-  //     treestak_done_question_mark[dep] = true;
+    //     // Calculating the water/sed/prop volume
+    //     this->graph.depression_tree.volume_water[dep] += water_volume[dep]; 
+    //     // this->graph.depression_tree.label_prop[dep] = mix_two_proportions(this->graph.depression_tree.volume_sed[dep], this->graph.depression_tree.label_prop[dep],
+    //     //             sed_volume[dep],representative_chonk[dep].get_label_tracker());
+    //     // this->graph.depression_tree.volume_sed[dep] += sed_volume[dep]; 
 
-  //     // Calculating the water/sed/prop volume
-  //     this->graph.depression_tree.volume_water[dep] += water_volume[dep]; 
-  //     // this->graph.depression_tree.label_prop[dep] = mix_two_proportions(this->graph.depression_tree.volume_sed[dep], this->graph.depression_tree.label_prop[dep],
-  //     //             sed_volume[dep],representative_chonk[dep].get_label_tracker());
-  //     // this->graph.depression_tree.volume_sed[dep] += sed_volume[dep]; 
+    //     if(twin > -1)
+    //     {
+    //       this->graph.depression_tree.volume_water[twin] += water_volume[twin]; 
+    //       // this->graph.depression_tree.label_prop[twin] = mix_two_proportions(this->graph.depression_tree.volume_sed[twin], this->graph.depression_tree.label_prop[twin],
+    //       //          sed_volume[twin],representative_chonk[twin].get_label_tracker());
+    //       // this->graph.depression_tree.volume_sed[twin] += sed_volume[twin]; 
+    //     }
 
-  //     if(twin > -1)
-  //     {
-  //       this->graph.depression_tree.volume_water[twin] += water_volume[twin]; 
-  //       // this->graph.depression_tree.label_prop[twin] = mix_two_proportions(this->graph.depression_tree.volume_sed[twin], this->graph.depression_tree.label_prop[twin],
-  //       //          sed_volume[twin],representative_chonk[twin].get_label_tracker());
-  //       // this->graph.depression_tree.volume_sed[twin] += sed_volume[twin]; 
-  //     }
+    //     // comparign with the volume total of the twin depression
+    //     double volmax = this->graph.depression_tree.volume[dep];
+    //     double this_total_water = this->graph.depression_tree.volume_water[dep];
+    //     if(twin > -1)
+    //     {
+    //       volmax += this->graph.depression_tree.volume[twin];
+    //       this_total_water += this->graph.depression_tree.volume_water[twin];
+    //     }
 
-  //     // comparign with the volume total of the twin depression
-  //     double volmax = this->graph.depression_tree.volume[dep];
-  //     double this_total_water = this->graph.depression_tree.volume_water[dep];
-  //     if(twin > -1)
-  //     {
-  //       volmax += this->graph.depression_tree.volume[twin];
-  //       this_total_water += this->graph.depression_tree.volume_water[twin];
-  //     }
+    //     // if no water: stop here
+    //     if(this_total_water == 0)
+    //       continue;
 
-  //     // if no water: stop here
-  //     if(this_total_water == 0)
-  //       continue;
+    //     // If I can fill the whole thingy -> transferring water and sed volumes upstream
+    //     if(this_total_water > volmax)
+    //     {
+    //       int parent = this->graph.depression_tree.parentree[dep];
+    //       this->graph.depression_tree.volume_water[parent] += this->graph.depression_tree.volume_water[dep];
+    //       this->graph.depression_tree.label_prop[parent] = mix_two_proportions(this->graph.depression_tree.volume_sed[dep], this->graph.depression_tree.label_prop[twin],
+    //                this->graph.depression_tree.volume_sed[parent], this->graph.depression_tree.label_prop[parent]);
+    //       this->graph.depression_tree.volume_sed[parent] += this->graph.depression_tree.volume_sed[dep];
+    //       if(twin > -1)
+    //       {
+    //         this->graph.depression_tree.volume_water[parent] += this->graph.depression_tree.volume_water[twin];
+    //         this->graph.depression_tree.label_prop[parent] = mix_two_proportions(this->graph.depression_tree.volume_sed[twin], this->graph.depression_tree.label_prop[twin],
+    //                  this->graph.depression_tree.volume_sed[parent], this->graph.depression_tree.label_prop[parent]);
+    //         this->graph.depression_tree.volume_sed[parent] += this->graph.depression_tree.volume_sed[twin];
+    //       }
+    //     }
+    //     else
+    //     {
+    //       // otherwise, let's check wether I have enough water to fill me twin
+    //       if(twin > -1)
+    //       {
+    //         // redistributing water in case one twin can be filled but not the other
+    //         if(this->graph.depression_tree.volume_water[dep] > this->graph.depression_tree.volume[dep])
+    //         {
+    //           this->graph.depression_tree.volume_water[twin] += this->graph.depression_tree.volume_water[dep] - this->graph.depression_tree.volume[dep];
+    //           this->graph.depression_tree.volume_water[dep] = this->graph.depression_tree.volume[dep];
 
-  //     // If I can fill the whole thingy -> transferring water and sed volumes upstream
-  //     if(this_total_water > volmax)
-  //     {
-  //       int parent = this->graph.depression_tree.parentree[dep];
-  //       this->graph.depression_tree.volume_water[parent] += this->graph.depression_tree.volume_water[dep];
-  //       this->graph.depression_tree.label_prop[parent] = mix_two_proportions(this->graph.depression_tree.volume_sed[dep], this->graph.depression_tree.label_prop[twin],
-  //                this->graph.depression_tree.volume_sed[parent], this->graph.depression_tree.label_prop[parent]);
-  //       this->graph.depression_tree.volume_sed[parent] += this->graph.depression_tree.volume_sed[dep];
-  //       if(twin > -1)
-  //       {
-  //         this->graph.depression_tree.volume_water[parent] += this->graph.depression_tree.volume_water[twin];
-  //         this->graph.depression_tree.label_prop[parent] = mix_two_proportions(this->graph.depression_tree.volume_sed[twin], this->graph.depression_tree.label_prop[twin],
-  //                  this->graph.depression_tree.volume_sed[parent], this->graph.depression_tree.label_prop[parent]);
-  //         this->graph.depression_tree.volume_sed[parent] += this->graph.depression_tree.volume_sed[twin];
-  //       }
-  //     }
-  //     else
-  //     {
-  //       // otherwise, let's check wether I have enough water to fill me twin
-  //       if(twin > -1)
-  //       {
-  //         // redistributing water in case one twin can be filled but not the other
-  //         if(this->graph.depression_tree.volume_water[dep] > this->graph.depression_tree.volume[dep])
-  //         {
-  //           this->graph.depression_tree.volume_water[twin] += this->graph.depression_tree.volume_water[dep] - this->graph.depression_tree.volume[dep];
-  //           this->graph.depression_tree.volume_water[dep] = this->graph.depression_tree.volume[dep];
+    //         }
+    //         else if(this->graph.depression_tree.volume_water[twin] > this->graph.depression_tree.volume[twin])
+    //         {
+    //           this->graph.depression_tree.volume_water[dep] += this->graph.depression_tree.volume_water[twin] - this->graph.depression_tree.volume[twin];
+    //           this->graph.depression_tree.volume_water[twin] += this->graph.depression_tree.volume[twin];
+    //         }
+    //         local_deps2reproc.emplace_back(twin);
+    //       }
+    //       local_deps2reproc.emplace_back(dep);
 
-  //         }
-  //         else if(this->graph.depression_tree.volume_water[twin] > this->graph.depression_tree.volume[twin])
-  //         {
-  //           this->graph.depression_tree.volume_water[dep] += this->graph.depression_tree.volume_water[twin] - this->graph.depression_tree.volume[twin];
-  //           this->graph.depression_tree.volume_water[twin] += this->graph.depression_tree.volume[twin];
-  //         }
-  //         local_deps2reproc.emplace_back(twin);
-  //       }
-  //       local_deps2reproc.emplace_back(dep);
+    //     }
+    //   }
 
-  //     }
-  //   }
-
-  // }
+    // }
+  }
 
   for(auto dep: local_deps2reproc)
   {
@@ -2640,18 +2641,6 @@ void ModelRunner::lake_solver_v3(int node)
     int receiver_extern = this->graph.depression_tree.externode[dep];
     // getting all children depressions (and self)
     std::vector<int> children = this->graph.depression_tree.get_all_children(dep, true);
-
-    // TEMPORARY MEASURE, ASSUMING hw = hw max
-    this->graph.depression_tree.hw[dep] = this->graph.depression_tree.hw_max[dep];
-
-    if(water_volume[dep] >= this->graph.depression_tree.volume[dep] )
-      this->graph.depression_tree.volume_water[dep] = this->graph.depression_tree.volume[dep];
-    else
-      this->graph.depression_tree.volume_water[dep] = water_volume[dep];
-
-
-    bool outflows = (water_volume[dep] > this->graph.depression_tree.volume_water[dep]);
-    // std::cout << outflows << std::endl;
 
     // Before reprocessing the outlet, I need to reprocess everything downstream of it
     // reprocessing the outlet and the downstream nodes
@@ -2683,10 +2672,56 @@ void ModelRunner::lake_solver_v3(int node)
       PQstack.pop();
     }
 
-    for(auto tnode:nodes)
+    // TEMPORARY MEASURE, ASSUMING hw = hw max
+
+    if(water_volume[dep] >= this->graph.depression_tree.volume[dep] )
     {
-      is_in_queue[tnode] = 'l';
+      this->graph.depression_tree.volume_water[dep] = this->graph.depression_tree.volume[dep];
+      this->graph.depression_tree.hw[dep] = this->graph.depression_tree.hw_max[dep];      
     }
+    else
+    {
+      this->graph.depression_tree.volume_water[dep] = water_volume[dep];
+      auto tnodes = this->graph.depression_tree.get_all_nodes(dep);
+      std::priority_queue< PQ_helper<int,double>, std::vector<PQ_helper<int,double> >, std::greater<PQ_helper<int,double> > > Sorter;
+      for(auto tn: tnodes)
+        Sorter.emplace(PQ_helper<int,double>(tn, surface_elevation[tn]));
+      int n_nodes = 0;
+      while(Sorter.size() >= 2)
+      {
+        // Getting the thingy out of the PQ and poping it out
+        auto dn = Sorter.top().node; Sorter.pop();
+        n_nodes++;
+        is_in_queue[dn] = 'l';
+
+        if(this->graph.depression_tree.potential_volume[Sorter.top().node] > this->graph.depression_tree.volume_water[dep])
+        {
+          double low_h = this->surface_elevation[dn];
+          double high_h = this->surface_elevation[Sorter.top().node];
+          double deltelev = high_h - low_h;
+
+          double volume2fill = this->graph.depression_tree.potential_volume[Sorter.top().node] - this->graph.depression_tree.potential_volume[dn]; 
+          this->graph.depression_tree.hw[dep] = low_h + ((this->graph.depression_tree.volume_water[dep] - this->graph.depression_tree.potential_volume[dn])/volume2fill) * deltelev;
+          std::cout << "LKASDFKJLSDFKLJ------->" <<  ((this->graph.depression_tree.volume_water[dep] - this->graph.depression_tree.potential_volume[dn])/volume2fill) * deltelev << std::endl;
+          break;
+        }
+      }
+
+
+    }
+
+    std::cout << "HW CALCULATED IS " << this->graph.depression_tree.hw[dep] << " vs " << this->surface_elevation[this->graph.depression_tree.tippingnode[dep]] << std::endl;
+
+
+    bool outflows = (water_volume[dep] > this->graph.depression_tree.volume_water[dep]);
+    // std::cout << outflows << std::endl;
+
+
+
+    // for(auto tnode:nodes)
+    // {
+    //   is_in_queue[tnode] = 'l';
+    // }
 
     // is_in_queue[outlet] = 'y';
     double wat2remove = 0, wat2add = 0;
@@ -2724,6 +2759,7 @@ void ModelRunner::lake_solver_v3(int node)
       // std::cout << "BEEF sed_volume[dep] " << sed_volume[dep] << " this->graph.depression_tree.volume_sed[dep] " << this->graph.depression_tree.volume_sed[dep] << std::endl;
 
       representative_chonk[dep].add_to_sediment_flux(sed2remove,labrador,1.);
+      double was = sed_volume[dep];
       sed_volume[dep] -= sed2remove;
       // if(sed_volume[dep] < this->graph.depression_tree.volume_sed[dep])
       //   this->graph.depression_tree.volume_sed[dep] -= std::abs(sed2remove - this->graph.depression_tree.volume_sed[dep]);
@@ -2732,7 +2768,7 @@ void ModelRunner::lake_solver_v3(int node)
       // std::cout << "AFATT sed_volume[dep] " << sed_volume[dep] << " this->graph.depression_tree.volume_sed[dep] " << this->graph.depression_tree.volume_sed[dep] << std::endl;
 
       if(sed_volume[dep] < 0)
-        throw std::runtime_error("sed_volume[dep] < 0");
+        throw std::runtime_error("sed_volume[dep] < 0 :: " + std::to_string(sed_volume[dep]) + " was " + std::to_string(was));
       if(this->graph.depression_tree.volume_sed[dep] < 0)
         throw std::runtime_error("depression_tree < 0");
 
@@ -2894,6 +2930,7 @@ void ModelRunner::lake_solver_v3(int node)
       }
       else
       {
+        std::cout << "rep " << tnode << "|";
         // # I am not a nodor:
         if(tnode == outlet && outflows)
         {
@@ -2905,9 +2942,13 @@ void ModelRunner::lake_solver_v3(int node)
           this->process_node_nolake_for_sure(tnode, this->is_processed, this->active_nodes, this->cellarea,this->topography, false, false);
         }
         else
+        {
+          // throw std::runtime_error("SafetyStoppah #12BC45f");
           this->process_node_nolake_for_sure(tnode, this->is_processed, this->active_nodes, this->cellarea,this->topography, true, true);
+        }
       }
     }
+    std::cout << std::endl;
 
 
   }// end of for loop fgoing through the lakes
