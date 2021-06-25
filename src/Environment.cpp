@@ -2437,7 +2437,7 @@ void ModelRunner::lake_solver_v3(int node)
   treestak_done_question_mark[-1] = true;
 
   // Going from top to bottom in the local binary tree
-  for(int i=int(treestak.size()) - 1; i >= 0; i--)
+  for(int i = int(treestak.size()) - 1; i >= 0; i--)
   {
     // getting dep ID as well as its potential twin
     int tdep = treestak[i];
@@ -2451,7 +2451,7 @@ void ModelRunner::lake_solver_v3(int node)
     for( auto dep:{tdep,twin})
     {
       // Is dep proc or -1?
-      if(treestak_done_question_mark[dep])
+      if(treestak_done_question_mark[dep] == true)
         continue;
 
       // Now it will be
@@ -2459,7 +2459,7 @@ void ModelRunner::lake_solver_v3(int node)
 
       double lowerboundvol = this->graph.depression_tree.get_volume_of_children(dep);
 
-      std::cout << "lowerboundvol is "<< lowerboundvol << ", available water is " << water_volume[dep] << " and is filling? ";
+      std::cout << "lowerboundvol is "<< lowerboundvol <<" and higher bound is " << this->graph.depression_tree.volume[dep] << ", available water is " << water_volume[dep] << " and is filling? ";
       // Do I have enough water to fill the current master_depression
       if(lowerboundvol <= water_volume[dep])
       {
@@ -2480,12 +2480,15 @@ void ModelRunner::lake_solver_v3(int node)
         std::cout << " no" << std::endl;
 
     }
+    std::cout << ":n_outflowing" << n_outflowing << " twin is " << -1 << std::endl;
+
 
     // Last check: only one outflowing?? redistributing the water to the second one 
     // (which itself will not outflow otherwise the parent would have already been done)
-    if(n_outflowing != 1)
+    if(n_outflowing != 1 || twin == -1)
       continue;
 
+    std::cout << "which_one_outflows-->" << which_one_outflows << std::endl;
     twin = this->graph.depression_tree.get_twin(which_one_outflows);
     double extra_water = water_volume[which_one_outflows] - this->graph.depression_tree.volume[which_one_outflows];
 
@@ -2674,13 +2677,22 @@ void ModelRunner::lake_solver_v3(int node)
 
     // TEMPORARY MEASURE, ASSUMING hw = hw max
 
-    if(water_volume[dep] >= this->graph.depression_tree.volume[dep] )
+    if(water_volume[dep] >= this->graph.depression_tree.volume[dep] ||  double_equals(water_volume[dep] - this->graph.depression_tree.volume[dep],0., 1e-5) )
     {
       this->graph.depression_tree.volume_water[dep] = this->graph.depression_tree.volume[dep];
-      this->graph.depression_tree.hw[dep] = this->graph.depression_tree.hw_max[dep];      
+      this->graph.depression_tree.hw[dep] = this->graph.depression_tree.hw_max[dep]; 
+      for (auto gh:this->graph.depression_tree.get_all_nodes(dep))
+      {
+        if(gh != outlet)
+          is_in_queue[gh] = 'l';     
+      }
+
     }
     else
     {
+      std::cout << "THIS IS HAPPENNING GRUMBL" << std::endl;
+      // throw std::runtime_error("lksdjflkjdsj42134");
+      std::cout << water_volume[dep] - this->graph.depression_tree.volume[dep] << "+=+=+=+" << water_volume[dep] << " " << this->graph.depression_tree.volume[dep] <<  " KOJDSFLKDFKJSDLJKFLSJDFLJSLSDKJFLKSJDFLKJSDLKFJLSKDJFLKSJDLKFJSLKDJFLJEOIRUWOEIRUOIWEUROIWEUROIUDFJLMCVLKJDF(" << std::endl;
       this->graph.depression_tree.volume_water[dep] = water_volume[dep];
       auto tnodes = this->graph.depression_tree.get_all_nodes(dep);
       std::priority_queue< PQ_helper<int,double>, std::vector<PQ_helper<int,double> >, std::greater<PQ_helper<int,double> > > Sorter;
@@ -2692,7 +2704,8 @@ void ModelRunner::lake_solver_v3(int node)
         // Getting the thingy out of the PQ and poping it out
         auto dn = Sorter.top().node; Sorter.pop();
         n_nodes++;
-        is_in_queue[dn] = 'l';
+        if(dn != outlet)
+          is_in_queue[dn] = 'l';
 
         if(this->graph.depression_tree.potential_volume[Sorter.top().node] > this->graph.depression_tree.volume_water[dep])
         {
@@ -2768,9 +2781,9 @@ void ModelRunner::lake_solver_v3(int node)
       // std::cout << "AFATT sed_volume[dep] " << sed_volume[dep] << " this->graph.depression_tree.volume_sed[dep] " << this->graph.depression_tree.volume_sed[dep] << std::endl;
 
       if(sed_volume[dep] < 0)
-        throw std::runtime_error("sed_volume[dep] < 0 :: " + std::to_string(sed_volume[dep]) + " was " + std::to_string(was));
+        throw std::runtime_error("Dep: " + std::to_string(dep) + "sed_volume[dep] < 0 :: " + std::to_string(sed_volume[dep]) + " was " + std::to_string(was));
       if(this->graph.depression_tree.volume_sed[dep] < 0)
-        throw std::runtime_error("depression_tree < 0");
+        throw std::runtime_error("Dep: " + std::to_string(dep) + "depression_tree < 0");
 
 
       std::cout << "Removing " << sed2remove << " from what the outlet were giving to the lake " << std::endl;

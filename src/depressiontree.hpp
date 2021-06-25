@@ -274,7 +274,9 @@ public:
   int get_twin(int dep)
   {
   	if(this->parentree[dep] == -1) {return -1;}
+
   	for(auto i:this->treeceivers[this->parentree[dep]]){if(i != dep) {return i;} ;};
+  	
   	return -1;
   }
 
