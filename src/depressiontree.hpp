@@ -188,7 +188,7 @@ public:
 		this->register_new_depression(elevation,pitnode, {-1,-1});
 	}
 
-  //  ___________________
+  	//  ___________________
 	// |                   |
 	// | Linking functions |
 	// |___________________| 
@@ -390,6 +390,33 @@ public:
 	// returns the number of depressions in the whole tree
 	int get_n_dep(){return int(this->parentree.size());}
 
+
+	// Retuns -1 if the inputted node index (in dem referential) is not an outlet, otherwise returns the dep for which it is
+	int is_outlet(int nodeindex)
+	{
+		int output = -1;
+		for(int i = 0; i < this->get_n_dep(); i++)
+		{
+			if(this->tippingnode[i] == nodeindex)
+				return i;
+
+		}
+	return output;
+	}
+
+	// Retuns -1 if the inputted node index (in dem referential) is not an outlet, otherwise returns the dep for which it is
+	int is_pit(int nodeindex)
+	{
+		int output = -1;
+		for(int i = 0; i < this->get_n_dep(); i++)
+		{
+			if(this->pitnode[i] == nodeindex)
+				return i;
+
+		}
+	return output;
+	}
+
   //  ___________________
 	// |                   |
 	// | Filling helpers   |
@@ -516,7 +543,7 @@ public:
 
 
 
-  //  ___________________
+  	//  ___________________
 	// |                   |
 	// |   Postprocessing  |
 	// |___________________| 

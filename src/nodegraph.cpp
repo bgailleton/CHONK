@@ -262,6 +262,42 @@ NodeGraphV2::NodeGraphV2(
     node_to_check = this->update_receivers_explicit();
     // std::cout << "B" << std::endl;
 
+    // Testing doubles here
+    std::vector<bool> is_in_a_dep(this->un_element);
+    for(int i=0; i<this->depression_tree.get_n_dep(); i++)
+    {
+        double max_potvol = 0;
+
+      // if(this->depression_tree.level[i] == 0)
+      if(true)
+      {
+        for(auto n:this->depression_tree.nodes[i] )
+        {
+          if(is_in_a_dep[n] == false)
+            is_in_a_dep[n] = true;
+          else
+            throw std::runtime_error("node in multiple lake");
+
+          if(this->depression_tree.potential_volume[n] == -1)
+            throw std::runtime_error("No ptovol in node?!");
+
+          if(this->depression_tree.potential_volume[n] > max_potvol)
+            max_potvol = this->depression_tree.potential_volume[n];
+
+        }
+      }
+
+      if(max_potvol < this->depression_tree.volume[i])
+      {
+        std::cout << max_potvol << " vs " << this->depression_tree.volume[i] << "|" << this->depression_tree.nodes[i].size() << std::endl;
+        std::cout << "Level::" << this->depression_tree.level[i] << std::endl;
+        std::cout << "DEP::" << i << std::endl;
+
+        throw std::runtime_error("Model Anomaly in potential volume?!");
+      }
+    }
+
+
   }
 
 
@@ -455,6 +491,9 @@ void NodeGraphV2::fill_the_depressions(std::vector<int>& next_to_check, xt::pyte
         this->depression_tree.register_new_depression(elevation,this->depression_tree.pitnode[dep]);
         this->depression_tree.merge_children_to_parent({dep,bro}, this->depression_tree.get_last_id(), next_node, neightbors, elevation);
 
+        if(dep == 0)
+          std::cout << "MERGES" << std::endl;
+
         // # 4) Switching the filling to the new depression
         dep = this->depression_tree.get_last_id();
         // std::cout << dep << " just merged and vol is  " << this->depression_tree.volume[dep] << std::endl;
@@ -493,6 +532,9 @@ void NodeGraphV2::fill_the_depressions(std::vector<int>& next_to_check, xt::pyte
           continue;
         }
 
+        if(dep == 0)
+          std::cout << "BREAKS" << std::endl;
+
         // If none of the above, Iz an outlet
         // #1) double break activated (will break the main loop after looping through all neighbors)
         double_break = true;
@@ -517,6 +559,22 @@ void NodeGraphV2::fill_the_depressions(std::vector<int>& next_to_check, xt::pyte
   // std::cout << "checker_filling 7" << std::endl;
 
   }
+
+  for(int dep = 0 ; dep< this->depression_tree.get_n_dep(); dep++)
+  {
+    if(this->depression_tree.parentree[dep] == -1)
+    {
+      auto tnodes = this->depression_tree.get_all_nodes(dep);
+      for(size_t i =0; i< tnodes.size(); i++)
+      {
+        if(this->depression_tree.potential_volume[tnodes[i]] == -1)
+        {
+          this->depression_tree.potential_volume[tnodes[i]] = 0;
+        }
+      }
+    }
+  }
+
   // std::cout << "checker_filling 8" << std::endl;
 
 
@@ -552,13 +610,17 @@ void NodeGraphV2::raise_dep_to_new_node(int dep, int node, xt::pytensor<double,1
   double dV = nbeef * dz * this->cellarea;
 
   this->depression_tree.volume[dep] += dV;
-  if(this->depression_tree.nodes[dep].size()>0)
+
+  if(this->depression_tree.nodes[dep].size() > 0)
     this->depression_tree.potential_volume[this->depression_tree.nodes[dep][this->depression_tree.nodes[dep].size()-1]] = this->depression_tree.volume[dep];
   else if(this->depression_tree.treeceivers[dep][0] != -1)
   {
     this->depression_tree.potential_volume[this->depression_tree.tippingnode[this->depression_tree.treeceivers[dep][0]]] = this->depression_tree.volume[dep];
     // this->depression_tree.potential_volume[this->depression_tree.tippingnode[this->depression_tree.treeceivers[dep][1]]] = this->depression_tree.volume[dep];
   }
+  else
+    this->depression_tree.potential_volume[node] = 0;
+
 
 
   if(integrate_node)
