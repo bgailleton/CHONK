@@ -2940,7 +2940,7 @@ void ModelRunner::lake_solver_v3(int node)
     for (auto n:this->graph.depression_tree.get_all_nodes(dep))
     {
       // std::cout << n << "-" << this->graph.depression_tree.node2tree[n] << "-";
-      if(this->node_in_lake[n] == dep)
+      if(is_in_queue[n] == 'l')
       {
         if(n ==  outlet)
           continue;
