@@ -287,14 +287,14 @@ NodeGraphV2::NodeGraphV2(
         }
       }
 
-      if(max_potvol < this->depression_tree.volume[i])
-      {
-        std::cout << max_potvol << " vs " << this->depression_tree.volume[i] << "|" << this->depression_tree.nodes[i].size() << std::endl;
-        std::cout << "Level::" << this->depression_tree.level[i] << std::endl;
-        std::cout << "DEP::" << i << std::endl;
+      // if(max_potvol < this->depression_tree.volume[i])
+      // {
+      //   std::cout << max_potvol << " vs " << this->depression_tree.volume[i] << "|" << this->depression_tree.nodes[i].size() << std::endl;
+      //   std::cout << "Level::" << this->depression_tree.level[i] << std::endl;
+      //   std::cout << "DEP::" << i << std::endl;
 
-        throw std::runtime_error("Model Anomaly in potential volume?!");
-      }
+      //   throw std::runtime_error("Model Anomaly in potential volume?!");
+      // }
     }
 
 
@@ -611,15 +611,24 @@ void NodeGraphV2::raise_dep_to_new_node(int dep, int node, xt::pytensor<double,1
 
   this->depression_tree.volume[dep] += dV;
 
-  if(this->depression_tree.nodes[dep].size() > 0)
-    this->depression_tree.potential_volume[this->depression_tree.nodes[dep][this->depression_tree.nodes[dep].size()-1]] = this->depression_tree.volume[dep];
-  else if(this->depression_tree.treeceivers[dep][0] != -1)
+  if(integrate_node)
   {
-    this->depression_tree.potential_volume[this->depression_tree.tippingnode[this->depression_tree.treeceivers[dep][0]]] = this->depression_tree.volume[dep];
-    // this->depression_tree.potential_volume[this->depression_tree.tippingnode[this->depression_tree.treeceivers[dep][1]]] = this->depression_tree.volume[dep];
+    this->depression_tree.potential_volume[node] = this->depression_tree.volume[dep];
   }
   else
-    this->depression_tree.potential_volume[node] = 0;
+  {
+    this->depression_tree.potential_volume[node] += this->depression_tree.volume[dep];
+  }
+
+  // if(this->depression_tree.nodes[dep].size() > 0)
+  //   this->depression_tree.potential_volume[this->depression_tree.nodes[dep][this->depression_tree.nodes[dep].size()-1]] = this->depression_tree.volume[dep];
+  // else if(this->depression_tree.treeceivers[dep][0] != -1)
+  // {
+  //   this->depression_tree.potential_volume[this->depression_tree.tippingnode[this->depression_tree.treeceivers[dep][0]]] = this->depression_tree.volume[dep];
+  //   // this->depression_tree.potential_volume[this->depression_tree.tippingnode[this->depression_tree.treeceivers[dep][1]]] = this->depression_tree.volume[dep];
+  // }
+  // else
+  //   this->depression_tree.potential_volume[node] = 0;
 
 
 

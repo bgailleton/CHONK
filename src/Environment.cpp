@@ -2795,13 +2795,21 @@ void ModelRunner::lake_solver_v3(int node)
           double volume2fill = this->graph.depression_tree.potential_volume[top_node] - this->graph.depression_tree.potential_volume[dn]; 
           
           if(volume2fill < 0)
+          {
+            std::cout << low_h << " vs " << high_h << " -----> " << volume2fill << " = " << this->graph.depression_tree.potential_volume[top_node] << " - " << this->graph.depression_tree.potential_volume[dn] <<  std::endl;
             throw std::runtime_error("volume2fill negative??!!");
+          }
 
-
-          this->graph.depression_tree.hw[dep] = low_h + 
+          if(volume2fill > 0)
+            this->graph.depression_tree.hw[dep] = low_h + 
                                                 ((this->graph.depression_tree.volume_water[dep] - this->graph.depression_tree.potential_volume[dn])/volume2fill) 
                                                 * deltelev;
-
+          else
+          {
+            if(low_h != high_h)
+              throw std::runtime_error("Invalid low_h high_h vol combinaition");
+            this->graph.depression_tree.hw[dep] = low_h;
+          }
 
           is_changed = true;
           
