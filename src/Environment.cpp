@@ -2256,11 +2256,6 @@ void ModelRunner::finalise()
       this->Qw_out += this->chonk_network[i].get_water_flux();
       this->Qs_mass_balance += this->chonk_network[i].get_sediment_flux();
     }
-    // double delta_sed = (sed_height_tp1[i] - sed_height[i]);
-    // double delta_elev = surface_elevation_tp1[i] - surface_elevation[i];
-    // double delta_delta = delta_elev - delta_sed;
-    // this->Qs_mass_balance += (delta_elev) * cellarea * this->timestep;
-    // this->Qs_mass_balance -= (delta_delta) * cellarea * this->timestep;
   }
 }
 
@@ -2318,31 +2313,9 @@ void ModelRunner::lake_solver_v3(int node)
     this->process_node_nolake_for_sure(tnode, this->is_processed, this->active_nodes, this->cellarea, this->topography, true, true);
   }
 
-  // for(auto dep:this->graph.depression_tree.get_all_children(master_dep,true))
-  // {
-  //   if(std::find(nodes.begin(),nodes.end(),this->graph.depression_tree.pitnode[dep]) == nodes.end())
-  //     throw std::runtime_error("PIT NOT IN NODES");
-  //   ;
-  // }
-
 
   // Get the topological order of depressions - > depressions from bottom to top
   std::vector<int> treestak = this->graph.depression_tree.get_local_treestack(master_dep);
-
-  // for(auto dep:this->graph.depression_tree.get_all_children(master_dep,true))
-  // {
-  //   if(std::find(treestak.begin(),treestak.end(),dep) == treestak.end())
-  //     throw std::runtime_error("TREESTACK ISSUE");
-    
-  // }
-  // auto gfjkl = this->graph.depression_tree.get_all_children(master_dep,true);
-  // for(auto dep:treestak)
-  // {
-  //   if(std::find(gfjkl.begin(),gfjkl.end(),dep) == gfjkl.end())
-  //     throw std::runtime_error("TREESTACK ISSUE2:" + std::to_string(dep));
-
-  //   ;
-  // }
   
   // Getting ready to gather the water and sediment fluxes I will have for that depression
   // Water for the whole system
@@ -2570,7 +2543,8 @@ void ModelRunner::lake_solver_v3(int node)
             );
           }
           water_volume[achild] += extra_water;
-          achild = this->graph.depression_tree.treeceivers[twin][0];
+
+          achild = this->graph.depression_tree.treeceivers[achild][0];
 
         }
 
