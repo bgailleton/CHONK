@@ -2493,90 +2493,29 @@ void ModelRunner::lake_solver_v3(int node)
       continue;
 
     std::cout << "HAPPENS HEREHAPPENS HEREHAPPENS HEREHAPPENS HEREHAPPENS HEREHAPPENS HEREHAPPENS HEREHAPPENS HEREHAPPENS HEREHAPPENS HERE" << std::endl;;
-    int original_twin = this->graph.depression_tree.get_twin(which_one_outflows);
-    std::vector<int> neightbors; std::vector<double> dummy ; graph.get_D8_neighbors(this->graph.depression_tree.tippingnode[original_twin], this->active_nodes, neightbors, dummy);
-    
-    std::cout << "0: " << which_one_outflows << " gives to " << original_twin << std::endl;
-
-    if(this->graph.depression_tree.level[original_twin] == 0)
-    {
-      twin = original_twin;
-    }
-    else
-    {
-
-
-      int this_node = this->graph.depression_tree.internode[original_twin];
-      if(this_node == -1)
-        this_node == this->graph.depression_tree.tippingnode[original_twin];
-      std::cout << "0.5 " << this_node << " nn: " << this->graph.depression_tree.nodes[original_twin].size() << " TN: " << this->graph.depression_tree.tippingnode[original_twin] << std::endl;
-      bool uncharted = false;
-      for(auto n:neightbors)
-      {
-        if(this->graph.depression_tree.node2tree[n] == original_twin && this_node != this->graph.depression_tree.tippingnode[original_twin])
-        {
-          this_node = n;
-          uncharted = true;
-          break;
-        }
-        if(this->graph.depression_tree.node2tree[n] != which_one_outflows)
-          this_node = n;
-      }
-
-      if(uncharted == false)
-      {
-        std::cout << "Unchanged. " << graph.depression_tree.node2tree[this_node] << std::endl;
-
-      }
-
-
-
-      std::cout << "1 " << original_twin << std::endl;
-      std::cout << "2 " << this_node << std::endl;
-      do
-      {
-        if(this->graph.depression_tree.node2tree[this_node] != -1)
-        {
-          if(this->graph.depression_tree.level[this->graph.depression_tree.node2tree[this_node]] == 0)
-            break;
-        }
-
-        this_node = this->graph.get_Srec(this_node);
-
-      }while(true);
-      std::cout << "3 " << this_node << std::endl;
-
-      twin = this->graph.depression_tree.node2tree[this_node];
-      std::cout << "4 " << twin << std::endl;
-    }
-
-
-
+    twin = this->graph.depression_tree.get_twin(which_one_outflows);
     double extra_water = water_volume[which_one_outflows] - this->graph.depression_tree.volume[which_one_outflows];
     
     double extra_sed = sed_volume[which_one_outflows] - this->graph.depression_tree.volume[which_one_outflows];
     water_volume[which_one_outflows] -= extra_water;
     water_volume[twin] += extra_water;
+    std::cout << "Giving " << extra_water << " from " << which_one_outflows << " to " << twin << std::endl;
+    std::cout << "Remaining " << water_volume[which_one_outflows] << "/" << this->graph.depression_tree.volume[which_one_outflows]
+     << " and " << water_volume[twin]<< "/" << this->graph.depression_tree.volume[twin] << std::endl;
 
-    std::cout << "5 " << twin << std::endl;
+    double totwat = 0;
+    for(auto ch:this->graph.depression_tree.get_all_children(twin,true))
+    {
+      if(this->graph.depression_tree.level[ch] ==0)
+        totwat += this->chonk_network[this->graph.depression_tree.pitnode[ch]].get_water_flux() * this->timestep;
+    }
+    for(auto ch:this->graph.depression_tree.get_all_children(which_one_outflows,true))
+    {
+      if(this->graph.depression_tree.level[ch] ==0)
+        totwat += this->chonk_network[this->graph.depression_tree.pitnode[ch]].get_water_flux() * this->timestep;
+    }
 
-    // std::cout << "Giving " << extra_water << " from " << which_one_outflows << " to " << twin << std::endl;
-    // std::cout << "Remaining " << water_volume[which_one_outflows] << "/" << this->graph.depression_tree.volume[which_one_outflows]
-    //  << " and " << water_volume[twin]<< "/" << this->graph.depression_tree.volume[twin] << std::endl;
-
-    // double totwat = 0;
-    // for(auto ch:this->graph.depression_tree.get_all_children(twin,true))
-    // {
-    //   if(this->graph.depression_tree.level[ch] ==0)
-    //     totwat += this->chonk_network[this->graph.depression_tree.pitnode[ch]].get_water_flux() * this->timestep;
-    // }
-    // for(auto ch:this->graph.depression_tree.get_all_children(which_one_outflows,true))
-    // {
-    //   if(this->graph.depression_tree.level[ch] ==0)
-    //     totwat += this->chonk_network[this->graph.depression_tree.pitnode[ch]].get_water_flux() * this->timestep;
-    // }
-
-    // std::cout << totwat << " should be equal to " << water_volume[twin]+ water_volume[which_one_outflows] << std::endl;
+    std::cout << totwat << " should be equal to " << water_volume[twin]+ water_volume[which_one_outflows] << std::endl;
 
     if(extra_sed > 0)
     {
@@ -2588,31 +2527,6 @@ void ModelRunner::lake_solver_v3(int node)
         representative_chonk[which_one_outflows].get_fluvialprop_sedflux()
       );
     }
-    std::cout << "6 " << twin << std::endl;
-
-    while(twin != original_twin)
-    {
-      twin = this->graph.depression_tree.parentree[twin];
-      if(twin == -1)
-        throw std::runtime_error("Went too far");
-
-      if(extra_sed > 0)
-      {
-        sed_volume[twin] += extra_sed; 
-        representative_chonk[twin].add_to_sediment_flux(
-          sed_volume[which_one_outflows], 
-          representative_chonk[which_one_outflows].get_label_tracker(),
-          representative_chonk[which_one_outflows].get_fluvialprop_sedflux()
-        );
-        water_volume[twin] += extra_water;
-      }
-
-
-    }
-
-
-    std::cout << "7 " << twin << std::endl;
-
 
     if(treestak_in_localocalocal[twin] == false)
     {
@@ -2637,7 +2551,30 @@ void ModelRunner::lake_solver_v3(int node)
         for (auto ch:doz_children)
           treestak_done_question_mark[ch] = true;
       }
+      else
+      {
+        // THIS IS WHERE YOU NEED TO PUT WORK!!!!!
+        // BASICALLY THE REEQUILIBRIUM DID NOT WORK BECAUSE THE TWIN DOES NOT GET FILLED
+        // NEED TO FIND THE LEVEL0 DEPRESSION LINKED TO THAT OUTLET AND REPROPAGATE THE WATER UP
+        int origin_dep = twin;
+        int achild = this->graph.depression_tree.treeceivers[twin][0];
+        while(achild != -1)
+        {
+          if(extra_sed > 0)
+          {
+            sed_volume[achild] += extra_sed; 
+            representative_chonk[achild].add_to_sediment_flux(
+              sed_volume[which_one_outflows], 
+              representative_chonk[which_one_outflows].get_label_tracker(),
+              representative_chonk[which_one_outflows].get_fluvialprop_sedflux()
+            );
+          }
+          water_volume[achild] += extra_water;
+          achild = this->graph.depression_tree.treeceivers[twin][0];
 
+        }
+
+      }
     }
 
   }
