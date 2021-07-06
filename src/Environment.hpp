@@ -436,6 +436,11 @@ std::vector<double>& pre_sed, std::vector<double>& pre_water);
     bool external_kappa = false;
     bool precipitations_enabled = false;
 
+    bool lake_evaporation = false;
+    bool lake_evaporation_spatial = false;
+    double lake_evaporation_rate = 0.1;
+    xt::pytensor<double,1> lake_evaporation_rate_spatial;
+
 
     double hillslope2fluvial_connectivity = 0;
     xt::pytensor<double,1> precipitations;

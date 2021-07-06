@@ -185,6 +185,15 @@ void ModelRunner::initiate_nodegraph()
 
   this->lake_to_process = std::vector<int>();
 
+  if(this->lake_evaporation)
+  {
+    if(this->lake_evaporation_spatial == false)
+      this->lake_evaporation_rate_spatial = this->lake_evaporation_rate + xt::zeros_like(this->topography);
+
+    this->graph.depression_tree.preprocess_lake_evaporation_potential(this->lake_evaporation_rate_spatial, this->cellarea);
+
+  }
+
   // Also initialising the Lake graph
   //# incrementor reset to 0
   lake_incrementor = 0;

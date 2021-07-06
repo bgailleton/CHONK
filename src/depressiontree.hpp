@@ -105,6 +105,8 @@ public:
 	std::vector<double> volume_sed;
 	// index: depression ID -> value: volume of actual water hosted in the depression 
 	std::vector<double> volume_water;
+	// index: depression ID -> value: volume max of water storable taking account of potential lake evaporation
+	std::vector<double> volume_max_with_evaporation;
 	// index: depression ID -> value: maximum water height of the depression (in absolute elevation)
 	std::vector<double> hw_max;
 	// index: depression ID -> value: actual water height of the depression (in absolute elevation)
@@ -171,6 +173,7 @@ public:
 		this->pitnode.emplace_back(pitnode);
 		// No volumes at first
 		this->volume.emplace_back(0);
+		this->volume_max_with_evaporation.emplace_back(0);
 		this->volume_sed.emplace_back(0);
 		this->volume_water.emplace_back(0);
 		// Initial hw is the one of the pits
@@ -617,6 +620,30 @@ public:
 		}
 		std::cout << tot << std::endl;
 		return tot;
+	}
+
+  //  ___________________
+	// |                   |
+	// |    Evaporation    |
+	// |___________________| 
+	//            (\__/)||
+	//            (•ㅅ•) ||
+	//            / 　 づ
+
+
+	// ran as post-processing function, if calculates an amount of water max stored in the lake taking into account the lake evaporation
+	void preprocess_lake_evaporation_potential(xt::pytensor<double,1>& evaporate, double cellarea)
+	{
+		for(int i = 0;  i< this->get_n_dep(); ++i)
+		{
+			auto tnodes = this->get_all_nodes(i);
+			double tvol = this->volume[i];
+			for(auto no:tnodes)
+			{
+				tvol += evaporate[no] * cellarea;
+			}
+
+		}
 	}
 
 };

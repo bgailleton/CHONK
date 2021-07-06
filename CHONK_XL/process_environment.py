@@ -234,7 +234,7 @@ class CoreModel:
 
 
 	precipitations = xs.variable(intent = 'in', default = False)
-	precipitations_array = xs.variable(intent = 'in', dims = [('y','x'), ('node')])
+	precipitations_array = xs.variable(intent = 'in', dims = [('y','x'), ('node'),()], default = -1)
 
 
 	# what gets out
