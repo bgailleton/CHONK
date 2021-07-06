@@ -643,6 +643,8 @@ public:
 				tvol += evaporate[no] * cellarea;
 			}
 
+			this->volume_max_with_evaporation[i] = tvol;
+
 		}
 	}
 
