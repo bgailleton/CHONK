@@ -233,6 +233,10 @@ class CoreModel:
 	external_kappa = xs.variable(intent = 'in', default = False)
 
 
+	precipitations = xs.variable(intent = 'in', default = False)
+	precipitations_array = xs.variable(intent = 'in', dims = [('y','x'), ('node')])
+
+
 	# what gets out
 	model = xs.any_object( description = "The main model object, controls the c++ part (I/O, results, run function, process order of execution, ...)")
 
@@ -283,9 +287,14 @@ class CoreModel:
 		self.model.update_int_param("n_cols", self.nx)
 		self.model.update_int_param("n_elements",self.ny*self.nx)
 
+
 		self.model.update_double_param("threshold_single_flow", self.threshold_single_flow)
 		self.model.set_active_nodes( self.active_nodes)
 		# input("BITE3")
+		if self.precipitations:
+			self.model.precipitations_enabled = True
+			self.model.precipitations = self.precipitations_array.ravel()
+
 
 		self.topolake = np.copy(self.surface_elevation).reshape(self.ny,self.nx) 
 		# input("BITE4")
