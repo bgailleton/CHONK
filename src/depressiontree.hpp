@@ -583,7 +583,7 @@ public:
 		for(auto ch: this->treeceivers[dep])
 		{
 			if(ch>=0)
-				totvol += this->volume[ch];
+				totvol += this->volume_max_with_evaporation[ch];
 		}
 		return totvol;
 	}

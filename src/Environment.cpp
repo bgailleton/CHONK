@@ -1301,7 +1301,7 @@ void ModelRunner::lake_solver_v3(int node)
 
         // Checking and recording cases where my local depression outflows
         // This is in case one of my local dep outflows but not its twin (if exists)
-        if(this->graph.depression_tree.volume[dep] <= water_volume[dep])
+        if(this->graph.depression_tree.volume_max_with_evaporation[dep] <= water_volume[dep])
         {
           n_outflowing++;
           which_one_outflows = dep;
@@ -1330,7 +1330,7 @@ void ModelRunner::lake_solver_v3(int node)
     twin = this->graph.depression_tree.get_twin(which_one_outflows);
 
     // Getting the extra water/sed and transferring them to transfer
-    double extra_water = water_volume[which_one_outflows] - this->graph.depression_tree.volume[which_one_outflows];   
+    double extra_water = water_volume[which_one_outflows] - this->graph.depression_tree.volume_max_with_evaporation[which_one_outflows];   
     double extra_sed = sed_volume[which_one_outflows] - this->graph.depression_tree.volume[which_one_outflows];
 
     // Transferring the water from Otwin to Utwin
@@ -1362,7 +1362,7 @@ void ModelRunner::lake_solver_v3(int node)
       // Do I have enough water to fill the new depression
       if(lowerboundvol <= water_volume[twin])
       {
-        if(this->graph.depression_tree.volume[twin] <= water_volume[twin])
+        if(this->graph.depression_tree.volume_max_with_evaporation[twin] <= water_volume[twin])
         {
           n_outflowing++;
           which_one_outflows = twin;
@@ -1464,10 +1464,10 @@ void ModelRunner::lake_solver_v3(int node)
 
     // TEMPORARY MEASURE, ASSUMING hw = hw max
     // So, First checking if I can fill the dep entirely or partially.
-    if(water_volume[dep] >= this->graph.depression_tree.volume[dep] ||  double_equals(water_volume[dep] - this->graph.depression_tree.volume[dep],0., 1e-5) )
+    if(water_volume[dep] >= this->graph.depression_tree.volumvolume_max_with_evaporatione[dep] ||  double_equals(water_volume[dep] - this->graph.depression_tree.volume_max_with_evaporation[dep],0., 1e-5) )
     {
       // Yes, is simple - > water to max and volume to max
-      this->graph.depression_tree.volume_water[dep] = this->graph.depression_tree.volume[dep];
+      this->graph.depression_tree.volume_water[dep] = this->graph.depression_tree.volume_max_with_evaporation[dep];
       this->graph.depression_tree.hw[dep] = this->graph.depression_tree.hw_max[dep]; 
       // making sure nodes are maked as lake
       for (auto gh:this->graph.depression_tree.get_all_nodes(dep))

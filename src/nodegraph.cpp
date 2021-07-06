@@ -443,6 +443,8 @@ void NodeGraphV2::grow_depression_tree_v2(xt::pytensor<double,1>& elevation, xt:
   // }
 
   this->depression_tree.compile_n_0_level_children();
+  for (int i=0; i< this->depression_tree.get_n_dep(); i++)
+    this->depression_tree.volume_max_with_evaporation[i] = this->depression_tree.volume[i];
 
 }
 
