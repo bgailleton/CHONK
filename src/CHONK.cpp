@@ -720,7 +720,7 @@ void chonk::move_MF_from_fastscapelib_threshold_SF(NodeGraphV2& graph, double th
 void chonk::inplace_only_drainage_area(double Xres, double Yres){this->water_flux += Xres * Yres; }//; std::cout << this->water_flux << "||";};
 
 // Calculate discharge by adding simple precipitation modulator 
-void chonk::inplace_precipitation_discharge(double Xres, double Yres, xt::pytensor<double,1>& precipitation){this->water_flux += Xres * Yres * precipitation[current_node];};
+double chonk::inplace_precipitation_discharge(double Xres, double Yres, xt::pytensor<double,1>& precipitation){this->water_flux += Xres * Yres * precipitation[current_node]; return Xres * Yres * precipitation[current_node];};
 
 // Reduce the waterflux by infiltrating some water
 void chonk::inplace_infiltration(double Xres, double Yres, xt::pytensor<double,1>& infiltration){this->water_flux -= Xres * Yres * infiltration[this->current_node];};
@@ -729,7 +729,7 @@ void chonk::inplace_infiltration(double Xres, double Yres, xt::pytensor<double,1
 void chonk::cancel_inplace_only_drainage_area(double Xres, double Yres){this->water_flux += -1 *(Xres * Yres); }//; std::cout << this->water_flux << "||";};
 
 // Calculate discharge by adding simple precipitation modulator 
-void chonk::cancel_inplace_precipitation_discharge(double Xres, double Yres, xt::pytensor<double,1>& precipitation){this->water_flux += -1 *(Xres * Yres * precipitation[current_node]);};
+double chonk::cancel_inplace_precipitation_discharge(double Xres, double Yres, xt::pytensor<double,1>& precipitation){this->water_flux += -1 *(Xres * Yres * precipitation[current_node]); return Xres * Yres * precipitation[current_node];};
 
 // Reduce the waterflux by infiltrating some water
 void chonk::cancel_inplace_infiltration(double Xres, double Yres, xt::pytensor<double,1>& infiltration){this->water_flux -= -1 *(Xres * Yres * infiltration[this->current_node]);};

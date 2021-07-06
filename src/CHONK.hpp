@@ -72,12 +72,12 @@ class chonk
     // Functions that apply and calculate fluxes
     //#### In place flux applyer (BEFORE move)
     void inplace_only_drainage_area(double Xres, double Yres);
-    void inplace_precipitation_discharge(double Xres, double Yres, xt::pytensor<double,1>& precipitation);
+    double inplace_precipitation_discharge(double Xres, double Yres, xt::pytensor<double,1>& precipitation);
     void inplace_infiltration(double Xres, double Yres, xt::pytensor<double,1>& infiltration);
     
     //#### Cancelling counterpart for the reprocessing
     void cancel_inplace_only_drainage_area(double Xres, double Yres);
-    void cancel_inplace_precipitation_discharge(double Xres, double Yres, xt::pytensor<double,1>& precipitation);
+    double cancel_inplace_precipitation_discharge(double Xres, double Yres, xt::pytensor<double,1>& precipitation);
     void cancel_inplace_infiltration(double Xres, double Yres, xt::pytensor<double,1>& infiltration);
 
 

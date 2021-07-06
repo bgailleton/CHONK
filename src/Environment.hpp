@@ -434,8 +434,12 @@ std::vector<double>& pre_sed, std::vector<double>& pre_water);
     bool tool_effect_sed = false;
     bool external_K = false;
     bool external_kappa = false;
+    bool precipitations_enabled = false;
+
 
     double hillslope2fluvial_connectivity = 0;
+    xt::pytensor<double,1> precipitations;
+
 
   protected:
 
@@ -500,6 +504,7 @@ std::vector<double>& pre_sed, std::vector<double>& pre_water);
     xt::pytensor<double,1> calculated_K;
 
 
+    // Precipitation raster
 
 
 

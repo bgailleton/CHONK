@@ -2382,7 +2382,7 @@ void ModelRunner::lake_solver_v3(int node)
     }
 
 
-    // Propagating the water and sed up if there is a paretn
+    // Propagating the water and sed up if there is a parent
     int parent = this->graph.depression_tree.parentree[this_dep];
     if(parent == -1)
       continue;
@@ -2429,67 +2429,54 @@ void ModelRunner::lake_solver_v3(int node)
       if(treestak_done_question_mark[dep] == true)
         continue;
 
-      std::cout << "Assessing dep " << dep << std::endl;
-
       // Now it will be
       treestak_done_question_mark[dep] = true;
 
       double lowerboundvol = this->graph.depression_tree.get_volume_of_children(dep);
 
-      // std::cout << "lowerboundvol is "<< lowerboundvol <<" and higher bound is " << this->graph.depression_tree.volume[dep] << ", available water is " << water_volume[dep] << " and is filling? ";
       // Do I have enough water to fill the current master_depression
       if(lowerboundvol <= water_volume[dep])
       {
+
+        // Checking and recording cases where my local depression outflows
+        // This is in case one of my local dep outflows but not its twin (if exists)
         if(this->graph.depression_tree.volume[dep] <= water_volume[dep])
         {
           n_outflowing++;
           which_one_outflows = dep;
         }
 
-        std::cout << "Saving " << dep << " for proc" << std::endl;
-        // if yes, this dep is marked to be filled
+        // his dep is marked to be filled
         local_deps2reproc.emplace_back(dep);
         treestak_in_localocalocal[dep] = true;
-        // And I am therefore marking all its children to processed
+
+        // And I am therefore marking all its children to processed and not to be filled a second/third/... time
         auto doz_children = this->graph.depression_tree.get_all_children(dep);
         for (auto ch:doz_children)
           treestak_done_question_mark[ch] = true;
+
       }
-      // else
-
     }
-
 
     // Last check: only one outflowing?? redistributing the water to the second one 
     // (which itself will not outflow otherwise the parent would have already been done)
+    // Also if this is a single dep, I do not outflow
     if(n_outflowing != 1 || twin == -1)
       continue;
 
-    std::cout << "HAPPENS HEREHAPPENS HEREHAPPENS HEREHAPPENS HEREHAPPENS HEREHAPPENS HEREHAPPENS HEREHAPPENS HEREHAPPENS HEREHAPPENS HERE" << std::endl;;
+    // this is the hardest part, thanksfully does not happens much
+    // Getting the twin of the depression which outflowed
     twin = this->graph.depression_tree.get_twin(which_one_outflows);
-    double extra_water = water_volume[which_one_outflows] - this->graph.depression_tree.volume[which_one_outflows];
-    
+
+    // Getting the extra water/sed and transferring them to transfer
+    double extra_water = water_volume[which_one_outflows] - this->graph.depression_tree.volume[which_one_outflows];   
     double extra_sed = sed_volume[which_one_outflows] - this->graph.depression_tree.volume[which_one_outflows];
+
+    // Transferring the water from Otwin to Utwin
     water_volume[which_one_outflows] -= extra_water;
     water_volume[twin] += extra_water;
-    std::cout << "Giving " << extra_water << " from " << which_one_outflows << " to " << twin << std::endl;
-    std::cout << "Remaining " << water_volume[which_one_outflows] << "/" << this->graph.depression_tree.volume[which_one_outflows]
-     << " and " << water_volume[twin]<< "/" << this->graph.depression_tree.volume[twin] << std::endl;
 
-    double totwat = 0;
-    for(auto ch:this->graph.depression_tree.get_all_children(twin,true))
-    {
-      if(this->graph.depression_tree.level[ch] ==0)
-        totwat += this->chonk_network[this->graph.depression_tree.pitnode[ch]].get_water_flux() * this->timestep;
-    }
-    for(auto ch:this->graph.depression_tree.get_all_children(which_one_outflows,true))
-    {
-      if(this->graph.depression_tree.level[ch] ==0)
-        totwat += this->chonk_network[this->graph.depression_tree.pitnode[ch]].get_water_flux() * this->timestep;
-    }
-
-    std::cout << totwat << " should be equal to " << water_volume[twin]+ water_volume[which_one_outflows] << std::endl;
-
+    // transferring sediments if and only if I have enough of them
     if(extra_sed > 0)
     {
       sed_volume[which_one_outflows] -= extra_sed; 
@@ -2501,13 +2488,17 @@ void ModelRunner::lake_solver_v3(int node)
       );
     }
 
+
+    // tricky part:
+    // If my depression is not registered as TO PROCESS
+    // It can happen when a twin dep overflows, but its twin did not have enough water so its children will be processed instead
+    // Well here, we want to reassess the situation with 
     if(treestak_in_localocalocal[twin] == false)
     {
+      // Calculating the minimum amount of water required to fill this depression
       double lowerboundvol = this->graph.depression_tree.get_volume_of_children(twin);
-      // std::cout << "Reassessing " << twin << " Lowerbound" << std::endl;
 
-      // std::cout << "lowerboundvol is "<< lowerboundvol <<" and higher bound is " << this->graph.depression_tree.volume[dep] << ", available water is " << water_volume[dep] << " and is filling? ";
-      // Do I have enough water to fill the current master_depression
+      // Do I have enough water to fill the new depression
       if(lowerboundvol <= water_volume[twin])
       {
         if(this->graph.depression_tree.volume[twin] <= water_volume[twin])
@@ -2516,7 +2507,6 @@ void ModelRunner::lake_solver_v3(int node)
           which_one_outflows = twin;
         }
 
-        std::cout << "Saving " << twin << " for proc" << std::endl;
         // if yes, this dep is marked to be filled
         local_deps2reproc.emplace_back(twin);
         // And I am therefore marking all its children to processed
@@ -2526,11 +2516,12 @@ void ModelRunner::lake_solver_v3(int node)
       }
       else
       {
-        // THIS IS WHERE YOU NEED TO PUT WORK!!!!!
-        // BASICALLY THE REEQUILIBRIUM DID NOT WORK BECAUSE THE TWIN DOES NOT GET FILLED
-        // NEED TO FIND THE LEVEL0 DEPRESSION LINKED TO THAT OUTLET AND REPROPAGATE THE WATER UP
+
+        // If I arrive here, my dep got more water but yet does not have enough to fill the minimum level. Need to propagate water to children
         int origin_dep = twin;
+        // By default getting the first child
         int achild = this->graph.depression_tree.treeceivers[twin][0];
+        // WHile I found children, propagate to the first child
         while(achild != -1)
         {
           if(extra_sed > 0)
@@ -2549,9 +2540,15 @@ void ModelRunner::lake_solver_v3(int node)
         }
 
       }
+      // DOne with rechecking the new dep
     }
 
+    // DOne with navigating the tree
+
   }
+
+
+  // Now ready to fill the depression that need it
 
   double totwatchecekr = 0;
   std::vector<int> counter_of_dep(local_deps2reproc.size(), 0);
@@ -2559,15 +2556,10 @@ void ModelRunner::lake_solver_v3(int node)
   for(auto dep: local_deps2reproc)
   {
 
-    std::cout << "Processing local depression  " << dep << std::endl;
-    // if(std::isnan(sed_volume[dep]) || sed_volume[dep] <0)
-    // {
-    //   std::cout << sed_volume[dep] << std::endl;
-    //   throw std::runtime_error("InvalidSedflux A");
-    // }
-
+    // I dont remember what is this but I guess it is a bug checker
     totwatchecekr += water_volume[dep];
 
+    // Keeping memory of this lake for the finilising process
     this->lake_to_process.push_back(dep);
 
     // Activate the lake for deposition
@@ -2610,11 +2602,13 @@ void ModelRunner::lake_solver_v3(int node)
     }
 
     // TEMPORARY MEASURE, ASSUMING hw = hw max
-
+    // So, First checking if I can fill the dep entirely or partially.
     if(water_volume[dep] >= this->graph.depression_tree.volume[dep] ||  double_equals(water_volume[dep] - this->graph.depression_tree.volume[dep],0., 1e-5) )
     {
+      // Yes, is simple - > water to max and volume to max
       this->graph.depression_tree.volume_water[dep] = this->graph.depression_tree.volume[dep];
       this->graph.depression_tree.hw[dep] = this->graph.depression_tree.hw_max[dep]; 
+      // making sure nodes are maked as lake
       for (auto gh:this->graph.depression_tree.get_all_nodes(dep))
       {
         if(gh != outlet)
@@ -2624,43 +2618,42 @@ void ModelRunner::lake_solver_v3(int node)
     }
     else
     {
+
+      // No -> less simple
+
+      //all water goes to dep 
       this->graph.depression_tree.volume_water[dep] = water_volume[dep];
 
+      // gathering nodes and sorting them by elevation for the partial filling
       auto tnodes = this->graph.depression_tree.get_all_nodes(dep);
       std::priority_queue< PQ_helper<int,double>, std::vector<PQ_helper<int,double> >, std::greater<PQ_helper<int,double> > > Sorter;
-      
       bool checekr_switch = false;
       for(auto tn: tnodes)
       {
           Sorter.emplace(PQ_helper<int,double>(tn, this->surface_elevation[tn]));
       }
 
+      // And filling the depression
       int n_nodes = 0;
       std::vector<int> nodes2topogy;
       bool is_changed = false;
       int last_node = 0, last_top_node = 0;
       double remaining_volume = water_volume[dep];
       double cumul_V = 0;
-
-      std::cout << "SORTER SIZE::"  << Sorter.size() << std::endl;
       while(Sorter.size() > 0)
       {
-
+        // Getting node and elev
         int this_node = Sorter.top().node;
         double this_elev = Sorter.top().score;
         Sorter.pop();
+
+        // Getting node and elev of the next node
         int top_node;
         double top_elev;
-
         if(Sorter.empty())
         {
           top_node = this->graph.depression_tree.tippingnode[dep];
           top_elev = this->surface_elevation[top_node];
-          // std::cout << water_volume[dep] << "||" << this->graph.depression_tree.volume[dep] << std::endl;
-          // std::cout <<  this->graph.depression_tree.volume[dep] - water_volume[dep] << std::endl;
-
-          // std::cout << cumul_V << "||" << remaining_volume << std::endl;
-          // throw std::runtime_error("Underfilled lake error: could not fill but could fill?");
         }
         else
         {
@@ -2669,33 +2662,25 @@ void ModelRunner::lake_solver_v3(int node)
         }
         last_top_node = top_node;
 
+        // Incrementing the counter of nodes
         n_nodes++;
 
+        // while not the outlet, registering it
         if(this_node != outlet)
         {
           nodes2topogy.push_back(this_node);
           is_in_queue[this_node] = 'l';
-
-          if(this->node_in_lake[this_node] != -1 && this->node_in_lake[this_node] != dep)
-          {
-            std::cout << this_node << "|" << this->graph.depression_tree.is_outlet(this_node) << "||" << this->graph.depression_tree.is_pit(this_node) << std::endl;;
-            throw std::runtime_error("Node already in lake: trying to " + std::to_string(dep) + " but is  in " + std::to_string(this->node_in_lake[this_node]) );
-          }
-
           this->node_in_lake[this_node] = dep;
         }
 
 
+        // Calculating the incrementing volume
         double deltelev = top_elev - this_elev;
-
         double dV = n_nodes * this->cellarea * deltelev;
-
-
         if(remaining_volume > dV)
         {
           remaining_volume -= dV;
           cumul_V += dV;
-          // std::cout << "Stored " << cumul_V << " nnodes:" << n_nodes << " remaining " << remaining_volume << " tot vol " << this->graph.depression_tree.volume[dep] << std::endl;
         }
         else
         {
@@ -2707,23 +2692,13 @@ void ModelRunner::lake_solver_v3(int node)
           break;
         }
       }
-
-      // DEBUG CHECKER TO DELETE LATER
-      if(is_changed == false)
-      {
-        std::cout << Sorter.size()<< std::endl;;
-        std::cout << "dep volume: " << this->graph.depression_tree.volume_water[dep] << " vs " << water_volume[dep] 
-        << " vs " << this->graph.depression_tree.potential_volume[last_node] << " vs " << this->graph.depression_tree.potential_volume[last_top_node] << std::endl;;
-        std::cout << tnodes.size() << std::endl;
-        std::cout << this->graph.depression_tree.volume[dep] << std::endl;
-        throw std::runtime_error("topo not changed");
-      }
-
     }
 
+    // Checkwhether it outflows
     bool outflows = (water_volume[dep] > this->graph.depression_tree.volume_water[dep]);
     double wat2remove = 0, wat2add = 0;
 
+    // if it does, I need to reprocess the unprocessed nodes bellow
     if(outflows)
     {
       //----------------------------------------------------
@@ -2768,11 +2743,7 @@ void ModelRunner::lake_solver_v3(int node)
 
     }
 
-    // if(std::isnan(sed_volume[dep]) || sed_volume[dep] <0)
-    // {
-    //   std::cout << sed_volume[dep] << std::endl;
-    //   throw std::runtime_error("InvalidSedflux B");
-    // }
+
 
     // Need to "cancel" erosion and deposition to backcalculate the sediment in the lake
 
@@ -2824,21 +2795,13 @@ void ModelRunner::lake_solver_v3(int node)
           // And finally resetting the sediment flux of the chonk
           this->chonk_network[n].reset_sed_fluxes();
         }
-
-
       }
-      // std::cout << defluvialisation_of_sed << "|" << std::endl;
     }
 
 
     representative_chonk[dep].add_to_sediment_flux(-1 * defluvialisation_of_sed,defluvialisation_of_sed_label_edition,1.);
     sed_volume[dep] -= defluvialisation_of_sed;
 
-    if(std::isnan(sed_volume[dep]) || sed_volume[dep] <0)
-    {
-      std::cout << sed_volume[dep] << std::endl;
-      throw std::runtime_error("InvalidSedflux C");
-    }
     
     if(sed_volume[dep] < this->graph.depression_tree.volume[dep])
       this->graph.depression_tree.volume_sed[dep] = sed_volume[dep];
@@ -2847,16 +2810,8 @@ void ModelRunner::lake_solver_v3(int node)
     
     this->graph.depression_tree.label_prop[dep] = representative_chonk[dep].get_label_tracker();
 
-    if(std::isnan(sed_volume[dep]) || sed_volume[dep] <0)
-    {
-      std::cout << sed_volume[dep] << std::endl;
-      throw std::runtime_error("InvalidSedflux D");
-    }
 
-
-    std::cout << "Amount of defluvialisation_of_sed:" << defluvialisation_of_sed/ this->timestep << std::endl;
-    std::cout << "Remaining Sed" << sed_volume[dep]/ this->timestep << std::endl;
-
+    // transmitting eventual Q to the outlet
     double extra_sed = sed_volume[dep] - this->graph.depression_tree.volume_sed[dep];
     double extra_wat = (water_volume[dep] - this->graph.depression_tree.volume_water[dep] + wat2add)/this->timestep;
 
@@ -2941,682 +2896,11 @@ void ModelRunner::lake_solver_v3(int node)
 
   }// end of for loop fgoing through the lakes
 
-
-  std::cout << "TOTWAT CHECKER TO TO::::---->>>>" << totwatchecekr << " VS " << tot_water_volume << std::endl;
-
-
-  // std::cout << "DLAKESv3::G" << std::endl;
-
-
-  // I know now which depression to reprocess
-  // Processing the depressions
-
-  // for(auto dep: local_deps2reproc)
-  // {
-  //   this->lake_to_process.push_back(dep);
-  //   // std::cout << "DLAKESv3::H" << std::endl;
-  //   // Activate the lake for deposition
-  //   this->graph.depression_tree.active[dep] = true;
-  //   // finding the outlet
-  //   int outlet = this->graph.depression_tree.tippingnode[dep];
-  //   // And their receiver
-  //   int rec = this->graph.depression_tree.externode[dep];
-  //   // getting all children depressions (and self)
-  //   std::vector<int> children = this->graph.depression_tree.get_all_children(dep, true);
-
-
-  //   // CORRECTING FOR DONORS AND RECEIVERS
-
-
-  //   // My outlet gave to the lake, and the water it gave to the lake will be reoutletted to it.
-  //   // I need to substract it somehow not to give twice
-  //   // POTENTIAL LABPROP MISSING HERE??
-  //   double corrwat = 0, corrsed = 0, corrFP = 0; std::vector<double> corrlabprop;
-  //   std::vector<int> recs = this->graph.get_MF_receivers_at_node(outlet);
-  //   for(auto r : recs)
-  //   {
-  //     // std::cout << ":receiver:" << r;
-
-  //     if(std::find(children.begin(), children.end(), this->graph.depression_tree.node2tree[r]) != children.end())
-  //     {
-  //       double tcorrwat,tcorrsed;
-  //       this->chonk_network[outlet].get_what_was_given_to(r, tcorrwat, tcorrsed, corrlabprop, corrFP);
-  //       corrwat += tcorrwat * this->timestep;
-  //       corrsed += tcorrsed;    
-  //     }
-  //   }
-  //   // std::cout << "DLAKESv3::I" << std::endl;
-
-
-  //   // Before reprocessing the outlet, I need to reprocess everything downstream of it
-  //     // reprocessing the outlet and the downstream nodes
-  //   // Initialising a priority queue sorting the nodes to reprocess by their id in the Mstack. the smallest Ids should come first
-  //   // Because I am only processing nodes in between 2 discrete lakes, it should not be a problem
-  //   std::priority_queue< node_to_reproc, std::vector<node_to_reproc>, std::greater<node_to_reproc> > ORDEEEEEER; // I am not politically aligned with John Bercow, this is jsut for the joke haha
-
-
-  //   //----------------------------------------------------
-  //   //------- FORMING THE STACK OF NODE TO REPROC --------
-  //   //----------------------------------------------------
-  //   // This section aims to gather all nodes to reprocess. All node of the landscape have a type sort them by type: 
-  //   // # 'n' if not concerned, 'l' if in lake, 'd' if donor, 'r' if potential reproc and 'y' if in stack
-  //   std::vector<int> local_mstack;
-  //   // keeping track of which nodes are already in teh queue (or more generally to avoid) and which one have receivers in the local stack
-  //   std::vector<char> is_in_queue(this->io_int["n_elements"],'n');
-  //   // Before starting to gather the nodes downstream of me outlet, let's gather mark the node in me lake as not available (as if already in the queue)
-  //   // Avoinding nodes in the lakes
-  //   lstack = this->graph.depression_tree.get_all_nodes(dep);
-  //   nodes; nodes.reserve(lstack.size());
-
-  //   PQstack = std::priority_queue< PQ_helper<int,int>, std::vector<PQ_helper<int,int> >, std::greater<PQ_helper<int,int> > >() ;
-  //   for(auto n: lstack)
-  //     PQstack.emplace(PQ_helper<int,int>(n,this->graph.get_index_MF_stack_at_i(n)));
-
-  //   while(PQstack.empty() == false)
-  //   {
-  //     nodes.emplace_back(PQstack.top().node);
-  //     PQstack.pop();
-  //   }
-
-  //   for(auto tnode:nodes)
-  //   {
-  //     is_in_queue[tnode] = 'l';
-  //   }
-  //   // This function gathers all the nodes to be reprocessed. Including their donor which will be partially reprocessed
-  //   // This function is only geometrical, it does not assume any existing transfer of sed/water
-  //   this->gather_nodes_to_reproc(local_mstack,  ORDEEEEEER,  is_in_queue,  outlet);
-  //   this->deprocess_local_stack(local_mstack, is_in_queue);
-
-
-  //   // Now I can deprocess/reprocess the outlet
-  //   // resetting the outlet
-  //   // # First removing what this node gave to its receivers
-  //   this->chonk_network[outlet].cancel_split_and_merge_in_receiving_chonks(this->chonk_network, this->graph, this->timestep);
-  //   // # the cancelling the prec/DA/inf (mostly for mass balance calculation)
-  //   this->cancel_fluxes_before_moving_prep(this->chonk_network[outlet], outlet);
-  //   // # resetting the chonk totally
-  //   this->chonk_network[outlet].reset();
-
-  //   for(auto n: local_mstack)
-  //   {
-  //     if(is_in_queue[n] == 'y')
-  //     {
-  //       this->chonk_network[n].reset();
-  //       this->chonk_network[n].set_label_tracker(std::vector<double>(this->n_labels,0));
-  //       this->is_processed[n] = false;
-  //     }
-  //   }
-  //   // std::cout << "Is outlet part of inherited water? " << this->inherited_water_added[outlet] << std::endl;; 
-
-  //   // std::cout << "DLAKESv3::I.1" << std::endl;
-  //   // Redonning what its donors gave it
-  //   std::vector<int> dons = this->graph.get_MF_donors_at_node(outlet);
-  //   for(auto n : dons)
-  //   {
-  //     this->chonk_network[n].split_and_merge_in_receiving_chonks_ignore_but_one(this->chonk_network,this->graph, this->timestep, outlet);
-  //   }
-  //   // std::cout << "DLAKESv3::I.2" << std::endl;
-
-
-  //   // Need to "cancel" erosion and deposition to backcalculate the sediment in the lake
-
-  //   // Now I am post-processing the lakes: adding the lake depth, and ID and all
-  //   // std::cout << "Are raised to " << this->graph.depression_tree.hw[dep] << ":";
-
-  //   double defluvialisation_of_sed = 0;
-  //   std::vector<double> defluvialisation_of_sed_label_edition(this->n_labels,0.);
-  //   for (auto n:this->graph.depression_tree.get_all_nodes(dep))
-  //   {
-  //     // std::cout << n << "-" << this->graph.depression_tree.node2tree[n] << "-";
-  //     if(std::find(children.begin(), children.end(), this->graph.depression_tree.node2tree[n]) != children.end())
-  //     {
-  //       if(n ==  outlet)
-  //         continue;
-
-  //       if(this->graph.depression_tree.potential_volume[n] <= this->graph.depression_tree.volume_water[dep])
-  //       // if(true)
-  //       {
-  //         this->topography[n] = this->graph.depression_tree.hw[dep];
-  //         this->node_in_lake[n] = dep;
-  //         // HERE I WILL NEED TO REMOVE THE SED FROM EROSION?DEP WITH THE RIGHT PROPORTIONS
-  //         double tsed = 0;
-
-  //         // REMOVING EROSION OF BEDROCK
-  //         tsed = this->chonk_network[n].get_erosion_flux_only_bedrock() * this->timestep * this->cellarea;
-  //         std::vector<double> temp(this->n_labels,0.); temp[this->label_array[n]] = 1.;
-  //         defluvialisation_of_sed_label_edition = mix_two_proportions(tsed,temp,defluvialisation_of_sed,defluvialisation_of_sed_label_edition);
-  //         defluvialisation_of_sed += tsed;
-  //         // REMOVING EROSION OF SEDIMENT LAYER
-  //         // if(this->is_there_sed_here[n])
-  //         if(true)
-  //         {
-  //           tsed = this->chonk_network[n].get_erosion_flux_only_sediments() * this->timestep * this->cellarea;
-  //           if(this->sed_prop_by_label[n].size() > 0)
-  //             temp = this->sed_prop_by_label[n][this->sed_prop_by_label[n].size() - 1];
-  //           else
-  //             temp = this->chonk_network[n].get_label_tracker();
-
-  //           defluvialisation_of_sed_label_edition = mix_two_proportions(tsed,temp,defluvialisation_of_sed,defluvialisation_of_sed_label_edition);
-  //           defluvialisation_of_sed += tsed;
-  //         }
-  //         // REMOVING DEPOSITION
-  //         tsed = -1 * this->chonk_network[n].get_deposition_flux() * this->timestep * this->cellarea;
-  //         temp = this->chonk_network[n].get_label_tracker();
-  //         defluvialisation_of_sed_label_edition = mix_two_proportions(tsed,temp,defluvialisation_of_sed,defluvialisation_of_sed_label_edition);
-  //         defluvialisation_of_sed -= tsed;
-
-  //         // And finally resetting the sediment flux of the chonk
-  //         this->chonk_network[n].reset_sed_fluxes();
-  //       }
-
-
-  //     }
-  //     // std::cout << defluvialisation_of_sed << "|" << std::endl;
-
-
-  //   }
-
-  //   if(sed_volume[dep] - this->graph.depression_tree.volume_sed[dep] > 0)
-  //   {
-  //     std::cout << "A" << std::endl;
-  //     sed_volume[dep] -= defluvialisation_of_sed;
-  //     representative_chonk[dep].add_to_sediment_flux(-1 * defluvialisation_of_sed, defluvialisation_of_sed_label_edition, 1.);
-  //     sed_volume[dep] -= corrsed;
-  //     representative_chonk[dep].add_to_sediment_flux(-1 * corrsed, this->chonk_network[outlet].get_label_tracker(), 1.);
-
-  //     if(sed_volume[dep] - this->graph.depression_tree.volume_sed[dep] < 0)
-  //     {
-  //       std::cout << "B" << std::endl;
-  //       // TODO HERE::STUFF WITH THE PROPORTIONS
-  //       this->graph.depression_tree.volume_sed[dep] -= std::abs(sed_volume[dep] - this->graph.depression_tree.volume_sed[dep]);
-  //       sed_volume[dep] -= std::abs(sed_volume[dep] - this->graph.depression_tree.volume_sed[dep]);
-  //     }
-    
-  //   }
-  //   else
-  //   {
-  //     std::cout << "C" << std::endl;
-
-  //     sed_volume[dep] -= defluvialisation_of_sed;
-  //     this->graph.depression_tree.volume_sed[dep] -= defluvialisation_of_sed;
-  //     representative_chonk[dep].add_to_sediment_flux(-1 * defluvialisation_of_sed, defluvialisation_of_sed_label_edition, 1.);
-  //     sed_volume[dep] -= corrsed;
-  //     this->graph.depression_tree.volume_sed[dep] -= corrsed;
-  //     representative_chonk[dep].add_to_sediment_flux(-1 * corrsed, this->chonk_network[outlet].get_label_tracker(), 1.);
-
-  //   }
-
-  //   std::cout << "Defluv is " << defluvialisation_of_sed << " and corrsed is " << corrsed << " and sedvol is " << sed_volume[dep] << " and t is " << this->graph.depression_tree.volume_sed[dep] << std::endl;
-
-  //   // Calculating what needs to be given to it:
-  //   // -> what the depression received in total -  what the depression holds - the correcttions corrected for the time step
-  //   double extra_water = (water_volume[dep] - this->graph.depression_tree.volume_water[dep] - corrwat)/(this->timestep);
-  //   double extra_sed = (sed_volume[dep] - this->graph.depression_tree.volume_sed[dep]) ;
-
-  //   std::cout << "EXTRASED IS " << extra_sed << std::endl;
-
-  //   //NEED TO GIVE THE DEFLUVIALISATION TO THE LABELS TOO
-  //   // representative_chonk[dep].add_to_sediment_flux_no_tracking(-1 * corrsed);
-  //   // representative_chonk[dep].add_to_sediment_flux(-1 * defluvialisation_of_sed, defluvialisation_of_sed_label_edition, 1.);
-  //   // std::cout << "DLAKESv3::I.3" << std::endl;
-
-  //   // if <0 -> 0 (hoepefully useless)
-  //   if(extra_water < 0){extra_water = 0;  std::cout << "NEGEXTRAWATER" << std::endl;}
-  //   // if(extra_sed < 0){extra_sed = 0;std::cout << "NEGEXTRASED" << std::endl;}
-
-  //   // std::cout << "DLAKESv3::I.4::" << outlet << "|" << rec << std::endl;
-  //   // std::cout << "Gibing " << extra_sed << "to outlet" << std::endl;
-
-  //   // Forcing the outlet to only have the receiver out of the lake
-  //   this->chonk_network[outlet].external_moving_prep({rec},{1},{1}, {(this->topography[outlet] - this->topography[rec])/this->dx });
-  //   // giving it the water flux
-  //   this->chonk_network[outlet].add_to_water_flux(extra_water);
-
-  //   this->is_processed[outlet] = false;
-  //   this->chonk_network[outlet].add_to_sediment_flux(extra_sed, representative_chonk[dep].get_label_tracker(), 1.);
-
-  //   // std::cout<< "WATER OUT DEP " << extra_water << " leaving " << this->graph.depression_tree.volume_water[dep]/this->timestep << std::endl;
-
-  //   // std::cout << "DLAKESv3::I.5" << std::endl;
-  //   // Reprocessing the node, without move prep
-  //   this->process_node_nolake_for_sure(outlet, this->is_processed, this->active_nodes, this->cellarea, this->topography, false, true);
-  //   // And the sediment flux (the 1 is the fluvialprop)
-
-
-  //   // Now reprocessing the stack of stuff
-
-  //   // Iterating through the local stack
-  //   for(auto tnode:local_mstack)
-  //   {
-  //     // std::cout << "REPROCESSING NODES::" << tnode << "--" << this->inherited_water_added[tnode] << " OO " << is_in_queue[tnode]  << std::endl;
-  //     // Discriminating between the donors and the receivers
-  //     if(is_in_queue[tnode] == 'd')
-  //     {
-  //       // # I am a donor, I just need to regive the sed/water without other reproc
-  //       // # Let me just just check which of my receivers I need to give fluxes (I shall not regive to the nodes not in my local stack)
-  //       std::vector<int> ignore_some; 
-  //       for(auto ttnode: this->chonk_network[tnode].get_chonk_receivers_copy())
-  //       {
-  //         // if the node is the outlet, or not a 'y', I ignore it
-  //         if(is_in_queue[ttnode] != 'y' || ttnode == outlet)
-  //         {          
-  //           ignore_some.emplace_back(ttnode);
-  //           continue;
-  //         }
-  //         // I also ignore the nodes in the current lake (they have a 'y' signature)
-  //         else if (this->node_in_lake[ttnode] >= 0)
-  //         {
-  //           ignore_some.emplace_back(ttnode);
-  //           continue;
-  //         }
-  //       }
-  //       if(ignore_some.size() == this->chonk_network[tnode].get_chonk_receivers_copy().size())
-  //         // std::cout << "LDKFJKLDFDSFHJKLDF" << std::endl;
-
-  //       // # Ignore_some has the node i so not want
-  //       // # So I transmit my fluxes to the nodes I do not ignore
-  //       this->chonk_network[tnode].split_and_merge_in_receiving_chonks_ignore_some(this->chonk_network, this->graph, this->timestep, ignore_some);
-
-  //     }
-  //     else
-  //     {
-  //       // # I am not a nodor:
-  //       this->process_node_nolake_for_sure(tnode, this->is_processed, this->active_nodes, this->cellarea,this->topography, true, true);
-  //     }
-  //   }
-  
-
-
-
-  //   // Setting it as not processed
-  //   // std::cout << "DLAKESv3::J" << std::endl;
-  //   // DEBUG STUFF
-  //   // this->chonk_network[outlet].print_status();
-  //   // this->print_debug_are_rec_proc(outlet);
-  //   // std::cout << dep << " IS RECOUT PROC?? -> " << this->is_processed[rec]  << " GIVING " << extra_water << " To " << rec
-  //   //  << " Which is potentially in " << this->graph.depression_tree.get_ultimate_parent(this->graph.depression_tree.node2tree[rec]) << " AND REC OF DEP IS " << this->graph.depression_tree.externode[dep] << std::endl;
-
-  //   // // this->print_debug_are_rec_proc(rec);
-  //   // // HERE LIEs THE ROUTINGS TO REPROCESS THE THINGIES WHN DONE
-  //   // std::cout << "Are in the local tree ";
-  //   // for(auto ch:treestak)
-  //   //   std::cout << ch << "|";
-  //   // std::cout << std::endl;
-
-  //   // std::cout << "Are in the chlidren ";
-  //   // for(auto ch:children)
-  //   //   std::cout << ch << "|";
-  //   // std::cout << std::endl;
-
-
-
-  //   // std::cout << std::endl;
-  //   // std::cout << "DLAKESv3::K" << std::endl;
-
-
-
-  // }
-
-
-
 }
 
 
 
 
-  // while(maPQ.empty() == false)
-  // {
-  //   // Getting the next lower depression and its potential twin 
-  //   int i = maPQ.top().node;
-  //   int twin = this->graph.depression_tree[i].connections_bas.second;
-  //   maPQ.pop();
-
-  //   // if already processed (probably via its twin) I pass
-  //   if(hvrstr_stlln[i])
-  //     continue;
-
-  //   // marking twins as done
-  //   hvrstr_stlln[i] = true;
-  //   hvrstr_stlln[twin] = true;
-
-  //   std::map<int,double> local_water, local_sed;
-
-  //   for(auto j : {i,twin} )
-  //   {
-
-  //     if(j == -1)
-  //       continue;
-
-  //     this->graph.depression_tree[j].processed = true;
-
-  //     if(this->graph.depression_tree[j].level == 0)
-  //     {
-  //       local_water[j] = this->chonk_network[this->graph.depression_tree[j].pit].get_water_flux() * this->cellarea * this->timestep;
-  //       local_sed[j] = this->chonk_network[this->graph.depression_tree[j].pit].get_sediment_flux() * this->cellarea;
-  //       this->graph.depression_tree[j].volume_water += local_water[j];
-  //       this->graph.depression_tree[j].volume_sed += local_sed[j];
-  //       representative_chonk[j].add_to_water_flux(this->chonk_network[this->graph.depression_tree[j].pit].get_water_flux());
-  //       representative_chonk[j].add_to_sediment_flux(this->chonk_network[this->graph.depression_tree[j].pit].get_sediment_flux(), this->chonk_network[this->graph.depression_tree[j].pit].get_label_tracker(), this->chonk_network[this->graph.depression_tree[j].pit].get_fluvialprop_sedflux());
-
-  //     }
-  //     else
-  //     {
-  //       local_water[j] = this->graph.depression_tree[j].volume_water;
-  //       local_sed[j] = this->graph.depression_tree[j].volume_sed;
-  //     }
-
-  //     total_water += local_water[j];
-  //     total_sed += local_sed[j];
-
-  //     if(local_water[j] < 0)
-  //     {
-  //       std::cout << "NEGATIVE_WATER::" << local_water[j] << "|" << this->graph.depression_tree[j].volume_water;
-  //     }
-
-
-  //   }
-
-  //   std::cout << "I have " << total_water  << " water in total" << std::endl;
-
-  //   //case 1 I have enough water between the twins to fill it all
-
-  //   double volvol = -1;
-  //   if(this->graph.depression_tree[i].parent != -1)
-  //   {
-  //     volvol = this->graph.depression_tree[this->graph.depression_tree[i].parent].min_volume_to_start;
-  //   }
-
-  //   if( volvol < total_water && this->graph.depression_tree[i].parent != -1)
-  //   {
-  //     // std::cout << "FILLING whole LAKE " << std::endl;
-
-  //     // then I give to my parent the water and sed
-  //     int parent = this->graph.depression_tree[i].parent;
-  //     this->graph.depression_tree[parent].volume_water += this->graph.depression_tree[i].volume_water;
-  //     this->graph.depression_tree[parent].volume_sed += this->graph.depression_tree[i].volume_sed;
-
-  //     this->graph.depression_tree[parent].volume_water += this->graph.depression_tree[twin].volume_water;
-  //     this->graph.depression_tree[parent].volume_sed += this->graph.depression_tree[twin].volume_sed;
-
-  //     representative_chonk[parent].add_to_water_flux(representative_chonk[i].get_water_flux());
-  //     representative_chonk[parent].add_to_sediment_flux(representative_chonk[i].get_sediment_flux(), representative_chonk[i].get_label_tracker(), representative_chonk[i].get_fluvialprop_sedflux());
-  //     representative_chonk[parent].add_to_water_flux(representative_chonk[twin].get_water_flux());
-  //     representative_chonk[parent].add_to_sediment_flux(representative_chonk[twin].get_sediment_flux(), representative_chonk[twin].get_label_tracker(), representative_chonk[twin].get_fluvialprop_sedflux());
-
-  //   }
-  //   else
-  //   {
-
-  //     // 
-  //     // transfer the water in the half-filled case to the twin somehow. 
-  //     // 
-
-  //     dep_adder_wat[i] = 0;
-  //     dep_adder_sed[i] = 0;
-  //     dep_adder_lab[i] = std::vector<double>(this->n_labels,0.);
-  //     // giving priority to fill at the lake with the highest ratio of filling:
-  //     // If I am here it means that I cannot fill both my lakes entirely. But I might be able to fill one, and I want to start with it in order to reprocess the outlet and nodes in between 
-  //     if(twin != -1)
-  //     {
-  //       dep_adder_wat[twin] = 0;
-  //       dep_adder_sed[twin] = 0;
-  //       dep_adder_lab[twin] = std::vector<double>(this->n_labels,0.);
-  //       if(local_water[i] / this->graph.depression_tree[i].volume > local_water[twin] / this->graph.depression_tree[twin].volume)
-  //       {
-  //         dep_2_proc.emplace_back(i);
-  //         corresponding_volume_of_water.emplace_back(this->graph.depression_tree[i].volume_water);
-  //         corresponding_volume_of_sed.emplace_back(this->graph.depression_tree[i].volume_sed);
-
-  //         double extra_water = this->graph.depression_tree[i].volume_water - this->graph.depression_tree[i].volume;
-  //         double extra_sed = this->graph.depression_tree[i].volume_sed - this->graph.depression_tree[i].volume;
-  //         if(extra_water < 0)
-  //         {
-  //           extra_water = 0;
-  //           extra_sed = 0;
-  //         }
-
-  //         dep_2_proc.emplace_back(twin);
-
-  //         corresponding_volume_of_water.emplace_back(this->graph.depression_tree[twin].volume_water + extra_water);
-  //         corresponding_volume_of_sed.emplace_back(this->graph.depression_tree[twin].volume_sed + extra_sed);
-  //         if(extra_water > 0)
-  //         {
-  //           representative_chonk[twin].add_to_water_flux(extra_water);
-  //           representative_chonk[twin].add_to_sediment_flux(extra_sed, 
-  //             representative_chonk[i].get_label_tracker(),
-  //            1);
-  //         }
-
-  //       }
-  //       else
-  //       {
-  //         dep_2_proc.emplace_back(twin);
-  //         corresponding_volume_of_water.emplace_back(this->graph.depression_tree[twin].volume_water);
-  //         corresponding_volume_of_sed.emplace_back(this->graph.depression_tree[twin].volume_sed);
-
-  //         double extra_water = this->graph.depression_tree[twin].volume_water - this->graph.depression_tree[twin].volume;
-  //         double extra_sed = this->graph.depression_tree[twin].volume_sed - this->graph.depression_tree[twin].volume;
-  //         if(extra_water < 0)
-  //         {
-  //           extra_water = 0;
-  //           extra_sed = 0;
-  //         }
-
-
-  //         dep_2_proc.emplace_back(i);
-  //         corresponding_volume_of_water.emplace_back(this->graph.depression_tree[i].volume_water + extra_water);
-  //         corresponding_volume_of_sed.emplace_back(this->graph.depression_tree[i].volume_sed + extra_sed);
-
-  //         if(extra_water > 0)
-  //         {
-  //           representative_chonk[i].add_to_water_flux(extra_water);
-  //           representative_chonk[i].add_to_sediment_flux(extra_sed, 
-  //             representative_chonk[twin].get_label_tracker(),
-  //            1);
-  //         }
-
-  //       }
-  //     }
-  //     else
-  //     {
-  //       dep_2_proc.emplace_back(i);
-  //       corresponding_volume_of_water.emplace_back(this->graph.depression_tree[i].volume_water);
-  //       corresponding_volume_of_sed.emplace_back(this->graph.depression_tree[i].volume_sed);
-  //     }
-  //   }
-
-  // }
-
-  // // std::map<int,int> stop_lake_node_vector;
-  // // std::vector<int> next_round;
-  // // Now I have an order of depressions to process. In an ideal case, I only have one.
-  // for (size_t i = 0; i < dep_2_proc.size(); i++)
-  // {
-  //   int dep = dep_2_proc[i];
-
-  //   std::cout << "Filling " << dep << std::endl;
-
-  //   this->graph.depression_tree[dep].label_prop = representative_chonk[dep].get_label_tracker();
-
-  //   this->graph.depression_tree[dep].processed = true;
-  //   double volume_water = corresponding_volume_of_water[i];
-  //   double volume_sed = corresponding_volume_of_water[i];
-  //   int last = 0;
-  //   double hw = this->topography[this->graph.depression_tree[dep].nodes[0]];
-
-  //   // OK I COULD OPTIMISE THAT A LOT IF I HAVE TIME BUT FOR NOW IT JUST WORKS
-  //   std::vector<PQ_helper<int,double> > volvo;
-  //   for(int j = 0; j< this->graph.depression_tree[dep].nodes.size(); j++)
-  //   {
-  //     int n = this->graph.depression_tree[dep].nodes[j];
-  //     volvo.emplace_back(PQ_helper<int,double>(n,this->graph.get_potential_depression_volume_at_node(n)));
-  //   } 
-
-  //   std::priority_queue< PQ_helper<int,double>, std::vector<PQ_helper<int,double> >, std::greater<PQ_helper<int,double> > > PQfill(volvo.begin(), volvo.end() );
-  //   double max_vol = 0;
-  //   while(PQfill.empty() == false)
-  //   {
-  //     int n = PQfill.top().node;
-  //     double VOL = PQfill.top().score;
-  //     PQfill.pop();
-  //     // if(this->)
-  //       // std::cout << "n = " << n << " score = " << VOL << " VW: " << volume_water << std::endl;
-
-  //     if(VOL <= volume_water)
-  //     {
-  //       // marking as belonging to the dep
-  //       this->node_in_lake[n] = dep;
-
-  //       this->chonk_network[n].reset();
-
-  //       if(PQfill.size()>0)
-  //         hw = this->topography[PQfill.top().node];
-  //       else
-  //         hw = this->graph.depression_tree[dep].hw_max;
-
-  //       max_vol = VOL;
-  //     }
-  //     else
-  //     {
-  //       // NEED BACKCALCULATE STUFF HERE WHEN PARTIALLY FILLED LAKE
-  //       break;
-  //     }
-  //   }
-
-  //   // for(int j = 0; j< this->graph.depression_tree[dep].nodes.size() - 1; j++)
-  //   // {
-  //   //   int n = this->graph.depression_tree[dep].nodes[j];
-  //   //   // if still enough water and node is not the outlet
-  //   //   if(this->graph.get_potential_depression_volume_at_node(n) >= volume_water && n != this->graph.depression_tree[dep].connections.first)
-  //   //   {
-  //   //     // marking as belonging to the dep
-  //   //     this->node_in_lake[n] = dep;
-  //   //     this->chonk_network[n].reset();
-  //   //     hw = this->topography[this->graph.depression_tree[dep].nodes[j+1]];
-  //   //     last = j;
-  //   //   }
-  //   //   else
-  //   //   {
-  //   //     // NEED BACKCALCULATE STUFF HERE WHEN PARTIALLY FILLED LAKE
-  //   //     break;
-  //   //   }
-  //   // }
-
-  //   // stop_lake_node_vector[dep] = last_node;
-  //   int nfd = 0;
-  //   for(int j = 0; j< this->graph.depression_tree[dep].nodes.size(); j++)
-  //   {
-  //     int n = this->graph.depression_tree[dep].nodes[j];
-  //     if(this->graph.get_potential_depression_volume_at_node(n) <= max_vol)
-  //     {
-  //       // std::cout << "raising topo at " << n << " to " << hw << " from " << this->topography[n] << std::endl;
-  //       this->topography[n] = hw;
-  //     }
-
-  //     // if(n == this->graph.depression_tree[dep].nodes[last] )
-  //     // {
-  //     //   break;
-  //     // }
-  //   }
-  //   std::cout << "NFD IS " << nfd << std::endl;
-
-  // }
-
-  // for (size_t i = 0; i < dep_2_proc.size(); i++)
-  // {
-  //   int dep = dep_2_proc[i];
-  //   double volume_water = corresponding_volume_of_water[i];
-  //   double volume_sed = corresponding_volume_of_water[i];
-  //   int outlet = this->graph.depression_tree[dep].connections.first;
-  //   double extra_water = volume_water - this->graph.depression_tree[dep].volume;
-  //   double extra_sed = volume_sed - this->graph.depression_tree[dep].volume;
-
-
-  //   // Reprocessing the outlet
-  //   if(volume_water > this->graph.depression_tree[dep].volume)
-  //   {
-
-  //     this->chonk_network[outlet].reset();
-  //     std::vector<int> dons = this->graph.get_MF_donors_at_node(outlet);
-  //     for(auto n : dons)
-  //       this->chonk_network[n].split_and_merge_in_receiving_chonks_ignore_but_one(this->chonk_network,this->graph, this->timestep, outlet);
-
-  //     this->chonk_network[outlet].external_moving_prep({this->graph.depression_tree[dep].connections.second},{1},{1}, {(this->topography[outlet] - this->graph.depression_tree[dep].connections.second)/this->dx });
-  //     this->chonk_network[outlet].add_to_water_flux(extra_water/(this->cellarea * this->timestep));
-  //     this->chonk_network[outlet].add_to_sediment_flux(extra_sed/(this->cellarea), representative_chonk[dep].get_label_tracker(), 1.);
-  //   }
-
-  //   // tricky part: the outlet and its receiver are already processed (edge case when one depression is filled but not its twin)
-  //   if(volume_water > this->graph.depression_tree[dep].volume && this->is_processed[this->graph.depression_tree[dep].connections.second])
-  //   {
-  //     // reprocessing the outlet and the downstream nodes
-  //     // Initialising a priority queue sorting the nodes to reprocess by their id in the Mstack. the smallest Ids should come first
-  //     // Because I am only processing nodes in between 2 discrete lakes, it should not be a problem
-  //     std::priority_queue< node_to_reproc, std::vector<node_to_reproc>, std::greater<node_to_reproc> > ORDEEEEEER; // I am not politically aligned with John Bercow, this is jsut for the joke haha
-
-
-  //     //----------------------------------------------------
-  //     //------- FORMING THE STACK OF NODE TO REPROC --------
-  //     //----------------------------------------------------
-  //     // This section aims to gather all nodes to reprocess. All node of the landscape have a type sort them by type: 
-  //     // # 'n' if not concerned, 'l' if in lake, 'd' if donor, 'r' if potential reproc and 'y' if in stack
-  //     std::vector<int> local_mstack;
-  //     // keeping track of which nodes are already in teh queue (or more generally to avoid) and which one have receivers in the local stack
-  //     std::vector<char> is_in_queue(this->io_int["n_elements"],'n');
-  //     // Before starting to gather the nodes downstream of me outlet, let's gather mark the node in me lake as not available (as if already in the queue)
-  //     // Avoinding nodes in the lakes
-  //     for(auto tnode:this->graph.depression_tree[dep].nodes)
-  //     {
-  //       is_in_queue[tnode] = 'l';
-  //     }
-
-  //     // This function gathers all the nodes to be reprocessed. Including their donor which will be partially reprocessed
-  //     // This function is only geometrical, it does not assume any existing transfer of sed/water
-  //     this->gather_nodes_to_reproc(local_mstack,  ORDEEEEEER,  is_in_queue,  outlet);
-  //     this->deprocess_local_stack(local_mstack, is_in_queue);
-      
-  //     // Now reprocessing the stack of stuff
-
-  //     // Iterating through the local stack
-  //     for(auto tnode:local_mstack)
-  //     {
-  //       // Discriminating between the donors and the receivers
-  //       if(is_in_queue[tnode] == 'd')
-  //       {
-  //         // # I am a donor, I just need to regive the sed/water without other reproc
-  //         // # Let me just just check which of my receivers I need to give fluxes (I shall not regive to the nodes not in my local stack)
-  //         std::vector<int> ignore_some; 
-  //         for(auto ttnode: this->chonk_network[tnode].get_chonk_receivers_copy())
-  //         {
-  //           // if the node is the outlet, or not a 'y', I ignore it
-  //           if(is_in_queue[ttnode] != 'y' || ttnode == outlet)
-  //           {          
-  //             ignore_some.emplace_back(ttnode);
-  //             continue;
-  //           }
-  //           // I also ignore the nodes in the current lake (they have a 'y' signature)
-  //           else if (this->node_in_lake[ttnode] >= 0)
-  //           {
-  //             ignore_some.emplace_back(ttnode);
-  //             continue;
-  //           }
-  //         }
-
-  //         // # Ignore_some has the node i so not want
-  //         // # So I transmit my fluxes to the nodes I do not ignore
-  //         this->chonk_network[tnode].split_and_merge_in_receiving_chonks_ignore_some(this->chonk_network, this->graph, this->timestep, ignore_some);
-
-  //       }
-  //       else
-  //       {
-  //         // # I am not a nodor:
-  //         this->process_node_nolake_for_sure(tnode, is_processed, this->active_nodes, 
-  //           cellarea,topography, true, true);
-  //       }
-  //     }
-  //   }
-
-  // }
 
 // this Fucntion add a height of sediment to a preexisting pile. It updates the tracking of deposited sediments
 void ModelRunner::add_to_sediment_tracking(int index, double height, std::vector<double> label_prop, double sed_depth_here)
@@ -3803,70 +3087,38 @@ void ModelRunner::manage_fluxes_before_moving_prep(chonk& this_chonk, int label_
   CHRONO_start[2] = std::chrono::high_resolution_clock::now();
   NTIMEPREFLUXCALLED++;
   
-
-  this_chonk.inplace_only_drainage_area(this->dx, this->dy);
-  this->Qw_in += this->dx* this->dy;
+  if(this->precipitations_enabled == false)
+  {
+    this_chonk.inplace_only_drainage_area(this->dx, this->dy);
+    this->Qw_in += this->dx* this->dy;
+  }
+  else
+  {
+    this->Qw_in += this_chonk.inplace_precipitation_discharge(this->dx, this->dy, this->precipitations);
+  }
 
   CHRONO_stop[2] = std::chrono::high_resolution_clock::now();
   CHRONO_n_time[2] ++;
   CHRONO_mean[2] += std::chrono::duration<double>(CHRONO_stop[2] - CHRONO_start[2]).count();
   return;
-  // for(auto method:this->ordered_flux_methods)
-  // {
-  //   if(method == "move")
-  //     break;
-  //   int this_case = intcorrespondance[method];
-
-  //   switch(this_case)
-  //   {
-  //     case 5:
-  //       this_chonk.inplace_only_drainage_area(this->dx, this->dy);
-  //       this->Qw_in += this->dx* this->dy;
-  //       break;
-  //     case 6:
-  //       this_chonk.inplace_precipitation_discharge(this->dx, this->dy,this->io_double_array["precipitation"]);
-  //       this->Qw_in += this->io_double_array["precipitation"][this_chonk.get_current_location()] * this->dx* this->dy;
-  //       break;
-  //     case 7:
-  //       this_chonk.inplace_infiltration(this->dx, this->dy, this->io_double_array["infiltration"]);
-  //       this->Qw_out += this->io_double_array["infiltration"][this_chonk.get_current_location()] * this->dx* this->dy;
-  //       break;
-  //   }
-
-  // }
 }
 
 void ModelRunner::cancel_fluxes_before_moving_prep(chonk& this_chonk, int label_id)
 {
-
-  this_chonk.cancel_inplace_only_drainage_area(this->dx, this->dy);
-  this->Qw_in -= this->dx* this->dy;
+  if(this->precipitations_enabled == false)
+  {
+    this_chonk.cancel_inplace_only_drainage_area(this->dx, this->dy);
+    this->Qw_in -= this->dx* this->dy;
+  }
+  else
+  {
+    this->Qw_in += this_chonk.cancel_inplace_precipitation_discharge(this->dx, this->dy, this->precipitations);
+  }
+  
   this->NTIMEPREFLUXCALLED -= 1;
 
   return;
-  // for(auto method:this->ordered_flux_methods)
-  // {
-  //   if(method == "move")
-  //     break;
-  //   int this_case = intcorrespondance[method];
 
-  //   switch(this_case)
-  //   {
-  //     case 5:
-  //       this_chonk.cancel_inplace_only_drainage_area(this->dx, this->dy);
-  //       this->Qw_in -= this->dx* this->dy;
-  //       break;
-  //     case 6:
-  //       this_chonk.cancel_inplace_precipitation_discharge(this->dx, this->dy,this->io_double_array["precipitation"]);
-  //       this->Qw_in -= this->io_double_array["precipitation"][this_chonk.get_current_location()] * this->dx* this->dy;
-  //       break;
-  //     case 7:
-  //       this_chonk.cancel_inplace_infiltration(this->dx, this->dy, this->io_double_array["infiltration"]);
-  //       this->Qw_out -= this->io_double_array["infiltration"][this_chonk.get_current_location()] * this->dx* this->dy;
-  //       break;
-  //   }
-
-  // }
 }
 
 
