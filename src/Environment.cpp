@@ -1534,6 +1534,14 @@ void ModelRunner::lake_solver_v3(int node)
           this->node_in_lake[this_node] = dep;
         }
 
+        double lcoal_evaporation = 0;
+        if(this->lake_evaporation)
+        {
+          lcoal_evaporation = this->lake_evaporation_rate_spatial[this_node] * this->cellarea;
+        }
+
+        // remaining_volume -= lcoal_evaporation;
+        this->graph.depression_tree.actual_amount_of_evaporation[dep] += lcoal_evaporation;
 
         // Calculating the incrementing volume
         double deltelev = top_elev - this_elev;
@@ -1547,6 +1555,16 @@ void ModelRunner::lake_solver_v3(int node)
         {
           is_changed = true;
           double ratio = remaining_volume / dV;
+
+          // At the moment the lake evaporation is approximated at a pixel pret:
+          // If I fall in between 2 nodes, I assume it stick at the top of the last node and backcalculate the evaporation as "in-between"
+          // this could eventually be rethought a bit more accurately, although it is a detail so we'll leave it to a next publication refining the lake evaporation method
+
+          if(ratio < 0)
+          {
+            ratio = 0;
+            this->graph.depression_tree.actual_amount_of_evaporation[dep] += remaining_volume;
+          }
           this->graph.depression_tree.hw[dep] = this_elev + ratio * deltelev;
           for(auto nj:nodes2topogy)
             this->topography[nj] = this->graph.depression_tree.hw[dep];

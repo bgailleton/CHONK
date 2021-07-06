@@ -105,6 +105,7 @@ public:
 	std::vector<double> volume_sed;
 	// index: depression ID -> value: volume of actual water hosted in the depression 
 	std::vector<double> volume_water;
+	std::vector<double> actual_amount_of_evaporation;
 	// index: depression ID -> value: volume max of water storable taking account of potential lake evaporation
 	std::vector<double> volume_max_with_evaporation;
 	// index: depression ID -> value: maximum water height of the depression (in absolute elevation)
@@ -174,6 +175,7 @@ public:
 		// No volumes at first
 		this->volume.emplace_back(0);
 		this->volume_max_with_evaporation.emplace_back(0);
+		this->actual_amount_of_evaporation.emplace_back(0);
 		this->volume_sed.emplace_back(0);
 		this->volume_water.emplace_back(0);
 		// Initial hw is the one of the pits
