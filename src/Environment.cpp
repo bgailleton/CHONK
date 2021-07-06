@@ -985,6 +985,14 @@ void ModelRunner::finalise()
   // First dealing with lake deposition:
   this->drape_deposition_flux_to_chonks();
 
+  for (int i = 0; i < this->graph.depression_tree.get_n_dep(); i++)
+  {
+    if(this->depression_tree.graph.active[i] == true)
+    {
+      this->Qw_out += this->depression_tree.actual_amount_of_evaporation/this->timestep;
+    }
+  }
+
   // then actively finalising the deposition and other details
   // Iterating through all nodes
   for(int i=0; i< this->io_int["n_elements"]; i++)
@@ -997,6 +1005,7 @@ void ModelRunner::finalise()
     this->Qs_mass_balance -= this->chonk_network[i].get_erosion_flux_only_bedrock() * cellarea * timestep;
     this->Qs_mass_balance -= this->chonk_network[i].get_erosion_flux_only_sediments() * cellarea * timestep;
     this->Qs_mass_balance += this->chonk_network[i].get_deposition_flux() * cellarea * timestep;
+
 
 
     if(this->active_nodes[i] == false)

@@ -437,7 +437,7 @@ std::vector<double>& pre_sed, std::vector<double>& pre_water);
     bool precipitations_enabled = false;
 
     bool lake_evaporation = false;
-    bool lake_evaporation_spatial = false;
+    bool lake_evaporation_spatial = true;
     double lake_evaporation_rate = 0.1;
     xt::pytensor<double,1> lake_evaporation_rate_spatial;
 

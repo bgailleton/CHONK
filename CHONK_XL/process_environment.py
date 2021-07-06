@@ -236,6 +236,9 @@ class CoreModel:
 	precipitations = xs.variable(intent = 'in', default = False)
 	precipitations_array = xs.variable(intent = 'in', dims = [('y','x'), ('node'),()], default = -1)
 
+	lake_evaporation = xs.variable(intent = 'in', default = False)
+	lake_evaporation_rate = xs.variable(intent = 'in', dims = [('y','x'), ('node'),()], default = 0.1)
+
 
 	# what gets out
 	model = xs.any_object( description = "The main model object, controls the c++ part (I/O, results, run function, process order of execution, ...)")
@@ -294,6 +297,11 @@ class CoreModel:
 		if self.precipitations:
 			self.model.precipitations_enabled = True
 			self.model.precipitations = self.precipitations_array.ravel()
+		if self.lake_evaporation:
+			if(isinstance(self.lake_evaporation, np.ndarray) )
+				self.model.lake_evaporation_rate_spatial = self.lake_evaporation_rate.ravel()
+			else:
+				self.model.lake_evaporation_rate_spatial = np.zeros_like(self.surface_elevation) + self.lake_evaporation_rate
 
 
 		self.topolake = np.copy(self.surface_elevation).reshape(self.ny,self.nx) 
