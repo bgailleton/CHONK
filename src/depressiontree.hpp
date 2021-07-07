@@ -634,7 +634,7 @@ public:
 
 
 	// ran as post-processing function, if calculates an amount of water max stored in the lake taking into account the lake evaporation
-	void preprocess_lake_evaporation_potential(xt::pytensor<double,1>& evaporate, double cellarea)
+	void preprocess_lake_evaporation_potential(xt::pytensor<double,1>& evaporate, double cellarea, double timestep)
 	{
 		for(int i = 0;  i< this->get_n_dep(); ++i)
 		{
@@ -642,7 +642,7 @@ public:
 			double tvol = this->volume[i];
 			for(auto no:tnodes)
 			{
-				tvol += evaporate[no] * cellarea;
+				tvol += evaporate[no] * cellarea * timestep;
 			}
 
 			this->volume_max_with_evaporation[i] = tvol;

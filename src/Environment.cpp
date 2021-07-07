@@ -188,9 +188,13 @@ void ModelRunner::initiate_nodegraph()
   if(this->lake_evaporation)
   {
     if(this->lake_evaporation_spatial == false)
+    {
+      //
       this->lake_evaporation_rate_spatial = this->lake_evaporation_rate + xt::zeros_like(this->topography);
+    }
 
-    this->graph.depression_tree.preprocess_lake_evaporation_potential(this->lake_evaporation_rate_spatial, this->cellarea);
+    this->graph.depression_tree.preprocess_lake_evaporation_potential(this->lake_evaporation_rate_spatial, this->cellarea, this->timestep);
+
 
   }
 
@@ -987,9 +991,10 @@ void ModelRunner::finalise()
 
   for (int i = 0; i < this->graph.depression_tree.get_n_dep(); i++)
   {
-    if(this->depression_tree.graph.active[i] == true)
+    if(this->graph.depression_tree.active[i] == true)
     {
-      this->Qw_out += this->depression_tree.actual_amount_of_evaporation/this->timestep;
+      std::cout << "Lake Evaporation:: " << this->graph.depression_tree.actual_amount_of_evaporation[i]/this->timestep << " vs " << this->graph.depression_tree.volume_water[i]/this->timestep << std::endl;
+      this->Ql_out += this->graph.depression_tree.actual_amount_of_evaporation[i]/this->timestep;
     }
   }
 
@@ -1105,8 +1110,8 @@ void ModelRunner::finalise()
 
   auto tlake_depth = this->topography - this->surface_elevation;
   // Calculating the water balance thingies
-  double save_Ql_out = this->Ql_out;
-  this->Ql_out = 0;
+  // double save_Ql_out = this->Ql_out;
+  // this->Ql_out = 0;
   for(int i=0; i<this->io_int["n_elements"]; i++)
   {
     this->Ql_out += (tlake_depth[i] - this->io_double_array["lake_depth"][i]) * this->dx * this->dy / this->timestep;
@@ -1302,6 +1307,8 @@ void ModelRunner::lake_solver_v3(int node)
       // Now it will be
       treestak_done_question_mark[dep] = true;
 
+      // This calculate the minimum amount of water required to enter this lake, based on the max volume accumulatable in the Children
+      // It does take account of lake evaporation when needed
       double lowerboundvol = this->graph.depression_tree.get_volume_of_children(dep);
 
       // Do I have enough water to fill the current master_depression
@@ -1367,6 +1374,8 @@ void ModelRunner::lake_solver_v3(int node)
     {
       // Calculating the minimum amount of water required to fill this depression
       double lowerboundvol = this->graph.depression_tree.get_volume_of_children(twin);
+
+      // treestak_in_localocalocal[twin] = true;
 
       // Do I have enough water to fill the new depression
       if(lowerboundvol <= water_volume[twin])
@@ -1471,24 +1480,36 @@ void ModelRunner::lake_solver_v3(int node)
       PQstack.pop();
     }
 
+
+    bool need_to_remove_lakevap = false;
     // TEMPORARY MEASURE, ASSUMING hw = hw max
     // So, First checking if I can fill the dep entirely or partially.
-    if(water_volume[dep] >= this->graph.depression_tree.volumvolume_max_with_evaporatione[dep] ||  double_equals(water_volume[dep] - this->graph.depression_tree.volume_max_with_evaporation[dep],0., 1e-5) )
+    if(water_volume[dep] >= this->graph.depression_tree.volume_max_with_evaporation[dep] ||  double_equals(water_volume[dep] - this->graph.depression_tree.volume_max_with_evaporation[dep],0., 1e-5) )
     {
+      std::cout << "A" << std::endl;
       // Yes, is simple - > water to max and volume to max
       this->graph.depression_tree.volume_water[dep] = this->graph.depression_tree.volume_max_with_evaporation[dep];
       this->graph.depression_tree.hw[dep] = this->graph.depression_tree.hw_max[dep]; 
       // making sure nodes are maked as lake
+      double this_laevapop = 0;
       for (auto gh:this->graph.depression_tree.get_all_nodes(dep))
       {
         if(gh != outlet)
+        {
           is_in_queue[gh] = 'l'; 
+          if(this->lake_evaporation)
+            this_laevapop += this->lake_evaporation_rate_spatial[gh] * this->cellarea * this->timestep;
+        }
+
       }
+
+      this->graph.depression_tree.actual_amount_of_evaporation[dep] += this_laevapop;
 
     }
     else
     {
-
+      std::cout << "B" << std::endl;
+      need_to_remove_lakevap = true;
       // No -> less simple
 
       //all water goes to dep 
@@ -1546,10 +1567,10 @@ void ModelRunner::lake_solver_v3(int node)
         double lcoal_evaporation = 0;
         if(this->lake_evaporation)
         {
-          lcoal_evaporation = this->lake_evaporation_rate_spatial[this_node] * this->cellarea;
+          lcoal_evaporation = this->lake_evaporation_rate_spatial[this_node] * this->cellarea * this->timestep;
         }
 
-        // remaining_volume -= lcoal_evaporation;
+        remaining_volume -= lcoal_evaporation;
         this->graph.depression_tree.actual_amount_of_evaporation[dep] += lcoal_evaporation;
 
         // Calculating the incrementing volume
@@ -1580,10 +1601,14 @@ void ModelRunner::lake_solver_v3(int node)
           break;
         }
       }
+
+      // this->graph.depression_tree.volume_water[dep] -= this->graph.depression_tree.actual_amount_of_evaporation[dep];
+      // water_volume[dep] -= this->graph.depression_tree.actual_amount_of_evaporation[dep];;
+
     }
 
     // Checkwhether it outflows
-    bool outflows = (water_volume[dep] > this->graph.depression_tree.volume_water[dep]);
+    bool outflows = (water_volume[dep] > this->graph.depression_tree.volume_max_with_evaporation[dep]);
     double wat2remove = 0, wat2add = 0;
 
     // if it does, I need to reprocess the unprocessed nodes bellow
@@ -1701,7 +1726,16 @@ void ModelRunner::lake_solver_v3(int node)
 
     // transmitting eventual Q to the outlet
     double extra_sed = sed_volume[dep] - this->graph.depression_tree.volume_sed[dep];
-    double extra_wat = (water_volume[dep] - this->graph.depression_tree.volume_water[dep] + wat2add)/this->timestep;
+    double extra_wat = 0;
+    if(need_to_remove_lakevap)
+      extra_wat = (water_volume[dep] - 
+                        this->graph.depression_tree.volume_water[dep] 
+                        - this->graph.depression_tree.actual_amount_of_evaporation[dep] + wat2add)
+                        /this->timestep;
+    else
+      extra_wat = (water_volume[dep] - 
+                        this->graph.depression_tree.volume_water[dep] + wat2add)
+                        /this->timestep;
 
     if(extra_sed < 0)
       extra_sed = 0;
@@ -2000,7 +2034,7 @@ void ModelRunner::cancel_fluxes_before_moving_prep(chonk& this_chonk, int label_
   }
   else
   {
-    this->Qw_in += this_chonk.cancel_inplace_precipitation_discharge(this->dx, this->dy, this->precipitations);
+    this->Qw_in -= this_chonk.cancel_inplace_precipitation_discharge(this->dx, this->dy, this->precipitations);
   }
   
   this->NTIMEPREFLUXCALLED -= 1;
@@ -2384,9 +2418,9 @@ void ModelRunner::process_inherited_water()
       }
       // sumwat += this->io_double_array["lake_depth"][node] * this->dx * this->dy / this->timestep ;
     }
-    std::cout << "INHERITED WATER AT " << minnodor << " : " << this->graph.depression_tree.volume_water[tlake]/this->timestep << std::endl;
-    this->chonk_network[minnodor].add_to_water_flux(this->graph.depression_tree.volume_water[tlake]/this->timestep);
-    this->inherited_water_added[minnodor] += this->graph.depression_tree.volume_water[tlake]/this->timestep;
+    // std::cout << "INHERITED WATER AT " << minnodor << " : " << this->graph.depression_tree.volume_water[tlake]/this->timestep << std::endl;
+    this->chonk_network[minnodor].add_to_water_flux((this->graph.depression_tree.volume_water[tlake] - this->graph.depression_tree.actual_amount_of_evaporation[tlake])/this->timestep);
+    this->inherited_water_added[minnodor] += (this->graph.depression_tree.volume_water[tlake] - this->graph.depression_tree.actual_amount_of_evaporation[tlake])/this->timestep;
   }
 
   // Done with reshuffling the water

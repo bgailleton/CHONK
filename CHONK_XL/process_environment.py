@@ -297,10 +297,15 @@ class CoreModel:
 		if self.precipitations:
 			self.model.precipitations_enabled = True
 			self.model.precipitations = self.precipitations_array.ravel()
+
+
 		if self.lake_evaporation:
-			if(isinstance(self.lake_evaporation, np.ndarray) )
+			if(isinstance(self.lake_evaporation_rate, np.ndarray) ):
+				self.model.lake_evaporation = True
 				self.model.lake_evaporation_rate_spatial = self.lake_evaporation_rate.ravel()
+				# print(np.median(self.model.lake_evaporation_rate_spatial))
 			else:
+				self.model.lake_evaporation = True
 				self.model.lake_evaporation_rate_spatial = np.zeros_like(self.surface_elevation) + self.lake_evaporation_rate
 
 
@@ -349,6 +354,7 @@ class CoreModel:
 		# tempolake = self.model.get_array_double_param("surface_elevation")
 		# self.model.update_array_double_param("surface_elevation", np.copy(self.model.get_array_double_param("surface_elevation_tp1") + np.random.rand(self.nx * self.ny) * 1e-7 ) )
 		self.model.set_surface_elevation(np.copy(self.model.get_surface_elevation_tp1()) + (np.random.rand(self.surface_elevation.shape[0])*2e-6 - 1e-6) )
+		# print(np.unique(self.model.lake_evaporation_rate_spatial))
 		# input("BITE9")
 
 		self.model.set_sed_height(np.copy(self.model.get_sed_height_tp1()) )
