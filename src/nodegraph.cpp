@@ -149,7 +149,7 @@ NodeGraphV2::NodeGraphV2(
     }
   }
 
-  
+  std::cout <<" REj" << std::endl;
 
   if(this->lake_solver == false)
   {
@@ -255,6 +255,35 @@ NodeGraphV2::NodeGraphV2(
   }
   else
   {
+    // Computing basin info from stack
+    this->compute_basins(active_nodes);
+    this->compute_pits(active_nodes);
+
+
+
+    // std::cout << "DEBUGDEP:: flow corrr-1" << std::endl;
+
+
+    // Now I am labelling my basins
+    //# Initialising the vector of basin labels
+    std::vector<int> basin_labels(this->Sstack.size(),-1);
+    //# Initialising the label to 0
+    int label = 0;
+    //# Iterating through all my single-flow stack from bottom to top (see Braun and Willett 2013 for meaning of stack)
+    //# if a node is it's receiver then the label becomse that node. The resulting basin vector show which nodes are linked to which
+    for(auto node:this->Sstack)
+    {
+      if(node == this->graph[node].Sreceivers)
+      {
+        label = node;
+      }
+      basin_labels[node] = label;
+    }
+
+    std::cout << "DEBUGDEP:: flow corrr1" << std::endl;
+    this->correct_flatrouting(active_nodes, elevation);
+
+
     // THIS IS WHAT HAPPENS WHEN THE LAKE SOVER IS EXPLICIT
     this->grow_depression_tree_v2(elevation, active_nodes);
     // this->depression_tree.printree();
@@ -1304,6 +1333,9 @@ void NodeGraphV2::compute_receveivers_and_donors(xt::pytensor<bool,1>& active_no
 
       idL++;
       test_elev = elevation[node];
+      if(i == 604)
+        std::cout << "BULF:: " << i << "->" << elevation[i] << " " << node << "->" << elevation[node] << std::endl;
+
       if(test_elev < this_elev)
       {
         this->graph[i].receivers.emplace_back(node);
@@ -1742,6 +1774,80 @@ void NodeGraphV2::compute_receveivers_and_donors(xt::pytensor<bool,1>& active_no
 
 // }
 // DEPRECATED
+
+
+void NodeGraphV2::recompute_SFMF_receveivers_and_donors(xt::pytensor<bool,1>& active_nodes, xt::pytensor<double,1>& elevation, std::vector<int>& nodes_to_compute)
+{
+
+  for(auto& i:nodes_to_compute)
+  {
+    if(active_nodes[i] == false)
+    {
+      this->graph[i].Sreceivers = i;
+      continue;
+    }
+    std::vector<int> receivers,donors;
+    std::vector<double> length2rec,length2don;
+    receivers.reserve(8);
+    donors.reserve(8);
+    length2rec.reserve(8);
+    length2don.reserve(8);
+    int checker;
+    if(i<ncols)
+      checker = 1;
+    else if (i >= this->n_element - ncols)
+      checker = 2;
+    else if(i % ncols == 0 || i == 0)
+      checker = 3;
+    else if((i + 1) % (ncols) == 0 )
+      checker = 4;
+    else
+      checker = 0;
+
+
+    double this_elev = elevation[i];
+    double test_elev;
+    int idL = -1;
+    double max_slope = 0;
+    int max_slope_i = -1;
+    for(auto& adder:this->neightbourer[checker])
+    {
+      int node = i+adder;
+      idL++;
+      test_elev = elevation[node];
+      if(test_elev<this_elev)
+      {
+        receivers.emplace_back(node);
+        length2rec.emplace_back(this->lengthener[idL]);
+        double slopehere = (this_elev - test_elev)/this->lengthener[idL];
+        if(slopehere > max_slope) 
+        {
+          max_slope = slopehere;
+          max_slope_i = node;
+        }
+      }
+      else if(test_elev>this_elev)
+      {
+        donors.emplace_back(node);
+        length2don.emplace_back(this->lengthener[idL]);
+      }
+    }
+    this->graph[i].receivers = std::move(receivers);
+    this->graph[i].donors = std::move(donors);
+    this->graph[i].length2rec = std::move(length2rec);
+    this->graph[i].length2don = std::move(length2don);
+
+    if(max_slope_i != -1)
+      this->graph[i].Sreceivers = max_slope_i;
+
+  }
+
+
+}
+
+
+
+
 
 
 void NodeGraphV2::recompute_multi_receveivers_and_donors(xt::pytensor<bool,1>& active_nodes, xt::pytensor<double,1>& elevation, std::vector<int>& nodes_to_compute)
@@ -2237,6 +2343,7 @@ std::vector<int> multiple_stack_fastscape(int n_element, std::vector<Vertex>& gr
 void NodeGraphV2::compute_stack()
 {    
   int istack = 0;
+  // std::cout << "Am I even reaching here?" << std::endl;
 
   for (int inode = 0; inode< this->n_element;inode++)
   {
@@ -2259,7 +2366,9 @@ int NodeGraphV2::_add2stack(int& inode, int& istack)
   for(int k = 0; k < int(this->graph[inode].Sdonors.size());k++)
   {
     int idonor = this->graph[inode].Sdonors[k];
+    // std::cout << istack << "||" << this->n_element << std::endl;
     Sstack[istack] = idonor;
+
     istack ++;
     istack = this->_add2stack(idonor, istack);
   }
@@ -2446,6 +2555,167 @@ void NodeGraphV2::correct_flowrouting(xt::pytensor<bool,1>& active_nodes, xt::py
     //                        mstree, elevation, nx, dx, dy)
     // compute_donors(ndonors, donors, receivers, nnodes)
     // compute_stack(stack, ndonors, donors, receivers, nnodes)
+}
+
+void NodeGraphV2::correct_flatrouting(xt::pytensor<bool,1>& active_nodes, xt::pytensor<double,1>& elevation)
+{
+    // """Ensure that no flow is captured in sinks.
+
+    // If needed, update `receivers`, `dist2receivers`, `ndonors`,
+    // `donors` and `stack`.
+
+    // """
+    int nnodes = this->n_element;
+
+    // # theory of planar graph -> max nb. of connections known
+    int nconn_max = this->nbasins * 7;
+    xt::pytensor<int,2> conn_basins = xt::zeros<int>({nconn_max,2}); // np.empty((nconn_max, 2), dtype=np.intp)
+    for(size_t i=0;i<nconn_max;i++)
+    {
+      conn_basins(i,1) = -2;
+      conn_basins(i,0) = -2;
+    }
+    xt::pytensor<int,2> conn_nodes = xt::zeros<int>({nconn_max,2}); //    conn_nodes = np.empty((nconn_max, 2), dtype=np.intp)
+    for(size_t i=0;i<nconn_max;i++)
+    {
+      conn_nodes(i,1) = -2;
+      conn_nodes(i,0) = -2;
+    }
+    xt::pytensor<double,1> conn_weights = xt::zeros<double>({nconn_max}); //conn_weights = np.empty(nconn_max, dtype=np.float64)
+    for(auto& v:conn_weights)
+      v = -2;
+
+    int nconn, basin0;
+    this->_connect_basins(conn_basins, conn_nodes, conn_weights, active_nodes, elevation, nconn, basin0);
+    
+    int scb = nconn, scn = nconn, scw = nconn;
+    // for(size_t i=0;i<nconn_max;i++)
+    // {
+    //   if(scb == -1 && conn_basins(i,0) == -2)
+    //     scb = int(i);
+    //   if(scn == -1 && conn_nodes(i,0) == -2)
+    //     scn = int(i);
+    //   if(scw == -1 && conn_weights(i) == -2)
+    //     scw = int(i);
+    // }
+
+    xt::pytensor<int,2> conn_basins_2 = xt::zeros<int>({scb,2});
+    xt::pytensor<int,2> conn_nodes_2 = xt::zeros<int>({scn,2});
+    xt::pytensor<double,1> conn_weights_2 = xt::zeros<double>({scw}); //conn_weights = np.empty(nconn_max, dtype=np.float64)
+
+    for(size_t i=0; i<scb ; i++)
+    {
+      conn_basins_2(i,0) = conn_basins(i,0);
+      conn_basins_2(i,1) = conn_basins(i,1);
+      DEBUG_connbas.push_back({SBasinOutlets[conn_basins(i,0)],SBasinOutlets[conn_basins(i,1)]});
+    }
+    for(size_t i=0; i<scn ; i++)
+    {
+      conn_nodes_2(i,0) = conn_nodes(i,0);
+      conn_nodes_2(i,1) = conn_nodes(i,1);
+      DEBUG_connode.push_back({conn_nodes(i,0),conn_nodes(i,1)});
+    }
+
+    for(size_t i=0; i<scw ; i++)
+      conn_weights_2[i] = conn_weights[i];
+
+    int g = 6;
+
+    // if method == 'mst_linear':
+    //     mstree = _compute_mst_linear(conn_basins, conn_weights, nbasins)
+    // elif method == 'mst_kruskal':
+    //     mstree = _compute_mst_kruskal(conn_basins, conn_weights, nbasins)
+    // else:
+    //     raise ValueError("invalid flow correction method %r" % method)
+    mstree = _compute_mst_kruskal(conn_basins_2, conn_weights_2);
+
+    // std::cout << "HFKJDFH" << std::endl;
+
+    this->_orient_basin_tree(conn_basins_2,conn_nodes_2,basin0, mstree);
+
+
+    std::vector<int> nodes_to_reconfigure = this->_update_pits_receivers_keep_track(conn_basins_2, conn_nodes_2, mstree, elevation);
+
+    // std::cout << "A" << std::endl;
+
+    // Recomputing the stack
+    this->Sstack = xt::zeros<int>({this->n_element});;
+    this->compute_stack();
+
+
+    std::vector<int> n_stuff(this->un_element,0);
+    for(auto i : this->Sstack)
+      n_stuff[i]++;
+    for(auto i : n_stuff)
+    {
+      if(i>1 || i==0)
+      {
+        throw std::runtime_error("!!!");
+      }
+    }
+
+    // std::cout << "B" << std::endl;
+    xt::pytensor<double,1> previousz = xt::zeros<double>({this->n_element});
+    for(size_t i =0; i< this->un_element; i++)
+      previousz[i] = elevation[i];
+
+    for(int i=0; i<this->un_element; i++)
+    {
+      int node = this->Sstack[i];
+      // std::cout << elevation[i] << std::endl;
+      // if(i == 604 || i == 705)
+        // std::cout << "!!! " << i << std::endl; 
+      if(this->graph[node].Sreceivers != node && previousz[node] == previousz[this->graph[node].Sreceivers])
+      {
+         
+        elevation[node] = elevation[this->graph[node].Sreceivers] + 1e-3;
+        pits_to_reroute[node] = false;
+        // if(i == 604 || i == 705)
+          // std::cout << "changed: " << previousz[i] << " -> " << elevation[i] << " -> " << elevation[this->graph[i].Sreceivers] << std::endl;
+      }
+    }
+
+    // std::cout << "C" << std::endl;
+    // this->recompute_SFMF_receveivers_and_donors(active_nodes, elevation, nodes_to_reconfigure);
+    this->graph = std::vector<Vertex>();
+    this->graph.reserve(un_element);
+    for(int i=0; i<this->n_element;i++)
+    this->graph.emplace_back(Vertex());
+
+    // computing receivers and donors information, multi and SS flow
+    this->compute_receveivers_and_donors(active_nodes,elevation);
+    // std::cout << "D" << std::endl;
+
+    // _update_pits_receivers(receivers, dist2receivers, outlets,
+    //                        conn_basins, conn_nodes,
+    //                        mstree, elevation, nx, dx, dy)
+    // compute_donors(ndonors, donors, receivers, nnodes)
+    // compute_stack(stack, ndonors, donors, receivers, nnodes)
+    for(int i =0; i<this->n_element; i++)
+    {
+      if(active_nodes[i] == 0)
+        continue;
+      std::vector<int> neight; std::vector<double> duf;
+      this->get_D8_neighbors(i,active_nodes,neight,duf);
+      bool isfalt = true;
+      bool at_least_a_flat = false;
+      bool no_rec = true;
+      for(auto j: neight)
+      {
+        if(elevation[j] != elevation[i])
+          isfalt = false;
+        else
+          at_least_a_flat = true;
+        if(elevation[j] < elevation[i])
+          no_rec =false;
+
+      }
+      if(isfalt || (at_least_a_flat && no_rec))
+      {
+        std::cout << "node is " << i << " rec is " << this->graph[i].Sreceivers << std::endl;
+        // throw std::runtime_error("Flat surfaces remaning");
+      }
+    }
 }
 
 // """Connect adjacent basins together through their lowest pass.
@@ -2787,6 +3057,63 @@ void NodeGraphV2::_update_pits_receivers(xt::pytensor<int,2>& conn_basins,xt::py
     //   // this->graph[node_from].length2Srec = this->dx; // TODO correct here the correct distance. Should not be used anyway. 
     // }
   }
+}
+
+std::vector<int> NodeGraphV2::_update_pits_receivers_keep_track(xt::pytensor<int,2>& conn_basins,xt::pytensor<int,2>& conn_nodes, xt::xtensor<int,1>& mstree, xt::pytensor<double,1>& elevation)
+{
+
+  std::vector<int> output;
+  // for i in mstree:
+  for(auto i : mstree)
+  {
+
+    int node_to = conn_nodes(i, 0);
+    int node_from = conn_nodes(i, 1);
+    int outlet_from = this->SBasinOutlets[conn_basins(i, 1)];
+
+    if(outlet_from == 604)
+      std::cout << "604 here!!!";
+
+    // # skip open basins
+    if (node_from == -1)
+    {
+      std::cout << std::endl;
+        continue;
+    }
+      // std::cout << SBasinOutlets[conn_basins(i,0)] << "-" << SBasinOutlets[conn_basins(i,1)] << "--" << << "||";
+
+
+
+    output.push_back(outlet_from);
+    output.push_back(node_to);
+
+    if(outlet_from == 604)
+    {
+      bool isequal = (elevation[outlet_from] == elevation[node_to]);
+      std::cout << outlet_from << "(" << elevation[outlet_from] << ")" << "->" << node_to<< "(" << elevation[node_to] << ") " << isequal << " || ";
+    }
+
+    // if (elevation[node_from] < elevation[node_to])
+    // {
+    // if(this->graph[outlet_from].Sreceivers != outlet_from)
+    //   throw std::runtime_error("???");
+
+    this->graph[outlet_from].Sreceivers = node_to;
+    this->graph[outlet_from].length2Srec = this->dx*1000; // just to have a length but it should not actually be used
+    // std::cout << node_to << "." << std::endl;
+    this->graph[node_to].Sdonors.emplace_back(outlet_from);
+    // }
+    // else
+    // {
+    //   this->graph[outlet_from].Sreceivers = node_to;
+    //   // this->graph[node_from].Sreceivers = node_to;
+    //   this->graph[outlet_from].length2Srec = this->dx*1000; // just to have a length but it should not actually be used
+    //   // this->graph[node_from].length2Srec = this->dx; // TODO correct here the correct distance. Should not be used anyway. 
+    // }
+  }
+
+
+  return output;
 }
 
 

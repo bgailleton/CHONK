@@ -803,8 +803,8 @@ void chonk::add_to_sediment_flux(double value, double prop_fluvial)
 // Add a certain amount to the sediment flux
 void chonk::add_to_sediment_flux(double value, std::vector<double> label_proportions, double prop_fluvial)
 {
-  if(this->sediment_flux <0)
-    std::cout << "WARNING:: IN Sediment flux <0 " << this->sediment_flux << std::endl;
+  // if(this->sediment_flux <0)
+  //   std::cout << "WARNING:: IN Sediment flux <0 " << this->sediment_flux << std::endl;
 
   // if I am adding no sediment: do nothing
   if(double_equals(value,0, 1e-8))
@@ -820,12 +820,12 @@ void chonk::add_to_sediment_flux(double value, std::vector<double> label_proport
     this->label_tracker = label_proportions;
     this->fluvialprop_sedflux = prop_fluvial;
 
-    if(this->sediment_flux <0)
-    {
-      std::cout << this->fluvialprop_sedflux  << "|" << this->sediment_flux << "|" << prop_fluvial << "|value:" << value << std::endl;
+    // if(this->sediment_flux <0)
+    // {
+    //   std::cout << this->fluvialprop_sedflux  << "|" << this->sediment_flux << "|" << prop_fluvial << "|value:" << value << std::endl;
 
-      std::cout << "WARNING:: OUT(nobeef) Sediment flux <0 " << this->sediment_flux << std::endl;
-    }
+    //   std::cout << "WARNING:: OUT(nobeef) Sediment flux <0 " << this->sediment_flux << std::endl;
+    // }
 
     return;
   }

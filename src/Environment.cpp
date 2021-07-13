@@ -286,7 +286,10 @@ void ModelRunner::run()
       ndfgs++;
   }
   if(ndfgs>0)
-    throw std::runtime_error("NODE UNPROCESSED::" + std::to_string(ndfgs));
+  {
+    // throw std::runtime_error("NODE UNPROCESSED::" + std::to_string(ndfgs));
+    std::cout << "WARNING::Node Unprocessed::"  + std::to_string(ndfgs) << std::endl;
+  }
 
   std::cout << NTIMEPREFLUXCALLED << " TIMES CALLING PREFLUX METHOD" <<  std::endl;
 
@@ -427,10 +430,13 @@ void ModelRunner::deprocess_local_stack(std::vector<int>& local_mstack, std::vec
     // std::cout
     // # Cancelling the fluxes before moving prep (i.e. the precipitation, infiltrations, ...)
     // # This is not for water purposes as it gets reproc anyway, but for mass balance calculation
+    std::cout << "cancels:" << tnode << "|";
     this->chonk_network[tnode].cancel_split_and_merge_in_receiving_chonks(this->chonk_network, this->graph, this->timestep);
 
     if(tnode != outlet)
+    {
       this->cancel_fluxes_before_moving_prep(this->chonk_network[tnode], tnode);
+    }
     // this->chonk_network[tnode].reset();
     // this->chonk_network[tnode].set_label_tracker(std::vector<double>(this->n_labels,0));
     // this->is_processed[tnode] = false;
@@ -449,7 +455,10 @@ void ModelRunner::deprocess_local_stack(std::vector<int>& local_mstack, std::vec
     if(tnode == outlet)
       this->chonk_network[tnode].reset();
     else
+    {
       this->chonk_network[tnode].reset_sed_fluxes();
+      this->chonk_network[tnode].reinitialise_moving_prep();
+    }
 
     this->chonk_network[tnode].set_label_tracker(std::vector<double>(this->n_labels,0));
     this->is_processed[tnode] = false;
@@ -993,7 +1002,10 @@ void ModelRunner::finalise()
   {
     if(this->graph.depression_tree.active[i] == true)
     {
-      std::cout << "Lake Evaporation:: " << this->graph.depression_tree.actual_amount_of_evaporation[i]/this->timestep << " vs " << this->graph.depression_tree.volume_water[i]/this->timestep << std::endl;
+      // std::cout.precision(12);
+      std::cout << "Lake Evaporation:: " << this->graph.depression_tree.actual_amount_of_evaporation[i]/this->timestep << " vs " << std::fixed << this->graph.depression_tree.volume_water[i]/this->timestep << std::endl;
+      std::cout << "N nodes = " << this->graph.depression_tree.get_all_nodes(i).size() << " elev pit " << this->surface_elevation[this->graph.depression_tree.pitnode[i]] << " elev externode " << this->surface_elevation[this->graph.depression_tree.externode[i]] << " elev tippingnode " << this->surface_elevation[this->graph.depression_tree.tippingnode[i]] << std::endl;
+      std::cout << " pit " << this->graph.depression_tree.pitnode[i] << " externode " << this->graph.depression_tree.externode[i] << " tipping " << this->graph.depression_tree.tippingnode[i] << std::endl;
       this->Ql_out += this->graph.depression_tree.actual_amount_of_evaporation[i]/this->timestep;
     }
   }
@@ -1434,6 +1446,7 @@ void ModelRunner::lake_solver_v3(int node)
 
   for(auto dep: local_deps2reproc)
   {
+    std::cout << "Actually processing " << dep << std::endl;
 
     // I dont remember what is this but I guess it is a bug checker
     totwatchecekr += water_volume[dep];
@@ -1631,6 +1644,7 @@ void ModelRunner::lake_solver_v3(int node)
           labrador = mix_two_proportions(tadd,this->chonk_network[outlet].get_label_tracker(), sed2remove, labrador);
           sed2remove += tadd;
           wat2remove += wwf[r] * this->chonk_network[outlet].get_water_flux() * this->timestep;
+          // this->graph.depression_tree.print_all_lakes_from_node(trec);
         }
         else
         {
@@ -1643,7 +1657,12 @@ void ModelRunner::lake_solver_v3(int node)
       sed_volume[dep] -= sed2remove;
   
       if(sed_volume[dep] < 0)
+      {
+        std::cout << "Dep: " << dep << " Sedvol = " << sed_volume[dep] << " was removed: "  << sed2remove << " dep_volume is " << this->graph.depression_tree.volume[dep] << std::endl;
+        std::cout << "N Nodes in dep: " << this->graph.depression_tree.get_all_nodes(dep).size() << std::endl;
         throw std::runtime_error("Dep: " + std::to_string(dep) + "sed_volume[dep] < 0 :: " + std::to_string(sed_volume[dep]) + " was " + std::to_string(was));
+      }
+      
       if(this->graph.depression_tree.volume_sed[dep] < 0)
         throw std::runtime_error("Dep: " + std::to_string(dep) + "depression_tree < 0");
 
@@ -1676,6 +1695,8 @@ void ModelRunner::lake_solver_v3(int node)
         if(true)
         {
           this->topography[n] = this->graph.depression_tree.hw[dep];
+          if(this->node_in_lake[n] != -1)
+            throw std::runtime_error("Node already in lake");
           this->node_in_lake[n] = dep;
 
           // HERE I WILL NEED TO REMOVE THE SED FROM EROSION?DEP WITH THE RIGHT PROPORTIONS
@@ -1749,6 +1770,7 @@ void ModelRunner::lake_solver_v3(int node)
     // Now reprocessing the stack of stuff
 
     // Iterating through the local stack
+    std::cout << "OUTLET IS:" << outlet << std::endl;
     for(auto tnode:local_mstack)
     {
       // std::cout << "REPROCESSING NODES::" << tnode << "--" << this->inherited_water_added[tnode] << " OO " << is_in_queue[tnode]  << std::endl;
@@ -1760,7 +1782,7 @@ void ModelRunner::lake_solver_v3(int node)
         std::vector<int> ignore_some; 
         std::vector<int> rec; std::vector<double> wwf; std::vector<double> wws; std::vector<double> strec;
         this->chonk_network[tnode].copy_moving_prep(rec,wwf,wws,strec);
-        for(size_t cat =0; cat< rec.size(); cat++)
+        for(size_t cat =0; cat < rec.size(); cat++)
         {
           int ttnode = rec[cat];
           if(ttnode == outlet)
@@ -1801,6 +1823,12 @@ void ModelRunner::lake_solver_v3(int node)
         {
           this->is_processed[outlet] = false;
           // external_moving_prep(std::vector<int> rec,std::vector<double> wwf,std::vector<double> wws, std::vector<double> strec)
+          std::cout << "Adding " << extra_wat << " to outlet and " << this->graph.depression_tree.volume_water[dep] << 
+            " to lake which has a total volume of " << this->graph.depression_tree.volume_max_with_evaporation[dep] << " -> ev= " 
+              << this->graph.depression_tree.actual_amount_of_evaporation[dep] << " volume: " <<  this->graph.depression_tree.volume[dep] 
+                << " hw_max = " << this->graph.depression_tree.hw_max[dep] << " ztpoint = " << this->surface_elevation[this->graph.depression_tree.tippingnode[dep]] << std::endl; 
+
+
           this->chonk_network[outlet].add_to_water_flux(extra_wat);
           this->chonk_network[outlet].add_to_sediment_flux(extra_sed, representative_chonk[dep].get_label_tracker(), 1.);
           this->chonk_network[outlet].external_moving_prep({receiver_extern}, {1.}, {1.}, {(this->topography[outlet] - this->topography[receiver_extern])/this->dx});
@@ -1811,6 +1839,7 @@ void ModelRunner::lake_solver_v3(int node)
           // throw std::runtime_error("SafetyStoppah #12BC45f");
           this->process_node_nolake_for_sure(tnode, this->is_processed, this->active_nodes, this->cellarea,this->topography, true, true);
         }
+        std::cout << "done|";
       }
     }
     std::cout << std::endl;
@@ -2607,7 +2636,7 @@ void ModelRunner::drape_deposition_flux_to_chonks()
 
   std::vector<char> isinhere(this->io_int["n_elements"],'n');
 
-
+  double DEBUG_totsed = 0;
   for(int i = 0; i< this->graph.depression_tree.get_n_dep(); i++)
   { 
     // auto& loch = this->graph.depression_tree[i];
@@ -2617,7 +2646,7 @@ void ModelRunner::drape_deposition_flux_to_chonks()
 
     double totsed = 0;
     double totwat = 0;
-    double ratio_of_dep = this->graph.depression_tree.volume_sed[i]/this->graph.depression_tree.volume_water[i];
+    double ratio_of_dep = this->graph.depression_tree.volume_sed[i]/(this->graph.depression_tree.volume_water[i] - this->graph.depression_tree.actual_amount_of_evaporation[i]);
     // std::cout << "Gougnge:" <<i << " rat : " << ratio_of_dep << std::endl;
 
     // NEED TO DEAL WITH THAT BOBO
@@ -2671,6 +2700,7 @@ void ModelRunner::drape_deposition_flux_to_chonks()
       
       // chonk_network[no].reset_sed_fluxes();
     }
+    DEBUG_totsed += totsed;
     // Seems fine here...
     // std::cout << "BALANCE LAKE = " << total << " out of " << this->graph.depression_tree.volume_sed[i] << std::endl;
     std::cout << i << " TOT IN SED = " << totsed << " out of " << this->graph.depression_tree.volume_sed[i] << " AND VOL WAS " << this->graph.depression_tree.volume[i] << std::endl;
@@ -2678,6 +2708,8 @@ void ModelRunner::drape_deposition_flux_to_chonks()
     std::cout << i << " hw " << this->graph.depression_tree.hw[i] << " pitelev " << this->surface_elevation[this->graph.depression_tree.pitnode[i]] << std::endl;
     std::cout << std::endl;
   }
+
+  std::cout << "DEBUG::drape_lake_sed::tototsed=" << DEBUG_totsed << std::endl;
 
 }
 

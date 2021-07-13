@@ -264,6 +264,23 @@ public:
 		}
 		return output;
 	}
+		// Simple Breadth first traversal to get all children, include_node determinesif the mother dep must be included or not in the outputs
+	std::vector<int> get_all_parents(int node, bool include_node = false)
+	{
+		// Initialising the output and reserving an arbitrary capacity, it does not matter much
+		std::vector<int> output;
+		int next_dep = node;
+		if(include_node)
+			output.push_back(next_dep);
+		next_dep = this->parentree[next_dep];
+		while(next_dep != -1)
+		{
+			output.push_back(next_dep);
+			next_dep = this->parentree[next_dep];
+		}
+
+		return output;
+	}
 
 	// Returns the topmost parent linked to a depression
 	int get_ultimate_parent(int dep)
@@ -608,6 +625,21 @@ public:
 		{
 			std::cout << "Dep. " << i << ": children: {" << this->treeceivers[i][0] << "," <<  this->treeceivers[i][1] << "} -> pot. V:" << this->volume[i] << std::endl;
 		}
+
+	}
+
+	void print_all_lakes_from_node(int node)
+	{
+		int this_dep = this->node2tree[node];
+		std::cout << "node " << node << " belongs to " << this_dep << std::endl;
+		std::cout << "Children are: ";
+		for(auto tdep: this->get_all_children(this_dep) )
+			std::cout << tdep << ",";
+		std::cout << "|" << std::endl;;
+		std::cout << "Parents are: ";
+		for(auto tdep: this->get_all_parents(this_dep) )
+			std::cout << tdep << ",";
+		std::cout << "|" << std::endl << "DOne with the printing" << std::endl;;;
 
 	}
 

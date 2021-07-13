@@ -241,6 +241,11 @@ std::vector<int> update_receivers_explicit();
 
 
 void recompute_multi_receveivers_and_donors(xt::pytensor<bool,1>& active_nodes, xt::pytensor<double,1>& elevation, std::vector<int>& nodes_to_compute);
+void recompute_SFMF_receveivers_and_donors(xt::pytensor<bool,1>& active_nodes, xt::pytensor<double,1>& elevation, std::vector<int>& nodes_to_compute);
+
+
+std::vector<int> _update_pits_receivers_keep_track(xt::pytensor<int,2>& conn_basins,xt::pytensor<int,2>& conn_nodes, xt::xtensor<int,1>& mstree, xt::pytensor<double,1>& elevation);
+void correct_flatrouting(xt::pytensor<bool,1>& active_nodes, xt::pytensor<double,1>& elevation);
 
 // // Flat surface resolver
 // std::vector<int> Barnes2014_identify_flat(int starting_node, xt::pytensor<double,1>& elevation,xt::pytensor<bool,1>& active_nodes, int checker,  
