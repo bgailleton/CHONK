@@ -47,6 +47,9 @@ Example of tree Structure:
 #include "xtensor/xtensor.hpp" // same
 
 
+
+
+
 // Single class hosting everything
 class DepressionTree
 {
@@ -87,6 +90,7 @@ public:
 	std::vector<std::vector<double> > label_prop;
 	// index Depression ID -> value: I am not sure...
 	std::vector<bool> active;
+	std::vector<bool> processed;
 
 	//# Node connections 
 	// index: depression ID -> value: an internode connected to the outlet
@@ -185,6 +189,7 @@ public:
 		this->filler.emplace_back(std::priority_queue< PQ_helper<int,double>, std::vector<PQ_helper<int,double> >, std::greater<PQ_helper<int,double> > >());
 		// whatever that is, that is false RN
 		this->active.emplace_back(false);
+		this->processed.emplace_back(false);
 	}
 
 	// registering new depression without bothering about children
@@ -564,8 +569,81 @@ public:
 	}
 
 
+	void add_water(double Vw, int dep)
+	{
+		this->volume_water[dep] += Vw;
+	}
 
-  	//  ___________________
+	void add_sediment(double Vs, std::vector<double> props, int dep)
+	{		
+		this->label_prop[dep] = this->mix_two_proportions(Vs,props,this->volume_sed[dep], this->label_prop[dep]);
+		this->volume_sed[dep] += Vs;
+	}
+
+	void transmit_up(int dep)
+	{
+		int parent = this->parentree[dep];
+		if(parent > -1)
+		{
+			this->label_prop[parent] = this->mix_two_proportions(this->volume_sed[dep], this->label_prop[dep], this->volume_sed[parent], this->label_prop[parent]);
+			this->volume_water[parent] += this->volume_water[dep];
+			this->volume_sed[parent] += this->volume_sed[dep];
+		}
+	}
+
+	bool is_full_of_water(int dep)
+	{
+		if(dep < 0)
+			return true;
+
+		if(this->volume_water[dep] >= this->volume_max_with_evaporation[dep])
+			return true;
+		else
+			return false;
+	}
+
+	int get_first_child_unprocessed(int dep)
+	{
+
+		std::queue<int> next; next.emplace(dep);
+
+		while(next.empty() == false)
+		{
+			
+			int tnext = next.front();
+			next.pop();
+
+			if(this->processed[tnext] == false)
+			{
+				
+				int rec1 = this->treeceivers[tnext][0];
+				int rec2 = this->treeceivers[tnext][1];
+
+				if(rec1 > -1)
+				{
+					if(this->processed[rec1])
+						return tnext;
+					else
+						next.emplace(rec1);
+				}
+				if(rec2 > -1)
+				{
+					if(this->processed[rec2])
+						return tnext;
+					else
+						next.emplace(rec2);
+				}
+
+			}
+
+		}
+
+		return -1;
+
+	}
+
+
+  //  ___________________
 	// |                   |
 	// |   Postprocessing  |
 	// |___________________| 
@@ -682,7 +760,60 @@ public:
 		}
 	}
 
+	// Mixe two proportions
+	std::vector<double> mix_two_proportions(double prop1, std::vector<double> labprop1, double prop2, std::vector<double> labprop2)
+	{ 
+	  if(labprop1.size() == 0)
+	    return labprop2;
+	  if(labprop2.size() == 0)
+	    return labprop1;
+
+	  // The ouput will eb the same size as the inputs
+	  std::vector<double>output(labprop1.size(),0.);
+	  
+	  // Saving the global sum
+	  double sumall = 0;
+	  // summing all proportions with their respective weigths
+	  for(size_t i=0; i< labprop1.size(); i++)
+	  {
+	    // Absolute value because one of the two proportions might be negative, if I am revmoving element for example.
+	    output[i] = std::abs( prop1 * labprop1[i] + prop2 * labprop2[i]);
+
+	    sumall += output[i];
+	  }
+	  // If all is 0, all is 0
+	  if(this->double_equals(sumall,0.,1e-6))
+	    return output;
+
+	  // Normalising the new proportions and checking that the sum is 1 (can take few iterations is cases where there are very small proportions in order to ensure numerical stability)
+	  do
+	  {
+	    double new_sumfin = 0;
+	    for(auto& gag:output)
+	    {
+	      gag = gag/sumall;
+	      new_sumfin += gag;
+	    }
+	    sumall = new_sumfin;
+	  }while(this->double_equals(sumall,1, 1e-6) == false);
+
+	  // Keeping that check for a bit
+	  for(auto gag:output)
+	    if(std::isfinite(gag) == false)
+	      throw std::runtime_error("There are some nan/inf in the mixing proportions");
+
+	  return output;
+	}
+
+
+	bool double_equals(double a, double b, double epsilon)
+	{
+	    return std::abs(a - b) < epsilon;
+	}
+
 };
+
+
 
 
 

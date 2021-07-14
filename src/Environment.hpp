@@ -406,6 +406,14 @@ std::vector<double>& pre_sed, std::vector<double>& pre_water);
 
     void manage_K_kappa(int label_id, chonk& this_chonk, double& K_r, double& K_s, double& kappa_r, double& kappa_s, double& S_c);
     void lake_solver_v3(int node);
+    void lake_solver_v4(int node);
+
+    void fill_lake_to_top(int dep);
+
+    void fill_underfilled_lake(int dep);
+
+    void defluvialise_lake(int dep, double& extra_sed, std::vector<double>& extra_sed_prop);
+
 
     xt::pytensor<int,1> get_top_depression(){return xt::adapt(this->graph.depression_tree.node2tree);};
     xt::pytensor<int,1> get_potential_volume(){return xt::adapt(this->graph.depression_tree.potential_volume);};
@@ -420,6 +428,8 @@ std::vector<double>& pre_sed, std::vector<double>& pre_water);
     xt::pytensor<double,1> get_fluvlabprop(){xt::pytensor<double,1> output = xt::zeros<double>({this->chonk_network.size()}); for(size_t i=0; i< this->chonk_network.size();i++){output[i] = this->chonk_network[i].get_fluvialprop_sedflux();}; }
 
     double get_sum_of_all_volume_full_lake(){this->graph.depression_tree.get_sum_of_all_volume_full_lake();}
+
+
 
 
     // DEBUGGER

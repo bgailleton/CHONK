@@ -282,6 +282,14 @@ NodeGraphV2::NodeGraphV2(
 
     std::cout << "DEBUGDEP:: flow corrr1" << std::endl;
     this->correct_flatrouting(active_nodes, elevation);
+    for(size_t i=0; i<this->un_element; i++)
+    {
+      if(i == this->graph[i].Sreceivers && active_nodes[i] == true)
+        this->pits_to_reroute[i] = true;
+      else
+        this->pits_to_reroute[i] = false;
+
+    }
 
 
     // THIS IS WHAT HAPPENS WHEN THE LAKE SOVER IS EXPLICIT
@@ -2669,8 +2677,6 @@ void NodeGraphV2::correct_flatrouting(xt::pytensor<bool,1>& active_nodes, xt::py
       {
          
         elevation[node] = elevation[this->graph[node].Sreceivers] + 1e-3;
-        pits_to_reroute[node] = false;
-        // if(i == 604 || i == 705)
           // std::cout << "changed: " << previousz[i] << " -> " << elevation[i] << " -> " << elevation[this->graph[i].Sreceivers] << std::endl;
       }
     }

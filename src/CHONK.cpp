@@ -225,6 +225,11 @@ void chonk::get_what_was_given_to(int to, double& water, double& sed, std::vecto
 
 }
 
+double chonk::get_local_sedflux(double dt, double cellarea)
+{
+  return (this->erosion_flux_only_bedrock + this->erosion_flux_only_sediments - this->deposition_flux) * dt * cellarea;
+}
+
 void chonk::cancel_split_and_merge_in_receiving_chonks(std::vector<chonk>& chonkscape, NodeGraphV2& graph, double dt)
 {
   // Iterating through the receivers

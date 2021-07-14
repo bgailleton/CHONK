@@ -161,6 +161,7 @@ class chonk
     std::vector<double> get_chonk_slope_to_recs_copy(){return slope_to_rec;}
     void get_what_was_given_to(int to, double& water, double& sed, std::vector<double>& lapprop, double& proflu);
 
+    double get_local_sedflux(double dt, double cellarea);
 
     // reinitialise moving preparation by clearing all vectors of move
     void reinitialise_moving_prep(){receivers.clear(); weigth_water_fluxes.clear(); weigth_sediment_fluxes.clear(); slope_to_rec.clear(); return;}
