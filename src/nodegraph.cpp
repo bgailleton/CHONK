@@ -1341,8 +1341,8 @@ void NodeGraphV2::compute_receveivers_and_donors(xt::pytensor<bool,1>& active_no
 
       idL++;
       test_elev = elevation[node];
-      if(i == 604)
-        std::cout << "BULF:: " << i << "->" << elevation[i] << " " << node << "->" << elevation[node] << std::endl;
+      // if(i == 604)
+      //   std::cout << "BULF:: " << i << "->" << elevation[i] << " " << node << "->" << elevation[node] << std::endl;
 
       if(test_elev < this_elev)
       {
@@ -2677,7 +2677,7 @@ void NodeGraphV2::correct_flatrouting(xt::pytensor<bool,1>& active_nodes, xt::py
       {
          
         elevation[node] = elevation[this->graph[node].Sreceivers] + 1e-3;
-          // std::cout << "changed: " << previousz[i] << " -> " << elevation[i] << " -> " << elevation[this->graph[i].Sreceivers] << std::endl;
+        std::cout << "changed: " << previousz[node] << " -> " << elevation[node] << " -> " << elevation[this->graph[node].Sreceivers] << std::endl;
       }
     }
 
@@ -3083,7 +3083,7 @@ std::vector<int> NodeGraphV2::_update_pits_receivers_keep_track(xt::pytensor<int
     // # skip open basins
     if (node_from == -1)
     {
-      std::cout << std::endl;
+      // std::cout << std::endl;
         continue;
     }
       // std::cout << SBasinOutlets[conn_basins(i,0)] << "-" << SBasinOutlets[conn_basins(i,1)] << "--" << << "||";
