@@ -1240,7 +1240,7 @@ void ModelRunner::lake_solver_v4(int node)
     if(this->graph.depression_tree.volume_water[dep] >= lowerboundvol)
     {
       /// depression to save
-      depstack.emplace(PQ_helper<int,int>(dep, this->graph.depression_tree.level[dep]));
+      this->process_dep(dep, outsed[dep], outlab[dep], outflows[dep], outwat[dep]);
 
       int twin = this->graph.depression_tree.get_twin(dep);
       if(twin > -1 && outwat[dep] > 0)
@@ -1268,113 +1268,148 @@ void ModelRunner::lake_solver_v4(int node)
         }
       }
 
-
       std::vector<int> children = this->graph.depression_tree.get_all_children(dep,true);
 
       for(auto chd:children)
       {
         this->graph.depression_tree.processed[chd] = true;
-
       }
     }
 
   }
 
 
-  std::cout << "Done with preproc" << std::endl;
-  // Fill the lakes phase
-  while(depstack.empty() == false)
+  // std::cout << "Done with preproc" << std::endl;
+  // // Fill the lakes phase
+  // while(depstack.empty() == false)
+  // {
+  //   int dep = depstack.top().node;
+  //   depstack.pop();
+  //   this->process_dep(dep, outsed[dep], outlab[dep], outflows[dep], outwat[dep]);
+  // }
+
+
+}
+
+void ModelRunner::process_dep(int dep, double& extra_sed, std::vector<double>& extra_lab, bool does_outlet, double& extra_wat)
+{
+  std::cout << "Actually processing " << dep << std::endl;
+
+  this->graph.depression_tree.active[dep] = true;
+
+  if(does_outlet)
   {
-    int dep = depstack.top().node;
-    depstack.pop();
+    std::cout << "OUTFLOWS" << std::endl;
 
-    std::cout << "Actually processing " << dep << std::endl;
+    // std::cout << "BEEF::" << outsed[dep] << " vs " << this->graph.depression_tree.volume_sed[dep] - this->graph.depression_tree.volume[dep] << std::endl;
 
-    this->graph.depression_tree.active[dep] = true;
+    this->fill_lake_to_top(dep);
 
-    if(outflows[dep])
+
+    this->defluvialise_lake(dep, extra_sed, extra_lab);
+    // std::cout << "AFT::" << extra_sed << std::endl;
+
+    int outlet = this->graph.depression_tree.tippingnode[dep];
+
+    double locsedflux = this->chonk_network[outlet].get_local_sedflux(this->timestep, this->cellarea);
+
+    std::vector<int> rec; std::vector<double> wwf; std::vector<double> wws; std::vector<double> strec;
+
+    this->chonk_network[outlet].copy_moving_prep(rec,wwf,wws,strec);
+
+    double sed2remove = 0;
+    double sed2remove_only_outlet = 0;
+    double water2add = 0;
+
+    if(this->is_processed[outlet])
+      this->process_node_nolake_for_sure(outlet, this->is_processed, this->active_nodes, this->cellarea, this->topography, true, true);
+      
+
+    for(size_t i = 0; i < rec.size(); i++)
     {
-      std::cout << "OUTFLOWS" << std::endl;
-
-      std::cout << "BEEF::" << outsed[dep] << " vs " << this->graph.depression_tree.volume_sed[dep] - this->graph.depression_tree.volume[dep] << std::endl;
-
-      this->fill_lake_to_top(dep);
-
-
-      this->defluvialise_lake(dep, outsed[dep], outlab[dep]);
-      std::cout << "AFT::" << outsed[dep] << std::endl;
-
-      int outlet = this->graph.depression_tree.tippingnode[dep];
-
-      double locsedflux = this->chonk_network[outlet].get_local_sedflux(this->timestep, this->cellarea);
-
-      std::vector<int> rec; std::vector<double> wwf; std::vector<double> wws; std::vector<double> strec;
-
-      this->chonk_network[outlet].copy_moving_prep(rec,wwf,wws,strec);
-
-      double sed2remove = 0;
-      double sed2remove_only_outlet = 0;
-      double water2add = 0;
-      for(size_t i = 0; i < rec.size(); i++)
+      if(this->node_in_lake[rec[i]] == dep)
       {
-        if(this->node_in_lake[rec[i]] == dep)
-        {
 
-          sed2remove -= wws[i] * locsedflux;
-        }
-        else
-        {
-          // std::cout << "Rec " << rec[i] << " of outlet " << outlet << " is processed? " << std::to_string(this->is_processed[rec[i]]) << std::endl;
-          water2add += wwf[i] * this->chonk_network[outlet].get_water_flux() * this->timestep;
-          sed2remove_only_outlet -= wws[i] * locsedflux;
-        }
+        sed2remove -= wws[i] * locsedflux;
       }
-      
-      outlab[dep] = mix_two_proportions(outsed[dep], outlab[dep], sed2remove, this->chonk_network[outlet].get_label_tracker());
-      outsed[dep] += sed2remove;
-      outwat[dep] += water2add;
-
-      outsed[dep] += this->chonk_network[outlet].get_sediment_flux() - locsedflux;
-
-      if(outsed[dep] < 0)
-      {
-        this->graph.depression_tree.add_sediment(outsed[dep], outlab[dep], dep);
-        outsed[dep] = 0;
-      }
-      
-      this->chonk_network[outlet].cancel_split_and_merge_in_receiving_chonks(this->chonk_network, this->graph, this->timestep);
-      this->chonk_network[outlet].reset();
-      this->chonk_network[outlet].external_moving_prep({this->graph.depression_tree.externode[dep]},
-       {1.}, {1.}, {(this->topography[outlet] - this->topography[this->graph.depression_tree.externode[dep]])/this->dx});
-
-      bool need_fluxbeef = false;
-      if(this->is_processed[outlet])
-        this->is_processed[outlet] = false;
       else
-        need_fluxbeef = true;
-      this->chonk_network[outlet].set_sediment_flux(outsed[dep], outlab[dep], 1.);
-      this->chonk_network[outlet].set_water_flux(outwat[dep]/this->timestep);
-
-      this->process_node_nolake_for_sure(outlet, this->is_processed, this->active_nodes, this->cellarea, this->topography, false, need_fluxbeef);
-
-    }
-    else
-    {
-      std::cout << "DOES NOT OUTFLOWS" << std::endl;
-      this->fill_underfilled_lake(dep);
-      this->defluvialise_lake(dep, outsed[dep], outlab[dep]);
-      // outlab[dep] = mix_two_proportions(outsed[dep], outlab[dep], sed2remove, this->chonk_network[outlet].get_label_tracker());
-      if(outsed[dep] < 0)
       {
-        this->graph.depression_tree.add_sediment(outsed[dep], outlab[dep], dep);
-        outsed[dep] = 0;
+        // std::cout << "Rec " << rec[i] << " of outlet " << outlet << " is processed? " << std::to_string(this->is_processed[rec[i]]) << std::endl;
+        water2add += wwf[i] * this->chonk_network[outlet].get_water_flux() * this->timestep;
+        sed2remove_only_outlet -= wws[i] * locsedflux;
       }
+    }
+    
+    
+    extra_lab = mix_two_proportions(extra_sed, extra_lab, sed2remove, this->chonk_network[outlet].get_label_tracker());
+    extra_sed += sed2remove;
+    extra_wat += water2add;
 
+    extra_sed += this->chonk_network[outlet].get_sediment_flux() - locsedflux;
+
+    if(extra_sed < 0)
+    {
+      this->graph.depression_tree.add_sediment(extra_sed, extra_lab, dep);
+      extra_sed = 0;
+    }
+    
+    this->chonk_network[outlet].cancel_split_and_merge_in_receiving_chonks(this->chonk_network, this->graph, this->timestep);
+    this->chonk_network[outlet].reset();
+    this->chonk_network[outlet].external_moving_prep({this->graph.depression_tree.externode[dep]},
+     {1.}, {1.}, {(this->topography[outlet] - this->topography[this->graph.depression_tree.externode[dep]])/this->dx});
+
+    bool need_fluxbeef = false;
+
+    if(this->is_processed[outlet])
+      this->is_processed[outlet] = false;
+    else
+      need_fluxbeef = true;
+    
+    this->chonk_network[outlet].set_sediment_flux(extra_sed, extra_lab, 1.);
+    this->chonk_network[outlet].set_water_flux(extra_wat/this->timestep);
+    std::cout << std::endl << "need_fluxbeef? " << need_fluxbeef << std::endl;
+    std::cout << "WBEEF::" << this->chonk_network[outlet].get_water_flux() << std::endl;
+    // if(outlet == 1966)
+    //   need_fluxbeef = false;
+    this->process_node_nolake_for_sure(outlet, this->is_processed, this->active_nodes, this->cellarea, this->topography, false, need_fluxbeef);
+    std::cout << "WAFT::" << this->chonk_network[outlet].get_water_flux() << std::endl;
+    
+    // std::vector<int> rec; std::vector<double> wwf; std::vector<double> wws; std::vector<double> strec;
+    // this->chonk_network[outlet].print_status();
+    std::vector<int> datr = this->chonk_network[outlet].get_chonk_receivers();
+    int rectr=datr[0];
+    while(this->graph.get_Srec(rectr) != rectr)
+      rectr = this->graph.get_Srec(rectr);
+
+
+    std::cout << "OUTLET IS " << outlet << " REC IS " << datr[0] << "(" << this->is_processed[datr[0]] << ") ultrec is " << rectr << "active? " << this->active_nodes[rectr]  << std::endl;
+    std::cout << "REC IN LAKE?? " << this->node_in_lake[datr[0]] << std::endl;
+    if(this->node_in_lake[datr[0]] > -1)
+    {
+      std::cout << "Active?? " << this->graph.depression_tree.active[this->node_in_lake[datr[0]]] << std::endl;
+      std::cout << "ultimate parent rec " << this->graph.depression_tree.get_ultimate_parent(this->node_in_lake[datr[0]]) << std::endl;
+      std::cout << "ultimate parent dep " << this->graph.depression_tree.get_ultimate_parent(dep) << std::endl;
+    }
+
+    std::vector<int> neightbors; std::vector<double> dummy ; graph.get_D8_neighbors(outlet, this->active_nodes, neightbors, dummy);
+    for(auto n: neightbors)
+      if(this->surface_elevation[n] > this->surface_elevation[outlet])
+        std::cout << "N:" << n << " Is processed? -> " << this->is_processed[n] << std::endl;
+
+  }
+  else
+  {
+    std::cout << "DOES NOT OUTFLOWS" << std::endl;
+    this->fill_underfilled_lake(dep);
+    this->defluvialise_lake(dep, extra_sed, extra_lab);
+    // extra_lab = mix_two_proportions(extra_sed, extra_lab, sed2remove, this->chonk_network[outlet].get_label_tracker());
+    if(extra_sed < 0)
+    {
+      this->graph.depression_tree.add_sediment(extra_sed, extra_lab, dep);
+      extra_sed = 0;
     }
 
   }
-
-
 }
 
 void ModelRunner::fill_lake_to_top(int dep)

@@ -408,6 +408,8 @@ std::vector<double>& pre_sed, std::vector<double>& pre_water);
     void lake_solver_v3(int node);
     void lake_solver_v4(int node);
 
+    void process_dep(int dep, double& extra_sed, std::vector<double>& extra_lab, bool does_outlet, double& extra_wat);
+
     void fill_lake_to_top(int dep);
 
     void fill_underfilled_lake(int dep);
@@ -417,6 +419,7 @@ std::vector<double>& pre_sed, std::vector<double>& pre_water);
 
     xt::pytensor<int,1> get_top_depression(){return xt::adapt(this->graph.depression_tree.node2tree);};
     xt::pytensor<int,1> get_potential_volume(){return xt::adapt(this->graph.depression_tree.potential_volume);};
+
 
     void print_debug_are_rec_proc(int node)
     {

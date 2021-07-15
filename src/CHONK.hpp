@@ -144,8 +144,8 @@ class chonk
     bool is_depression_solved_at_this_timestep(){return depression_solved_at_this_timestep;};
 
     // receivers
-    std::vector<int>& get_chonk_receivers(){return receivers;}
-    std::vector<double>& get_chonk_slope_to_recs(){return slope_to_rec;}
+    std::vector<int> get_chonk_receivers(){return receivers;}
+    std::vector<double> get_chonk_slope_to_recs(){return slope_to_rec;}
     // water weights
     std::vector<double>& get_chonk_water_weight(){return weigth_water_fluxes;}
     std::vector<double>& get_chonk_sediment_weight(){return weigth_sediment_fluxes;}

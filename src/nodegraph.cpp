@@ -300,29 +300,29 @@ NodeGraphV2::NodeGraphV2(
     // std::cout << "B" << std::endl;
 
     // Testing doubles here
-    std::vector<bool> is_in_a_dep(this->un_element);
-    for(int i=0; i<this->depression_tree.get_n_dep(); i++)
-    {
-        double max_potvol = 0;
+    // std::vector<bool> is_in_a_dep(this->un_element);
+    // for(int i=0; i<this->depression_tree.get_n_dep(); i++)
+    // {
+    //     double max_potvol = 0;
 
-      // if(this->depression_tree.level[i] == 0)
-      if(true)
-      {
-        for(auto n:this->depression_tree.nodes[i] )
-        {
-          if(is_in_a_dep[n] == false)
-            is_in_a_dep[n] = true;
-          else
-            throw std::runtime_error("node in multiple lake");
+    //   // if(this->depression_tree.level[i] == 0)
+    //   if(true)
+    //   {
+    //     for(auto n:this->depression_tree.nodes[i] )
+    //     {
+    //       if(is_in_a_dep[n] == false)
+    //         is_in_a_dep[n] = true;
+    //       else
+    //         throw std::runtime_error("node in multiple lake");
 
-          if(this->depression_tree.potential_volume[n] == -1)
-            throw std::runtime_error("No ptovol in node?!");
+    //       if(this->depression_tree.potential_volume[n] == -1)
+    //         throw std::runtime_error("No ptovol in node?!");
 
-          if(this->depression_tree.potential_volume[n] > max_potvol)
-            max_potvol = this->depression_tree.potential_volume[n];
+    //       if(this->depression_tree.potential_volume[n] > max_potvol)
+    //         max_potvol = this->depression_tree.potential_volume[n];
 
-        }
-      }
+    //     }
+    //   }
 
       // if(max_potvol < this->depression_tree.volume[i])
       // {
@@ -332,15 +332,16 @@ NodeGraphV2::NodeGraphV2(
 
       //   throw std::runtime_error("Model Anomaly in potential volume?!");
       // }
-    }
+    // }
 
 
   }
 
 
+
   // I am now ready to create my topological order utilising a c++ port of the fortran algorithm from Jean Braun
   bool has_failed = false;
-  Mstack = xt::adapt(multiple_stack_fastscape( n_element, graph, this->not_in_stack, has_failed));
+  Mstack = xt::adapt(multiple_stack_fastscape( n_element, graph, this->not_in_stack, has_failed, depression_tree));
 
 
   // DEBUG CHECKING
@@ -1174,6 +1175,7 @@ std::vector<int> NodeGraphV2::update_receivers_explicit()
     int current = i;
     if(is_processed[current])
       continue;
+
     int parent = this->depression_tree.get_ultimate_parent(current);
     std::vector<int> children = this->depression_tree.get_all_children(parent, true);
     std::vector<int> nrecs;
@@ -1186,39 +1188,23 @@ std::vector<int> NodeGraphV2::update_receivers_explicit()
       }
     }
 
-    
-    // std::cout << parent << " || "<< current << std::endl;
-    
-    // if(parent > -1)
-    // {
-    //   // std::cout << "1POPOPOPO" << std::endl;
-    //   to = this->depression_tree.externode[parent];
-    // }
-    // else
-    // {
-    //   // std::cout << "2POPOPOPO" << std::endl;
-    //   to = this->depression_tree.externode[current];
-    // }
-    // std::cout << parent << " | "<< to << std::endl;
-
-    // std::cout << "gaft" << std::endl;
 
     for(size_t k=0; k<children.size(); k++)
     {
 
       int j = children[k];
-      // is_processed[k] = true;
-      // std::cout << "d:" << j << std::endl;
-      // std::cout << "e:" << this->depression_tree.pitnode[j] << std::endl;
+
 
       is_processed[j] = true;
       if(this->depression_tree.level[j] == 0)
       {
         for(auto r: nrecs)
         {
-
+          if(r == 969)
+            std::cout << this->depression_tree.pitnode[j] << " GIVES TO 969 " << std::endl;
           this->graph[this->depression_tree.pitnode[j]].receivers.emplace_back(r);
           this->graph[this->depression_tree.pitnode[j]].length2rec.emplace_back(this->dx);
+
           output.push_back(this->depression_tree.pitnode[j]);
         
         }
@@ -2167,7 +2153,7 @@ void NodeGraphV2::update_donors_at_node(int node, std::vector<int>& new_donors)
 }
 
 
-std::vector<int> multiple_stack_fastscape(int n_element, std::vector<Vertex>& graph, std::vector<int>& not_in_stack, bool& has_failed)
+std::vector<int> multiple_stack_fastscape(int n_element, std::vector<Vertex>& graph, std::vector<int>& not_in_stack, bool& has_failed, DepressionTree& depression_tree)
 {
 
   std::vector<int>ndon(n_element,0);
@@ -2199,6 +2185,8 @@ std::vector<int> multiple_stack_fastscape(int n_element, std::vector<Vertex>& gr
     while (nparse > -1)
     {
       int ijn = parse[nparse];
+      if(969 == ijn)
+        std::cout << "969 SELECTED " <<  vis[ijn]<< std::endl;
       nparse = nparse-1;
       nstack = nstack+1;
 
@@ -2206,7 +2194,11 @@ std::vector<int> multiple_stack_fastscape(int n_element, std::vector<Vertex>& gr
       for(int ijk=0; ijk < graph[ijn].receivers.size();ijk++)
       {
         int ijr = graph[ijn].receivers[ijk];
+        if(ijn == 1170)
+          std::cout << "1170 -> " << ijr << std::endl;
         vis[ijr] = vis[ijr]+1;
+        if(969 == ijr)
+          std::cout << "969 HERE-> " <<  vis[ijr] << "/" << ndon[ijr] << " from " << ijn << std::endl;
         // if the counter is equal to the number of donors for that node we add it to the parsing stack
         if (vis[ijr] == ndon[ijr])
         {
@@ -2217,26 +2209,62 @@ std::vector<int> multiple_stack_fastscape(int n_element, std::vector<Vertex>& gr
       }
     } 
   }
+
   if(nstack < n_element - 1 )
   {
     has_failed = true;
     std::cout << "WARNING::STACK UNDERPOPULATED::" << nstack << "/" << stack.size() << std::endl;
     std::cout << "Investigating ..." << std::endl;
     std::vector<bool> is_in_stack(stack.size(),false);
+    std::vector<int> doublednode;
     for(auto& node: stack)
     {
       if(node >=0)
+      {
+        if(is_in_stack[node])
+          doublednode.emplace_back(node);
+
         is_in_stack[node] = true;
+      }
       else
+      {
         node = 0;
+      }
     }
     std::cout << "identifying the ghost nodes ..." << std::endl;
-    for(int i=0; i< int(is_in_stack.size()); i++)
+    for(int i=0; i < int(is_in_stack.size()); i++)
     {
       if(is_in_stack[i] == false)
         not_in_stack.emplace_back(i);
     }
-    std::cout << "Got them! you can access the ghost nodes with model.get_broken_nodes()" << std::endl;
+    std::cout << "Got them! you can access the ghost nodes with model.get_broken_nodes(), or here is the list: " << std::endl;
+
+    for(auto upn:not_in_stack)
+    {
+      std::cout<< "Node: " << upn << "|";
+      for(int i = 0; i< depression_tree.get_n_dep(); i++)
+        if(upn == depression_tree.tippingnode[i])
+          std::cout << "IS OUTLET |";
+      for(int i = 0; i< depression_tree.get_n_dep(); i++)
+        if(upn == depression_tree.pitnode[i])
+          std::cout << "IS PIT |";
+      std::cout << "Donors:";
+      for(auto d:graph[upn].donors)
+        std::cout << d << ":";
+
+
+      std::cout << std::endl;
+
+      std::cout << "Are doubled in the stack::";
+      for (auto re:doublednode)
+        std::cout << re << "::";
+      std::cout << std::endl;
+
+    }
+
+
+
+
     if(EXTENSIVE_STACK_INFO == false)
     {
       std::cout << "Important: If this happens at the start of the model with a random surface for few timesteps this is not critical." << std::endl;
