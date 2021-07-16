@@ -1171,28 +1171,39 @@ void ModelRunner::lake_solver_v4(int node)
   }
 
   // If I reach here: all the depressions of the system have been proc and the lake solver is ready to roll
-  // First, I am distributing the water and sediments for each depressions in the tree
-  std::priority_queue< PQ_helper<int,int>, std::vector<PQ_helper<int,int> > > depstack;
+  // Initiating a bunch of container to store the amount outletting the depressions
+  //# Does it outlets? 
   std::map<int,bool> outflows;
+  //# how much water outlets?
   std::map<int,double> outwat;
+  //# how much sed outlets?
   std::map<int,double> outsed;
+  //# in which proportions of labels?
   std::map<int,std::vector<double> > outlab;
+  //# Getting the treestack: lakes from bottom to top
   std::vector<int> treestack = this->graph.depression_tree.get_local_treestack(master_dep);
 
-  // first pass to initialise the 0 level depressions
+  // First iterations thourgh the lakes to initialise the containers to 0
   for(auto dep : treestack )
   {
+    // Getting potential paretnt (-> -1 if no parent)
     int parent = this->graph.depression_tree.parentree[dep];
+    // Initialising the map to not-outflowing
     outflows[dep] = false;
+    // and the quantities to 0;
     outwat[dep] = 0;
     outsed[dep] = 0;
     outlab[dep] = std::vector<double>();
   }
 
-
+  // Second iterations: every level 0 depression gets their water from their chonks
+  // Every depression with a parent propagates their water up
   for(auto dep : treestack )
   {
+    // Parent ID (-1 if no parent)
     int parent = this->graph.depression_tree.parentree[dep];
+
+    // If the level is 0 -> getting the total volume of water/sed from this timestep
     if(this->graph.depression_tree.level[dep] == 0)
     {
       this->graph.depression_tree.add_water(this->chonk_network[this->graph.depression_tree.pitnode[dep]].get_water_flux() * this->timestep, dep);
@@ -1200,26 +1211,28 @@ void ModelRunner::lake_solver_v4(int node)
       this->graph.depression_tree.label_prop[dep];
     }
 
+    // If there is a parent -> fire up
     if(parent > -1)
     {
       this->graph.depression_tree.transmit_up(dep);
     }
 
-    // if(this->graph.depression_tree.is_full_of_water(dep))
-    // {
+    // if the depression is full -> labelled as outflowing
     if(this->graph.depression_tree.is_full_of_water(dep))
       outflows[dep] = true;
     
+    // Outletting quantities are the delta between potential accomodation space and the inputted Q
     outwat[dep] = this->graph.depression_tree.volume_water[dep] - this->graph.depression_tree.volume_max_with_evaporation[dep];
     outsed[dep] = this->graph.depression_tree.volume_sed[dep] - this->graph.depression_tree.volume[dep];
     outlab[dep] = this->graph.depression_tree.label_prop[dep];
 
-    outflows[dep] = true;
+    // If < 0 --> 0 (not outflowing)
     if(outsed[dep]<0)
       outsed[dep] = 0;
     if(outwat[dep]<0)
       outwat[dep] = 0;
-    // }
+
+    // Done with 2nd iteration
   }
 
 
@@ -1303,6 +1316,8 @@ void ModelRunner::process_dep(int dep, double& extra_sed, std::vector<double>& e
 
     // std::cout << "BEEF::" << outsed[dep] << " vs " << this->graph.depression_tree.volume_sed[dep] - this->graph.depression_tree.volume[dep] << std::endl;
 
+    std::cout << "Wat in dep " << this->graph.depression_tree.volume_water[dep] << std::endl;
+
     this->fill_lake_to_top(dep);
 
 
@@ -1382,12 +1397,12 @@ void ModelRunner::process_dep(int dep, double& extra_sed, std::vector<double>& e
       rectr = this->graph.get_Srec(rectr);
 
 
-    std::cout << "OUTLET IS " << outlet << " REC IS " << datr[0] << "(" << this->is_processed[datr[0]] << ") ultrec is " << rectr << "active? " << this->active_nodes[rectr]  << std::endl;
-    std::cout << "REC IN LAKE?? " << this->node_in_lake[datr[0]] << std::endl;
-    if(this->node_in_lake[datr[0]] > -1)
+    std::cout << "OUTLET IS " << outlet << " (wat:" << this->chonk_network[outlet].get_water_flux() << ")" << " REC IS " << this->graph.depression_tree.externode[dep] << "(" << this->is_processed[this->graph.depression_tree.externode[dep]] << ") ultrec is " << rectr << "active? " << this->active_nodes[this->graph.depression_tree.externode[dep]]  << std::endl;
+    std::cout << "REC IN LAKE?? " << this->node_in_lake[this->graph.depression_tree.externode[dep]] << std::endl;
+    if(this->node_in_lake[this->graph.depression_tree.externode[dep]] > -1)
     {
-      std::cout << "Active?? " << this->graph.depression_tree.active[this->node_in_lake[datr[0]]] << std::endl;
-      std::cout << "ultimate parent rec " << this->graph.depression_tree.get_ultimate_parent(this->node_in_lake[datr[0]]) << std::endl;
+      std::cout << "Active?? " << this->graph.depression_tree.active[this->graph.depression_tree.externode[dep]] << std::endl;
+      std::cout << "ultimate parent rec " << this->graph.depression_tree.get_ultimate_parent(this->node_in_lake[this->graph.depression_tree.externode[dep]]) << std::endl;
       std::cout << "ultimate parent dep " << this->graph.depression_tree.get_ultimate_parent(dep) << std::endl;
     }
 
