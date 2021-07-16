@@ -298,34 +298,26 @@ NodeGraphV2::NodeGraphV2(
     // std::cout << "A" << std::endl;
     node_to_check = this->update_receivers_explicit();
 
+    for(int i=0; i < this->n_element ; i++)
+    {
+      if(active_nodes[i] == false)
+        continue;
+
+      if(i == this->graph[i].Sreceivers)
+      {
+        if(this->depression_tree.is_pit(i) == -1)
+        {
+          std::cout << i << " is not a pit but is its self rec. is in dep? " << this->depression_tree.node2tree[i] << std::endl;
+          throw std::runtime_error("ISOLATED PIT");
+        }
+      }
+    }
+
   }
-
-  std::cout << "RECS  of 1170::";
-  for(auto r:this->graph[1170].receivers)
-    std::cout << r << "|";
-  std::cout << std::endl;
-
-  std::cout << "DONS  of 1170::";
-  for(auto r:this->graph[1170].donors)
-    std::cout << r << "|";
-  std::cout << std::endl;
-
-  std::cout << "RECS  of 969::";
-  for(auto r:this->graph[969].receivers)
-    std::cout << r << "|";
-  std::cout << std::endl;
-
-  std::cout << "DONS  of 969::";
-  for(auto r:this->graph[969].donors)
-    std::cout << r << "|";
-  std::cout << std::endl;
-
-  std::cout << "969 is in dep " << this->depression_tree.node2tree[969] << " master dep being " << this->depression_tree.get_ultimate_parent(this->depression_tree.node2tree[969])  <<  " elev is " << elevation[969]  << std::endl; ;
-  std::cout << "1170 is in dep " << this->depression_tree.node2tree[1170] << " master dep being " << this->depression_tree.get_ultimate_parent(this->depression_tree.node2tree[1170]) <<  " elev is " << elevation[1170]   << std::endl; ;
 
   // I am now ready to create my topological order utilising a c++ port of the fortran algorithm from Jean Braun
   bool has_failed = false;
-  Mstack = xt::adapt(multiple_stack_fastscape( n_element, graph, this->not_in_stack, has_failed, depression_tree));
+  Mstack = xt::adapt(multiple_stack_fastscape( n_element, graph, this->not_in_stack, has_failed, depression_tree,elevation));
 
 
   // DEBUG CHECKING
@@ -529,10 +521,6 @@ void NodeGraphV2::fill_the_depressions(std::vector<int>& next_to_check, xt::pyte
         for(auto i:chill_drenz)
           n_nodes_in_children += int(this->depression_tree.nodes[i].size());
 
-
-
-
-
         // this continue statement run the next iteration of the while loop but with the new dep
         continue;
       } 
@@ -547,6 +535,8 @@ void NodeGraphV2::fill_the_depressions(std::vector<int>& next_to_check, xt::pyte
         if(is_in_queue[n] || this->depression_tree.node2tree[n] == dep)
           continue;
 
+        
+
         // if the node is a child or above the current elev -> gather it
         if(this->depression_tree.is_child_of(this->depression_tree.node2tree[n],dep) || elevation[n] >= elevation[next_node])
         {
@@ -556,8 +546,8 @@ void NodeGraphV2::fill_the_depressions(std::vector<int>& next_to_check, xt::pyte
           continue;
         }
 
-        if(dep == 0)
-          std::cout << "BREAKS" << std::endl;
+        // if(dep == 0)
+        //   std::cout << "BREAKS" << std::endl;
 
         // If none of the above, Iz an outlet
         // #1) double break activated (will break the main loop after looping through all neighbors)
@@ -1162,7 +1152,15 @@ std::vector<int> NodeGraphV2::update_receivers_explicit()
 
     is_processed[current] = true;
     int parent = this->depression_tree.get_ultimate_parent(current);
-    int trex = this->depression_tree.externode[parent];
+    std::vector<int> rex; //this->depression_tree.externode[parent];
+
+    for ( auto yre:this->graph[this->depression_tree.tippingnode[parent]].receivers)
+    {
+      int ttdep = this->depression_tree.get_ultimate_parent(this->depression_tree.node2tree[yre]);
+      if( ttdep != parent)
+        rex.emplace_back(yre);
+    }
+
     std::vector<int> children = this->depression_tree.get_all_children(parent, true);
     for(size_t k=0; k<children.size(); k++)
     {
@@ -1172,8 +1170,12 @@ std::vector<int> NodeGraphV2::update_receivers_explicit()
       if(this->depression_tree.level[j] == 0)
       {
         int pit = this->depression_tree.pitnode[j];
-        this->graph[pit].receivers.emplace_back(trex);
-        this->graph[pit].length2rec.emplace_back(this->dx);
+        for(auto tyrranosaurus : rex)
+        {
+          this->graph[pit].receivers.emplace_back(tyrranosaurus);
+          this->graph[pit].length2rec.emplace_back(this->dx);
+            
+        }
         output.push_back(pit);
 
       }
@@ -2157,7 +2159,7 @@ void NodeGraphV2::update_donors_at_node(int node, std::vector<int>& new_donors)
 }
 
 
-std::vector<int> multiple_stack_fastscape(int n_element, std::vector<Vertex>& graph, std::vector<int>& not_in_stack, bool& has_failed, DepressionTree& depression_tree)
+std::vector<int> multiple_stack_fastscape(int n_element, std::vector<Vertex>& graph, std::vector<int>& not_in_stack, bool& has_failed, DepressionTree& depression_tree, xt::pytensor<double,1>& elevation)
 {
 
   std::vector<int>ndon(n_element,0);
@@ -2189,8 +2191,8 @@ std::vector<int> multiple_stack_fastscape(int n_element, std::vector<Vertex>& gr
     while (nparse > -1)
     {
       int ijn = parse[nparse];
-      if(969 == ijn)
-        std::cout << "969 SELECTED " <<  vis[ijn]<< std::endl;
+      // if(969 == ijn)
+        // std::cout << "969 SELECTED " <<  vis[ijn]<< std::endl;
       nparse = nparse-1;
       nstack = nstack+1;
 
@@ -2198,11 +2200,11 @@ std::vector<int> multiple_stack_fastscape(int n_element, std::vector<Vertex>& gr
       for(int ijk=0; ijk < graph[ijn].receivers.size();ijk++)
       {
         int ijr = graph[ijn].receivers[ijk];
-        if(ijn == 1170)
-          std::cout << "1170 -> " << ijr << std::endl;
+        // if(ijn == 1170)
+          // std::cout << "1170 -> " << ijr << std::endl;
         vis[ijr] = vis[ijr]+1;
-        if(969 == ijr)
-          std::cout << "969 HERE-> " <<  vis[ijr] << "/" << ndon[ijr] << " from " << ijn << std::endl;
+        // if(969 == ijr)
+          // std::cout << "969 HERE-> " <<  vis[ijr] << "/" << ndon[ijr] << " from " << ijn << std::endl;
         // if the counter is equal to the number of donors for that node we add it to the parsing stack
         if (vis[ijr] == ndon[ijr])
         {
@@ -2245,26 +2247,42 @@ std::vector<int> multiple_stack_fastscape(int n_element, std::vector<Vertex>& gr
 
     for(auto upn:not_in_stack)
     {
-      std::cout<< "Node: " << upn << "|";
+      std::cout << std::endl;
+      std::cout << std::endl;
+      std::cout<< "Node: " << upn << "(" << elevation[upn] << ")" << "|";
       for(int i = 0; i< depression_tree.get_n_dep(); i++)
         if(upn == depression_tree.tippingnode[i])
           std::cout << "IS OUTLET |";
       for(int i = 0; i< depression_tree.get_n_dep(); i++)
         if(upn == depression_tree.pitnode[i])
           std::cout << "IS PIT |";
+      std::cout << std::endl;
       std::cout << "Donors:";
       for(auto d:graph[upn].donors)
-        std::cout << d << ":";
-
+        std::cout << d << "(" << elevation[d] << ")" << ":";
+      std::cout << std::endl;
+      std::cout << "Receivers:";
+      for(auto d:graph[upn].receivers)
+        std::cout << d << "(" << elevation[d] << ")" << ":";
+      std::cout << std::endl;
+      int dep = depression_tree.node2tree[upn];
+      if(dep >-1)
+      {
+        std::cout << "Is in dep " << dep << " masterdep is " << depression_tree.get_ultimate_parent(dep)<< " pit is " << depression_tree.pitnode[depression_tree.get_ultimate_parent(dep)] <<   " tippingnode is " << depression_tree.tippingnode[depression_tree.get_ultimate_parent(dep)] << " and externode " << depression_tree.externode[depression_tree.get_ultimate_parent(dep)] << std::endl;
+        std::cout << " pitZ is " << elevation[depression_tree.pitnode[depression_tree.get_ultimate_parent(dep)]] <<   " tippingnodeZ is " << elevation[depression_tree.tippingnode[depression_tree.get_ultimate_parent(dep)] ]<< " and externodeZ " << elevation[depression_tree.externode[depression_tree.get_ultimate_parent(dep)]] << std::endl;
+        
+      }
 
       std::cout << std::endl;
-
-      std::cout << "Are doubled in the stack::";
-      for (auto re:doublednode)
-        std::cout << re << "::";
       std::cout << std::endl;
+
+
 
     }
+
+    for(auto ze : elevation)
+      if(std::isfinite(ze) == false)
+        std::cout << "NAN in elev" << std::endl;
 
     throw std::runtime_error("Stack problem.");
 
@@ -2705,8 +2723,8 @@ void NodeGraphV2::correct_flatrouting(xt::pytensor<bool,1>& active_nodes, xt::py
     {
       int node = this->Sstack[i];
 
-      if(node == 871)
-        std::cout << "871::: " << previousz[node] << " -> " << elevation[node] << " -> " << elevation[this->graph[node].Sreceivers] << std::endl;
+      // if(node == 871)
+      //   std::cout << "871::: " << previousz[node] << " -> " << elevation[node] << " -> " << elevation[this->graph[node].Sreceivers] << std::endl;
       // std::cout << elevation[i] << std::endl;
       // if(i == 604 || i == 705)
         // std::cout << "!!! " << i << std::endl; 
@@ -2715,12 +2733,12 @@ void NodeGraphV2::correct_flatrouting(xt::pytensor<bool,1>& active_nodes, xt::py
         
         elevation[node] = elevation[this->graph[node].Sreceivers] + 1e-3;
 
-        std::cout << "changed: " << node << ": " << previousz[node] << " -> " << elevation[node] << " -> " << elevation[this->graph[node].Sreceivers] << std::endl;
-        if(this->graph[node].Sreceivers == 871)
-          std::cout << "REC is 871" << ": " << previousz[this->graph[node].Sreceivers] << " -> " << elevation[this->graph[node].Sreceivers] << " -> " << elevation[this->graph[this->graph[node].Sreceivers].Sreceivers] << std::endl;
+        // std::cout << "changed: " << node << ": " << previousz[node] << " -> " << elevation[node] << " -> " << elevation[this->graph[node].Sreceivers] << std::endl;
+        // if(this->graph[node].Sreceivers == 871)
+        //   std::cout << "REC is 871" << ": " << previousz[this->graph[node].Sreceivers] << " -> " << elevation[this->graph[node].Sreceivers] << " -> " << elevation[this->graph[this->graph[node].Sreceivers].Sreceivers] << std::endl;
       }
     }
-    std::cout << "871::: " << previousz[871] << " -> " << elevation[871] << " -> " << elevation[this->graph[871].Sreceivers] << std::endl;
+    // std::cout << "871::: " << previousz[871] << " -> " << elevation[871] << " -> " << elevation[this->graph[871].Sreceivers] << std::endl;
 
 
     // std::cout << "C" << std::endl;
@@ -2730,15 +2748,7 @@ void NodeGraphV2::correct_flatrouting(xt::pytensor<bool,1>& active_nodes, xt::py
     for(int i=0; i<this->n_element;i++)
     this->graph.emplace_back(Vertex());
 
-    // computing receivers and donors information, multi and SS flow
-    this->compute_receveivers_and_donors(active_nodes,elevation);
-    // std::cout << "D" << std::endl;
 
-    // _update_pits_receivers(receivers, dist2receivers, outlets,
-    //                        conn_basins, conn_nodes,
-    //                        mstree, elevation, nx, dx, dy)
-    // compute_donors(ndonors, donors, receivers, nnodes)
-    // compute_stack(stack, ndonors, donors, receivers, nnodes)
     for(int i =0; i<this->n_element; i++)
     {
       if(active_nodes[i] == 0)
@@ -2749,38 +2759,50 @@ void NodeGraphV2::correct_flatrouting(xt::pytensor<bool,1>& active_nodes, xt::py
       bool at_least_a_flat = false;
       bool no_rec = true;
       double minelev_around = std::numeric_limits<double>::max();
+
       for(auto j: neight)
       {
-        if(elevation[j] != elevation[i])
+        if(elevation[j] == elevation[i])
         {
-          isfalt = false;
+          elevation[j] +=  (1 + rand() % (( 5 + 1 ) - 1)) * 1e-4;;
         }
-        else
-        {
-          at_least_a_flat = true;
-        }
-        if(elevation[j] < elevation[i])
-        {
-          no_rec = false;
-        }
-        if(elevation[j] > elevation[i])
-        {
-          if(minelev_around > elevation[j])
-            minelev_around = elevation[j];
-        }
-
-      }
-      if(isfalt || (at_least_a_flat && no_rec))
-      {
-        if(minelev_around == std::numeric_limits<double>::max())
-          minelev_around = elevation[i] + 1e-5;
         // else
-        elevation[i] = (elevation[i] + minelev_around )/ 2;
-        // std::cout << "node is " << i << " rec is " << this->graph[i].Sreceivers << std::endl;
-        // throw std::runtime_error("Flat surfaces remaning");
+        // {
+        //   at_least_a_flat = true;
+        // }
+        // if(elevation[j] < elevation[i])
+        // {
+        //   no_rec = false;
+        // }
+        // if(elevation[j] > elevation[i])
+        // {
+        //   if(minelev_around > elevation[j])
+        //     minelev_around = elevation[j];
+        // }
 
       }
+      // if(isfalt || (at_least_a_flat && no_rec))
+      // {
+      //   if(minelev_around == std::numeric_limits<double>::max())
+      //     minelev_around = elevation[i] + 1e-5;
+
+      //   elevation[i] = (elevation[i] + minelev_around )/2 * 1e-3;
+      // }
+
     }
+
+
+
+    // computing receivers and donors information, multi and SS flow
+    this->compute_receveivers_and_donors(active_nodes,elevation);
+    // std::cout << "D" << std::endl;
+
+    // _update_pits_receivers(receivers, dist2receivers, outlets,
+    //                        conn_basins, conn_nodes,
+    //                        mstree, elevation, nx, dx, dy)
+    // compute_donors(ndonors, donors, receivers, nnodes)
+    // compute_stack(stack, ndonors, donors, receivers, nnodes)
+
 }
 
 // """Connect adjacent basins together through their lowest pass.
@@ -3136,8 +3158,8 @@ std::vector<int> NodeGraphV2::_update_pits_receivers_keep_track(xt::pytensor<int
     int node_from = conn_nodes(i, 1);
     int outlet_from = this->SBasinOutlets[conn_basins(i, 1)];
 
-    if(outlet_from == 604)
-      std::cout << "604 here!!!";
+    // if(outlet_from == 604)
+    //   std::cout << "604 here!!!";
 
     // # skip open basins
     if (node_from == -1)
@@ -3152,11 +3174,11 @@ std::vector<int> NodeGraphV2::_update_pits_receivers_keep_track(xt::pytensor<int
     output.push_back(outlet_from);
     output.push_back(node_to);
 
-    if(outlet_from == 604)
-    {
-      bool isequal = (elevation[outlet_from] == elevation[node_to]);
-      std::cout << outlet_from << "(" << elevation[outlet_from] << ")" << "->" << node_to<< "(" << elevation[node_to] << ") " << isequal << " || ";
-    }
+    // if(outlet_from == 604)
+    // {
+    //   bool isequal = (elevation[outlet_from] == elevation[node_to]);
+    //   std::cout << outlet_from << "(" << elevation[outlet_from] << ")" << "->" << node_to<< "(" << elevation[node_to] << ") " << isequal << " || ";
+    // }
 
     // if (elevation[node_from] < elevation[node_to])
     // {
