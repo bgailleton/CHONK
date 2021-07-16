@@ -280,7 +280,7 @@ NodeGraphV2::NodeGraphV2(
       basin_labels[node] = label;
     }
 
-    std::cout << "DEBUGDEP:: flow corrr1" << std::endl;
+    // std::cout << "DEBUGDEP:: flow corrr1" << std::endl;
     this->correct_flatrouting(active_nodes, elevation);
     for(size_t i=0; i<this->un_element; i++)
     {
@@ -499,16 +499,61 @@ void NodeGraphV2::fill_the_depressions(std::vector<int>& next_to_check, xt::pyte
       if(this->depression_tree.is_child_of(this->depression_tree.node2tree[next_node],dep) == false && this->depression_tree.node2tree[next_node] > -1  )
       {
         // triggering the merging of two depressions
+
+
+
         // # 1) updating the depression hw and volume to the current elevation (but not ingesting the node)
         this->raise_dep_to_new_node( dep, next_node, elevation, active_nodes, false, n_nodes_in_children);
+        int flatnode = next_node;
+        // # 1.1) need to deal with flats here: gathering all flats in the surface while there are still around
+        while(true)
+        {
+          std::vector<int> falatess =  this->get_all_flat_from_node(flatnode, elevation, active_nodes);
+          for(auto fnode:falatess)
+          {
+            std::vector<int> neflat; std::vector<double> dummyflat ; this->get_D8_neighbors(next_node, active_nodes, neflat, dummyflat);
+
+            for (auto nef: neflat)
+            {
+              if( (is_in_queue[fnode]) || (this->depression_tree.is_child_of(this->depression_tree.node2tree[fnode],dep)))
+                continue;
+              if(elevation[nef] > elevation[fnode])
+              {
+                this->depression_tree.filler[dep].emplace(nef,elevation[nef]);
+                is_in_queue[nef] = true;
+              }
+            }
+
+            if( (is_in_queue[fnode]) || (this->depression_tree.is_child_of(this->depression_tree.node2tree[fnode],dep)) || this->depression_tree.node2tree[fnode] > -1)
+              continue;
+
+            is_in_queue[fnode] = true;
+            this->raise_dep_to_new_node( dep, fnode, elevation, active_nodes, false, n_nodes_in_children);
+          }
+          if(this->depression_tree.filler[dep].empty() == false)
+          {
+            if(this->depression_tree.filler[dep].top().score == elevation[flatnode])
+            {
+              flatnode = this->depression_tree.filler[dep].top().node;
+              this->depression_tree.filler[dep].pop();
+            }
+            else
+              break;
+          }
+          else
+            break;
+        }
+
+
+
         // # 2) Getting ht etwin depression
         int bro = this->depression_tree.get_ultimate_parent(this->depression_tree.node2tree[next_node]);
         // # 3) Registering the parent depression and merging children info in it
         this->depression_tree.register_new_depression(elevation,this->depression_tree.pitnode[dep]);
         this->depression_tree.merge_children_to_parent({dep,bro}, this->depression_tree.get_last_id(), next_node, neightbors, elevation);
 
-        if(dep == 0)
-          std::cout << "MERGES" << std::endl;
+        // if(dep == 0)
+        //   std::cout << "MERGES" << std::endl;
 
         // # 4) Switching the filling to the new depression
         dep = this->depression_tree.get_last_id();
@@ -535,10 +580,15 @@ void NodeGraphV2::fill_the_depressions(std::vector<int>& next_to_check, xt::pyte
         if(is_in_queue[n] || this->depression_tree.node2tree[n] == dep)
           continue;
 
-        
+        bool next_at_same_elevation = false;
+        if(this->depression_tree.filler[dep].size() > 0)
+        {
+          if(this->depression_tree.filler[dep].top().score == elevation[next_node])
+            next_at_same_elevation = true;
+        }
 
         // if the node is a child or above the current elev -> gather it
-        if(this->depression_tree.is_child_of(this->depression_tree.node2tree[n],dep) || elevation[n] >= elevation[next_node])
+        if(this->depression_tree.is_child_of(this->depression_tree.node2tree[n],dep) || elevation[n] >= elevation[next_node] || next_at_same_elevation)
         {
           this->depression_tree.filler[dep].emplace(n,elevation[n]);
           is_in_queue[n] = true;
@@ -2764,7 +2814,7 @@ void NodeGraphV2::correct_flatrouting(xt::pytensor<bool,1>& active_nodes, xt::py
       {
         if(elevation[j] == elevation[i])
         {
-          elevation[j] +=  (1 + rand() % (( 5 + 1 ) - 1)) * 1e-4;;
+          elevation[j] +=  1e-4; //(1 + rand() % (( 5 + 1 ) - 1)) * 1e-4;;
         }
         // else
         // {
