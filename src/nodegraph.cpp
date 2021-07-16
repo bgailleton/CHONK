@@ -297,47 +297,31 @@ NodeGraphV2::NodeGraphV2(
     // this->depression_tree.printree();
     // std::cout << "A" << std::endl;
     node_to_check = this->update_receivers_explicit();
-    // std::cout << "B" << std::endl;
-
-    // Testing doubles here
-    // std::vector<bool> is_in_a_dep(this->un_element);
-    // for(int i=0; i<this->depression_tree.get_n_dep(); i++)
-    // {
-    //     double max_potvol = 0;
-
-    //   // if(this->depression_tree.level[i] == 0)
-    //   if(true)
-    //   {
-    //     for(auto n:this->depression_tree.nodes[i] )
-    //     {
-    //       if(is_in_a_dep[n] == false)
-    //         is_in_a_dep[n] = true;
-    //       else
-    //         throw std::runtime_error("node in multiple lake");
-
-    //       if(this->depression_tree.potential_volume[n] == -1)
-    //         throw std::runtime_error("No ptovol in node?!");
-
-    //       if(this->depression_tree.potential_volume[n] > max_potvol)
-    //         max_potvol = this->depression_tree.potential_volume[n];
-
-    //     }
-    //   }
-
-      // if(max_potvol < this->depression_tree.volume[i])
-      // {
-      //   std::cout << max_potvol << " vs " << this->depression_tree.volume[i] << "|" << this->depression_tree.nodes[i].size() << std::endl;
-      //   std::cout << "Level::" << this->depression_tree.level[i] << std::endl;
-      //   std::cout << "DEP::" << i << std::endl;
-
-      //   throw std::runtime_error("Model Anomaly in potential volume?!");
-      // }
-    // }
-
 
   }
 
+  std::cout << "RECS  of 1170::";
+  for(auto r:this->graph[1170].receivers)
+    std::cout << r << "|";
+  std::cout << std::endl;
 
+  std::cout << "DONS  of 1170::";
+  for(auto r:this->graph[1170].donors)
+    std::cout << r << "|";
+  std::cout << std::endl;
+
+  std::cout << "RECS  of 969::";
+  for(auto r:this->graph[969].receivers)
+    std::cout << r << "|";
+  std::cout << std::endl;
+
+  std::cout << "DONS  of 969::";
+  for(auto r:this->graph[969].donors)
+    std::cout << r << "|";
+  std::cout << std::endl;
+
+  std::cout << "969 is in dep " << this->depression_tree.node2tree[969] << " master dep being " << this->depression_tree.get_ultimate_parent(this->depression_tree.node2tree[969])  <<  " elev is " << elevation[969]  << std::endl; ;
+  std::cout << "1170 is in dep " << this->depression_tree.node2tree[1170] << " master dep being " << this->depression_tree.get_ultimate_parent(this->depression_tree.node2tree[1170]) <<  " elev is " << elevation[1170]   << std::endl; ;
 
   // I am now ready to create my topological order utilising a c++ port of the fortran algorithm from Jean Braun
   bool has_failed = false;
@@ -1176,45 +1160,65 @@ std::vector<int> NodeGraphV2::update_receivers_explicit()
     if(is_processed[current])
       continue;
 
+    is_processed[current] = true;
     int parent = this->depression_tree.get_ultimate_parent(current);
+    int trex = this->depression_tree.externode[parent];
     std::vector<int> children = this->depression_tree.get_all_children(parent, true);
-    std::vector<int> nrecs;
-    for(auto r: this->graph[this->depression_tree.tippingnode[parent]].receivers)
-    {
-      if(std::find(children.begin(),children.end(), this->depression_tree.node2tree[r]) == children.end())
-      {
-        nrecs.emplace_back(r);
-        // std::cout << "DSKLFJSLKDJFLJSDLFJSLDJFLJ:" << r << std::endl;
-      }
-    }
-
-
     for(size_t k=0; k<children.size(); k++)
     {
 
       int j = children[k];
-
-
       is_processed[j] = true;
       if(this->depression_tree.level[j] == 0)
       {
-        for(auto r: nrecs)
-        {
-          if(r == 969)
-            std::cout << this->depression_tree.pitnode[j] << " GIVES TO 969 " << std::endl;
-          this->graph[this->depression_tree.pitnode[j]].receivers.emplace_back(r);
-          this->graph[this->depression_tree.pitnode[j]].length2rec.emplace_back(this->dx);
+        int pit = this->depression_tree.pitnode[j];
+        this->graph[pit].receivers.emplace_back(trex);
+        this->graph[pit].length2rec.emplace_back(this->dx);
+        output.push_back(pit);
 
-          output.push_back(this->depression_tree.pitnode[j]);
-        
-        }
-
-        
       }
-      // std::cout << "f:" << output.size() << std::endl;
-
 
     }
+
+
+
+    // std::vector<int> nrecs;
+    // for(auto r: this->graph[this->depression_tree.tippingnode[parent]].receivers)
+    // {
+    //   if(std::find(children.begin(),children.end(), this->depression_tree.node2tree[r]) == children.end())
+    //   {
+    //     nrecs.emplace_back(r);
+    //     // std::cout << "DSKLFJSLKDJFLJSDLFJSLDJFLJ:" << r << std::endl;
+    //   }
+    // }
+
+
+    // for(size_t k=0; k<children.size(); k++)
+    // {
+
+    //   int j = children[k];
+
+
+    //   is_processed[j] = true;
+    //   if(this->depression_tree.level[j] == 0)
+    //   {
+    //     for(auto r: nrecs)
+    //     {
+    //       if(r == 969)
+    //         std::cout << this->depression_tree.pitnode[j] << " GIVES TO 969 " << std::endl;
+    //       this->graph[this->depression_tree.pitnode[j]].receivers.emplace_back(r);
+    //       this->graph[this->depression_tree.pitnode[j]].length2rec.emplace_back(this->dx);
+
+    //       output.push_back(this->depression_tree.pitnode[j]);
+        
+    //     }
+
+        
+    //   }
+    //   // std::cout << "f:" << output.size() << std::endl;
+
+
+    // }
 
     // std::cout << " Done with " << parent << std::endl;
 
@@ -2262,6 +2266,8 @@ std::vector<int> multiple_stack_fastscape(int n_element, std::vector<Vertex>& gr
 
     }
 
+    throw std::runtime_error("Stack problem.");
+
 
 
 
@@ -2698,16 +2704,24 @@ void NodeGraphV2::correct_flatrouting(xt::pytensor<bool,1>& active_nodes, xt::py
     for(int i=0; i<this->un_element; i++)
     {
       int node = this->Sstack[i];
+
+      if(node == 871)
+        std::cout << "871::: " << previousz[node] << " -> " << elevation[node] << " -> " << elevation[this->graph[node].Sreceivers] << std::endl;
       // std::cout << elevation[i] << std::endl;
       // if(i == 604 || i == 705)
         // std::cout << "!!! " << i << std::endl; 
       if(this->graph[node].Sreceivers != node && previousz[node] == previousz[this->graph[node].Sreceivers])
       {
-         
+        
         elevation[node] = elevation[this->graph[node].Sreceivers] + 1e-3;
-        std::cout << "changed: " << previousz[node] << " -> " << elevation[node] << " -> " << elevation[this->graph[node].Sreceivers] << std::endl;
+
+        std::cout << "changed: " << node << ": " << previousz[node] << " -> " << elevation[node] << " -> " << elevation[this->graph[node].Sreceivers] << std::endl;
+        if(this->graph[node].Sreceivers == 871)
+          std::cout << "REC is 871" << ": " << previousz[this->graph[node].Sreceivers] << " -> " << elevation[this->graph[node].Sreceivers] << " -> " << elevation[this->graph[this->graph[node].Sreceivers].Sreceivers] << std::endl;
       }
     }
+    std::cout << "871::: " << previousz[871] << " -> " << elevation[871] << " -> " << elevation[this->graph[871].Sreceivers] << std::endl;
+
 
     // std::cout << "C" << std::endl;
     // this->recompute_SFMF_receveivers_and_donors(active_nodes, elevation, nodes_to_reconfigure);
@@ -2734,20 +2748,37 @@ void NodeGraphV2::correct_flatrouting(xt::pytensor<bool,1>& active_nodes, xt::py
       bool isfalt = true;
       bool at_least_a_flat = false;
       bool no_rec = true;
+      double minelev_around = std::numeric_limits<double>::max();
       for(auto j: neight)
       {
         if(elevation[j] != elevation[i])
+        {
           isfalt = false;
+        }
         else
+        {
           at_least_a_flat = true;
+        }
         if(elevation[j] < elevation[i])
-          no_rec =false;
+        {
+          no_rec = false;
+        }
+        if(elevation[j] > elevation[i])
+        {
+          if(minelev_around > elevation[j])
+            minelev_around = elevation[j];
+        }
 
       }
       if(isfalt || (at_least_a_flat && no_rec))
       {
-        std::cout << "node is " << i << " rec is " << this->graph[i].Sreceivers << std::endl;
+        if(minelev_around == std::numeric_limits<double>::max())
+          minelev_around = elevation[i] + 1e-5;
+        // else
+        elevation[i] = (elevation[i] + minelev_around )/ 2;
+        // std::cout << "node is " << i << " rec is " << this->graph[i].Sreceivers << std::endl;
         // throw std::runtime_error("Flat surfaces remaning");
+
       }
     }
 }
