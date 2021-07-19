@@ -419,6 +419,7 @@ std::vector<double>& pre_sed, std::vector<double>& pre_water);
 
     xt::pytensor<int,1> get_top_depression(){return xt::adapt(this->graph.depression_tree.node2tree);};
     xt::pytensor<int,1> get_potential_volume(){return xt::adapt(this->graph.depression_tree.potential_volume);};
+    void drape_dep_only_sed(int dep_ID);
 
 
     void print_debug_are_rec_proc(int node)

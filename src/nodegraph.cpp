@@ -2760,7 +2760,7 @@ void NodeGraphV2::correct_flatrouting(xt::pytensor<bool,1>& active_nodes, xt::py
       if(active_nodes[i] == 0)
         continue;
 
-      elevation[i] +=  (1 + rand() % (( 100 + 1 ) - 1)) * 1e-5;;
+      elevation[i] +=  (1 + rand() % (( 10000 + 1 ) - 1)) * 1e-7;;
       // std::vector<int> neight; std::vector<double> duf;
       // this->get_D8_neighbors(i,active_nodes,neight,duf);
       // bool isfalt = true;
