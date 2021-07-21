@@ -520,29 +520,34 @@ public:
 		// initialising the parent PQ with the main one
 		this->filler[parent] = std::priority_queue< PQ_helper<int, double>, std::vector<PQ_helper<int, double> >, std::greater<PQ_helper<int, double> > >(concat.begin(), concat.end());
 
-		// Children are merging which means I need to determine their externodeand make sure they are in each other
+		// Children are merging which means I need to determine their externode and make sure they are in each other
 		// By convention, picking the lowest one of the neightbour of the tipping node
-		int lower_elev_c1,lower_elev_c2;
+		int lower_elev_c1 = -1,lower_elev_c2 = -1;
 		double vlower_elev_c1 = 1e36,vlower_elev_c2 = 1e36;
 		// looping thourgh neighbours and getting it
 		for(auto n:neightbors)
 		{
 			int tdep = this->node2tree[n];
-			if(tdep == -1 )
-				continue;
+			// if(tdep == -1 )
+			// 	continue;
 			tdep = this->get_ultimate_parent(tdep);
 
-			if(elevation[n] >= vlower_elev_c1 && tdep == children[0])
+			if(elevation[n] < vlower_elev_c1 && (tdep == children[0] || this->is_child_of(tdep,children[0]) ) )
 			{
 				lower_elev_c1 = n;
 				vlower_elev_c1 = elevation[n];
 			}
-			if(elevation[n] >= vlower_elev_c2 && tdep == children[1])
+			if(elevation[n] < vlower_elev_c2 && (tdep == children[1] || this->is_child_of(tdep,children[1]) ) )
 			{
 				lower_elev_c2 = n;
 				vlower_elev_c2 = elevation[n];
 			}
 		}
+		
+		if(outlet_node == lower_elev_c2 || outlet_node == lower_elev_c2)
+			throw std::runtime_error("EXTERNODE IS TIPPINGNODE"); 
+		if(-1 == lower_elev_c2 || -1 == lower_elev_c2)
+			throw std::runtime_error("NO EXTERNODE"); 
 
 		// actually saving them
 		this->externode[children[0]] = lower_elev_c2;
@@ -591,12 +596,12 @@ public:
 		}
 	}
 
-	bool is_full_of_water(int dep)
+	bool is_full(int dep)
 	{
 		if(dep < 0)
 			return true;
 
-		if(this->volume_water[dep] >= this->volume_max_with_evaporation[dep])
+		if(this->volume_water[dep] >= this->volume_max_with_evaporation[dep] || this->volume_sed[dep] >= this->volume[dep])
 			return true;
 		else
 			return false;
@@ -674,13 +679,24 @@ public:
 	}	
 
 
-	double get_volume_of_children(int dep)
+	double get_volume_of_children_water(int dep)
 	{
 		double totvol = 0;
 		for(auto ch: this->treeceivers[dep])
 		{
 			if(ch>=0)
 				totvol += this->volume_max_with_evaporation[ch];
+		}
+		return totvol;
+	}
+
+	double get_volume_of_children_sed(int dep)
+	{
+		double totvol = 0;
+		for(auto ch: this->treeceivers[dep])
+		{
+			if(ch>=0)
+				totvol += this->volume[ch];
 		}
 		return totvol;
 	}

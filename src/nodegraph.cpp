@@ -294,6 +294,16 @@ NodeGraphV2::NodeGraphV2(
 
     // THIS IS WHAT HAPPENS WHEN THE LAKE SOVER IS EXPLICIT
     this->grow_depression_tree_v2(elevation, active_nodes);
+
+    for(int i=0; i<this->depression_tree.get_n_dep(); i++)
+    {
+      if(this->depression_tree.externode[i] == this->depression_tree.tippingnode[i])
+      {
+        std::cout << "Depression " << i << " has tippingnode == externode::" << this->depression_tree.externode[i] << std::endl;
+        throw std::runtime_error("TIppingnode Error");
+      }
+    }
+
     // this->depression_tree.printree();
     // std::cout << "A" << std::endl;
     node_to_check = this->update_receivers_explicit();
@@ -388,6 +398,8 @@ NodeGraphV2::NodeGraphV2(
 
     }
   }
+
+
 
   
   //Done
@@ -559,8 +571,12 @@ void NodeGraphV2::fill_the_depressions(std::vector<int>& next_to_check, xt::pyte
         // #3) if no receiver detected or lower than the existing one -> registering it
         if(this->depression_tree.externode[dep] == -1)
           this->depression_tree.externode[dep] = n;
-        else if(elevation[this->depression_tree.externode[dep]] > elevation[n] )
+
+        else if(elevation[this->depression_tree.externode[dep]] < elevation[n] )
           this->depression_tree.externode[dep] = n;
+
+        if(this->depression_tree.externode[dep] == this->depression_tree.tippingnode[dep])
+          throw std::runtime_error("Not possible externode");
       }
 
       // Even if the current node is 
@@ -588,6 +604,10 @@ void NodeGraphV2::fill_the_depressions(std::vector<int>& next_to_check, xt::pyte
           this->depression_tree.potential_volume[tnodes[i]] = 0;
         }
       }
+    }
+    if(this->depression_tree.externode[dep] < 0)
+    {
+      throw std::runtime_error("Need Externote here");
     }
   }
 
@@ -1174,6 +1194,11 @@ std::vector<int> NodeGraphV2::update_receivers_explicit()
         int pit = this->depression_tree.pitnode[j];
         for(auto tyrranosaurus : rex)
         {
+          if(tyrranosaurus == pit)
+          {
+            // if(this->depression_tree.externode[dep] == this->depression_tree.tippingnode[dep])
+              throw std::runtime_error("Not possible updates of explicit rec");
+          }
           this->graph[pit].receivers.emplace_back(tyrranosaurus);
           this->graph[pit].length2rec.emplace_back(this->dx);
             

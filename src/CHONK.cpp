@@ -200,7 +200,10 @@ void chonk::split_and_merge_in_receiving_chonks(std::vector<chonk>& chonkscape, 
   for (auto rec : this->receivers)
   {
     if(this->current_node == rec)
+    {
+      std::cout << "Node is " << rec << std::endl;
       throw std::runtime_error("RecError::Node giving to itself yo!");
+    }
   }
   // and kill this chonk is memory saving is activated
   if(memory_saver)
@@ -1088,6 +1091,10 @@ void chonk::charlie_I(double n, double m, double K_r, double K_s,
 
   double tempsedheight = H_eq;
 
+  // this can happen at lake output when a gigantic input of sediment forces very high dep and very low E
+  if(Dsphi/E_cap_s > 1e3 && E_cap_s < 1e-5)
+    E_cap_s = 0;
+
   // Case 1 (32)
   if(Dsphi != E_cap_s && E_cap_s > 0)
   {
@@ -1112,8 +1119,20 @@ void chonk::charlie_I(double n, double m, double K_r, double K_s,
   //   std::cout << new_sed_height << "|" << this_sed_height << "|" << Ds_tot << "|" << Es_tot << "|" << Er_tot << "|" \
   //    << this->fluvialprop_sedflux << "|" << Qs << "|" << this->water_flux << "|"  << std::endl;
   // }
+  // if(std::isfinite(this->sediment_creation_flux) == false)
+  // {
+  //   throw std::runtime_error("sedcreanancharliI-beef");
+  // }
 
   this->add_sediment_creation_flux(new_sedcrea);
+ 
+  // if(std::isfinite(this->sediment_creation_flux) == false)
+  // {
+  //   std::cout << "DEBUG::Sedcrea in Charlie_I:";
+  //   std::cout << "new_sed_height" << new_sed_height << "|" << "this_sed_height" << this_sed_height << "|" << "Ds_tot" << Ds_tot << "|" << "Es_tot" << Es_tot << "|" << "Er_tot" << Er_tot << "|" \
+  //    << "this->fluvialprop_sedflux" << this->fluvialprop_sedflux << "|" << "Qs" << Qs << "|" << "this->water_flux" << this->water_flux << "|"  << std::endl;
+  //   throw std::runtime_error("sedcreanancharliI-aff");
+  // }
 
   // Finally need to deal with flux partition
   // let's assume here that the fluxes are partitioned by water
