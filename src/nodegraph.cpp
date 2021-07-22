@@ -421,8 +421,8 @@ std::vector<int> NodeGraphV2::get_Cordonnier_order()
 
 bool NodeGraphV2::is_flat_draining(int node, xt::pytensor<double,1>& elevation, xt::pytensor<bool,1>& active_nodes)
 {
-  std::vector<int> neightbors; std::vector<double> dummy ; this->get_D8_neighbors(node, active_nodes, neightbors, dummy);
-  for(auto tnode:neightbors)
+  std::vector<int> neighbours; std::vector<double> dummy ; this->get_D8_neighbors(node, active_nodes, neighbours, dummy);
+  for(auto tnode:neighbours)
   {
     if(elevation[tnode] < elevation[node])
       return false;
@@ -468,9 +468,19 @@ void NodeGraphV2::grow_depression_tree_v2(xt::pytensor<double,1>& elevation, xt:
   //   }
   // }
 
+
   this->depression_tree.compile_n_0_level_children();
   for (int i=0; i< this->depression_tree.get_n_dep(); i++)
+  {
     this->depression_tree.volume_max_with_evaporation[i] = this->depression_tree.volume[i];
+    // if(i == 103)
+    // {
+    //   std::cout << "VOLUME 103 =" << this->depression_tree.volume[i] << std::endl;
+    //   this->depression_tree.print_all_lakes_from_dep(i);
+
+    // }
+    this->depression_tree.double_check_volume(i, elevation, this->cellarea);
+  }
 
 }
 
@@ -504,26 +514,38 @@ void NodeGraphV2::fill_the_depressions(std::vector<int>& next_to_check, xt::pyte
       if(this->depression_tree.get_ultimate_parent(this->depression_tree.node2tree[next_node]) == dep)
         continue;
 
-      std::vector<int> neightbors; std::vector<double> dummy ; this->get_D8_neighbors(next_node, active_nodes, neightbors, dummy);
+      if(elevation[next_node] < this->depression_tree.hw_max[dep])
+      {
+        std::cout << next_node << " is in " << this->depression_tree.node2tree[next_node] << " current is " << dep <<  std::endl;
+        throw std::runtime_error("NodeGraphV2::fill_the_depressions::hw_max_not_good");
+      }
+
+      std::vector<int> neighbours; std::vector<double> dummy ; this->get_D8_neighbors(next_node, active_nodes, neighbours, dummy);
       // std::cout << "checker_filling 3" << std::endl;
 
       // if my node is not belonging to my children but in a depression system
       if(this->depression_tree.is_child_of(this->depression_tree.node2tree[next_node],dep) == false && this->depression_tree.node2tree[next_node] > -1  )
       {
         // triggering the merging of two depressions
+        // std::cout <<  "Twut1 : " << dep << "|"  << next_node << "|" << this->depression_tree.node2tree[next_node] << "|" << elevation[next_node]  << std::endl;
         // # 1) updating the depression hw and volume to the current elevation (but not ingesting the node)
         this->raise_dep_to_new_node( dep, next_node, elevation, active_nodes, false, n_nodes_in_children);
+        this->depression_tree.double_check_volume(dep, elevation, this->cellarea);
+
         // # 2) Getting ht etwin depression
         int bro = this->depression_tree.get_ultimate_parent(this->depression_tree.node2tree[next_node]);
         // # 3) Registering the parent depression and merging children info in it
         this->depression_tree.register_new_depression(elevation,this->depression_tree.pitnode[dep]);
-        this->depression_tree.merge_children_to_parent({dep,bro}, this->depression_tree.get_last_id(), next_node, neightbors, elevation);
+        this->depression_tree.merge_children_to_parent({dep,bro}, this->depression_tree.get_last_id(), next_node, neighbours, elevation);
 
-        if(dep == 0)
-          std::cout << "MERGES" << std::endl;
+        // std::cout <<  "Twut2 " << dep << "|"  << std::endl;
+        this->depression_tree.double_check_volume(dep, elevation, this->cellarea);
+        // if(dep == 0)
+        // std::cout << dep << " MERGES with " << bro << " into ";
 
         // # 4) Switching the filling to the new depression
         dep = this->depression_tree.get_last_id();
+        // std::cout << dep  << std::endl;
         // std::cout << dep << " just merged and vol is  " << this->depression_tree.volume[dep] << std::endl;
 
 
@@ -532,6 +554,22 @@ void NodeGraphV2::fill_the_depressions(std::vector<int>& next_to_check, xt::pyte
         n_nodes_in_children = 0;
         for(auto i:chill_drenz)
           n_nodes_in_children += int(this->depression_tree.nodes[i].size());
+
+        // New step here, I need to double check if there is an outlet to this depression that is NOT in any child depression AND bellow
+        bool double_break = false;
+        for (auto no:neighbours)
+        {
+          if(this->depression_tree.is_child_of(this->depression_tree.node2tree[no],dep) == false && elevation[no] < elevation[next_node])
+          {
+            // there is an outlet not part of this dep! In short the depression merges 2 depression but the tipping noe ALSO outlets
+            // std::cout << "Double mergeoutlet" << std::endl;
+            this->depression_tree.externode[dep] = no;
+            this->depression_tree.tippingnode[dep] = next_node;
+            double_break = true;
+          }
+        }
+        if(double_break)
+          break;
 
 
 
@@ -545,7 +583,7 @@ void NodeGraphV2::fill_the_depressions(std::vector<int>& next_to_check, xt::pyte
       bool double_break = false;
 
       // Checking neightbour
-      for(auto n:neightbors)
+      for(auto n:neighbours)
       {
         // Already in this lake system
         if(is_in_queue[n] || this->depression_tree.node2tree[n] == dep)
@@ -560,8 +598,8 @@ void NodeGraphV2::fill_the_depressions(std::vector<int>& next_to_check, xt::pyte
           continue;
         }
 
-        if(dep == 0)
-          std::cout << "BREAKS" << std::endl;
+          // std::cout << "BREAKS" << std::endl;
+
 
         // If none of the above, Iz an outlet
         // #1) double break activated (will break the main loop after looping through all neighbors)
@@ -581,11 +619,17 @@ void NodeGraphV2::fill_the_depressions(std::vector<int>& next_to_check, xt::pyte
 
       // Even if the current node is 
       this->raise_dep_to_new_node( dep, next_node, elevation, active_nodes, true, n_nodes_in_children);
+      // std::cout <<  "Twut3 " << dep << "|"  << next_node << "|" << this->depression_tree.node2tree[next_node] << "|" << elevation[next_node]  << std::endl; //<< std::endl;
+      this->depression_tree.double_check_volume(dep, elevation, this->cellarea);
       // std::cout << "checker_filling 6" << std::endl;
-      // std::cout << dep << " dep end volume is " << this->depression_tree.volume[dep] << std::endl;
+      if(dep == 103)
+        std::cout << dep << " dep volume is " << this->depression_tree.volume[dep] << std::endl;
 
       if(double_break)
+      {
+        std::cout << "Found outlet " << next_node << " (" << std::fixed << elevation[next_node] << ")" << std::endl;
         break;
+      }
 
     }
   // std::cout << "checker_filling 7" << std::endl;
@@ -626,6 +670,11 @@ void NodeGraphV2::raise_dep_to_new_node(int dep, int node, xt::pytensor<double,1
   // if(this->depression_tree.nodes[dep].size()>0)
   //   last_node = this->depression_tree.nodes[dep][this->depression_tree.nodes[dep].size() - 1];
   double last_elev = this->depression_tree.hw_max[dep];
+  if(this->depression_tree.hw_max[dep] > elevation[node] )
+  {
+    std::cout << "LAST hw_max was " << this->depression_tree.hw_max[dep]  << std::endl;
+    std::cout << " now is " << elevation[node] << std::endl;
+  }
 
   this->depression_tree.hw_max[dep] = elevation[node];
 
@@ -642,9 +691,13 @@ void NodeGraphV2::raise_dep_to_new_node(int dep, int node, xt::pytensor<double,1
   //   return;
   // }
 
+
   double dz = elevation[node] - last_elev;
   double dV = nbeef * dz * this->cellarea;
 
+  if(dep == 103)
+    std::cout << node << " adding " << dV << std::endl;
+ 
   this->depression_tree.volume[dep] += dV;
 
   if(integrate_node)
@@ -977,10 +1030,10 @@ void NodeGraphV2::virtual_filling(xt::pytensor<double,1>& elevation, xt::pytenso
   //   // then pop the next node
   //   depressionfiller.pop();
   //   // go through neighbours manually and either feed the queue or detect an outlet
-  //   std::vector<int> neightbors; std::vector<double> dummy ; this->get_D8_neighbors(next_node.node, active_nodes, neightbors, dummy);
+  //   std::vector<int> neighbours; std::vector<double> dummy ; this->get_D8_neighbors(next_node.node, active_nodes, neighbours, dummy);
 
   //   // For each of the neighbouring node: checking their status
-  //   for(auto tnode:neightbors)
+  //   for(auto tnode:neighbours)
   //   {
   //     // if already in the queue: I pass
   //     if(is_in_queue[tnode] == 'y')
@@ -1082,10 +1135,10 @@ void NodeGraphV2::virtual_filling(xt::pytensor<double,1>& elevation, xt::pytenso
   //   {
   //     // else my lake is ready to go! but I still want to gather remainings flat nodes
   //     // go through neighbours manually and either feed the queue or detect an outlet
-  //     std::vector<int> neightbors; std::vector<double> dummy ; this->get_D8_neighbors(next_node.node, active_nodes, neightbors, dummy);
+  //     std::vector<int> neighbours; std::vector<double> dummy ; this->get_D8_neighbors(next_node.node, active_nodes, neighbours, dummy);
 
   //     // For each of the neighbouring node: checking their status
-  //     for(auto tnode:neightbors)
+  //     for(auto tnode:neighbours)
   //     {
   //       // if already in the queue: I pass
   //       if(is_in_queue[tnode] == 'y')
@@ -1121,11 +1174,11 @@ void NodeGraphV2::virtual_filling(xt::pytensor<double,1>& elevation, xt::pytenso
   //       this->depression_tree[depression_ID].nodes.push_back(tnext_node.node);
   //       this->top_depression[tnext_node.node] = depression_ID;
 
-  //       std::vector<int> neightbors; std::vector<double> dummy ; this->get_D8_neighbors(tnext_node.node, active_nodes, neightbors, dummy);
+  //       std::vector<int> neighbours; std::vector<double> dummy ; this->get_D8_neighbors(tnext_node.node, active_nodes, neighbours, dummy);
 
   //       // For each of the neighbouring node: checking their status
   //       // For each of the neighbouring node: checking their status
-  //         for(auto tnode:neightbors)
+  //         for(auto tnode:neighbours)
   //         {
   //           // if already in the queue: I pass
   //           if(is_in_queue[tnode] == 'y')

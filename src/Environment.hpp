@@ -415,6 +415,7 @@ std::vector<double>& pre_sed, std::vector<double>& pre_water);
     void fill_underfilled_lake(int dep);
 
     void defluvialise_lake(int dep, double& extra_sed, std::vector<double>& extra_sed_prop);
+    void correct_extras(int dep, double& extra_wat, double& extra_sed, std::vector<double>& extra_lab);
 
 
     xt::pytensor<int,1> get_top_depression(){return xt::adapt(this->graph.depression_tree.node2tree);};

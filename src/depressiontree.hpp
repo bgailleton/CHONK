@@ -477,6 +477,7 @@ public:
 	bool is_child_of(int is_child, int of)
 	{
 		if(is_child == -1 || of == -1){return false;}
+		
 		std::queue<int> children; children.emplace(of);
 		while(children.empty() == false)
 		{
@@ -498,8 +499,7 @@ public:
 
 		// parent has these children
 		this->treeceivers[parent] = children;
-		// base hw of parent is the one of children
-		this->hw_max[parent] = this->hw_max[children[0]];
+		
 
 		// Level is set to max of level of each child + 1
 		this->level[parent] = std::max(this->level[children[0]], this->level[children[1]]) + 1;
@@ -508,14 +508,55 @@ public:
 		if(parent == children[0] || parent == children[1])
 			throw std::runtime_error("PARENTAL ISSUE");
 
+		if(this->hw_max[children[0]] != this->hw_max[children[1]])
+		{
+			std::cout << "NodeGraphV2::merge_children_to_parent::" << children[0] << "->" << this->hw_max[children[0]] << " vs " << children[1] << "->" << this->hw_max[children[1]] << " Delta: " << this->hw_max[children[0]] - this->hw_max[children[1]] << std::endl;
+			throw std::runtime_error("NodeGraphV2::merge_children_to_parent:: hwmax != 4 children");
+		}
+
 		// Hacking the underlying container of the PQ of children, and merging them into a single one for the parent
 		std::vector<PQ_helper<int,double> > c1 = Container(this->filler[children[0]]);
 		std::vector<PQ_helper<int,double> > c2 = Container(this->filler[children[1]]);
 		std::vector<PQ_helper<int,double> > concat; concat.reserve(c1.size() + c2.size());
-		for(auto n:c1) 
+		for(auto n:c1)
+		{
+
+			// if(elevation[n.node] > this->hw_max[children[0]])
+			// 	this->hw_max[children[0] ] = elevation[n.node];
+
 			concat.emplace_back(n);
-		for(auto n:c2) 
+		}
+		
+		for(auto n:c2)
+		{
+
+			// if(elevation[n.node] > this->hw_max[children[1]])
+			// 	this->hw_max[children[1] ] = elevation[n.node];
+
 			concat.emplace_back(n);
+		}
+
+		for(auto n:this->get_all_nodes(children[0]))
+		{
+			if(elevation[n] > this->hw_max[children[0]])
+			{
+				// std:: cout << "hw mod on child" << std::endl;
+				this->hw_max[children[0] ] = elevation[n];
+			}
+
+		}
+		for(auto n:this->get_all_nodes(children[1]))
+		{
+			if(elevation[n] > this->hw_max[children[1]])
+			{
+				// std:: cout << "hw mod on child" << std::endl;
+				this->hw_max[children[1] ] = elevation[n];
+			}
+
+		}
+
+		// base hw of parent is the one of children
+		this->hw_max[parent] = std::max(this->hw_max[children[0]], this->hw_max[children[1]]);
 
 		// initialising the parent PQ with the main one
 		this->filler[parent] = std::priority_queue< PQ_helper<int, double>, std::vector<PQ_helper<int, double> >, std::greater<PQ_helper<int, double> > >(concat.begin(), concat.end());
@@ -737,6 +778,20 @@ public:
 
 	}
 
+	void print_all_lakes_from_dep(int this_dep)
+	{
+		std::cout << this_dep << "(" << this->volume[this_dep] << ", " << this->nodes[this_dep].size() << std::endl;
+		std::cout << "Children of " << this_dep << " are: ";
+		for(auto tdep: this->get_all_children(this_dep) )
+			std::cout << tdep << "(" << this->volume[tdep] << ", " << this->nodes[tdep].size()  << ")||";
+		std::cout << "|" << std::endl;;
+		std::cout << "Parents are: ";
+		for(auto tdep: this->get_all_parents(this_dep) )
+			std::cout << tdep << "(" << this->volume[tdep] << ", " << this->nodes[tdep].size()  << ")||";
+		std::cout << "|" << std::endl << "DOne with the printing" << std::endl;;;
+
+	}
+
 	// sum the total volume of all master description
 	double get_sum_of_all_volume_full_lake()
 	{
@@ -748,6 +803,28 @@ public:
 		}
 		std::cout << tot << std::endl;
 		return tot;
+	}
+
+	void double_check_volume(int dep,xt::pytensor<double,1>& elevation, double cellarea)
+	{
+		std::vector<int> allnodes = this->get_all_nodes(dep);
+		double Vtot = 0;
+		for(auto no : allnodes)
+		{
+			if(this->hw_max[dep] - elevation[no] < 0)
+				std::cout << " NEGATIVE LAKEDEPTH?? " << this->hw_max[dep] << " vs " << elevation[no] << std::endl;
+
+			Vtot += (this->hw_max[dep] - elevation[no]) * cellarea;
+		}
+
+		if(this->double_equals(Vtot,this->volume[dep], 100) == false)
+		{
+			this->print_all_lakes_from_dep(dep);
+
+			std::cout << "Vtot: " << Vtot << " || " << this->volume[dep] << std::endl;
+
+			throw std::runtime_error("Dep check failed" );
+		}
 	}
 
   //  ___________________
