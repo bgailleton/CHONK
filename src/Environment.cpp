@@ -1474,6 +1474,7 @@ void ModelRunner::process_dep(int dep, double& extra_sed, std::vector<double>& e
     // It cancels all the erosion/depostion made by other processes in the lake
     // It back-calculates this->graph.depression_tree.volume_sed and the extra sed and lab in place
     this->defluvialise_lake(dep, extra_sed, extra_lab);
+
     this->correct_extras(dep,extra_wat, extra_sed, extra_lab);
 
     // Geting the outlet node ID
@@ -1481,6 +1482,7 @@ void ModelRunner::process_dep(int dep, double& extra_sed, std::vector<double>& e
 
     // getting the local sediment flux (ie what has been locally eroded/deposited)
     double locsedflux = this->chonk_network[outlet].get_local_sedflux(this->timestep, this->cellarea);
+    double globasedflux = this->chonk_network[outlet].get_sediment_flux();
 
 
     // In some rare cases outlet is not processed (deprecated I believe, it was because of flat surfaces, I leave it there for legacy)
@@ -1503,14 +1505,14 @@ void ModelRunner::process_dep(int dep, double& extra_sed, std::vector<double>& e
     {
       if(this->node_in_lake[rec[i]] == dep)
       {
-        sed2remove -= wws[i] * locsedflux;
+        sed2remove -= wws[i] * globasedflux;
       }
       else if(this->is_processed[rec[i]] == false)
       {
         // std::cout << "Rec " << rec[i] << " of outlet " << outlet << " is proc?  " << this->is_processed[rec[i]] << std::endl;
         
-        if(wwf[i]>0)
-          std::cout << "Wat2add2out" << std::endl;
+        // if(wwf[i]>0)
+        //   std::cout << "Wat2add2out" << std::endl;
         
         water2add += wwf[i] * this->chonk_network[outlet].get_water_flux() * this->timestep;
         // sed2remove_only_outlet -= wws[i] * locsedflux;
@@ -1518,6 +1520,7 @@ void ModelRunner::process_dep(int dep, double& extra_sed, std::vector<double>& e
     }
     
     // Putting the outlet reprocessing info into the extrasedwatlab stuff
+    std::cout << sed2remove << " <- sed2remove" << std::endl;
     this->graph.depression_tree.add_sediment(sed2remove, this->chonk_network[outlet].get_label_tracker(), dep);
 
     // extra_lab = mix_two_proportions(extra_sed, extra_lab, sed2remove, this->chonk_network[outlet].get_label_tracker());
@@ -1545,20 +1548,23 @@ void ModelRunner::process_dep(int dep, double& extra_sed, std::vector<double>& e
     //   this->graph.depression_tree.add_sediment(extra_sed, extra_lab, dep);
     //   extra_sed = 0;
     // }
+    this->graph.depression_tree.add_sediment(sed2add2outletonly, this->chonk_network[outlet].get_label_tracker(), dep);
 
     this->correct_extras(dep, extra_wat, extra_sed, extra_lab);
 
     // now only I can correct the rest
+    // std::cout << "sed2add2outletonly->" << sed2add2outletonly << std::endl;
     extra_wat += wat2add2outletonly;
-    extra_lab = mix_two_proportions(extra_sed, extra_lab,sed2add2outletonly,sed2add2outletonly_lab);
-    extra_sed += sed2add2outletonly;
+    // extra_lab = mix_two_proportions(extra_sed, extra_lab,sed2add2outletonly,sed2add2outletonly_lab);
+    // extra_sed += sed2add2outletonly;
+    
 
     if(extra_sed < 0)
       extra_sed = 0;
     
     if(extra_wat > 0)
     {
-      std::cout << "extra_wat" << std::endl;
+      std::cout << "extra_wat::wat::" << extra_wat <<"::extra_sed::" << extra_sed << std::endl;
       // Ready to reproc the outlet:
       // #1 cancel what it use to give to its receivers
       // std::cout << "427 beef " << this->chonk_network[427].get_water_flux() << std::endl;
@@ -1829,7 +1835,7 @@ void ModelRunner::defluvialise_lake(int dep, double& extra_sed, std::vector<doub
   // if(extra_sed < 0)
   // {
   //   std::cout << "Extra_sed removing stuff to lake directly::" << extra_sed << std::endl;
-  this->graph.depression_tree.add_sediment(defluvialisation_of_sed, extra_sed_prop, dep);
+  this->graph.depression_tree.add_sediment(-1 * defluvialisation_of_sed, extra_sed_prop, dep);
   //   extra_sed = 0;
   // }
 
@@ -3357,13 +3363,16 @@ void ModelRunner::drape_deposition_flux_to_chonks()
       
       if(this->graph.depression_tree.volume_sed[i] > 0)
       {
+        std::cout << i << " Draping only sed "<< std::endl;
         this->drape_dep_only_sed(i);
+      
       }
 
       continue;
     }
+    std::cout << i << " Draping f_water "<< std::endl;
 
-    // std::cout << "Gougnge:" <<i << " rat : " << ratio_of_dep << std::endl;
+    std::cout << "Gougnge:" <<i << " rat : " << ratio_of_dep << std::endl;
 
     // NEED TO DEAL WITH THAT BOBO
     // if(ratio_of_dep > 1)
@@ -3387,8 +3396,6 @@ void ModelRunner::drape_deposition_flux_to_chonks()
 
       if(this->node_in_lake[no] == -1)
       {
-        if(i == 103)
-          std::cout << "Ignoring " << no << std::endl;
         continue;
 
       }
@@ -3427,11 +3434,12 @@ void ModelRunner::drape_deposition_flux_to_chonks()
       // chonk_network[no].reset_sed_fluxes();
     }
 
-    
+
     DEBUG_totsed += totsed;
     // Seems fine here...
     // std::cout << "BALANCE LAKE = " << total << " out of " << this->graph.depression_tree.volume_sed[i] << std::endl;
-    if(double_equals(totsed , this->graph.depression_tree.volume_sed[i], 1) == false || double_equals(totwat + this->graph.depression_tree.actual_amount_of_evaporation[i] , this->graph.depression_tree.volume_water[i],1) == false)
+    // if(double_equals(totsed , this->graph.depression_tree.volume_sed[i], 1) == false || double_equals(totwat + this->graph.depression_tree.actual_amount_of_evaporation[i] , this->graph.depression_tree.volume_water[i],1) == false)
+    if(true)
     {
       std::cout << i << " TOT IN SED = " << totsed << " out of " << this->graph.depression_tree.volume_sed[i] << " AND VOL WAS " << this->graph.depression_tree.volume[i] << std::endl;
       std::cout << i << " TOT IN WATER = " << totwat + this->graph.depression_tree.actual_amount_of_evaporation[i] << " out of " << this->graph.depression_tree.volume_water[i] << " AND VOL WAS " << this->graph.depression_tree.volume[i] << std::endl;
@@ -3439,7 +3447,7 @@ void ModelRunner::drape_deposition_flux_to_chonks()
       double totvolmax = 0;
       for(auto no:this->graph.depression_tree.get_all_nodes(i) )
       {
-        std::cout << no << " in lake " << i << " -> " << this->node_in_lake[no] <<  " this->topography[no]" << this->topography[no] << std::endl;
+        // std::cout << no << " in lake " << i << " -> " << this->node_in_lake[no] <<  " this->topography[no]" << this->topography[no] << std::endl;
         // std::cout << no << " in lake " << i << " -> " << this->node_in_lake[no] << std::endl;
         totvolmax += (this->topography[no] - this->surface_elevation[no]) * this->cellarea;
       }
