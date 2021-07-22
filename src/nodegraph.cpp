@@ -516,8 +516,9 @@ void NodeGraphV2::fill_the_depressions(std::vector<int>& next_to_check, xt::pyte
 
       if(elevation[next_node] < this->depression_tree.hw_max[dep])
       {
-        std::cout << next_node << " is in " << this->depression_tree.node2tree[next_node] << " current is " << dep <<  std::endl;
-        throw std::runtime_error("NodeGraphV2::fill_the_depressions::hw_max_not_good");
+        std::cout << "NodeGraphV2::fill_the_depressions::hw_max_not_good " << next_node << " is in " << this->depression_tree.node2tree[next_node] << " current is " << dep <<  std::endl;
+        // throw std::runtime_error();
+        // throw std::runtime_error("NodeGraphV2::fill_the_depressions::hw_max_not_good");
       }
 
       std::vector<int> neighbours; std::vector<double> dummy ; this->get_D8_neighbors(next_node, active_nodes, neighbours, dummy);

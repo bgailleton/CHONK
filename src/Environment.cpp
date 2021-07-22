@@ -1557,7 +1557,7 @@ void ModelRunner::process_dep(int dep, double& extra_sed, std::vector<double>& e
     extra_wat += wat2add2outletonly;
     // extra_lab = mix_two_proportions(extra_sed, extra_lab,sed2add2outletonly,sed2add2outletonly_lab);
     // extra_sed += sed2add2outletonly;
-    
+
 
     if(extra_sed < 0)
       extra_sed = 0;
@@ -3355,6 +3355,8 @@ void ModelRunner::drape_deposition_flux_to_chonks()
     if(this->graph.depression_tree.active[i] == false)
       continue;
 
+    this->Qw_out += this->graph.depression_tree.actual_amount_of_evaporation[i]/this->timestep;
+
     double totsed = 0;
     double totwat = 0;
     double ratio_of_dep = this->graph.depression_tree.volume_sed[i]/(this->graph.depression_tree.volume_water[i] - this->graph.depression_tree.actual_amount_of_evaporation[i]);
@@ -3442,7 +3444,7 @@ void ModelRunner::drape_deposition_flux_to_chonks()
     if(true)
     {
       std::cout << i << " TOT IN SED = " << totsed << " out of " << this->graph.depression_tree.volume_sed[i] << " AND VOL WAS " << this->graph.depression_tree.volume[i] << std::endl;
-      std::cout << i << " TOT IN WATER = " << totwat + this->graph.depression_tree.actual_amount_of_evaporation[i] << " out of " << this->graph.depression_tree.volume_water[i] << " AND VOL WAS " << this->graph.depression_tree.volume[i] << std::endl;
+      std::cout << i << " TOT IN WATER = " << totwat + this->graph.depression_tree.actual_amount_of_evaporation[i] << " out of " << this->graph.depression_tree.volume_water[i] << " AND VOL WAS " << this->graph.depression_tree.volume_max_with_evaporation[i] << std::endl;
       std::cout << i << " hw " << this->graph.depression_tree.hw[i] << " vs max " << this->graph.depression_tree.hw_max[i] << " pitelev " << this->surface_elevation[this->graph.depression_tree.pitnode[i]] << " outelev " << this->surface_elevation[this->graph.depression_tree.tippingnode[i]] << std::endl;
       double totvolmax = 0;
       for(auto no:this->graph.depression_tree.get_all_nodes(i) )
