@@ -864,10 +864,12 @@ void chonk::add_to_sediment_flux(double value, std::vector<double> label_proport
     std::cout << this->fluvialprop_sedflux << "|" << fluvialsedfluxtot << "|" << this->sediment_flux << "|" << prop_fluvial << "|value:" << value << std::endl;
     throw std::runtime_error("fluvprop>1");
   }
-  if(this->sediment_flux <0)
+
+  if(this->sediment_flux < 0)
   {
-    std::cout << this->fluvialprop_sedflux << "|" << fluvialsedfluxtot << "|" << this->sediment_flux << "|" << prop_fluvial << "|value:" << value << std::endl;
-    std::cout << "WARNING:: OUT Sediment flux <0 " << this->sediment_flux << std::endl;
+    // std::cout << this->fluvialprop_sedflux << "|" << fluvialsedfluxtot << "|" << this->sediment_flux << "|" << prop_fluvial << "|value:" << value << std::endl;
+    std::cout << "--->" << this->current_node << std::endl;
+    std::cout << "WARNING:: OUT Sediment flux < 0 " << this->sediment_flux << std::endl;
   }
 
 }

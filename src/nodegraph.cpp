@@ -2839,7 +2839,9 @@ void NodeGraphV2::correct_flatrouting(xt::pytensor<bool,1>& active_nodes, xt::py
       if(active_nodes[i] == 0)
         continue;
 
-      elevation[i] +=  (1 + rand() % (( 10000 + 1 ) - 1)) * 1e-7;;
+      // srand(time(NULL)); // Seed the time
+      // int finalNum = (rand()%(100000)+1) * 1e-8; 
+      elevation[i] +=  static_cast <double> (rand()) / static_cast <double> (RAND_MAX) * 2e-6 - 1e-6 ;
       // std::vector<int> neight; std::vector<double> duf;
       // this->get_D8_neighbors(i,active_nodes,neight,duf);
       // bool isfalt = true;
