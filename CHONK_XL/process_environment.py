@@ -379,7 +379,7 @@ class CoreModel:
 
 	@topo.compute
 	def _topo(self):
-		return self.model.get_surface_elevation().reshape(self.ny,self.nx)
+		return self.model.get_surface_elevation_tp1().reshape(self.ny,self.nx)
 	@Kr_eff.compute
 	def _Kr_eff(self):
 		return self.model.get_K_calc().reshape(self.ny,self.nx)

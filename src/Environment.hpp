@@ -433,7 +433,7 @@ std::vector<double>& pre_sed, std::vector<double>& pre_water);
     xt::pytensor<double,1> get_fluvlabprop(){xt::pytensor<double,1> output = xt::zeros<double>({this->chonk_network.size()}); for(size_t i=0; i< this->chonk_network.size();i++){output[i] = this->chonk_network[i].get_fluvialprop_sedflux();}; }
 
     double get_sum_of_all_volume_full_lake(){this->graph.depression_tree.get_sum_of_all_volume_full_lake();}
-
+    void DEBUG_write_lakes_to_file(std::string filename);
 
 
 
@@ -469,6 +469,7 @@ std::vector<double>& pre_sed, std::vector<double>& pre_water);
     double start_time;
     // Curret time (see above)
     double current_time;
+    int ndt = 0;
 
     // Spatial thingies
     double dx;
@@ -551,6 +552,10 @@ std::vector<double>& pre_sed, std::vector<double>& pre_water);
     double sed_added_by_donors;
     double sed_outletting_system;
     std::vector<double> inherited_water_added;
+    double tot_inherited_water = 0;
+
+    std::map<int,double> ORIGINALPIT2WAT;
+    std::map<int,double> ORIGINALPIT2SED;
 
 
     //Labellisation:

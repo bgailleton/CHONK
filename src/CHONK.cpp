@@ -978,7 +978,7 @@ void chonk::charlie_I(double n, double m, double K_r, double K_s,
     return;
 
   // IMPORTANT in case another process had affected the sed-height bofre, I am applying it
-  this_sed_height += this->sediment_creation_flux *dt;
+  this_sed_height += this->sediment_creation_flux * dt;
 
   // First dealing with the erosion
 
@@ -1067,13 +1067,25 @@ void chonk::charlie_I(double n, double m, double K_r, double K_s,
 
   // # Getting the sediment flux available for fluvial deposition
   double Qs = this->sediment_flux * this->fluvialprop_sedflux;  
+  double save_QS = Qs;
   // COrrecting analytically THE DEPOSITION (see SPACE gmd paper equation 31)
+
+
   tadd = Qs/depodivider - Qs;
   this->add_to_sediment_flux(tadd, this->label_tracker, 1.);
   Qs += tadd;
 
   // # Deposition
-  Ds_tot += V_param * d_star * (Qs/ (this->water_flux * dt));
+  double this_dep = V_param * d_star * (Qs/ (this->water_flux * dt));
+  if(this_dep > 0.1)
+  {
+    double delta = std::abs(0.1 - this_dep);
+    this->add_to_sediment_flux(delta * Xres * Yres * dt, this->label_tracker, 1.);
+    Qs -= delta * Xres * Yres * dt;
+    this_dep = 0.1;
+  }
+
+  Ds_tot += this_dep;
   double removersed = -1 * Ds_tot * dt * Xres * Yres;
 
   // Applying to the global fluxes
@@ -1092,6 +1104,7 @@ void chonk::charlie_I(double n, double m, double K_r, double K_s,
     H_eq = 100;
 
   double tempsedheight = H_eq;
+  bool use_tempsedheight = true;
 
   // this can happen at lake output when a gigantic input of sediment forces very high dep and very low E
   if(Dsphi/E_cap_s > 1e3 && E_cap_s < 1e-5)
@@ -1111,15 +1124,22 @@ void chonk::charlie_I(double n, double m, double K_r, double K_s,
   else
   {
     new_sed_height = this_sed_height + Dsphi * dt;
+    use_tempsedheight = false;
   }
 
-  double new_sedcrea = (new_sed_height - tempsedheight) / dt;
+  double new_sedcrea;
+  if(use_tempsedheight)
+    new_sedcrea = (new_sed_height - tempsedheight) / dt;
+  else
+    new_sedcrea = (new_sed_height - this_sed_height) / dt;
 
-  // if(new_sedcrea > 0.01)
+
+  // if(new_sedcrea > 0.1)
   // {
   //   std::cout << "DEBUG::Sedcrea in Charlie_I very high:";
   //   std::cout << new_sed_height << "|" << this_sed_height << "|" << Ds_tot << "|" << Es_tot << "|" << Er_tot << "|" \
-  //    << this->fluvialprop_sedflux << "|" << Qs << "|" << this->water_flux << "|"  << std::endl;
+  //    << this->fluvialprop_sedflux << "|" << Qs << "|" << this->water_flux << "|" << save_QS  << std::endl;
+  //    throw std::runtime_error("Very high deposition in Charlie one");
   // }
   // if(std::isfinite(this->sediment_creation_flux) == false)
   // {

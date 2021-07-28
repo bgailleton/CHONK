@@ -109,6 +109,10 @@ public:
 	std::vector<double> volume_sed;
 	// index: depression ID -> value: volume of actual water hosted in the depression 
 	std::vector<double> volume_water;
+	std::vector<double> volume_water_outlet;
+	std::vector<double> volume_sed_outlet;
+	std::vector<double> volume_sed_defluvialised;
+
 	std::vector<double> actual_amount_of_evaporation;
 	// index: depression ID -> value: volume max of water storable taking account of potential lake evaporation
 	std::vector<double> volume_max_with_evaporation;
@@ -182,6 +186,9 @@ public:
 		this->actual_amount_of_evaporation.emplace_back(0);
 		this->volume_sed.emplace_back(0);
 		this->volume_water.emplace_back(0);
+		this->volume_water_outlet.emplace_back(0);
+		this->volume_sed_outlet.emplace_back(0);
+		this->volume_sed_defluvialised.emplace_back(0);
 		// Initial hw is the one of the pits
 		this->hw_max.emplace_back(elevation[pitnode]);
 		this->hw.emplace_back(elevation[pitnode]);
@@ -477,7 +484,7 @@ public:
 	bool is_child_of(int is_child, int of)
 	{
 		if(is_child == -1 || of == -1){return false;}
-		
+
 		std::queue<int> children; children.emplace(of);
 		while(children.empty() == false)
 		{
