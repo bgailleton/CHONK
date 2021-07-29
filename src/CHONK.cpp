@@ -1066,7 +1066,11 @@ void chonk::charlie_I(double n, double m, double K_r, double K_s,
   this->add_to_sediment_flux(tadd, sed_label_prop, 1.);
 
   // # Getting the sediment flux available for fluvial deposition
-  double Qs = this->sediment_flux * this->fluvialprop_sedflux;  
+  double Qs = this->sediment_flux * this->fluvialprop_sedflux;
+
+  if(Qs / (this->water_flux * dt) > 0.01)
+    Qs = 0.01 * (this->water_flux * dt);
+
   double save_QS = Qs;
   // COrrecting analytically THE DEPOSITION (see SPACE gmd paper equation 31)
 
@@ -1077,13 +1081,16 @@ void chonk::charlie_I(double n, double m, double K_r, double K_s,
 
   // # Deposition
   double this_dep = V_param * d_star * (Qs/ (this->water_flux * dt));
-  if(this_dep > 0.1)
-  {
-    double delta = std::abs(0.1 - this_dep);
-    this->add_to_sediment_flux(delta * Xres * Yres * dt, this->label_tracker, 1.);
-    Qs -= delta * Xres * Yres * dt;
-    this_dep = 0.1;
-  }
+
+
+  // This was an attempt to cap deposition in case it is needed
+  // if(this_dep > 0.1)
+  // {
+  //   double delta = std::abs(0.1 - this_dep);
+  //   this->add_to_sediment_flux(delta * Xres * Yres * dt, this->label_tracker, 1.);
+  //   Qs -= delta * Xres * Yres * dt;
+  //   this_dep = 0.1;
+  // }
 
   Ds_tot += this_dep;
   double removersed = -1 * Ds_tot * dt * Xres * Yres;
@@ -1127,6 +1134,13 @@ void chonk::charlie_I(double n, double m, double K_r, double K_s,
     use_tempsedheight = false;
   }
 
+  // if the above calculation fails, using a rougher solution
+  if(std::isfinite(this->sediment_creation_flux) == false)
+  {
+    new_sed_height = this_sed_height + Dsphi * dt - Er_tot * dt - Es_tot * dt;
+    use_tempsedheight = false;
+  }
+
   double new_sedcrea;
   if(use_tempsedheight)
     new_sedcrea = (new_sed_height - tempsedheight) / dt;
@@ -1148,13 +1162,13 @@ void chonk::charlie_I(double n, double m, double K_r, double K_s,
 
   this->add_sediment_creation_flux(new_sedcrea);
  
-  // if(std::isfinite(this->sediment_creation_flux) == false)
-  // {
-  //   std::cout << "DEBUG::Sedcrea in Charlie_I:";
-  //   std::cout << "new_sed_height" << new_sed_height << "|" << "this_sed_height" << this_sed_height << "|" << "Ds_tot" << Ds_tot << "|" << "Es_tot" << Es_tot << "|" << "Er_tot" << Er_tot << "|" \
-  //    << "this->fluvialprop_sedflux" << this->fluvialprop_sedflux << "|" << "Qs" << Qs << "|" << "this->water_flux" << this->water_flux << "|"  << std::endl;
-  //   throw std::runtime_error("sedcreanancharliI-aff");
-  // }
+  if(std::isfinite(this->sediment_creation_flux) == false)
+  {
+    std::cout << "DEBUG::Sedcrea in Charlie_I:";
+    std::cout << "new_sed_height" << new_sed_height << "|" << "this_sed_height" << this_sed_height << "|" << "Ds_tot" << Ds_tot << "|" << "Es_tot" << Es_tot << "|" << "Er_tot" << Er_tot << "|" \
+     << "this->fluvialprop_sedflux" << this->fluvialprop_sedflux << "|" << "Qs" << Qs << "|" << "this->water_flux" << this->water_flux << "|"  << std::endl;
+    throw std::runtime_error("sedcreanancharliI-aff");
+  }
 
   // Finally need to deal with flux partition
   // let's assume here that the fluxes are partitioned by water
