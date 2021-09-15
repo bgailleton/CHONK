@@ -441,8 +441,8 @@ std::vector<double>& pre_sed, std::vector<double>& pre_water);
     int NTIMEPREFLUXCALLED;
 
     // I need some members to be public
-    bool CHARLIE_I = true;
-    bool CIDRE_HS = true;
+    bool CHARLIE_I = false;
+    bool CIDRE_HS = false;
 
     // Parametrisation of law
     bool tool_effect_rock = false;
@@ -457,8 +457,15 @@ std::vector<double>& pre_sed, std::vector<double>& pre_water);
     xt::pytensor<double,1> lake_evaporation_rate_spatial;
 
 
+    xt::pytensor<double,1> lake_depth;
+
+    double depths_res_sed_proportions = 5;
+
+
     double hillslope2fluvial_connectivity = 0;
     xt::pytensor<double,1> precipitations;
+
+    double thresholdMF2SF = 0;
 
 
   protected:

@@ -122,6 +122,11 @@ PYBIND11_MODULE(CHONK_cpp, m)
       .def_readwrite("precipitations", &ModelRunner::precipitations)
       .def_readwrite("lake_evaporation", &ModelRunner::lake_evaporation)
       .def_readwrite("lake_evaporation_rate_spatial", &ModelRunner::lake_evaporation_rate_spatial)
+      .def_readwrite("thresholdMF2SF", &ModelRunner::thresholdMF2SF)
+      .def_readwrite("lake_depth", &ModelRunner::lake_depth)
+      .def_readwrite("depths_res_sed_proportions", &ModelRunner::depths_res_sed_proportions)
+      
+
       .def("get_K_calc", &ModelRunner::get_K_calc)
       .def("get_top_depression", &ModelRunner::get_top_depression)
       .def("get_potential_volume", &ModelRunner::get_potential_volume)

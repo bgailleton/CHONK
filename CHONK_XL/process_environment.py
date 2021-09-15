@@ -291,7 +291,7 @@ class CoreModel:
 		self.model.update_int_param("n_elements",self.ny*self.nx)
 
 
-		self.model.update_double_param("threshold_single_flow", self.threshold_single_flow)
+		self.model.thresholdMF2SF = self.threshold_single_flow
 		self.model.set_active_nodes( self.active_nodes)
 		# input("BITE3")
 		if self.precipitations:

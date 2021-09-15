@@ -5,3 +5,5 @@ __email__ = 'boris.gailleton@gfz-potsdam.de'
 __version__ = '0.0.1'
 
 from .process_environment import *
+from .environment import *
+from .environment import minimal_model

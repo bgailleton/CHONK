@@ -149,8 +149,6 @@ NodeGraphV2::NodeGraphV2(
     }
   }
 
-  std::cout <<" REj" << std::endl;
-
   if(this->lake_solver == false)
   {
     // Computing basin info from stack
@@ -2272,8 +2270,6 @@ std::vector<int> multiple_stack_fastscape(int n_element, std::vector<Vertex>& gr
     while (nparse > -1)
     {
       int ijn = parse[nparse];
-      // if(969 == ijn)
-        // std::cout << "969 SELECTED " <<  vis[ijn]<< std::endl;
       nparse = nparse-1;
       nstack = nstack+1;
 
@@ -2281,11 +2277,7 @@ std::vector<int> multiple_stack_fastscape(int n_element, std::vector<Vertex>& gr
       for(int ijk=0; ijk < graph[ijn].receivers.size();ijk++)
       {
         int ijr = graph[ijn].receivers[ijk];
-        // if(ijn == 1170)
-          // std::cout << "1170 -> " << ijr << std::endl;
         vis[ijr] = vis[ijr]+1;
-        // if(969 == ijr)
-          // std::cout << "969 HERE-> " <<  vis[ijr] << "/" << ndon[ijr] << " from " << ijn << std::endl;
         // if the counter is equal to the number of donors for that node we add it to the parsing stack
         if (vis[ijr] == ndon[ijr])
         {

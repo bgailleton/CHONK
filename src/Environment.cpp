@@ -293,10 +293,10 @@ void ModelRunner::run()
 
 
   // timer reports
-  std::cout << std::endl << "--------------------- START OF TIME REPORT ---------------------" << std::endl;
-  for(int i=0; i< this->n_timers; i++)
-    std::cout << CHRONO_name[i] << " took " << double(CHRONO_mean[i])/CHRONO_n_time[i] << " seconds out of " << CHRONO_n_time[i] << " runs" << std::endl;
-  std::cout << "--------------------- END OF TIME REPORT ---------------------" << std::endl << std::endl;
+  // std::cout << std::endl << "--------------------- START OF TIME REPORT ---------------------" << std::endl;
+  // for(int i=0; i< this->n_timers; i++)
+  //   std::cout << CHRONO_name[i] << " took " << double(CHRONO_mean[i])/CHRONO_n_time[i] << " seconds out of " << CHRONO_n_time[i] << " runs" << std::endl;
+  // std::cout << "--------------------- END OF TIME REPORT ---------------------" << std::endl << std::endl;
   // Done
 }
 
@@ -565,11 +565,11 @@ void ModelRunner::finalise()
   // this->Ql_out = 0;
   for(int i=0; i<this->io_int["n_elements"]; i++)
   {
-    this->Ql_out += (tlake_depth[i] - this->io_double_array["lake_depth"][i]) * this->dx * this->dy / this->timestep;
+    this->Ql_out += (tlake_depth[i] - this->lake_depth[i]) * this->dx * this->dy / this->timestep;
   }
 
   // Saving the new lake depth  
-  this->io_double_array["lake_depth"] = tlake_depth;
+  this->lake_depth  = tlake_depth;
 
   // calculating other water mass balance.
   for(int i = 0; i<this->io_int["n_elements"]; i++)
@@ -1218,7 +1218,7 @@ void ModelRunner::add_to_sediment_tracking(int index, double height, std::vector
   if(height == 0)
     return;
 
-  double depth_res = this->io_double["depths_res_sed_proportions"];
+  double depth_res = depths_res_sed_proportions;
 
   // First, let's calculates stats about the current box situation
   double boxes_there = sed_depth_here/depth_res;
@@ -1436,7 +1436,7 @@ void ModelRunner::manage_move_prep(chonk& this_chonk)
 {
 
   CHRONO_start[5] = std::chrono::high_resolution_clock::now();
-  this_chonk.move_MF_from_fastscapelib_threshold_SF(this->graph, this->io_double["threshold_single_flow"], this->timestep,  this->topography, 
+  this_chonk.move_MF_from_fastscapelib_threshold_SF(this->graph, this->thresholdMF2SF, this->timestep,  this->topography, 
         this->dx, this->dy, chonk_network);
 
   CHRONO_stop[5] = std::chrono::high_resolution_clock::now();
@@ -1778,9 +1778,7 @@ void ModelRunner::process_inherited_water()
         minnodor = node;
         minelev = this->surface_elevation[node];
       }
-      // sumwat += this->io_double_array["lake_depth"][node] * this->dx * this->dy / this->timestep ;
     }
-    // std::cout << "INHERITED WATER AT " << minnodor << " : " << this->graph.depression_tree.volume_water[tlake]/this->timestep << std::endl;
     this->chonk_network[minnodor].add_to_water_flux((this->graph.depression_tree.volume_water[tlake] - this->graph.depression_tree.actual_amount_of_evaporation[tlake])/this->timestep);
     this->inherited_water_added[minnodor] += (this->graph.depression_tree.volume_water[tlake] - this->graph.depression_tree.actual_amount_of_evaporation[tlake])/this->timestep;
     this->tot_inherited_water += (this->graph.depression_tree.volume_water[tlake] - this->graph.depression_tree.actual_amount_of_evaporation[tlake])/this->timestep;
