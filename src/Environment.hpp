@@ -402,6 +402,8 @@ std::vector<double>& pre_sed, std::vector<double>& pre_water);
     xt::pytensor<double,1> get_sed_height_tp1(){return this->sed_height_tp1 ;}
     xt::pytensor<double,1> get_K_calc(){return this->calculated_K ;}
     xt::pytensor<double,1> get_deposition_flux();
+    xt::pytensor<double,1> get_fluvial_Qs();
+    xt::pytensor<double,1> get_hillslope_Qs();
 
 
     void manage_K_kappa(int label_id, chonk& this_chonk, double& K_r, double& K_s, double& kappa_r, double& kappa_s, double& S_c);

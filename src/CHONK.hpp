@@ -134,6 +134,8 @@ class chonk
     void add_to_sediment_flux(double value, double prop_fluvial);
     double get_fluvialprop_sedflux(){return this->fluvialprop_sedflux;}
     void set_fluvialprop_sedflux(double val){this->fluvialprop_sedflux = val;}
+    double get_fluvial_Qs(){return this->fluvialprop_sedflux * this->sediment_flux;}
+    double get_hillslope_Qs(){return (1 - this->fluvialprop_sedflux) * this->sediment_flux;}
 
     // Be careful with that one!! I only use it when I am outletting lakes and SURE that everything is therefore fluvial
     void I_solemnly_swear_all_my_sediments_are_fluvial(){ this->fluvialprop_sedflux = 1;}// Be careful with that one!!

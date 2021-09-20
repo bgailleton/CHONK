@@ -125,6 +125,8 @@ PYBIND11_MODULE(CHONK_cpp, m)
       .def_readwrite("thresholdMF2SF", &ModelRunner::thresholdMF2SF)
       .def_readwrite("lake_depth", &ModelRunner::lake_depth)
       .def_readwrite("depths_res_sed_proportions", &ModelRunner::depths_res_sed_proportions)
+      .def("get_fluvial_Qs", &ModelRunner::get_fluvial_Qs)
+      .def("get_hillslope_Qs", &ModelRunner::get_hillslope_Qs)
       
 
       .def("get_K_calc", &ModelRunner::get_K_calc)
@@ -134,6 +136,8 @@ PYBIND11_MODULE(CHONK_cpp, m)
       .def("get_fluvlabprop",&ModelRunner::get_fluvlabprop)
 
     ;
+
+    
     m.def("set_DEBUG_switch_nodegraph",set_DEBUG_switch_nodegraph);
     m.def("pop_elevation_to_SS_SF_SPIL", pop_elevation_to_SS_SF_SPIL);
 

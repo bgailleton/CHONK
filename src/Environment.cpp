@@ -1857,6 +1857,29 @@ xt::pytensor<double,1> ModelRunner::get_deposition_flux()
 
 }
 
+xt::pytensor<double,1> ModelRunner::get_fluvial_Qs()
+{
+  xt::pytensor<double,1> output = xt::zeros<double>({size_t(this->io_int["n_elements"])});
+  for(auto& tchonk:chonk_network)
+  {
+    output[tchonk.get_current_location()] = tchonk.get_fluvial_Qs() ;
+  }
+  return output;
+
+}
+
+xt::pytensor<double,1> ModelRunner::get_hillslope_Qs()
+{
+  xt::pytensor<double,1> output = xt::zeros<double>({size_t(this->io_int["n_elements"])});
+  for(auto& tchonk:chonk_network)
+  {
+    output[tchonk.get_current_location()] = tchonk.get_hillslope_Qs();
+  }
+  return output;
+
+}
+
+
 xt::pytensor<double,1> ModelRunner::get_sediment_creation_flux()
 {
   xt::pytensor<double,1> output = xt::zeros<double>({size_t(this->io_int["n_elements"])});
