@@ -258,10 +258,6 @@ NodeGraphV2::NodeGraphV2(
     this->compute_pits(active_nodes);
 
 
-
-    // std::cout << "DEBUGDEP:: flow corrr-1" << std::endl;
-
-
     // Now I am labelling my basins
     //# Initialising the vector of basin labels
     std::vector<int> basin_labels(this->Sstack.size(),-1);
@@ -278,7 +274,6 @@ NodeGraphV2::NodeGraphV2(
       basin_labels[node] = label;
     }
 
-    std::cout << "DEBUGDEP:: flow corrr1" << std::endl;
     this->correct_flatrouting(active_nodes, elevation);
     for(size_t i=0; i<this->un_element; i++)
     {
