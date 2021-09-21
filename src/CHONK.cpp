@@ -1120,16 +1120,19 @@ void chonk::charlie_I(double n, double m, double K_r, double K_s,
   // Case 1 (32)
   if(Dsphi != E_cap_s && E_cap_s > 0)
   {
+    // std::cout << "A\n";
     new_sed_height = dimless_roughness * std::log( 1/ ((Dsphi / E_cap_s) - 1) *  \
       ( std::exp( (Dsphi - E_cap_s) * dt/dimless_roughness ) * ( ( Dsphi/E_cap_s - 1 ) \
        * std::exp(H_eq/dimless_roughness) + 1 ) - 1 )  );
   }
   else if (Dsphi == E_cap_s)
   {
+    // std::cout << "B\n";
     new_sed_height = dimless_roughness * std::log(E_cap_s/dimless_roughness * dt + std::exp(H_eq/dimless_roughness));
   }
   else
   {
+    // std::cout << "C\n";
     new_sed_height = this_sed_height + Dsphi * dt;
     use_tempsedheight = false;
   }

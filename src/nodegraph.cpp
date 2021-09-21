@@ -442,7 +442,7 @@ void NodeGraphV2::grow_depression_tree_v2(xt::pytensor<double,1>& elevation, xt:
   // Fill the depressions
   if(next_to_check.size() > 0)
   {
-    std::cout << next_to_check.size() << " depressions  to fill" << std::endl;
+    // std::cout << next_to_check.size() << " depressions  to fill" << std::endl;
     // First step: filling all the depressions
     this->fill_the_depressions(next_to_check, elevation, active_nodes);
 
@@ -616,12 +616,12 @@ void NodeGraphV2::fill_the_depressions(std::vector<int>& next_to_check, xt::pyte
       // std::cout <<  "Twut3 " << dep << "|"  << next_node << "|" << this->depression_tree.node2tree[next_node] << "|" << elevation[next_node]  << std::endl; //<< std::endl;
       this->depression_tree.double_check_volume(dep, elevation, this->cellarea);
       // std::cout << "checker_filling 6" << std::endl;
-      if(dep == 103)
-        std::cout << dep << " dep volume is " << this->depression_tree.volume[dep] << std::endl;
+      // if(dep == 103)
+      //   std::cout << dep << " dep volume is " << this->depression_tree.volume[dep] << std::endl;
 
       if(double_break)
       {
-        std::cout << "Found outlet " << next_node << " (" << std::fixed << elevation[next_node] << ")" << std::endl;
+        // std::cout << "Found outlet " << next_node << " (" << std::fixed << elevation[next_node] << ")" << std::endl;
         break;
       }
 
@@ -688,9 +688,6 @@ void NodeGraphV2::raise_dep_to_new_node(int dep, int node, xt::pytensor<double,1
 
   double dz = elevation[node] - last_elev;
   double dV = nbeef * dz * this->cellarea;
-
-  if(dep == 103)
-    std::cout << node << " adding " << dV << std::endl;
  
   this->depression_tree.volume[dep] += dV;
 

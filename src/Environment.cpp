@@ -253,6 +253,7 @@ void ModelRunner::run()
   // Debug checker
   int underfilled_lake = 0;
 
+  // std::cout << "wallec\n";
   // ########### Strating the calculation #############
   // ## Iterating though all the nodes ##
   for(int i=0; i<io_int["n_elements"]; i++)
@@ -265,6 +266,7 @@ void ModelRunner::run()
     this->process_node(node, is_processed, lake_incrementor, underfilled_lake, this->active_nodes, cellarea, surface_elevation, true);   
     // Switching to the next node in line
   }
+  // std::cout << "Do\n";
 
   // Calling the finalising function: it applies the changes in topography and I think will apply the lake sedimentation
   this->finalise();
@@ -1067,8 +1069,8 @@ void ModelRunner::fill_underfilled_lake(int dep)
     double deltelev = top_elev - this_elev;
     // -> local Volume = n nodes to be raised to the next elev
     double dV = n_nodes * this->cellarea * deltelev;
-    if(dep == 21)
-      std::cout << remaining_volume << std::endl;
+
+
 
     if(remaining_volume > dV)
     {
@@ -2037,12 +2039,12 @@ void ModelRunner::drape_deposition_flux_to_chonks()
       }
         // throw std::runtime_error("afshdffdaglui;regji;");
 
-      if(this->topography[no] != this->graph.depression_tree.hw[i])
-      {
+      // if(this->topography[no] != this->graph.depression_tree.hw[i])
+      // {
 
-        std::cout <<"DN::" << no << " [] " <<  this->node_in_lake[no] << " || " << this->topography[no] << "||" << this->graph.depression_tree.hw[i] << " || " << this->surface_elevation[no] << " is outlet? " << this->graph.depression_tree.is_outlet(i) << std::endl;
-        // throw std::runtime_error("NOT THE RIGHT ELEV");
-      }
+      //   std::cout <<"DN::" << no << " [] " <<  this->node_in_lake[no] << " || " << this->topography[no] << "||" << this->graph.depression_tree.hw[i] << " || " << this->surface_elevation[no] << " is outlet? " << this->graph.depression_tree.is_outlet(i) << std::endl;
+      //   // throw std::runtime_error("NOT THE RIGHT ELEV");
+      // }
 
       totsed += ratio_of_dep * (topography[no] - surface_elevation[no]) * cellarea;
 
@@ -2186,7 +2188,8 @@ void ModelRunner::drape_dep_only_sed(int dep_ID)
   if(double_equals(this->graph.depression_tree.volume_sed[dep_ID],tootlyc, 100) == false)
     throw std::runtime_error("drape_dep_only_sed::SedDrapedMassBalanceError");
 
-  if(Vs > 0)
+  // Just double checking there are not a huge amount of extra sediment
+  if(Vs > 1e2)
     std::cout << "EXTRA SED IN THE FILLING OF SED-ONLY DEP " << Vs << std::endl;
 
 }
