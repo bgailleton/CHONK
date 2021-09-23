@@ -1643,10 +1643,14 @@ void chonk::CidreHillslopes(double this_sed_height, double kappa_s, double kappa
   int zone_label, std::vector<double> sed_label_prop, double dt, double Xres, double Yres, bool bedrock, 
   NodeGraphV2& graph, double tolerance_to_Sc)
 {
+
+
   if(this->receivers.size() == 0)
     return;
+
+
   // std::cout << "Starting here" << std::endl;
-   // I am recording the current sediment fluxes in the model distributed for each receivers
+  // I am recording the current sediment fluxes in the model distributed for each receivers
   // std::vector<double> pre_sedfluxes = this->get_preexisting_sediment_flux_by_receivers_hillslopes();
   std::vector<double> pre_sedfluxes = std::vector<double>(this->receivers.size(), 0);
   std::vector<double> presedfluv = this->get_preexisting_sediment_flux_by_receivers_fluvial();
@@ -1685,10 +1689,21 @@ void chonk::CidreHillslopes(double this_sed_height, double kappa_s, double kappa
   if(SS == -9999)
     throw std::runtime_error("slope exception not handled in cidre hillslope routines");
 
+  // if the slope is bellow 0 (it can actually happen in the case of implicit lake solving)
+  // I recast it to very small 
+  // Not 0 to avoid unstability
+  std::cout << "A\n";
+  if(SS <= 0 )
+  {
+    SS = 1e-6;
+    SS_dx = (Xres + Yres)/2;
+    sumslopes = SS * this->receivers.size();
+  }
+
   // Adapting the current sediment height
   double save_sed_height = this_sed_height;
   double new_sed_height = 0;
-  this_sed_height = this_sed_height + this->sediment_creation_flux * dt;
+  // this_sed_height = this_sed_height + this->sediment_creation_flux * dt;
 
   // Pre_calculations
 
@@ -1699,16 +1714,22 @@ void chonk::CidreHillslopes(double this_sed_height, double kappa_s, double kappa
   double this_nl = 0;
   if(SS >= Sc - tolerance_to_Sc)
   {
-    SS = Sc - tolerance_to_Sc; // huge number on purpose
+    // SS = Sc - tolerance_to_Sc; // huge number on purpose
     L_is_inf = true;
   }
+
+  if(double_equals(SS,Sc,tolerance_to_Sc))
+    SS = Sc - tolerance_to_Sc; // huge number on purpose
 
   this_nl = SS/Sc;
 
   if(L_is_inf)
-    local_L = 1e36;
+    local_L = 1e13;
   else
     local_L = SS_dx / (1 - std::pow(this_nl,2));
+    // local_L = 1 / (1 - std::pow(this_nl,2));
+
+
 
   if(std::isfinite(local_L) == false)
     throw std::runtime_error("Local_L is not finite in cidre hillslope routines");
@@ -1716,7 +1737,18 @@ void chonk::CidreHillslopes(double this_sed_height, double kappa_s, double kappa
 
   // Total E assuming there is enough sediments to be diffused
   double local_es = 0;
-  local_es = kappa_s * SS;
+
+  // if L is infinity (ie SS > Sc)
+  // then I remove as much sediment as needed to get back to Sc
+  if(L_is_inf)
+  {
+    local_es = (SS - Sc) * SS_dx;
+  }
+  // Else I simply diffuse f(S)
+  else
+  {
+    local_es = kappa_s * SS;
+  }
 
   // std::cout << "2:" << local_es << std::endl;
 
@@ -1757,23 +1789,34 @@ void chonk::CidreHillslopes(double this_sed_height, double kappa_s, double kappa
 
 
   // std::cout << "3" << std::endl;
-  if(fraction_bedrock_exposed >1)
+  if(fraction_bedrock_exposed > 1)
     throw std::runtime_error("fraction_bedrock_exposed>1");
 
   // routines for bedrock if activated
   if(bedrock && fraction_bedrock_exposed > 0)
   {
-    double local_er = kappa_r * SS * fraction_bedrock_exposed;
+
+    double local_er;
+    // if SS > Sc: back to Sc else diffusion f(S)
+    if(L_is_inf)
+      local_er = (SS - Sc) * SS_dx;
+    else
+      local_er = kappa_r * SS;
+
+    local_er = local_er * fraction_bedrock_exposed;
+
+    std::cout << local_er << std::endl;
+
     std::vector<double> tlabprop = std::vector<double>(this->label_tracker.size(),0);
+
     tlabprop[zone_label] = 1;
+
     this->add_to_sediment_flux(local_er * dt * Xres * Yres,tlabprop, 0.);
-    sum_added_HS += local_er* dt * Xres * Yres;
-    // std::cout << this->erosion_flux_only_bedrock << " vs " << local_er << std::endl;
+
+    sum_added_HS += local_er * dt * Xres * Yres;
+
     this->erosion_flux_only_bedrock += local_er;
-  }
-  else
-  {
-    // std::cout << this->erosion_flux_only_bedrock << " vs " << 0 << std::endl;
+
   }
 
   // Cannot create sediment, so L has to be > 1 nor delete them to the oblivion
@@ -1782,8 +1825,9 @@ void chonk::CidreHillslopes(double this_sed_height, double kappa_s, double kappa
 
 
   // Calculating the deposition rate
-  double this_dep = ((sed_HS_in/dt )/ local_L);
+  double this_dep = ((sed_HS_in/dt/ ((Xres+ Yres)/2) )/ local_L);
   double checker_sedneg = (this->sediment_flux * (1 - this->fluvialprop_sedflux)) - this_dep * dt * Xres * Yres;
+  
   if(checker_sedneg < 0)
   {
     this_dep = (1 - abs(checker_sedneg)/(this_dep * dt * Xres * Yres)) * this_dep;
@@ -1801,18 +1845,20 @@ void chonk::CidreHillslopes(double this_sed_height, double kappa_s, double kappa
   // And calculating the sediment creation one
   this->sediment_creation_flux += (new_sed_height - this_sed_height)/dt;
 
-  if(this->sediment_creation_flux > 0.01)
-    std::cout << "SedHighCidre!!::" << this->sediment_creation_flux << " vs " << (new_sed_height - this_sed_height)/dt << std::endl;
+  // if(this->sediment_creation_flux > 0.01)
+  //   std::cout << "SedHighCidre!!::" << this->sediment_creation_flux << " vs " << (new_sed_height - this_sed_height)/dt << std::endl;
 
-  if(std::isfinite(this->sediment_creation_flux) == false)
-  {
-    std::cout << new_sed_height << "||" << this_sed_height << std::endl;
-    throw std::runtime_error("NAN SEDCREA CIDRE");
-  }
+  // if(std::isfinite(this->sediment_creation_flux) == false)
+  // {
+  //   std::cout << new_sed_height << "||" << this_sed_height << std::endl;
+  //   throw std::runtime_error("NAN SEDCREA CIDRE");
+  // }
+
   // Removing the deposited sediments from the global fluxes
-  // std::cout << "bulf:" << - this_dep * dt * Xres * Yres << "|" << this->sediment_flux << std::endl;
+
   this->add_to_sediment_flux(- this_dep * dt * Xres * Yres, this->label_tracker,0);
-    sum_added_HS -= this_dep* dt * Xres * Yres;
+  sum_added_HS -= this_dep* dt * Xres * Yres;
+  
   if(this->sediment_flux < 0 )
   {
     std::cout << "SEDCIDRE<0::" << this->sediment_flux << std::endl;
@@ -1835,6 +1881,10 @@ void chonk::CidreHillslopes(double this_sed_height, double kappa_s, double kappa
   {
     for(size_t i = 0; i < this->receivers.size(); i++ )
     {
+      double tS = this->slope_to_rec[i];
+      if(tS<0)
+        tS = 1e-6;
+
       pre_sedfluxes[i] += (this->slope_to_rec[i]/ sumslopes) * delta_sed;
       sumweights_1 += this->slope_to_rec[i]/ sumslopes;
 
