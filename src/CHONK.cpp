@@ -1897,7 +1897,7 @@ void chonk::CidreHillslopes(double this_sed_height, double kappa_s, double kappa
 
       if(pre_sedfluxes[i] < 0)
       {
-        std::cout << "Caluf::Correcting thingied " << abs(pre_sedfluxes[i]) << std::endl;
+        // std::cout << "Caluf::Correcting thingied " << abs(pre_sedfluxes[i]) << std::endl;
         corrector += abs(pre_sedfluxes[i]);
         pre_sedfluxes[i] = 0;
       }
