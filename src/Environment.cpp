@@ -253,7 +253,7 @@ void ModelRunner::run()
   // Debug checker
   int underfilled_lake = 0;
 
-  // std::cout << "wallec\n";
+  std::cout << "wallec\n";
   // ########### Strating the calculation #############
   // ## Iterating though all the nodes ##
   for(int i=0; i<io_int["n_elements"]; i++)
@@ -266,7 +266,7 @@ void ModelRunner::run()
     this->process_node(node, is_processed, lake_incrementor, underfilled_lake, this->active_nodes, cellarea, surface_elevation, true);   
     // Switching to the next node in line
   }
-  // std::cout << "Do\n";
+  std::cout << "Do\n";
 
   // Calling the finalising function: it applies the changes in topography and I think will apply the lake sedimentation
   this->finalise();

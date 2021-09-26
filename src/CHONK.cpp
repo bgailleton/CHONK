@@ -781,12 +781,12 @@ std::vector<double> chonk::get_preexisting_sediment_flux_by_receivers_hillslopes
     if(v != 0)
     {
       te = true;
-      std::cout << "|" << v;
+      // std::cout << "|" << v;
     }
     pre_sedfluxes.emplace_back(v * this->sediment_flux * (1 - this->fluvialprop_sedflux));
   }
     if(te)
-      std::cout << "\n";
+      // std::cout << "\n";
   return pre_sedfluxes;
 }
 
@@ -1878,10 +1878,11 @@ void chonk::CidreHillslopes(double this_sed_height, double kappa_s, double kappa
   //   std::cout << local_er << "||" << SS - Sc << " <---- CidreSedcreaNan" << std::endl;
   // Backcalculating the new weight of sediment
   double sumsum = 0;
-  double delta_sed = ( this->sediment_flux * (1 - this->fluvialprop_sedflux) );
+  double delta_sed = ( this->sediment_flux ) - sum_of_presedf;
   // if(delta_sed == 0)
   double corrector = 0;
   double sumweights_1 = 0;
+  
   if(sumslopes > 0)
   {
     for(size_t i = 0; i < this->receivers.size(); i++ )
@@ -1942,7 +1943,7 @@ void chonk::CidreHillslopes(double this_sed_height, double kappa_s, double kappa
     sumstuff += pre_sedfluxes[i] + presedfluv[i];
 
 
-    // this->weigth_sediment_fluxes[i] = pre_sedfluxes[i] /sumsum;
+    this->weigth_sediment_fluxes[i] = pre_sedfluxes[i] /sumsum;
     if(std::isfinite(this->weigth_sediment_fluxes[i]) == false || this->weigth_sediment_fluxes[i] < 0)
     { 
       std::cout << "cidreWeightProblem::" <<this->weigth_sediment_fluxes[i] <<  "||" << sumsum << std::endl;
@@ -1953,13 +1954,13 @@ void chonk::CidreHillslopes(double this_sed_height, double kappa_s, double kappa
   }
 
 
-  double afft_sedfluv = this->sediment_flux * this->fluvialprop_sedflux;
+  // double afft_sedfluv = this->sediment_flux * this->fluvialprop_sedflux;
 
-  if(double_equals(sumstuff,this->sediment_flux,1e-3) == false)
-    std::cout << sumstuff << " vs " << this->sediment_flux<< std::endl;
+  // if(double_equals(sumstuff,this->sediment_flux,1e-3) == false)
+  //   std::cout << sumstuff << " vs " << this->sediment_flux<< std::endl;
 
-  if(double_equals(sumweights,1,1e-6) == false)
-    std::cout << "BAGLABUF::" << sumweights << std::endl;
+  // if(double_equals(sumweights,1,1e-6) == false)
+  //   std::cout << "BAGLABUF::" << sumweights << std::endl;
 
   // Done
   return;
