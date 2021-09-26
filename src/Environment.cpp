@@ -353,7 +353,7 @@ void ModelRunner::process_node(int& node, std::vector<bool>& is_processed, int& 
 
       // Formatting the depression moving pattern     
       this->chonk_network[node].reinitialise_moving_prep();
-      this->chonk_network[node].external_moving_prep({next_node},{1.},{1.},{0});
+      this->chonk_network[node].external_moving_prep({next_node},{1.},{0},{0});
 
       // Applying the fluxes modifyers
       this->manage_fluxes_after_moving_prep(this->chonk_network[node],this->label_array[node]);
