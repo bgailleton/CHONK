@@ -870,7 +870,8 @@ void chonk::add_to_sediment_flux(double value, std::vector<double> label_proport
   if(this->fluvialprop_sedflux > 1)
   {
     std::cout << this->fluvialprop_sedflux << "|" << fluvialsedfluxtot << "|" << this->sediment_flux << "|" << prop_fluvial << "|value:" << value << std::endl;
-    throw std::runtime_error("fluvprop>1");
+    // throw std::runtime_error("fluvprop>1");
+    this->fluvialprop_sedflux = 1;
   }
 
   if(this->sediment_flux < 0)
@@ -1882,7 +1883,7 @@ void chonk::CidreHillslopes(double this_sed_height, double kappa_s, double kappa
   // if(delta_sed == 0)
   double corrector = 0;
   double sumweights_1 = 0;
-  
+
   if(sumslopes > 0)
   {
     for(size_t i = 0; i < this->receivers.size(); i++ )
