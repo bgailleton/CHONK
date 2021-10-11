@@ -60,6 +60,11 @@ class Landscape(object):
 		self.Uy[:self.normal_fault_idx] -= (Uneg * (np.exp(-X[:self.normal_fault_idx][::-1]/alpha_neg) * np.cos(X[:self.normal_fault_idx][::-1]/alpha_neg)) )
 		tX = np.arange(0,(self.mountain_front_idx - self.normal_fault_idx) * self.dy,self.dy )
 		self.Uy[self.normal_fault_idx:self.mountain_front_idx] += Upos * (np.exp(-tX/alpha_pos) * np.cos(tX/alpha_pos))
+		minUy = self.Uy.min()
+		if(minUy < 0):
+			self.Uy += abs(minUy)
+        
+		self.Uy[self.mountain_front_idx:] = 0
 		
 		self.uplift_NF = np.zeros((self.ny,self.nx), dtype = np.float64)
 		for i in range(self.nx):
