@@ -156,7 +156,8 @@ double dx, // resolution in x
 double dy, // resolution in y
 int nrows, // number of rows
 int ncols, // number of cols
-bool lake_solver // implicit if false, explicit if true
+bool lake_solver, // implicit if false, explicit if true
+double carving_th
   );
 
 std::vector<char> is_border;
@@ -244,7 +245,7 @@ void recompute_multi_receveivers_and_donors(xt::pytensor<bool,1>& active_nodes, 
 void recompute_SFMF_receveivers_and_donors(xt::pytensor<bool,1>& active_nodes, xt::pytensor<double,1>& elevation, std::vector<int>& nodes_to_compute);
 
 
-std::vector<int> _update_pits_receivers_keep_track(xt::pytensor<int,2>& conn_basins,xt::pytensor<int,2>& conn_nodes, xt::xtensor<int,1>& mstree, xt::pytensor<double,1>& elevation);
+std::vector<int> _update_pits_receivers_keep_track(xt::pytensor<int,2>& conn_basins,xt::pytensor<int,2>& conn_nodes, xt::xtensor<int,1>& mstree, xt::pytensor<double,1>& elevation, xt::pytensor<bool,1>& active_nodes);
 void correct_flatrouting(xt::pytensor<bool,1>& active_nodes, xt::pytensor<double,1>& elevation);
 
 // // Flat surface resolver
@@ -276,6 +277,8 @@ void depression_initialisation(xt::pytensor<double,1>& elevation);
 
 
 DepressionTree depression_tree;
+
+double threshold_depression_depth = 0.5;
 
 // std::vector<int> top_depression;
 // std::vector<int> bottom_depression;

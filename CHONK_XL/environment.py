@@ -42,6 +42,16 @@ class ChonkBase(object):
 	n_depths_recorded = xs.index(dims = 'n_depths_recorded')
 
 
+	E_r = xs.on_demand( dims = ('y','x'), description = "Bedrock erosion (all processes)")
+	E_s = xs.on_demand( dims = ('y','x'), description = "Sediment entrainment (all processes)")
+	D_s = xs.on_demand( dims = ('y','x'), description = "Sediment deposition (all processes)")
+
+	Q_sout_lab_N = xs.on_demand(dims = ('x','n_labels'), description = "Volume of suspended sediments outletting the model at the Northern boundary in m^3/yrs")
+	Q_sout_lab_S = xs.on_demand(dims = ('x','n_labels'), description = "Volume of suspended sediments outletting the model at the Northern boundary in m^3/yrs")
+	Q_sout_lab_E = xs.on_demand(dims = ('y','n_labels'), description = "Volume of suspended sediments outletting the model at the Northern boundary in m^3/yrs")
+	Q_sout_lab_W = xs.on_demand(dims = ('y','n_labels'), description = "Volume of suspended sediments outletting the model at the Northern boundary in m^3/yrs")
+
+
 	def initialize(self):
 
 		# Initialising dimentions
@@ -80,6 +90,32 @@ class ChonkBase(object):
 		self.CHONK.lake_depth =  np.zeros((self.nx * self.ny))
 		self.CHONK.set_lake_switch(False)
 
+	@D_s.compute
+	def _D_s(self):
+		return self.CHONK.get_deposition_flux().reshape(self.ny,self.nx)
+
+	@E_r.compute
+	def _E_r(self):
+		return self.CHONK.get_erosion_bedrock_only_flux().reshape(self.ny,self.nx)
+
+	@E_s.compute
+	def _E_s(self):
+		return self.CHONK.get_erosion_sed_only_flux().reshape(self.ny,self.nx)
+
+
+
+	@Q_sout_lab_N.compute
+	def _Q_sout_lab_N(self):
+		return self.CHONK.get_Qsprop_bound("N")
+	@Q_sout_lab_S.compute
+	def _Q_sout_lab_S(self):
+		return self.CHONK.get_Qsprop_bound("S")
+	@Q_sout_lab_E.compute
+	def _Q_sout_lab_E(self):
+		return self.CHONK.get_Qsprop_bound("E")
+	@Q_sout_lab_W.compute
+	def _Q_sout_lab_W(self):
+		return self.CHONK.get_Qsprop_bound("W")
 
 @xs.process
 class Runner(object):
@@ -125,6 +161,8 @@ class Topography(object):
 	runner_done = xs.foreign(Runner, "runner_done")
 	uplift_done = xs.foreign(Uplift, "uplift_done")
 	topo_updated = xs.variable(intent = "out")
+	initial_carving = xs.variable(intent = 'in', default = True)
+
 
 	topography = xs.on_demand( dims = ('y','x'))
 	sed_height = xs.on_demand( dims = ('y','x'))
@@ -135,6 +173,7 @@ class Topography(object):
 		self.CHONK.set_surface_elevation_tp1(np.copy( self.initial_elevation.ravel()))
 		self.CHONK.set_sed_height(np.zeros_like(self.initial_elevation.ravel()))
 		self.CHONK.set_sed_height_tp1(np.zeros_like(self.initial_elevation.ravel()))
+		self.CHONK.initial_carving = self.initial_carving
 
 	def finalize_step(self):
 		self.CHONK.set_surface_elevation(self.CHONK.get_surface_elevation_tp1() )
@@ -160,6 +199,7 @@ class Lake(object):
 	nx = xs.foreign(ChonkBase, "nx")
 	ny = xs.foreign(ChonkBase, "ny")
 	lake_depth = xs.on_demand(dims = ('y','x'))
+	topolake = xs.on_demand(dims = ('y','x'))
 
 	def initialize(self):
 		if(self.method == 'implicit'):
@@ -174,6 +214,10 @@ class Lake(object):
 			else:
 				self.CHONK.lake_evaporation_rate_spatial = np.full((self.ny,self.nx),self.evaporation_rate).ravel()
 
+	@topolake.compute
+	def _topolake(self):
+		return self.CHONK.get_topography().reshape(self.ny,self.nx)
+	
 	@lake_depth.compute
 	def _lake_depth(self):
 		return self.CHONK.lake_depth.reshape(self.ny,self.nx)

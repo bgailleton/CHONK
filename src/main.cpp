@@ -125,8 +125,12 @@ PYBIND11_MODULE(CHONK_cpp, m)
       .def_readwrite("thresholdMF2SF", &ModelRunner::thresholdMF2SF)
       .def_readwrite("lake_depth", &ModelRunner::lake_depth)
       .def_readwrite("depths_res_sed_proportions", &ModelRunner::depths_res_sed_proportions)
+      .def_readwrite("initial_carving", &ModelRunner::initial_carving)
       .def("get_fluvial_Qs", &ModelRunner::get_fluvial_Qs)
       .def("get_hillslope_Qs", &ModelRunner::get_hillslope_Qs)
+      .def("get_neighbours_for_debugging", &ModelRunner::get_neighbours_for_debugging)
+      .def("get_Qsprop_bound", &ModelRunner::get_Qsprop_bound)
+
       
 
       .def("get_K_calc", &ModelRunner::get_K_calc)

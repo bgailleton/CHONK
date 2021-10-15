@@ -260,8 +260,8 @@ void chonk::cancel_split_and_merge_in_receiving_chonks(std::vector<chonk>& chonk
 
 
     // TO DO:: SORT THIS SHIT IS NOT NORMAL
-    // if(other_chonk.get_sediment_flux() < 0)
-    //   other_chonk.set_sediment_flux(0., oatalab);
+    if(other_chonk.get_sediment_flux() < 0)
+      other_chonk.set_sediment_flux(0., oatalab,1.);
 
 
     // std::cout << "SEDFLUXDEBUG::" << this->sediment_flux << "||" << this->weigth_sediment_fluxes[i] << "||water::" << this->weigth_water_fluxes[i] << std::endl;
@@ -876,9 +876,10 @@ void chonk::add_to_sediment_flux(double value, std::vector<double> label_proport
 
   if(this->sediment_flux < 0)
   {
+    std::cout << "WARNING:: OUT Sediment flux < 0 " << this->sediment_flux << "recasting..." << std::endl;
+    this->sediment_flux = 0;
     // std::cout << this->fluvialprop_sedflux << "|" << fluvialsedfluxtot << "|" << this->sediment_flux << "|" << prop_fluvial << "|value:" << value << std::endl;
-    std::cout << "--->" << this->current_node << std::endl;
-    std::cout << "WARNING:: OUT Sediment flux < 0 " << this->sediment_flux << std::endl;
+    // std::cout << "--->" << this->current_node << std::endl;
   }
 
 }
@@ -1108,6 +1109,9 @@ void chonk::charlie_I(double n, double m, double K_r, double K_s,
   this->erosion_flux_only_bedrock += Er_tot;
   this->erosion_flux_only_sediments += Es_tot;
   this->deposition_flux += Ds_tot;
+
+  if(this->deposition_flux < 0)
+    std::cout << "this->deposition_flux::" << this->deposition_flux << std::endl;
 
   // Now calculating the new sediment heugh analytically
   double phi = 0; // TEMPORARY MEASURE, PHI WILL BE TO BE ADDED AFTER

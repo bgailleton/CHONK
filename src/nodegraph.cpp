@@ -31,6 +31,7 @@
 #include <tuple>
 #include <queue>
 #include "nodegraph.hpp"
+#include "npy.hpp"
 #include <chrono>
 
 
@@ -71,7 +72,8 @@ NodeGraphV2::NodeGraphV2(
   double dy,
   int nrows,
   int ncols,
-  bool lake_solver
+  bool lake_solver,
+  double carving_th
   )
 {
   // Saving general informations
@@ -83,6 +85,9 @@ NodeGraphV2::NodeGraphV2(
   this->nrows = nrows;
   this->ncols = ncols;
   this->lake_solver = lake_solver;
+  this->threshold_depression_depth = carving_th;
+
+  // std::cout << "Carving with " << this->threshold_depression_depth << std::endl;
 
   this->flat_mask = xt::zeros<int>({this->un_element}) - 1;
   // this->depression_tree = std::vector<Depression>();
@@ -139,18 +144,20 @@ NodeGraphV2::NodeGraphV2(
   //# and the origin of the pit
   std::vector<int> origin_pit;
 
-  //# Iterating through the nodes on the stack to gather all the pits
-  for(auto node:this->Sstack)
-  {
-    // If a pit is its single-flow receiver and an active node it is a pit to reroute
-    if(this->graph[node].Sreceivers == node && active_nodes[node])
-    {
-      this->pits_to_reroute[node] = true;
-    }
-  }
+  
 
   if(this->lake_solver == false)
   {
+
+    //# Iterating through the nodes on the stack to gather all the pits
+    for(auto node:this->Sstack)
+    {
+      // If a pit is its single-flow receiver and an active node it is a pit to reroute
+      if(this->graph[node].Sreceivers == node && active_nodes[node])
+      {
+        this->pits_to_reroute[node] = true;
+      }
+    }
     // Computing basin info from stack
       this->compute_basins(active_nodes);
       this->compute_pits(active_nodes);
@@ -275,6 +282,8 @@ NodeGraphV2::NodeGraphV2(
     }
 
     this->correct_flatrouting(active_nodes, elevation);
+
+
     for(size_t i=0; i<this->un_element; i++)
     {
       if(i == this->graph[i].Sreceivers && active_nodes[i] == true)
@@ -284,9 +293,29 @@ NodeGraphV2::NodeGraphV2(
 
     }
 
+    std::vector<double> original_elevations(this->un_element,0.);
+    for(size_t i=0; i<this->un_element; ++i)
+    {
+      if(active_nodes[i] == 0)
+      {
+        original_elevations[i] = elevation[i];
+        elevation[i] = -1e36;
+      }
+    }
+
 
     // THIS IS WHAT HAPPENS WHEN THE LAKE SOVER IS EXPLICIT
     this->grow_depression_tree_v2(elevation, active_nodes);
+
+    for(size_t i=0; i<this->un_element; ++i)
+    {
+      if(active_nodes[i] == 0)
+      {
+        elevation[i] = original_elevations[i];
+        // elevation[i] = -1e36;
+      }
+    }
+
 
     for(int i=0; i<this->depression_tree.get_n_dep(); i++)
     {
@@ -295,6 +324,9 @@ NodeGraphV2::NodeGraphV2(
         std::cout << "Depression " << i << " has tippingnode == externode::" << this->depression_tree.externode[i] << std::endl;
         throw std::runtime_error("TIppingnode Error");
       }
+      if(this->depression_tree.volume[i] < 0)
+        throw std::runtime_error("NegVolError");
+
     }
 
     // this->depression_tree.printree();
@@ -514,11 +546,19 @@ void NodeGraphV2::fill_the_depressions(std::vector<int>& next_to_check, xt::pyte
         // throw std::runtime_error("NodeGraphV2::fill_the_depressions::hw_max_not_good");
       }
 
+      // if(active_nodes[next_node] == 0)
+      // {
+      //   this->depression_tree.externode[dep] = -1;
+      //   this->depression_tree.tippingnode[dep] = next_node;
+      //   break;
+      // }
+
       std::vector<int> neighbours; std::vector<double> dummy ; this->get_D8_neighbors(next_node, active_nodes, neighbours, dummy);
       // std::cout << "checker_filling 3" << std::endl;
 
       // if my node is not belonging to my children but in a depression system
-      if(this->depression_tree.is_child_of(this->depression_tree.node2tree[next_node],dep) == false && this->depression_tree.node2tree[next_node] > -1  )
+      if(this->depression_tree.is_child_of(this->depression_tree.node2tree[next_node],dep) == false && 
+        this->depression_tree.node2tree[next_node] > -1  )
       {
         // triggering the merging of two depressions
         // std::cout <<  "Twut1 : " << dep << "|"  << next_node << "|" << this->depression_tree.node2tree[next_node] << "|" << elevation[next_node]  << std::endl;
@@ -643,7 +683,7 @@ void NodeGraphV2::fill_the_depressions(std::vector<int>& next_to_check, xt::pyte
         }
       }
     }
-    if(this->depression_tree.externode[dep] < 0)
+    if(this->depression_tree.externode[dep] < 0 && active_nodes[this->depression_tree.tippingnode[dep]] == 1)
     {
       throw std::runtime_error("Need Externote here");
     }
@@ -2479,7 +2519,7 @@ void NodeGraphV2::compute_stack()
       istack = this->_add2stack(inode, istack);
     }
   }
-  if(istack > this->n_element)
+  if(istack != this->n_element)
   {
     std::cout << "Sstack inconsistent? " << istack << std::endl;
     throw std::runtime_error("Sstack inconsistent");
@@ -2759,50 +2799,60 @@ void NodeGraphV2::correct_flatrouting(xt::pytensor<bool,1>& active_nodes, xt::py
     this->_orient_basin_tree(conn_basins_2,conn_nodes_2,basin0, mstree);
 
 
-    std::vector<int> nodes_to_reconfigure = this->_update_pits_receivers_keep_track(conn_basins_2, conn_nodes_2, mstree, elevation);
+    std::vector<int> nodes_to_reconfigure = this->_update_pits_receivers_keep_track(conn_basins_2, conn_nodes_2, mstree, elevation, active_nodes);
 
     // std::cout << "A" << std::endl;
 
     // Recomputing the stack
-    this->Sstack = xt::zeros<int>({this->n_element});;
-    this->compute_stack();
+    // this->Sstack = xt::zeros<int>({this->n_element});;
+    // this->compute_stack();
 
 
-    std::vector<int> n_stuff(this->un_element,0);
-    for(auto i : this->Sstack)
-      n_stuff[i]++;
-    for(auto i : n_stuff)
-    {
-      if(i>1 || i==0)
-      {
-        throw std::runtime_error("!!!");
-      }
-    }
+    // std::vector<int> n_stuff(this->un_element,0);
+    // for(auto i : this->Sstack)
+    //   n_stuff[i]++;
 
-    // std::cout << "B" << std::endl;
+    // for(auto i : n_stuff)
+    // {
+    //   if(i>1 || i==0)
+    //   {
+    //     throw std::runtime_error("!!!");
+    //   }
+    // }
+
+    // // std::cout << "B" << std::endl;
     xt::pytensor<double,1> previousz = xt::zeros<double>({this->n_element});
     for(size_t i =0; i< this->un_element; i++)
       previousz[i] = elevation[i];
 
+    // THIS IS THE WORKING VERSION REMOVING FLAT SURFACES
     for(int i=0; i<this->un_element; i++)
     {
       int node = this->Sstack[i];
 
-      // if(node == 871)
-      //   std::cout << "871::: " << previousz[node] << " -> " << elevation[node] << " -> " << elevation[this->graph[node].Sreceivers] << std::endl;
-      // std::cout << elevation[i] << std::endl;
-      // if(i == 604 || i == 705)
-        // std::cout << "!!! " << i << std::endl; 
       if(this->graph[node].Sreceivers != node && previousz[node] == previousz[this->graph[node].Sreceivers])
       {
         
         elevation[node] = elevation[this->graph[node].Sreceivers] + 1e-3;
-
-        // std::cout << "changed: " << node << ": " << previousz[node] << " -> " << elevation[node] << " -> " << elevation[this->graph[node].Sreceivers] << std::endl;
-        // if(this->graph[node].Sreceivers == 871)
-        //   std::cout << "REC is 871" << ": " << previousz[this->graph[node].Sreceivers] << " -> " << elevation[this->graph[node].Sreceivers] << " -> " << elevation[this->graph[this->graph[node].Sreceivers].Sreceivers] << std::endl;
       }
     }
+
+
+    // THIS IS MY ATTEMPT CARVING WITH THRESHOLD
+    // From top to bottom
+    // for(int i = this->un_element - 1; i>=0; --i)
+    // {
+    //   if(this->graph[node].Sreceivers != node)
+    //     continue;
+      
+    //   int trec = this->graph[node].Sreceivers;
+
+    //   if(previousz[trec] - previousz[])
+
+    // }
+
+
+
     // std::cout << "871::: " << previousz[871] << " -> " << elevation[871] << " -> " << elevation[this->graph[871].Sreceivers] << std::endl;
 
 
@@ -2919,7 +2969,7 @@ void NodeGraphV2::_connect_basins(xt::pytensor<int,2>& conn_basins, xt::pytensor
 {
   int iconn = 0;
 
-  basin0 = -1; //intp?
+  basin0 = -1; 
   int ibasin = 0;
 
   xt::pytensor<int,1> conn_pos = xt::zeros<int>({this->nbasins}); //np.full(nbasins, -1, dtype=np.intp)
@@ -3219,10 +3269,15 @@ void NodeGraphV2::_update_pits_receivers(xt::pytensor<int,2>& conn_basins,xt::py
   }
 }
 
-std::vector<int> NodeGraphV2::_update_pits_receivers_keep_track(xt::pytensor<int,2>& conn_basins,xt::pytensor<int,2>& conn_nodes, xt::xtensor<int,1>& mstree, xt::pytensor<double,1>& elevation)
+std::vector<int> NodeGraphV2::_update_pits_receivers_keep_track(xt::pytensor<int,2>& conn_basins,xt::pytensor<int,2>& conn_nodes, xt::xtensor<int,1>& mstree, xt::pytensor<double,1>& elevation, xt::pytensor<bool,1>& active_nodes)
 {
 
-  std::vector<int> output;
+  std::vector<int> tocarve(this->un_element,0);
+  std::vector<int> FlowAcc(this->un_element,0.);
+
+
+
+
   // for i in mstree:
   for(auto i : mstree)
   {
@@ -3244,8 +3299,13 @@ std::vector<int> NodeGraphV2::_update_pits_receivers_keep_track(xt::pytensor<int
 
 
 
-    output.push_back(outlet_from);
-    output.push_back(node_to);
+    // output.push_back(outlet_from);
+    // output.push_back(node_to);
+    bool carve = false;
+    if(std::max(elevation[node_from], elevation[node_to]) - elevation[outlet_from] < this->threshold_depression_depth)
+    {
+      carve = true;
+    }
 
     // if(outlet_from == 604)
     // {
@@ -3258,10 +3318,40 @@ std::vector<int> NodeGraphV2::_update_pits_receivers_keep_track(xt::pytensor<int
     // if(this->graph[outlet_from].Sreceivers != outlet_from)
     //   throw std::runtime_error("???");
 
-    this->graph[outlet_from].Sreceivers = node_to;
-    this->graph[outlet_from].length2Srec = this->dx*1000; // just to have a length but it should not actually be used
-    // std::cout << node_to << "." << std::endl;
-    this->graph[node_to].Sdonors.emplace_back(outlet_from);
+    if(carve)
+    {
+      int this_node = node_from;
+      int last_node = node_to;
+
+      while(this_node != outlet_from)
+      {
+        int toBnext = this->graph[this_node].Sreceivers;
+        this->graph[this_node].Sreceivers = last_node;
+        this->graph[this_node].length2Srec = this->dx; // just to have a length but it should not actually be used
+
+        last_node = this_node;
+        this_node = toBnext;
+      }
+
+      // if(this_node == last_node)
+      //   throw std::runtime_error("lskdfjalsjdf");
+
+      this->graph[this_node].Sreceivers = last_node;
+      this->graph[this_node].length2Srec = this->dx; // just to have a length but it should not actually be used
+
+      tocarve[outlet_from] = 1;
+      
+
+    }
+    else
+    {
+      this->graph[outlet_from].Sreceivers = node_to;
+      this->graph[outlet_from].length2Srec = this->dx*1000; // just to have a length but it should not actually be used
+      // std::cout << node_to << "." << std::endl;
+      this->graph[node_to].Sdonors.emplace_back(outlet_from);
+      tocarve[outlet_from] = -1;
+    }
+    
     // }
     // else
     // {
@@ -3272,8 +3362,88 @@ std::vector<int> NodeGraphV2::_update_pits_receivers_keep_track(xt::pytensor<int
     // }
   }
 
+  // Inverting the donor array
 
-  return output;
+  for(int i=0; i< this->n_element;++i)
+  {
+    this->graph[i].Sdonors.clear();
+    this->graph[i].Sdonors.reserve(8);
+  }
+
+  for(int i=0; i< this->n_element;++i)
+  {
+    if(i != this->graph[i].Sreceivers)
+      this->graph[this->graph[i].Sreceivers].Sdonors.emplace_back(i);
+  }
+
+
+
+  this->compute_stack();
+  
+
+
+  for(int ti= this->n_element-1; ti>=0; --ti)
+  // for(int ti=0; ti<this->n_element; ++ti)
+  {
+    int i = this->Sstack[ti]; 
+
+    if(tocarve[i] != 1)
+      continue;
+
+    int start_node = i;
+    while(this->graph[start_node].Sreceivers != start_node)
+    {
+
+      if(tocarve[start_node] == -1)
+        break;
+
+      if(elevation[this->graph[start_node].Sreceivers] >= elevation[start_node])
+      {
+        // double storelev = elevation[start_node];
+        FlowAcc[this->graph[start_node].Sreceivers] = elevation[this->graph[start_node].Sreceivers] - elevation[start_node] - 1e-3;
+        elevation[this->graph[start_node].Sreceivers] = elevation[start_node] - 1e-3;
+        // if(storelev)
+      }
+      else
+        break;
+
+      start_node = this->graph[start_node].Sreceivers;
+
+    }
+  }
+
+  // for(int ti= this->n_element-1; ti>=0; --ti)
+  // {
+  //   int i = this->Sstack[ti]; 
+  //   FlowAcc[i]++;
+  //   if(this->graph[i].Sreceivers != i)
+  //   {
+  //     FlowAcc[this->graph[i].Sreceivers] += FlowAcc[i];
+  //   }
+  // }
+  // const long unsigned shapa [] = {this->un_element};
+  // npy::SaveArrayAsNumpy("Stuff.npy", false, 1, shapa, FlowAcc);
+  // for(int ti= this->n_element-1; ti>=0; --ti)
+  // // for(int ti=0; ti<this->n_element; ++ti)
+  // {
+  //   int i = this->Sstack[ti];
+  //   if(tocarve[i] == false)
+  //     continue;
+
+  //   int start_node = i;
+  //   while(this->graph[start_node].Sreceivers != start_node)
+  //   {
+  //     if(elevation[this->graph[start_node].Sreceivers] >= elevation[start_node])
+  //       elevation[this->graph[start_node].Sreceivers] = elevation[start_node] - 1e-3;
+  //     else
+  //       break;
+
+  //     start_node = this->graph[start_node].Sreceivers;
+  //   }
+  // }
+
+
+  return std::vector<int>();
 }
 
 

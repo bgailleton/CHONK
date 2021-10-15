@@ -130,6 +130,9 @@ void ModelRunner::create(double ttimestep, std::vector<std::string> tordered_flu
   this->Qw_out = 0;
   this->Ql_in = 0;
   this->Ql_out = 0;
+
+  this->NTIME_DRAPEONLYSEDHAPPENED = 0;
+  this->NTIME_DRAPEONLYSEDHAPPENEDMAX = 0;
 }
 
 // initialising the node graph and the chonk network
@@ -139,6 +142,8 @@ void ModelRunner::initiate_nodegraph()
 
   // DEBUG STUFF IGNORER
   this->NTIMEPREFLUXCALLED = 0;
+  this->NTIME_DRAPEONLYSEDHAPPENED = 0;
+  this->NTIME_DRAPEONLYSEDHAPPENEDMAX = 0;
 
   // Creating the nodegraph and preprocessing the depression nodes
   this->dx = this->io_double["dx"];
@@ -177,9 +182,20 @@ void ModelRunner::initiate_nodegraph()
 
   // Dat is the real stuff:
   // Initialising the graph
+  double threshold = 0.1;
+  if(this->initial_carving)
+  {
+    threshold = 1e32;
+    this->initial_carving = false;
+  }
+    // threshold = 1e32;
+
+  // std::cout << "BEEF " << sumvecdouble(this->surface_elevation) << std::endl;
+
   this->graph = NodeGraphV2(this->surface_elevation, this->active_nodes,this->dx, this->dy,
-                            this->io_int["n_rows"], this->io_int["n_cols"], this->lake_solver);
+                            this->io_int["n_rows"], this->io_int["n_cols"], this->lake_solver, threshold);
   
+  // std::cout << "AFFT " << sumvecdouble(this->surface_elevation) << std::endl;
   // topography is the surface elevation + lake surface and is used to calculated its volume and mass balance  
   this->topography = xt::pytensor<double,1>(this->surface_elevation);
 
@@ -262,8 +278,18 @@ void ModelRunner::run()
 
     // Processing that node
     // ### Saving the local production of sediment, in order to cancel it later
+    // if(this->chonk_network[node].get_sediment_flux() < -0.1)
+    // {
+    //   std::cout << "SEDFLUXNEG_GLOBALCHECEKR" << std::endl;
+    //   throw std::runtime_error("Before proc.");
+    // }  
     this->process_node(node, is_processed, lake_incrementor, underfilled_lake, this->active_nodes, cellarea, surface_elevation, true);   
     // Switching to the next node in line
+    // if(this->chonk_network[node].get_sediment_flux() < -0.1)
+    // {
+    //   std::cout << "SEDFLUXNEG_GLOBALCHECEKR" << std::endl;
+    //   throw std::runtime_error("After proc.");
+    // }
   }
 
   // Calling the finalising function: it applies the changes in topography and I think will apply the lake sedimentation
@@ -291,13 +317,15 @@ void ModelRunner::run()
   CHRONO_n_time[1] ++;
   CHRONO_mean[1] += std::chrono::duration<double>(CHRONO_stop[1] - CHRONO_start[1]).count();
 
+  // if(this->NTIME_DRAPEONLYSEDHAPPENED >0 )
+  //   std::cout << "Draped only sed " << this->NTIME_DRAPEONLYSEDHAPPENED << " time max was " << this->NTIME_DRAPEONLYSEDHAPPENEDMAX << std::endl;
 
   // timer reports
   // std::cout << std::endl << "--------------------- START OF TIME REPORT ---------------------" << std::endl;
   // for(int i=0; i< this->n_timers; i++)
   //   std::cout << CHRONO_name[i] << " took " << double(CHRONO_mean[i])/CHRONO_n_time[i] << " seconds out of " << CHRONO_n_time[i] << " runs" << std::endl;
   // std::cout << "--------------------- END OF TIME REPORT ---------------------" << std::endl << std::endl;
-  // Done
+  // // Done
 }
 
 
@@ -387,9 +415,9 @@ void ModelRunner::process_node(int& node, std::vector<bool>& is_processed, int& 
     this->manage_move_prep(this->chonk_network[node]);
   }
 
-
   // Fluxes after moving prep are active fluxes such as erosion or other thingies
   this->manage_fluxes_after_moving_prep(this->chonk_network[node],this->label_array[node]);
+  if(this->chonk_network[node].get_sediment_flux() < -0.1)
 
 
   // Apply the changes and propagate the fluxes downstream
@@ -566,10 +594,28 @@ void ModelRunner::finalise()
   for(int i=0; i<this->io_int["n_elements"]; i++)
   {
     this->Ql_out += (tlake_depth[i] - this->lake_depth[i]) * this->dx * this->dy / this->timestep;
+
+    if(tlake_depth[i] > 0 && this->active_nodes[i] == 0)
+      std::cout <<"HAYAAAAA" << std::endl;
+
+    if(tlake_depth[i] > 0)
+    {
+      std::vector<int> neightbouring_nodes; std::vector<double> length2neigh;
+      this->graph.get_D8_neighbors( i, this->active_nodes,  neightbouring_nodes,  length2neigh);
+      for(auto tn:neightbouring_nodes)
+      {
+        if(this->topography[tn] < this->topography[i])
+          std::cout << i << " HAYA22:: " << this->topography[i] << " vs " << this->topography[tn] << std::endl;
+      }
+    }
+
   }
 
   // Saving the new lake depth  
   this->lake_depth  = tlake_depth;
+
+
+
 
   // calculating other water mass balance.
   for(int i = 0; i<this->io_int["n_elements"]; i++)
@@ -853,6 +899,9 @@ void ModelRunner::process_dep(int dep, double& extra_sed, std::vector<double>& e
     // Geting the outlet node ID
     int outlet = this->graph.depression_tree.tippingnode[dep];
 
+    if(this->active_nodes[outlet] == 0)
+      std::cout << "OUTLET IS 0" << std::endl;
+
     // getting the local sediment flux (ie what has been locally eroded/deposited)
     double locsedflux = this->chonk_network[outlet].get_local_sedflux(this->timestep, this->cellarea);
     double globasedflux = this->chonk_network[outlet].get_sediment_flux();
@@ -934,6 +983,10 @@ void ModelRunner::process_dep(int dep, double& extra_sed, std::vector<double>& e
   else
   {
 
+
+    if(extra_sed < 0)
+      extra_sed = 0;
+
     // much "simpler" scenario:
     // Just needs to fill the lake
     this->fill_underfilled_lake(dep);
@@ -962,6 +1015,22 @@ void ModelRunner::fill_lake_to_top(int dep)
 
   // getting the outlet or "tipping node"
   int outlet = this->graph.depression_tree.tippingnode[dep];
+
+  // if(this->graph.depression_tree.get_all_nodes(dep).size() == 1)
+  // {
+  //   std::cout << "Trapes" << std::endl;
+  //   int node=this->graph.depression_tree.get_all_nodes(dep)[0];
+  //   std::vector<int> stuff; std::vector<double> neight; this->graph.get_D8_neighbors(node,this->active_nodes, stuff, neight);
+  //   std::cout << "Node + hw -> " << this->graph.depression_tree.hw[dep] << std::endl;
+  //   std::cout << "Others: ";
+  //   for(auto n:stuff)
+  //   {
+  //     std::cout << "|" <<this->topography[n];
+  //     if(this->topography[n] <this->graph.depression_tree.hw[dep] )
+  //       std::cout  << std::endl << "IOASDFJSDJFLSDJFLKJSDKLFJKLSDJFKLJSDLKFJLKSJDFLKJASKLD" << std::endl;
+  //   }
+  //   std::cout << std::endl;
+  // }
 
   //going through each nodes of the lake to label them and adjust the topography
   for(auto n:this->graph.depression_tree.get_all_nodes(dep))
@@ -1094,6 +1163,11 @@ void ModelRunner::fill_underfilled_lake(int dep)
 
       this->graph.depression_tree.hw[dep] = this_elev + ratio * deltelev;
       
+      // if(nodes2topogy.size() == 1)
+      // {
+      //   std::cout << "Tripes" << std::endl;
+      // }
+
       for(auto nj:nodes2topogy)
         this->topography[nj] = this->graph.depression_tree.hw[dep];
 
@@ -2001,6 +2075,29 @@ void ModelRunner::drape_deposition_flux_to_chonks()
 
     this->Ql_out += this->graph.depression_tree.actual_amount_of_evaporation[i]/this->timestep;
 
+    if(this->graph.depression_tree.volume_water[i] < 0)
+      throw std::runtime_error("NEGWATLAKE");
+
+    if(this->graph.depression_tree.volume_sed[i] < 0)
+      throw std::runtime_error("NEGsedLAKE");
+
+    auto dat = this->graph.depression_tree.get_all_nodes(i);
+
+    if(dat.size() < 5 )
+    {
+      auto thw = this->graph.depression_tree.hw[i];
+      double lmax = 0;
+      for( auto n:dat)
+      {
+        if(thw - this->topography[n] > lmax)
+        {
+          lmax = thw - this->topography[n];
+        }
+      }
+      if(lmax > 100)
+        throw std::runtime_error("wtf lake");
+    }
+
     double totsed = 0;
     double totwat = 0;
     double ratio_of_dep = this->graph.depression_tree.volume_sed[i]/(this->graph.depression_tree.volume_water[i] - this->graph.depression_tree.actual_amount_of_evaporation[i]);
@@ -2010,7 +2107,6 @@ void ModelRunner::drape_deposition_flux_to_chonks()
       if(this->graph.depression_tree.volume_sed[i] > 0)
       {
         this->drape_dep_only_sed(i);
-      
       }
 
       continue;
@@ -2107,6 +2203,7 @@ void ModelRunner::drape_dep_only_sed(int dep_ID)
   if(Vs == 0)
     return;
 
+  this->NTIME_DRAPEONLYSEDHAPPENED++;
   // Depressions which have only sed need special treatment
   auto nodes = this->graph.depression_tree.get_all_nodes(dep_ID);
 
@@ -2176,6 +2273,9 @@ void ModelRunner::drape_dep_only_sed(int dep_ID)
 
     tootlyc += slangh * this->cellarea * this->timestep;
 
+    if( slangh * this->cellarea * this->timestep > this->NTIME_DRAPEONLYSEDHAPPENEDMAX)
+      this->NTIME_DRAPEONLYSEDHAPPENEDMAX = slangh * this->cellarea * this->timestep;
+
 
     this->chonk_network[node].add_sediment_creation_flux(slangh);
     this->chonk_network[node].add_deposition_flux(slangh);
@@ -2191,6 +2291,84 @@ void ModelRunner::drape_dep_only_sed(int dep_ID)
     std::cout << "EXTRA SED IN THE FILLING OF SED-ONLY DEP " << Vs << std::endl;
 
 }
+
+
+
+xt::pytensor<double,2> ModelRunner::get_Qsprop_bound( std::string which)
+{
+
+  // Preformatting the output
+  xt::pytensor<double,2> output;
+  if(which == "N" || which == "S")
+    output = xt::zeros<double>({this->io_int["nx"], this->n_labels});
+  else
+    output = xt::zeros<double>({this->io_int["ny"], this->n_labels});
+
+  if(which == "N")
+  {
+    int ti = -1;
+    for (int i=0; i < this->io_int["nx"]; ++i)
+    {
+      ti++;
+      auto dese = this->chonk_network[i].get_label_tracker();
+      for(int j = 0; j<this->n_labels;j++)
+        output(ti,j) = dese[j] * this->chonk_network[i].get_sediment_flux() / this->timestep;
+    }
+  }
+  else if(which == "S")
+  {
+    int ti = -1;
+    for (int i=this->io_int["n_elements"] - this->io_int["nx"]; i < this->io_int["n_elements"]; ++i)
+    {
+      ti++;
+      auto dese = this->chonk_network[i].get_label_tracker();
+      for(int j = 0; j<this->n_labels;j++)
+        output(ti,j) = dese[j] * this->chonk_network[i].get_sediment_flux() / this->timestep;
+    }
+  }
+  else if(which == "E")
+  {
+    int ti = -1;
+    for (int i=0; i < this->io_int["n_elements"]; i = i + this->io_int["ny"])
+    {
+      ti++;
+      auto dese = this->chonk_network[i].get_label_tracker();
+      for(int j =0; j < this->n_labels;j++)
+        output(ti,j) = dese[j] * this->chonk_network[i].get_sediment_flux() / this->timestep;
+    }
+  }
+  else if(which == "W")
+  {
+    int ti = -1;
+    for (int i=this->io_int["nx"] - 1; i < this->io_int["n_elements"]; i = i + this->io_int["ny"])
+    {
+      ti++;
+      auto dese = this->chonk_network[i].get_label_tracker();
+      for(int j = 0; j < this->n_labels;j++)
+        output(ti,j) = dese[j]* this->chonk_network[i].get_sediment_flux() / this->timestep;
+    }
+  }
+
+
+  return output;
+
+
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 void  ModelRunner::find_underfilled_lakes_already_processed_and_give_water(int SS_ID, std::vector<bool>& is_processed )

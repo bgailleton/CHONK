@@ -101,7 +101,13 @@ inline bool operator<( const PQ_helper<T,U>& lhs, const PQ_helper<T,U>& rhs )
 
 
 
-
+inline double sumvecdouble(xt::pytensor<double,1>& vec)
+{
+  double sum = 0;
+  for(auto v:vec)
+    sum +=v;
+  return sum;;
+}
 
 
 

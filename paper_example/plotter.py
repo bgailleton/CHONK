@@ -57,6 +57,7 @@ def anim_lake_cross_section(
 	fname = "outputgif",
 	timedim = "otime", # the time dimension
 	batch_dim = None, # if there is a batch dim to pick
+	batch_val = None, # if there is a batch dim to pick
 	cross_section_dir = 'y', # is the cross section in x or y direction
 	xy_cross_section = 0, # coordinate on the other axis
 	color_bedrock = 'gray', # color of the bedrock
@@ -82,12 +83,15 @@ def anim_lake_cross_section(
 
 		
 	def _anim_lake_cross_section(ds, fig, tt, framedim):
-
-		tds = ds.isel({timedim:tt})
+		
+		if(batch_dim is not None):
+			tds = ds.isel({timedim:tt, batch_dim:batch_val})
+		else:
+			tds = ds.isel({timedim:tt})
 		
 		shape = tds["Topography__topography"].values.shape
 		HS = np.zeros(shape)
-		hillshading(tds["Topography__topography"].values,200,200,shape[1],shape[0],HS,np.deg2rad(60),np.deg2rad(125),1)
+		hillshading(tds["Topography__topography"].values,tds["ChonkBase__dx"].item(0),tds["ChonkBase__dx"].item(0),shape[1],shape[0],HS,np.deg2rad(60),np.deg2rad(125),1)
 		
 # 		tds["Topography__topography"] -= ds["Topography__sed_height"]
 # 		fig.set_size_inches(*figsize)

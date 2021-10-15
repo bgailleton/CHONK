@@ -437,10 +437,21 @@ std::vector<double>& pre_sed, std::vector<double>& pre_water);
     double get_sum_of_all_volume_full_lake(){this->graph.depression_tree.get_sum_of_all_volume_full_lake();}
     void DEBUG_write_lakes_to_file(std::string filename);
 
+    std::vector<int> get_neighbours_for_debugging(int row, int col)
+    {
+        std::vector<int> neigh; std::vector<double> other;
+        this->graph.get_D8_neighbors(row * this->io_int["nx"] + col, this->active_nodes, neigh, other);
+        return neigh;
+    }
 
+
+    // Output function to get the proportion of outletting material from one boundary 
+    xt::pytensor<double,2> get_Qsprop_bound( std::string which);
 
     // DEBUGGER
     int NTIMEPREFLUXCALLED;
+    int NTIME_DRAPEONLYSEDHAPPENED;
+    double NTIME_DRAPEONLYSEDHAPPENEDMAX;
 
     // I need some members to be public
     bool CHARLIE_I = false;
@@ -468,6 +479,8 @@ std::vector<double>& pre_sed, std::vector<double>& pre_water);
     xt::pytensor<double,1> precipitations;
 
     double thresholdMF2SF = 0;
+
+    bool initial_carving = false;
 
 
   protected:
