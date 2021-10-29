@@ -447,6 +447,16 @@ std::vector<double>& pre_sed, std::vector<double>& pre_water);
 
     // Output function to get the proportion of outletting material from one boundary 
     xt::pytensor<double,2> get_Qsprop_bound( std::string which);
+    // new output function to get the straty
+    // CAN BE A BIT CONVOLUTED BUT IS THE BEST solution I CAN THINK OF
+    // output structure:    
+    // output[0] is a 2D array of node coordinates storing [0] zmax and [1] zmin
+    // output[1] is a 1D array of node coordinates storing the number of depth cell by node (BE CAREFULL, CELLS WITH NO DEPTHS ARE STILL COUNTED)
+    // output[2] is a 1D array of number of cells in depth (0 depths cells are counted as 1 empty) * n_label coordinates storing the props by labels
+    // output[3] is a 1D array of number of cells in depth (0 depths cells are counted as 1 empty) * n_label coordinates storing the volume of sed store there
+    // output[4] is the n_labels, for convenience to have it here
+    std::tuple< xt::pytensor<float,2>, xt::pytensor<int,1>,  xt::pytensor<float,1>,  xt::pytensor<float,1>, int> get_stratiprop();
+
 
     // DEBUGGER
     int NTIMEPREFLUXCALLED;

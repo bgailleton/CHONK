@@ -52,7 +52,12 @@ class ChonkBase(object):
 	Q_sout_lab_W = xs.on_demand(dims = ('y','n_labels'), description = "Volume of suspended sediments outletting the model at the Northern boundary in m^3/yrs")
 
 
+
+	stratigraphator = xs.on_demand(dims = ('nabonk'))
+
+
 	def initialize(self):
+	
 
 		# Initialising dimentions
 		self.x = np.arange(0,self.nx * self.dx,self.dx)
@@ -103,6 +108,9 @@ class ChonkBase(object):
 		return self.CHONK.get_erosion_sed_only_flux().reshape(self.ny,self.nx)
 
 
+	@stratigraphator.compute
+	def _stratigraphator(self):
+		return self.CHONK.get_stratiprop()
 
 	@Q_sout_lab_N.compute
 	def _Q_sout_lab_N(self):

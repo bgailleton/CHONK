@@ -130,6 +130,7 @@ PYBIND11_MODULE(CHONK_cpp, m)
       .def("get_hillslope_Qs", &ModelRunner::get_hillslope_Qs)
       .def("get_neighbours_for_debugging", &ModelRunner::get_neighbours_for_debugging)
       .def("get_Qsprop_bound", &ModelRunner::get_Qsprop_bound)
+      .def("get_stratiprop",&ModelRunner::get_stratiprop)
 
       
 

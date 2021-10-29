@@ -2507,6 +2507,78 @@ void ModelRunner::gather_nodes_to_reproc(std::vector<int>& local_mstack,
 
 
 
+// Getting the strati proportions output info
+// CAN BE A BIT CONVOLUTED BUT IS THE BEST solution I CAN THINK OF
+// output structure: 
+// output[0] is a 2D array of node coordinates storing [0] zmax and [1] zmin
+// output[1] is a 1D array of node coordinates storing the number of depth cell by node (BE CAREFULL, CELLS WITH NO DEPTHS ARE STILL COUNTED)
+// output[2] is a 1D array of number of cells in depth (0 depths cells are counted as 1 empty) * n_label coordinates storing the props by labels
+// output[3] is a 1D array of number of cells in depth (0 depths cells are counted as 1 empty) * n_label coordinates storing the volume of sed store there
+// output[4] is the n_labels, for convenience to have it here
+std::tuple< xt::pytensor<float,2>, xt::pytensor<int,1>,  xt::pytensor<float,1>,  xt::pytensor<float,1>, int> ModelRunner::get_stratiprop()
+{
+  // First getting the number of cells
+  // #-> considering that each pixel will have at least an entry
+  int ncellsdepths = this->io_int["n_elements"];
+  for(auto& val : this->sed_prop_by_label)
+  {
+    // # if there is more than one cell-> I need to increment the number minus the mandatory cell
+    if(val.second.size()>1)
+      ncellsdepths += val.second.size() - 1;
+  }
+
+  xt::pytensor<float,2> A1;
+  xt::pytensor<int,1> A2;
+  xt::pytensor<float,1> A3;
+  xt::pytensor<float,1> A4;
+  int A5;
+
+  // Preformatting the output
+  std::tuple< xt::pytensor<float,2>, xt::pytensor<int,1>,  xt::pytensor<float,1>,  xt::pytensor<float,1>, int> output = std::make_tuple(A1, A2, A3, A4, A5);
+
+  // going through all the nodes to get the output
+  int j=0;
+  for(int i=0; i<this->io_int["n_elements"];  ++i)
+  {
+    std::get<0>(output)(i,0) = this->surface_elevation_tp1[i];
+    std::get<0>(output)(i,1) = this->surface_elevation_tp1[i] - this->sed_height_tp1[i];
+    std::get<1>(output)[i] = this->sed_prop_by_label[i].size();
+    if(std::get<1>(output)[i] == 0)
+    {
+      std::get<1>(output)[i] = 1;
+      for(int k=0; k < this->n_labels; k++)
+      {
+        std::get<2>(output)[j] = 0;
+        std::get<3>(output)[j] = 0;
+        j++;
+      }
+    }
+    else
+    {
+      for(int i2 = 0; i2 < int(std::get<1>(output)[i]); ++i2)
+      {
+        for(int k=0; k < this->n_labels; k++)
+        {
+          std::get<2>(output)[j] = this->sed_prop_by_label[i][i2][k];
+          std::get<3>(output)[j] = this->sed_prop_by_label[i][i2][k];
+          j++;
+        }
+      }
+    }
+  }
+  std::get<4>(output) = this->n_labels;
+  return output;
+
+}
+
+
+
+
+
+
+
+
+
 
 
 //#################################################################################
@@ -2552,6 +2624,25 @@ xt::pytensor<double,1> pop_elevation_to_SS_SF_SPIL(xt::pytensor<int,1>& stack, x
   return elevation;
 
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 void ModelRunner::iterative_lake_solver()
 {
   // DEPRECATED
