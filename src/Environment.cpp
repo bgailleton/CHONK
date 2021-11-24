@@ -968,6 +968,11 @@ void ModelRunner::process_dep(int dep, double& extra_sed, std::vector<double>& e
       // #5 manually set the sed/water fluxes to what has been calculated above 
       this->chonk_network[outlet].set_sediment_flux(extra_sed, extra_lab, 1.);
       this->chonk_network[outlet].set_water_flux(extra_wat/this->timestep);
+
+      if(this->Ath_incision)
+        this->chonk_network[outlet].set_threshold_A_incision(extra_wat/this->timestep);
+        // this->chonk_network[outlet].set_threshold_A_incision(extra_wat/this->timestep - this->cellarea);
+
       this->graph.depression_tree.volume_water_outlet[dep] = extra_wat;
       this->graph.depression_tree.volume_sed_outlet[dep] = extra_sed;
       // #6 and finally reprocess the node (no move prep as it is forced, no preflux as already included in the outlet calculation)
@@ -2519,18 +2524,18 @@ std::tuple< xt::pytensor<float,2>, xt::pytensor<int,1>,  xt::pytensor<float,1>, 
 {
   // First getting the number of cells
   // #-> considering that each pixel will have at least an entry
-  int ncellsdepths = this->io_int["n_elements"];
+  int ncellsdepths = this->io_int["n_elements"] * this->n_labels;
   for(auto& val : this->sed_prop_by_label)
   {
     // # if there is more than one cell-> I need to increment the number minus the mandatory cell
     if(val.second.size()>1)
-      ncellsdepths += val.second.size() - 1;
+      ncellsdepths += (val.second.size() - 1) * this->n_labels;
   }
 
-  xt::pytensor<float,2> A1;
-  xt::pytensor<int,1> A2;
-  xt::pytensor<float,1> A3;
-  xt::pytensor<float,1> A4;
+  xt::pytensor<float,2> A1 = xt::zeros<float>({this->io_int["n_elements"],2});
+  xt::pytensor<int,1> A2  = xt::zeros<int>({this->io_int["n_elements"]});
+  xt::pytensor<float,1> A3 = xt::zeros<float>({ncellsdepths});
+  xt::pytensor<float,1> A4 = xt::zeros<float>({ncellsdepths});
   int A5;
 
   // Preformatting the output

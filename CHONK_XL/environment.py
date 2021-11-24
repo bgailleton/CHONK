@@ -9,6 +9,7 @@ import CHONK_cpp as ch
 from .hillshading import hillshading
 import numcodecs
 import zarr
+import os
 
 
 @xs.process
@@ -53,7 +54,12 @@ class ChonkBase(object):
 
 
 
-	stratigraphator = xs.on_demand(dims = ('nabonk'))
+
+	strati_recorder = xs.variable(default = False)
+	path_strati = xs.variable(default = "test")
+	pref_strati = xs.variable(default = "test")
+	create_folder_strati = xs.variable(default = False)
+	strati = xs.on_demand()
 
 
 	def initialize(self):
@@ -95,6 +101,32 @@ class ChonkBase(object):
 		self.CHONK.lake_depth =  np.zeros((self.nx * self.ny))
 		self.CHONK.set_lake_switch(False)
 
+
+		# Stting the strati recorder options:
+		if(self.strati_recorder):
+			if(self.create_folder_strati):
+				os.makedirs(self.path_strati, exist_ok=True ) #,self.pref_strati))
+	
+	@xs.runtime(args = 'step')
+	def run_step(self, step):
+		self.step = step
+
+	@strati.compute
+	def _strati(self):
+		if(self.strati_recorder):
+			name = str(self.step)
+			while(len(name) < 8):
+				name = '0' + name
+
+			stuff = self.CHONK.get_stratiprop()
+			np.save(self.path_strati+ "/" + self.pref_strati + "_zs_" + name + ".npy",stuff[0])
+			np.save(self.path_strati+ "/" + self.pref_strati + "_ncells_" + name + ".npy",stuff[1])
+			np.save(self.path_strati+ "/" + self.pref_strati + "_props_" + name + ".npy",stuff[2])
+			np.save(self.path_strati+ "/" + self.pref_strati + "_vol_" + name + ".npy",stuff[3])
+		return self.step
+
+
+
 	@D_s.compute
 	def _D_s(self):
 		return self.CHONK.get_deposition_flux().reshape(self.ny,self.nx)
@@ -108,9 +140,9 @@ class ChonkBase(object):
 		return self.CHONK.get_erosion_sed_only_flux().reshape(self.ny,self.nx)
 
 
-	@stratigraphator.compute
-	def _stratigraphator(self):
-		return self.CHONK.get_stratiprop()
+	# @stratigraphator.compute
+	# def _stratigraphator(self):
+	# 	return self.CHONK.get_stratiprop()
 
 	@Q_sout_lab_N.compute
 	def _Q_sout_lab_N(self):
@@ -201,6 +233,7 @@ class Topography(object):
 @xs.process
 class Lake(object):
 	method = xs.variable(default = "implicit")
+	Aincision_threshold = xs.variable(default = False)
 	CHONK = xs.foreign(ChonkBase, "CHONK")
 	evaporation = xs.variable()
 	evaporation_rate = xs.variable(intent = 'in', dims = [('y','x'), 'node', ()])
@@ -209,11 +242,18 @@ class Lake(object):
 	lake_depth = xs.on_demand(dims = ('y','x'))
 	topolake = xs.on_demand(dims = ('y','x'))
 
+
 	def initialize(self):
 		if(self.method == 'implicit'):
 			self.CHONK.set_lake_switch(False)
 		else:
 			self.CHONK.set_lake_switch(True)
+
+		if(self.Aincision_threshold):
+			self.CHONK.Ath_incision = True
+		else:
+			self.CHONK.Ath_incision = False
+
 
 		if(self.evaporation):
 			self.CHONK.lake_evaporation = True

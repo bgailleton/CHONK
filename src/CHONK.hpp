@@ -180,6 +180,11 @@ class chonk
     // REinitialises all the "static" fluxes (erosion, deposition, ...)
     void reinitialise_static_fluxes(){erosion_flux_undifferentiated = 0;erosion_flux_only_sediments = 0;erosion_flux_only_bedrock = 0;deposition_flux = 0;sediment_creation_flux = 0;};
 
+    // Trying stuff for luca v1
+    void add2threshold_A_incision(double other);
+    void set_threshold_A_incision(double other){this->threshold_A_incision = other;};
+
+
     //###############################
     // DEBUG HELPERS
     void print_status()
@@ -257,6 +262,8 @@ class chonk
     double sediment_creation_flux;
     // Fluvial part of the sediment flux
     double fluvialprop_sedflux;
+
+    double threshold_A_incision;
 
 
     // Movers

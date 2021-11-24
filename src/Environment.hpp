@@ -467,7 +467,7 @@ std::vector<double>& pre_sed, std::vector<double>& pre_water);
     bool CHARLIE_I = false;
     bool CIDRE_HS = false;
 
-    // Parametrisation of law
+    // Parametrisation of laws
     bool tool_effect_rock = false;
     bool tool_effect_sed = false;
     bool external_K = false;
@@ -479,6 +479,7 @@ std::vector<double>& pre_sed, std::vector<double>& pre_water);
     double lake_evaporation_rate = 0.1;
     xt::pytensor<double,1> lake_evaporation_rate_spatial;
 
+    bool Ath_incision = 0;
 
     xt::pytensor<double,1> lake_depth;
 

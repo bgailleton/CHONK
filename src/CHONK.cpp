@@ -105,6 +105,8 @@ void chonk::reset()
   this->weigth_water_fluxes.reserve(8);
   this->weigth_sediment_fluxes.reserve(8);
   this->slope_to_rec.reserve(8);
+
+  this->threshold_A_incision = 0;
 }
 
 void chonk::reset_sed_fluxes()
@@ -131,6 +133,11 @@ void chonk::reset_sed_fluxes()
 //   double sumsedweights = 0;
 
 // }
+
+void chonk::add2threshold_A_incision(double other)
+{
+  this->threshold_A_incision += other;
+}
 
 void chonk::split_and_merge_in_receiving_chonks(std::vector<chonk>& chonkscape, NodeGraphV2& graph, xt::pytensor<double,1>& surface_elevation_tp1, xt::pytensor<double,1>& sed_height_tp1, double dt)
 {
@@ -165,6 +172,9 @@ void chonk::split_and_merge_in_receiving_chonks(std::vector<chonk>& chonkscape, 
     // std::cout << "SP::" << this->sediment_flux  << " * " <<  this->weigth_sediment_fluxes[i] << std::endl;
     other_chonk.add_to_sediment_flux(this->sediment_flux * this->weigth_sediment_fluxes[i], oatalab, this->fluvialprop_sedflux);
     sum_weight_sed += this->weigth_sediment_fluxes[i] * this->sediment_flux ;
+    
+    other_chonk.add2threshold_A_incision(this->threshold_A_incision * this->weigth_sediment_fluxes[i]);
+
     // std::cout << "SEDFLUXDEBUG::" << this->sediment_flux << "||" << this->weigth_sediment_fluxes[i] << "||water::" << this->weigth_water_fluxes[i] << std::endl;
     // if(other_chonk.get_sediment_flux()/dt * other_chonk.get_fluvialprop_sedflux() > other_chonk.get_water_flux() )
     // {
@@ -1007,9 +1017,12 @@ void chonk::charlie_I(double n, double m, double K_r, double K_s,
 
     // Local water flux
     double this_Qw = this->water_flux * this->weigth_water_fluxes[i];
+    double this_Qw_incision = std::max(this_Qw - this->threshold_A_incision * this->weigth_water_fluxes[i], 0.);
 
     // Local Stream Power
-    double current_stream_power = std::pow(this_Qw,m) * std::pow(this->slope_to_rec[i],n);
+    double current_stream_power_sed = std::pow(this_Qw,m) * std::pow(this->slope_to_rec[i],n);
+    
+    double current_stream_power_bedrock = std::pow(this_Qw_incision,m) * std::pow(this->slope_to_rec[i],n);
 
     // Calculating the flux E = K s^n A^m - threshold
 
@@ -1017,17 +1030,21 @@ void chonk::charlie_I(double n, double m, double K_r, double K_s,
     // ## Bedrock
     double threshholder_bedrock = 0.;
     if(threshold_incision > 0)
-      threshholder_bedrock = current_stream_power * (1 - std::exp(- current_stream_power/threshold_incision) );
+    {
+      threshholder_bedrock = current_stream_power_bedrock * (1 - std::exp(- current_stream_power_bedrock/threshold_incision) );
+    }
     
     // ## Sediments
     double threshholder_sed = 0.;
     if(threshold_sed_entrainment > 0)
-      threshholder_sed = current_stream_power * (1 - std::exp(- current_stream_power/threshold_sed_entrainment) );
+    {
+      threshholder_sed = current_stream_power_sed * (1 - std::exp(- current_stream_power_sed/threshold_sed_entrainment) );
+    }
 
 
     // Calculating erosion
     // # Bedrock erosion
-    double Er = (current_stream_power * K_r 
+    double Er = (current_stream_power_bedrock * K_r 
         - threshholder_bedrock )
         * exp_sed_height_roughness;
 
@@ -1036,7 +1053,7 @@ void chonk::charlie_I(double n, double m, double K_r, double K_s,
       Er = 0;
 
     // # Sediment erosion (entrainment)
-    double Es = (current_stream_power * K_s
+    double Es = (current_stream_power_sed * K_s
         - threshholder_sed)
         * (1 - exp_sed_height_roughness);
 
@@ -1045,7 +1062,7 @@ void chonk::charlie_I(double n, double m, double K_r, double K_s,
       Es = 0;
 
     // Ecap will be needed for later 
-    double datcaps = current_stream_power * K_s - threshholder_sed;
+    double datcaps = current_stream_power_sed * K_s - threshholder_sed;
     // I keep it if negative (see H(t) calculation)
     E_cap_s += datcaps;
 
