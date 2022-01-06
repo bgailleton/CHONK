@@ -455,7 +455,7 @@ std::vector<double>& pre_sed, std::vector<double>& pre_water);
     // output[2] is a 1D array of number of cells in depth (0 depths cells are counted as 1 empty) * n_label coordinates storing the props by labels
     // output[3] is a 1D array of number of cells in depth (0 depths cells are counted as 1 empty) * n_label coordinates storing the volume of sed store there
     // output[4] is the n_labels, for convenience to have it here
-    std::tuple< xt::pytensor<float,2>, xt::pytensor<int,1>,  xt::pytensor<float,1>,  xt::pytensor<float,1>, int> get_stratiprop();
+    std::tuple< xt::pytensor<float,2>, xt::pytensor<int,2>,  xt::pytensor<float,1>,  xt::pytensor<float,1>, int> get_stratiprop();
 
 
     // DEBUGGER

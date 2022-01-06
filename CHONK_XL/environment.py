@@ -118,11 +118,18 @@ class ChonkBase(object):
 			while(len(name) < 8):
 				name = '0' + name
 
-			stuff = self.CHONK.get_stratiprop()
-			np.save(self.path_strati+ "/" + self.pref_strati + "_zs_" + name + ".npy",stuff[0])
-			np.save(self.path_strati+ "/" + self.pref_strati + "_ncells_" + name + ".npy",stuff[1])
-			np.save(self.path_strati+ "/" + self.pref_strati + "_props_" + name + ".npy",stuff[2])
-			np.save(self.path_strati+ "/" + self.pref_strati + "_vol_" + name + ".npy",stuff[3])
+			# print(help(self.CHONK.get_stratiprop))
+
+			try:
+				stuff = self.CHONK.get_stratiprop()
+
+			# print(stuff)
+				np.save(self.path_strati+ "/" + self.pref_strati + "_zs_" + name + ".npy",stuff[0])
+				np.save(self.path_strati+ "/" + self.pref_strati + "_ncells_" + name + ".npy",stuff[1])
+				np.save(self.path_strati+ "/" + self.pref_strati + "_props_" + name + ".npy",stuff[2])
+				np.save(self.path_strati+ "/" + self.pref_strati + "_vol_" + name + ".npy",stuff[3])
+			except:
+				print("missed step", self.step)
 		return self.step
 
 

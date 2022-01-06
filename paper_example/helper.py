@@ -1,4 +1,74 @@
 import numpy as np
+import xsimlab as xs
+import CHONK_XL as chxl
+
+@xs.process
+class CustomParameters:
+    label_array = xs.variable(intent = 'out', dims = (('y','x'), ('node')))
+    label_list = xs.any_object()
+    CHONK = xs.foreign(chxl.ChonkBase, "CHONK")
+    nx = xs.foreign(chxl.ChonkBase, "nx")
+    ny = xs.foreign(chxl.ChonkBase, "ny")
+    dx = xs.foreign(chxl.ChonkBase, "dx")
+    dy = xs.foreign(chxl.ChonkBase, "dy")
+    
+    active_nodes = xs.foreign(chxl.ChonkBase, "active_nodes")
+    landscape = xs.any_object()
+
+    def initialize(self):
+        # Instanciating the landscape
+        self.landscape = helper.Landscape()
+
+        # params for the landscapes dimensions
+
+        # landscape.set_dimensions_from_res( nx = 100, ny = 100, dx = 200, dy = 200)
+        self.landscape.set_dimensions_from_length(nx = self.nx, ny = self.ny, lx = self.nx * self.dx, ly = self.ny * self.dy)
+#         self.landscape.set_boundaries_elevation(N = 1000, S = 0)
+        self.landscape.set_boundaries_elevation(N = 0, S = 0)
+        self.landscape.set_rel_distances(mountain_front = 0.65, normal_fault = 0.30)
+        self.landscape.generate_uplift_4_StSt(U = 2e-4)
+        self.landscape.generate_uplift_Normal_fault(Upos = 1e-3, Uneg = 2e-3, alpha_pos = 2e3, alpha_neg = 0.8e4)
+#         self.landscape.add_pluton( dimless_X = 0.6, dimless_Y = 0.3, half_width = 5000,  half_heigth = 3000)
+        self.label_list = []
+    
+        self.label_array = self.landscape.indices
+
+        self.label_list.append(ch.label(0))
+        self.label_list[-1].m = 0.45;
+        self.label_list[-1].n = 1;
+        self.label_list[-1].base_K = 1e-4;
+        self.label_list[-1].Ks_modifyer = 1.2;
+        self.label_list[-1].Kr_modifyer = 0.8;
+        self.label_list[-1].dimless_roughness = 0.5;
+        self.label_list[-1].V = 0.5;
+        self.label_list[-1].dstar = 1;
+        self.label_list[-1].threshold_incision = 0;
+        self.label_list[-1].threshold_entrainment = 0;
+        self.label_list[-1].kappa_base = 1e-4;
+        self.label_list[-1].kappa_r_mod = 0.8;
+        self.label_list[-1].kappa_s_mod = 1.2;
+        self.label_list[-1].critical_slope = 0.57835;
+        self.label_list[-1].sensitivity_tool_effect = 1;
+
+        self.label_list.append(ch.label(1))
+        self.label_list[-1].m = 0.45;
+        self.label_list[-1].n = 1;
+        self.label_list[-1].base_K = 1e-4;
+        self.label_list[-1].Ks_modifyer = 1;
+        self.label_list[-1].Kr_modifyer = 0.3;
+        self.label_list[-1].dimless_roughness = 0.5;
+        self.label_list[-1].V = 0.1;
+        self.label_list[-1].dstar = 1;
+        self.label_list[-1].threshold_incision = 0;
+        self.label_list[-1].threshold_entrainment = 0;
+        self.label_list[-1].kappa_base = 1e-4;
+        self.label_list[-1].kappa_r_mod = 0.8;
+        self.label_list[-1].kappa_s_mod = 1.2;
+        self.label_list[-1].critical_slope = 0.57835;
+        self.label_list[-1].sensitivity_tool_effect = 1;
+
+        self.CHONK.initialise_label_list(self.label_list)
+        self.CHONK.update_label_array(self.label_array.ravel())
 
 
 class Landscape(object):
@@ -162,3 +232,4 @@ class Landscape(object):
 
 
 		# end of file
+
