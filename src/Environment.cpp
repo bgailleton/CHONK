@@ -2520,11 +2520,12 @@ void ModelRunner::gather_nodes_to_reproc(std::vector<int>& local_mstack,
 // output[2] is a 1D array of number of cells in depth (0 depths cells are counted as 1 empty) * n_label coordinates storing the props by labels
 // output[3] is a 1D array of number of cells in depth (0 depths cells are counted as 1 empty) * n_label coordinates storing the volume of sed store there
 // output[4] is the n_labels, for convenience to have it here
-std::tuple< xt::pytensor<float,2>, xt::pytensor<int,2>,  xt::pytensor<float,1>,  xt::pytensor<float,1>, int> ModelRunner::get_stratiprop()
+std::tuple< xt::pytensor<float,2>, xt::pytensor<int,2>,  xt::pytensor<float,1>,  xt::pytensor<float,1>, int, xt::pytensor<float,1>> ModelRunner::get_stratiprop()
 {
   // First getting the number of cells
   // #-> considering that each pixel will have at least an entry
   std::vector<int> ncells(this->io_int["n_elements"],0);
+  xt::pytensor<float,1> A6 = xt::zeros<float>({this->io_int["n_elements"]});
   int ncellsdepths = this->io_int["n_elements"] * this->n_labels;
   for(auto& val : this->sed_prop_by_label)
   {
@@ -2532,6 +2533,15 @@ std::tuple< xt::pytensor<float,2>, xt::pytensor<int,2>,  xt::pytensor<float,1>, 
     if(val.second.size()>1)
       ncellsdepths += (val.second.size()) * this->n_labels;
     ncells[val.first] = val.second.size();
+
+    // First, let's calculates stats about the current box situation
+    double boxes_there = this->sed_height_tp1[val.first]/this->depths_res_sed_proportions;
+    double delta_boxes = std::abs(this->sed_height_tp1[val.first]/this->depths_res_sed_proportions);
+
+    // Breakdown into filled and underfilled
+    double boxes_there_filled;
+    double box_there_ufill = std::modf(boxes_there, &boxes_there_filled); 
+    A6[val.first] = box_there_ufill > 0 ? box_there_ufill * this->depths_res_sed_proportions : this->depths_res_sed_proportions;
   }
 
   xt::pytensor<float,2> A1 = xt::zeros<float>({this->io_int["n_elements"],2});
@@ -2574,7 +2584,7 @@ std::tuple< xt::pytensor<float,2>, xt::pytensor<int,2>,  xt::pytensor<float,1>, 
     A2(i,1) = j;
   }
   A5 = this->n_labels;
-  std::tuple< xt::pytensor<float,2>, xt::pytensor<int,2>,  xt::pytensor<float,1>,  xt::pytensor<float,1>, int> output = std::make_tuple(A1, A2, A3, A4, A5);
+  std::tuple< xt::pytensor<float,2>, xt::pytensor<int,2>,  xt::pytensor<float,1>,  xt::pytensor<float,1>, int, xt::pytensor<float,1> >output = std::make_tuple(A1, A2, A3, A4, A5, A6);
 
   return output;
 

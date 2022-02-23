@@ -173,7 +173,7 @@ void chonk::split_and_merge_in_receiving_chonks(std::vector<chonk>& chonkscape, 
     other_chonk.add_to_sediment_flux(this->sediment_flux * this->weigth_sediment_fluxes[i], oatalab, this->fluvialprop_sedflux);
     sum_weight_sed += this->weigth_sediment_fluxes[i] * this->sediment_flux ;
     
-    other_chonk.add2threshold_A_incision(this->threshold_A_incision * this->weigth_sediment_fluxes[i]);
+    other_chonk.add2threshold_A_incision(this->threshold_A_incision * this->weigth_water_fluxes[i]);
 
     // std::cout << "SEDFLUXDEBUG::" << this->sediment_flux << "||" << this->weigth_sediment_fluxes[i] << "||water::" << this->weigth_water_fluxes[i] << std::endl;
     // if(other_chonk.get_sediment_flux()/dt * other_chonk.get_fluvialprop_sedflux() > other_chonk.get_water_flux() )
@@ -870,10 +870,10 @@ void chonk::add_to_sediment_flux(double value, std::vector<double> label_proport
 
   this->fluvialprop_sedflux = fluvialsedfluxtot/ this->sediment_flux;
 
-  if(double_equals(this->fluvialprop_sedflux - 1, 0, 1e-8))
+  if(double_equals(this->fluvialprop_sedflux - 1, 0, 1e-4))
     this->fluvialprop_sedflux = 1;
   
-  if(double_equals(this->fluvialprop_sedflux, 0, 1e-8))
+  if(double_equals(this->fluvialprop_sedflux, 0, 1e-4))
     this->fluvialprop_sedflux = 0;
 
 
@@ -1017,7 +1017,7 @@ void chonk::charlie_I(double n, double m, double K_r, double K_s,
 
     // Local water flux
     double this_Qw = this->water_flux * this->weigth_water_fluxes[i];
-    double this_Qw_incision = std::max(this_Qw - this->threshold_A_incision * this->weigth_water_fluxes[i], 0.);
+    double this_Qw_incision = std::max((this_Qw - this->threshold_A_incision )* this->weigth_water_fluxes[i], 0.);
 
     // Local Stream Power
     double current_stream_power_sed = std::pow(this_Qw,m) * std::pow(this->slope_to_rec[i],n);

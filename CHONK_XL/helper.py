@@ -10,9 +10,252 @@ import zarr
 import numba as nb
 from xmovie import Movie
 import matplotlib
-
+from scipy import stats
+from IPython.display import display, Markdown, Latex
 
 matplotlib.rc('font', serif='Helvetica Neue') 
+
+@nb.njit()
+def _gather_cross_section_info_EW(ny,nx, zs, ncells, f1, dz, dx, dy, label, nlabels, props, row):
+	elev = []
+	cols = []
+	volume = []
+
+	# for row in range(ny):
+	for col in range(nx):
+		# getting the vectorised ID for the map view
+		vid = row * nx + col
+		# getting the elevation of the summit
+		z0 = zs[vid,0]
+
+		# gettring the max vectorised depth id
+		j = ncells[vid,1] - 1
+		# Getting the min one
+		jmin = ncells[vid,0]
+		#temp vars
+		tprops = 0
+		oj = False
+		#Going through the depths
+		while( j>= jmin):
+			# if first, geeting the first depth ortherwise getting the regulrd dz
+
+			tdz = dz if oj else f1[vid]
+			oj = True
+
+			for tlab in range(nlabels-1,-1,-1):
+				if tlab == label:
+					#print("adding", props[j] ,tdz ,dx ,dy, j)
+					volume.append(props[j] * tdz * dx * dy)
+					cols.append(col)
+					elev.append(z0 - tdz/2)
+				j -= 1
+
+			nz = z0 - tdz
+			z0 = nz
+	return elev, cols, volume
+
+@nb.njit()
+def _gather_cross_section_info_EW_props(ny,nx, zs, ncells, f1, dz, dx, dy, label, nlabels, props, row):
+	elev = []
+	cols = []
+	volume = []
+
+	# for row in range(ny):
+	for col in range(nx):
+		# getting the vectorised ID for the map view
+		vid = row * nx + col
+		# getting the elevation of the summit
+		z0 = zs[vid,0]
+
+		# gettring the max vectorised depth id
+		j = ncells[vid,1] - 1
+		# Getting the min one
+		jmin = ncells[vid,0]
+		#temp vars
+		tprops = 0
+		oj = False
+		#Going through the depths
+		while( j>= jmin):
+			# if first, geeting the first depth ortherwise getting the regulrd dz
+
+			tdz = dz if oj else f1[vid]
+			oj = True
+
+			for tlab in range(nlabels-1,-1,-1):
+				if tlab == label:
+					#print("adding", props[j] ,tdz ,dx ,dy, j)
+					volume.append(props[j])
+					cols.append(col)
+					elev.append(z0 - tdz/2)
+				j -= 1
+
+			nz = z0 - tdz
+			z0 = nz
+	return elev, cols, volume
+
+
+@nb.njit()
+def _get_full_volume_sediment_label_map(ny,nx, zs, ncells, f1, dz, dx, dy, label, nlabels, props):
+	sumvol = np.zeros((ny,nx))
+
+	for row in range(ny):
+		for col in range(nx):
+			# getting the vectorised ID for the map view
+			vid = row * nx + col
+			# getting the elevation of the summit
+			z0 = zs[vid,0]
+
+			# gettring the max vectorised depth id
+			j = ncells[vid,1] - 1
+			# Getting the min one
+			jmin = ncells[vid,0]
+			#temp vars
+			tprops = 0
+			oj = False
+			#Going through the depths
+			while( j>= jmin):
+				# if first, geeting the first depth ortherwise getting the regulrd dz
+
+				tdz = dz if oj else f1[vid]
+				oj = True
+
+				for tlab in range(nlabels-1,-1,-1):
+					if tlab == label:
+						#print("adding", props[j] ,tdz ,dx ,dy, j)
+						sumvol[row,col] += props[j] * tdz * dx * dy
+					j -= 1
+
+				nz = z0 - tdz
+				z0 = nz
+	return sumvol.reshape(ny,nx)
+
+@nb.njit()
+def _get_first_m_volume_sediment_label_map(ny,nx, zs, ncells, f1, dz, dx, dy, label, nlabels, props, depth):
+	sumvol = np.zeros((ny,nx))
+
+	for row in range(ny):
+		for col in range(nx):
+			# getting the vectorised ID for the map view
+			vid = row * nx + col
+			# getting the elevation of the summit
+			z0 = zs[vid,0]
+
+			# gettring the max vectorised depth id
+			j = ncells[vid,1] - 1
+			# Getting the min one
+			jmin = ncells[vid,0]
+			#temp vars
+			tprops = 0
+			oj = False
+			totz = 0
+			#Going through the depths
+			while( j>= jmin):
+				# if first, geeting the first depth ortherwise getting the regulrd dz
+
+				tdz = dz if oj else f1[vid]
+				oj = True
+
+				for tlab in range(nlabels-1,-1,-1):
+					if tlab == label:
+						#print("adding", props[j] ,tdz ,dx ,dy, j)
+						sumvol[row,col] += props[j] * tdz * dx * dy
+					j -= 1
+
+				nz = z0 - tdz
+				totz += tdz
+				if(totz > depth):
+					break
+				z0 = nz
+	return sumvol.reshape(ny,nx)
+
+def get_full_volume_sediment_label_map(ds,sel,label, ChonkBase = 'ChonkBase'):
+	
+
+	nlabels = ds.n_labels.values.shape[0]
+
+
+	tds = ds
+	for key in sel.keys():
+		try:
+			tds = tds.sel({key:sel[key]}, method = 'nearest')
+		except:
+			tds = tds.sel({key:sel[key]})
+			
+
+	path_strati = tds[ChonkBase + "__path_strati"].values.item(0)
+	pref_strati = tds[ChonkBase + "__pref_strati"].values.item(0)
+	name = str(int(tds[ChonkBase + "__strati"].values.item(0)))
+	while(len(name) < 8):
+		name = '0' + name
+
+	try:
+		zs = np.load(path_strati+ "/" + pref_strati + "_zs_" + name + ".npy")
+		ncells = np.load(path_strati+ "/" + pref_strati + "_ncells_" + name + ".npy")
+		props = np.load(path_strati+ "/" + pref_strati + "_props_" + name + ".npy")
+		vol = np.load(path_strati+ "/" + pref_strati + "_vol_" + name + ".npy")
+		f1 = np.load(path_strati+ "/" + pref_strati + "_firstbox_" + name + ".npy")
+	except FileNotFoundError:
+		print("Could not find the strati file...")
+		link = '''[Sorry!](https://www.youtube.com/watch?v=Iouungm1aeQ&feature=emb_rel_end")'''
+		display(Markdown(link))
+
+	dz = tds[ChonkBase + "__depths_res_sed_proportions"].values.item(0)
+	nx = tds[ChonkBase + "__nx"].values.item(0)
+	ny = tds[ChonkBase + "__ny"].values.item(0)
+	dy = tds[ChonkBase + "__dy"].values.item(0)
+	dx = tds[ChonkBase + "__dx"].values.item(0)
+		
+	print("loading ", path_strati+ "/" + pref_strati + "_props_" + name + ".npy")
+
+	# print(tds)
+	return  _get_full_volume_sediment_label_map(ny,nx, zs, ncells, f1, dz, dx, dy, label, nlabels, props)
+
+def get_first_m_volume_sediment_label_map(ds,sel,label, depth, ChonkBase = 'ChonkBase'):
+	
+
+	nlabels = ds.n_labels.values.shape[0]
+
+
+	tds = ds
+	for key in sel.keys():
+		try:
+			tds = tds.sel({key:sel[key]}, method = 'nearest')
+		except:
+			tds = tds.sel({key:sel[key]})
+			
+
+	path_strati = tds[ChonkBase + "__path_strati"].values.item(0)
+	pref_strati = tds[ChonkBase + "__pref_strati"].values.item(0)
+	name = str(int(tds[ChonkBase + "__strati"].values.item(0)))
+	while(len(name) < 8):
+		name = '0' + name
+
+	try:
+		zs = np.load(path_strati+ "/" + pref_strati + "_zs_" + name + ".npy")
+		ncells = np.load(path_strati+ "/" + pref_strati + "_ncells_" + name + ".npy")
+		props = np.load(path_strati+ "/" + pref_strati + "_props_" + name + ".npy")
+		vol = np.load(path_strati+ "/" + pref_strati + "_vol_" + name + ".npy")
+		f1 = np.load(path_strati+ "/" + pref_strati + "_firstbox_" + name + ".npy")
+	except FileNotFoundError:
+		print("Could not find the strati file...")
+		link = '''[Sorry!](https://www.youtube.com/watch?v=Iouungm1aeQ&feature=emb_rel_end")'''
+		display(Markdown(link))
+
+	dz = tds[ChonkBase + "__depths_res_sed_proportions"].values.item(0)
+	nx = tds[ChonkBase + "__nx"].values.item(0)
+	ny = tds[ChonkBase + "__ny"].values.item(0)
+	dy = tds[ChonkBase + "__dy"].values.item(0)
+	dx = tds[ChonkBase + "__dx"].values.item(0)
+		
+	print("loading ", path_strati+ "/" + pref_strati + "_props_" + name + ".npy")
+
+	# print(tds)
+	return  _get_first_m_volume_sediment_label_map(ny,nx, zs, ncells, f1, dz, dx, dy, label, nlabels, props, depth)
+	
+
+	
+
+
 
 
 @nb.jit(nopython = True,cache = True)
@@ -84,8 +327,7 @@ def get_well(
 	vid = nx * row + col
 	print("vid is",vid)
 
-	dz = tds[ChonkBase + "__depths_res_sed_proportions"].item(0)
-	print("dz is",dz)
+	# print("dz is",dz)
 
 
 	name = str(int(tds[ChonkBase + "__strati"].values.item(0)))
@@ -96,6 +338,7 @@ def get_well(
 	ncells = np.load(path_strati+ "/" + pref_strati + "_ncells_" + name + ".npy")
 	props = np.load(path_strati+ "/" + pref_strati + "_props_" + name + ".npy")
 	vol = np.load(path_strati+ "/" + pref_strati + "_vol_" + name + ".npy")
+	f1 = np.load(path_strati+ "/" + pref_strati + "_firstbox_" + name + ".npy")
 	
 	cmap = matplotlib.cm.get_cmap(cmap)
 	norm = matplotlib.colors.Normalize(vmin=0, vmax=1)
@@ -108,17 +351,20 @@ def get_well(
 	# cb = ax.imshow([[0,0],[0,0]], cmap = cmap, zorder = -1, aspect = 'auto')
 
 	z0 = zs[vid,0]
-	j = ncells[vid,0]
-	jmax = ncells[vid,1]
-	tlab = 0
+	j = ncells[vid,1] - 1
+	jmin = ncells[vid,0]
 	tprops = 0
+	oj = False
+	print(f1[vid])
 
-	while(j<jmax):
+	while(j>=jmin):
+		dz = tds[ChonkBase + "__depths_res_sed_proportions"].item(0) if oj else f1[vid]
+		oj = True
 
-		for tlab in range(nlabels):
+		for tlab in range(nlabels-1,-1,-1):
 			if tlab == label:
 				tprops = props[j]
-			j += 1
+			j -= 1
 
 		nz = z0 - dz
 		# print("tprops was ", tprops)
@@ -127,7 +373,7 @@ def get_well(
 		z0 = nz
 
 
-	ax.fill_between([0,1],[z0,z0],[z0 + 5* dz,z0 + 5* dz], lw = 0, color = color_bedrock)
+	ax.fill_between([0,1], [z0,z0], [z0 - 5 * dz, z0 - 5* dz], lw = 0, color = color_bedrock)
 
 
 	ax.set_xlim(0,1)
@@ -146,13 +392,291 @@ def get_well(
 	return fig, ax
 	
 
+def get_well_time_serie(
+	ds, # The input ds 
+	# fname = "well.png",
+	timedim = "otime", # the time dimension
+	X = 5000,
+	Y = 5000,
+	ChonkBase = 'ChonkBase',
+	label = 0,
+	cmap = "magma",
+	color_bedrock = 'gray',
+	figsize = None,
+	nlabels = 2,
+	dpi = 300
+
+):
+	
+	fig = plt.figure(figsize = figsize) if not (figsize is None) else plt.figure()
+	gs = matplotlib.gridspec.GridSpec(100, 100)
+	# dt = (ds[timedim].values[2] - ds[timedim].values[1])/2
+	ax = fig.add_subplot(gs[:,7:80])
+
+	for i in range(ds[timedim].values.shape[0]):
+
+		tt = ds[timedim].values[i]
+		ttm1 = ds[timedim].values[i - 1] if i>0 else ds[timedim].values[0] - 100
+		ttp1 = ds[timedim].values[i + 1] if i<ds[timedim].values.shape[0] - 1 else ds[timedim].values[-1] + 100
+		# print(ttm1,tt,ttp1)
+
+		tds = ds.sel({timedim:tt}, method = 'nearest')
+		path_strati = tds[ChonkBase + "__path_strati"].values.item(0)
+		pref_strati = tds[ChonkBase + "__pref_strati"].values.item(0)
+		nx = tds[ChonkBase + "__nx"].values.item(0)
+		col, row = np.argmin(np.abs(ds.x.values - X)), np.argmin(np.abs(ds.y.values - Y))
+		# print("row, col are ",row,col)
+		vid = nx * row + col
+		# print("vid is",vid)
+
+		dz = tds[ChonkBase + "__depths_res_sed_proportions"].item(0)
+		# print("dz is",dz)
+
+		try:
+			name = str(int(tds[ChonkBase + "__strati"].values.item(0)))
+		except:
+			continue
+
+		while(len(name) < 8):
+			name = '0' + name
+		# print(name)
+		zs = np.load(path_strati+ "/" + pref_strati + "_zs_" + name + ".npy")
+		ncells = np.load(path_strati+ "/" + pref_strati + "_ncells_" + name + ".npy")
+		props = np.load(path_strati+ "/" + pref_strati + "_props_" + name + ".npy")
+		vol = np.load(path_strati+ "/" + pref_strati + "_vol_" + name + ".npy")
+		f1 = np.load(path_strati+ "/" + pref_strati + "_firstbox_" + name + ".npy")
+
+		
+		cmap = matplotlib.cm.get_cmap(cmap)
+		norm = matplotlib.colors.Normalize(vmin=0, vmax=1)
+
+		
+
+		# cb = ax.imshow([[0,1],[0,1]], cmap = cmap, zorder = -1, aspect = 'auto')
+		# cb = ax.imshow([[0,0],[0,0]], cmap = cmap, zorder = -1, aspect = 'auto')
+
+		z0 = zs[vid,0]
+		j = ncells[vid,1] - 1
+		jmin = ncells[vid,0]
+		tprops = 0
+		oj = False
+
+
+		while(j>=jmin):
+			dz = tds[ChonkBase + "__depths_res_sed_proportions"].item(0) if oj else f1[vid]
+			oj = True
+			for tlab in range(nlabels-1,-1,-1):
+				if tlab == label:
+					tprops = props[j]
+				j -= 1
+
+			nz = z0 - dz
+			# print("tprops was ", tprops)
+			color = cmap(norm(tprops))
+			# print([(tt + ttm1) /2, (ttp1 + tt)/2])
+			ax.fill_between([(tt + ttm1) /2, (ttp1 + tt)/2],[z0,z0],[nz,nz], lw = 0, color = color)
+			z0 = nz
+
+
+		ax.fill_between([(tt + ttm1) /2, (ttp1 + tt)/2], [z0,z0], [z0 - 5 * dz, z0 - 5* dz], lw = 0, color = color_bedrock)
+
+
+	# ax.set_xlim(0,1)
+	# ax.set_xticks()
+	ax.set_xlabel("time (yrs)")
+	ax.set_ylabel("Elevation (m)")
+	# ax.invert_yaxis()
+
+	ax2 = fig.add_subplot(gs[:,90:])
+
+	cb = matplotlib.colorbar.ColorbarBase(ax2, orientation='vertical', 
+                               cmap=plt.get_cmap(cmap))
+
+	ax2.set_ylabel("Proportions of label %s"%(label))
+
+	return fig, ax
 
 
 
 
+def get_cross_section_EW(
+	ds, # The input ds 
+	# fname = "well.png",
+	sel,
+	ChonkBase = 'ChonkBase',
+	label = 0,
+	cmap = "magma",
+	color_bedrock = 'gray',
+	figsize = None,
+	nlabels = 2,
+	dpi = 300,
+	minmax = None,
+
+):
+
+	tds = ds
+	for key in sel.keys():
+		try:
+			tds = tds.sel({key:sel[key]}, method = 'nearest')
+		except:
+			tds = tds.sel({key:sel[key]})
+	
+	path_strati = tds[ChonkBase + "__path_strati"].values.item(0)
+	pref_strati = tds[ChonkBase + "__pref_strati"].values.item(0)
+	nx = tds[ChonkBase + "__nx"].values.item(0)
+	ny = tds[ChonkBase + "__ny"].values.item(0)
+
+	dx = tds[ChonkBase + "__dx"].values.item(0)
+	dy = tds[ChonkBase + "__dy"].values.item(0)
+	
+	name = str(int(tds[ChonkBase + "__strati"].values.item(0)))
+	while(len(name) < 8):
+		name = '0' + name
+
+	zs = np.load(path_strati+ "/" + pref_strati + "_zs_" + name + ".npy")
+	ncells = np.load(path_strati+ "/" + pref_strati + "_ncells_" + name + ".npy")
+	props = np.load(path_strati+ "/" + pref_strati + "_props_" + name + ".npy")
+	vol = np.load(path_strati+ "/" + pref_strati + "_vol_" + name + ".npy")
+	f1 = np.load(path_strati+ "/" + pref_strati + "_firstbox_" + name + ".npy")
+	
+	cmap = matplotlib.cm.get_cmap(cmap)
+	norm = matplotlib.colors.Normalize(vmin=0, vmax=1)
+	
+	fig = plt.figure(figsize = figsize) if not (figsize is None) else plt.figure()
+	gs = matplotlib.gridspec.GridSpec(100, 100)
+
+	ax = fig.add_subplot(gs[:,:])
+	
+	gdz = tds[ChonkBase + "__depths_res_sed_proportions"].item(0)
+	row = np.argmin(np.abs(ds.y.values - sel["y"]))
 
 
+	elev, cols, volume = _gather_cross_section_info_EW(ny,nx, zs, ncells, f1, gdz, dx, dy, label, nlabels, props, row)
+	elev = np.asarray(elev)
+	# cols = np.asarray(cols).astype(np.int32)
+	volume = np.asarray(volume)
+	Ys = tds.x.values[cols]
+	zbins = np.arange( elev.min() - gdz, elev.max() + gdz, gdz)
+	# print(np.unique(np.isfinite(volume)))
+	# print(np.unique(np.isfinite(Ys)))
+	# print(np.unique(np.isfinite(zbins)))
 
+	ret = stats.binned_statistic_2d(Ys, elev, volume, 'median', bins=[tds.x.values, zbins])
+	# ret.statistic[np.isfinite(ret.statistic ) == False] = 0
+
+	if(minmax is None):
+		cb = ax.imshow(np.rot90(ret.statistic), extent = [ret.x_edge.min(),ret.x_edge.max(), ret.y_edge.min(),ret.y_edge.max()], cmap = cmap, aspect = 'auto')
+	else:
+		cb = ax.imshow(np.rot90(ret.statistic), extent = [ret.x_edge.min(),ret.x_edge.max(), ret.y_edge.min(),ret.y_edge.max()], cmap = cmap, aspect = 'auto', vmin = minmax[0], vmax = minmax[1])
+
+
+	ax.plot(tds.x.values,tds.Topography__topography.values, color = 'k', lw =2)
+	ax.set_xlim(tds.x.values.min(),tds.x.values.max())
+	# ax.set_xticks([])
+	ax.set_xlabel(r"Northing (m)")
+	ax.set_ylabel("Elevation (m)")
+	# ax.invert_yaxis()
+
+	plt.colorbar(cb, label = "Volume of label %s in $m^{3}$"%(label))
+
+	# ax2 = fig.add_subplot(gs[:,90:])
+
+	# cb = matplotlib.colorbar.ColorbarBase(ax2, orientation='vertical', 
+ #                               cmap=plt.get_cmap(cmap))
+
+	# ax2.set_ylabel("Proportions of label %s"%(label))
+
+	return fig, ax
+
+
+def get_cross_section_EW_props(
+	ds, # The input ds 
+	# fname = "well.png",
+	sel,
+	ChonkBase = 'ChonkBase',
+	label = 0,
+	cmap = "magma",
+	color_bedrock = 'gray',
+	figsize = None,
+	nlabels = 2,
+	dpi = 300,
+	minmax = None,
+
+):
+
+	tds = ds
+	for key in sel.keys():
+		try:
+			tds = tds.sel({key:sel[key]}, method = 'nearest')
+		except:
+			tds = tds.sel({key:sel[key]})
+	
+	path_strati = tds[ChonkBase + "__path_strati"].values.item(0)
+	pref_strati = tds[ChonkBase + "__pref_strati"].values.item(0)
+	nx = tds[ChonkBase + "__nx"].values.item(0)
+	ny = tds[ChonkBase + "__ny"].values.item(0)
+
+	dx = tds[ChonkBase + "__dx"].values.item(0)
+	dy = tds[ChonkBase + "__dy"].values.item(0)
+	
+	name = str(int(tds[ChonkBase + "__strati"].values.item(0)))
+	while(len(name) < 8):
+		name = '0' + name
+
+	zs = np.load(path_strati+ "/" + pref_strati + "_zs_" + name + ".npy")
+	ncells = np.load(path_strati+ "/" + pref_strati + "_ncells_" + name + ".npy")
+	props = np.load(path_strati+ "/" + pref_strati + "_props_" + name + ".npy")
+	vol = np.load(path_strati+ "/" + pref_strati + "_vol_" + name + ".npy")
+	f1 = np.load(path_strati+ "/" + pref_strati + "_firstbox_" + name + ".npy")
+	
+	cmap = matplotlib.cm.get_cmap(cmap)
+	norm = matplotlib.colors.Normalize(vmin=0, vmax=1)
+	
+	fig = plt.figure(figsize = figsize) if not (figsize is None) else plt.figure()
+	gs = matplotlib.gridspec.GridSpec(100, 100)
+
+	ax = fig.add_subplot(gs[:,:])
+	
+	gdz = tds[ChonkBase + "__depths_res_sed_proportions"].item(0)
+	row = np.argmin(np.abs(ds.y.values - sel["y"]))
+
+
+	elev, cols, props = _gather_cross_section_info_EW_props(ny,nx, zs, ncells, f1, gdz, dx, dy, label, nlabels, props, row)
+	elev = np.asarray(elev)
+	# cols = np.asarray(cols).astype(np.int32)
+	props = np.asarray(props)
+	Ys = tds.x.values[cols]
+	zbins = np.arange( elev.min() - gdz, elev.max() + gdz, gdz)
+	# print(np.unique(np.isfinite(props)))
+	# print(np.unique(np.isfinite(Ys)))
+	# print(np.unique(np.isfinite(zbins)))
+
+	ret = stats.binned_statistic_2d(Ys, elev, props, 'median', bins=[tds.x.values, zbins])
+	# ret.statistic[np.isfinite(ret.statistic ) == False] = 0
+
+	if(minmax is None):
+		cb = ax.imshow(np.rot90(ret.statistic), extent = [ret.x_edge.min(),ret.x_edge.max(), ret.y_edge.min(),ret.y_edge.max()], cmap = cmap, aspect = 'auto', vmin = 0, vmax = 1)
+	else:
+		cb = ax.imshow(np.rot90(ret.statistic), extent = [ret.x_edge.min(),ret.x_edge.max(), ret.y_edge.min(),ret.y_edge.max()], cmap = cmap, aspect = 'auto', vmin = minmax[0], vmax = minmax[1])
+
+
+	ax.plot(tds.x.values,tds.Topography__topography.values, color = 'k', lw =2)
+	ax.set_xlim(tds.x.values.min(),tds.x.values.max())
+	# ax.set_xticks([])
+	ax.set_xlabel(r"Northing (m)")
+	ax.set_ylabel("Elevation (m)")
+	# ax.invert_yaxis()
+
+	plt.colorbar(cb, label = "Proportion of label %s"%(label))
+
+	# ax2 = fig.add_subplot(gs[:,90:])
+
+	# cb = matplotlib.colorbar.ColorbarBase(ax2, orientation='vertical', 
+ #                               cmap=plt.get_cmap(cmap))
+
+	# ax2.set_ylabel("Proportions of label %s"%(label))
+
+	return fig, ax
 
 
 	

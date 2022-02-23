@@ -128,6 +128,7 @@ class ChonkBase(object):
 				np.save(self.path_strati+ "/" + self.pref_strati + "_ncells_" + name + ".npy",stuff[1])
 				np.save(self.path_strati+ "/" + self.pref_strati + "_props_" + name + ".npy",stuff[2])
 				np.save(self.path_strati+ "/" + self.pref_strati + "_vol_" + name + ".npy",stuff[3])
+				np.save(self.path_strati+ "/" + self.pref_strati + "_firstbox_" + name + ".npy",stuff[5])
 			except:
 				print("missed step", self.step)
 		return self.step
