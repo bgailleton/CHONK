@@ -48,18 +48,19 @@ class ChonkBase(object):
 	D_s = xs.on_demand( dims = ('y','x'), description = "Sediment deposition (all processes)")
 
 	Q_sout_lab_N = xs.on_demand(dims = ('x','n_labels'), description = "Volume of suspended sediments outletting the model at the Northern boundary in m^3/yrs")
-	Q_sout_lab_S = xs.on_demand(dims = ('x','n_labels'), description = "Volume of suspended sediments outletting the model at the Northern boundary in m^3/yrs")
-	Q_sout_lab_E = xs.on_demand(dims = ('y','n_labels'), description = "Volume of suspended sediments outletting the model at the Northern boundary in m^3/yrs")
-	Q_sout_lab_W = xs.on_demand(dims = ('y','n_labels'), description = "Volume of suspended sediments outletting the model at the Northern boundary in m^3/yrs")
+	Q_sout_lab_S = xs.on_demand(dims = ('x','n_labels'), description = "Volume of suspended sediments outletting the model at the Southern boundary in m^3/yrs")
+	Q_sout_lab_E = xs.on_demand(dims = ('y','n_labels'), description = "Volume of suspended sediments outletting the model at the Eastern boundary in m^3/yrs")
+	Q_sout_lab_W = xs.on_demand(dims = ('y','n_labels'), description = "Volume of suspended sediments outletting the model at the Western boundary in m^3/yrs")
 
 
 
 
-	strati_recorder = xs.variable(default = False)
-	path_strati = xs.variable(default = "test")
-	pref_strati = xs.variable(default = "test")
-	create_folder_strati = xs.variable(default = False)
-	strati = xs.on_demand()
+	strati_recorder = xs.variable(default = False, description = "Enables the stratigraphy recording (proportions)")
+	path_strati = xs.variable(default = "test", description = "Path to the folder holding this strati info (cannot store it in the zarr)")
+	pref_strati = xs.variable(default = "test",description = "Common prefix to all strati files")
+	create_folder_strati = xs.variable(default = False, description = "If True, will create the folder/replace the folder of path_strati")
+
+	strati = xs.on_demand(default = False, description = "While it does not return anything meaningfull, it is needed to save the strati file at the right place/time")
 
 
 	def initialize(self):
@@ -109,17 +110,30 @@ class ChonkBase(object):
 	
 	@xs.runtime(args = 'step')
 	def run_step(self, step):
+		'''
+		This class is more an data/model holder than anything, so the run fonction is static and does not do much
+		'''
+		# Simply saving the step number for ease in some other processes
 		self.step = step
+
 
 	@strati.compute
 	def _strati(self):
+		'''
+		This function habndles the saving of strati data
+		This is a bit convoluted but xarray/xsimlab don't manage variable length and the strati is varyuing all the time
+		Older version of CHONK used to have a fixed size 3D matrix instead, but that is very memory-unefficient adn slow to construct and harder to process as the top and bottom of the matrix constantly changed
+
+		'''
+		# Checks if stratifyer is enabled
+
 		if(self.strati_recorder):
+			# mAnages the name: it makes sure the name is consistent: 00001, 00002, ..., 00122, ..., 11235, ... and not 1, 2, 3, 112. MacOS and Windows browser get panicked otherwise
 			name = str(self.step)
 			while(len(name) < 8):
 				name = '0' + name
 
-			# print(help(self.CHONK.get_stratiprop))
-
+			# Error management: if there is literally no strati, it crashes.
 			try:
 				stuff = self.CHONK.get_stratiprop()
 
@@ -130,28 +144,34 @@ class ChonkBase(object):
 				np.save(self.path_strati+ "/" + self.pref_strati + "_vol_" + name + ".npy",stuff[3])
 				np.save(self.path_strati+ "/" + self.pref_strati + "_firstbox_" + name + ".npy",stuff[5])
 			except:
-				print("missed step", self.step)
+				print("Strati missed step %s, if it happens at every output step, there is a problem with the path, prefix or landscape.", self.step)
+
+		# Returning dummy stuff YOLO
 		return self.step
-
-
 
 	@D_s.compute
 	def _D_s(self):
+		'''
+		Query and reshapes the total deposition rate (all processes)
+		'''
 		return self.CHONK.get_deposition_flux().reshape(self.ny,self.nx)
 
 	@E_r.compute
 	def _E_r(self):
+		'''
+		Query and reshapes the total bedrock incision rate (all processes)
+		'''
 		return self.CHONK.get_erosion_bedrock_only_flux().reshape(self.ny,self.nx)
 
 	@E_s.compute
 	def _E_s(self):
+		'''
+		Query and reshapes the total sediment entrainment fluxes (all processes)
+		'''
 		return self.CHONK.get_erosion_sed_only_flux().reshape(self.ny,self.nx)
 
-
-	# @stratigraphator.compute
-	# def _stratigraphator(self):
-	# 	return self.CHONK.get_stratiprop()
-
+	
+	# Group of function managing the NSEW extraction of labels at outletting sediment flux		
 	@Q_sout_lab_N.compute
 	def _Q_sout_lab_N(self):
 		return self.CHONK.get_Qsprop_bound("N")
@@ -165,28 +185,45 @@ class ChonkBase(object):
 	def _Q_sout_lab_W(self):
 		return self.CHONK.get_Qsprop_bound("W")
 
+
 @xs.process
 class Runner(object):
 	"""
-		Class called when the model is ready to be ran
+		Class called when the model is ready to be ran.
+		All the parameters and the rest are set in the model holder ChonkBase
 	"""
+
 	CHONK = xs.foreign(ChonkBase, "CHONK")
-	runner_done = xs.variable(intent = "out")
+	runner_done = xs.variable(intent = "out", description = "Internal and debugging variable set to True if the model has ran at least once")
 
 	@xs.runtime(args='step_delta')
 	def run_step(self, dt):
+		# Setting up the current time step (variable timestep can be ingested that way)
 		self.CHONK.update_timestep(dt)
+		# Set up the graph 
 		self.CHONK.initiate_nodegraph()
+		# Run the surface processes
 		self.CHONK.run()
+		# Done
 		self.runner_done = True
 
 
 @xs.process
 class Uplift(object):
-	uplift_done = xs.variable(intent = "out")
+	'''
+		Base class to mange surface uplift
+		This one is generic and simply gets an external array of uplift rate
+	'''
+
+
+	uplift_done = xs.variable(intent = "out", description = 'Internal debugging variable,s et to True once the uplift has been applied')
+	# Need the runner done (hack to make sure a certain order of things is executed)
 	runner_done = xs.foreign(Runner, "runner_done")
-	uplift = xs.variable(intent = 'in', dims = [('y','x'), ('node')])
+	# Input uplift rate
+	uplift = xs.variable(intent = 'in', dims = [('y','x'), ('node')], description = 'Uplift rates in [L/T]')
+	# Model holder
 	CHONK = xs.foreign(ChonkBase, "CHONK")
+	# Boundary conditions array to check where the uplift needs to be cancelled
 	active_nodes = xs.foreign(ChonkBase, "active_nodes")
 
 	def initialize(self):
@@ -337,14 +374,35 @@ class Fluvial(object):
 	ny = xs.foreign(ChonkBase, "ny")	
 	CHONK = xs.foreign(ChonkBase, "CHONK")
 	Qs = xs.on_demand(dims = ('y','x'))
+	post_K = xs.on_demand(dims = ('y','x'))
+	
+	relative_erosivity_bed = xs.variable(default = False,description = 'Enable the "tool" effect via playing with the relative erosivity on the bedrocks if True (Default is False)')
+	relative_erosivity_sed = xs.variable(default = False,description = 'Enable the "tool" effect via playing with the relative erosivity on the sediment layer if True (Default is False)')
 
 	def initialize(self):
 		self.CHONK.CHARLIE_I = True
+		self.CHONK.tool_effect_rock = self.relative_erosivity_bed
+		self.CHONK.tool_effect_sed = self.relative_erosivity_sed
 
 
 	@Qs.compute
 	def _Qs(self):
 		return self.CHONK.get_fluvial_Qs().reshape(self.ny ,self.nx )
+
+	@post_K.compute
+	def _post_K(self):
+		'''
+		Get the K calculated post- tool effect
+		'''
+
+		# The try-catch structure is just in case this ouput is activated but K-calc is not. It then return a all-0 array
+		# Also happens at the first time-step for some reasons
+		try:
+			return self.CHONK.get_K_calc().reshape(self.ny ,self.nx ) 
+		except:
+			return np.zeros((self.ny ,self.nx) ) 
+
+
 
 @xs.process
 class Hillslope(object):

@@ -55,6 +55,45 @@ def _gather_cross_section_info_EW(ny,nx, zs, ncells, f1, dz, dx, dy, label, nlab
 	return elev, cols, volume
 
 @nb.njit()
+def _gather_cross_section_info_NS(ny,nx, zs, ncells, f1, dz, dx, dy, label, nlabels, props, col):
+	elev = []
+	cols = []
+	volume = []
+
+	# for row in range(ny):
+	for row in range(ny):
+		# getting the vectorised ID for the map view
+		vid = row * nx + col
+		# getting the elevation of the summit
+		z0 = zs[vid,0]
+
+		# gettring the max vectorised depth id
+		j = ncells[vid,1] - 1
+		# Getting the min one
+		jmin = ncells[vid,0]
+		#temp vars
+		tprops = 0
+		oj = False
+		#Going through the depths
+		while( j>= jmin):
+			# if first, geeting the first depth ortherwise getting the regulrd dz
+
+			tdz = dz if oj else f1[vid]
+			oj = True
+
+			for tlab in range(nlabels-1,-1,-1):
+				if tlab == label:
+					#print("adding", props[j] ,tdz ,dx ,dy, j)
+					volume.append(props[j] * tdz * dx * dy)
+					cols.append(row)
+					elev.append(z0 - tdz/2)
+				j -= 1
+
+			nz = z0 - tdz
+			z0 = nz
+	return elev, cols, volume
+
+@nb.njit()
 def _gather_cross_section_info_EW_props(ny,nx, zs, ncells, f1, dz, dx, dy, label, nlabels, props, row):
 	elev = []
 	cols = []
@@ -86,6 +125,45 @@ def _gather_cross_section_info_EW_props(ny,nx, zs, ncells, f1, dz, dx, dy, label
 					#print("adding", props[j] ,tdz ,dx ,dy, j)
 					volume.append(props[j])
 					cols.append(col)
+					elev.append(z0 - tdz/2)
+				j -= 1
+
+			nz = z0 - tdz
+			z0 = nz
+	return elev, cols, volume
+
+@nb.njit()
+def _gather_cross_section_info_NS_props(ny,nx, zs, ncells, f1, dz, dx, dy, label, nlabels, props, col):
+	elev = []
+	cols = []
+	volume = []
+
+	# for row in range(ny):
+	for row in range(ny):
+		# getting the vectorised ID for the map view
+		vid = row * nx + col
+		# getting the elevation of the summit
+		z0 = zs[vid,0]
+
+		# gettring the max vectorised depth id
+		j = ncells[vid,1] - 1
+		# Getting the min one
+		jmin = ncells[vid,0]
+		#temp vars
+		tprops = 0
+		oj = False
+		#Going through the depths
+		while( j>= jmin):
+			# if first, geeting the first depth ortherwise getting the regulrd dz
+
+			tdz = dz if oj else f1[vid]
+			oj = True
+
+			for tlab in range(nlabels-1,-1,-1):
+				if tlab == label:
+					#print("adding", props[j] ,tdz ,dx ,dy, j)
+					volume.append(props[j])
+					cols.append(row)
 					elev.append(z0 - tdz/2)
 				j -= 1
 
@@ -401,6 +479,7 @@ def get_well_time_serie(
 	ChonkBase = 'ChonkBase',
 	label = 0,
 	cmap = "magma",
+	minmax = (0,1),
 	color_bedrock = 'gray',
 	figsize = None,
 	nlabels = 2,
@@ -412,6 +491,8 @@ def get_well_time_serie(
 	gs = matplotlib.gridspec.GridSpec(100, 100)
 	# dt = (ds[timedim].values[2] - ds[timedim].values[1])/2
 	ax = fig.add_subplot(gs[:,7:80])
+	ztops = []
+	xztops = []
 
 	for i in range(ds[timedim].values.shape[0]):
 
@@ -448,7 +529,7 @@ def get_well_time_serie(
 
 		
 		cmap = matplotlib.cm.get_cmap(cmap)
-		norm = matplotlib.colors.Normalize(vmin=0, vmax=1)
+		norm = matplotlib.colors.Normalize(vmin=minmax[0], vmax=minmax[1])
 
 		
 
@@ -456,6 +537,8 @@ def get_well_time_serie(
 		# cb = ax.imshow([[0,0],[0,0]], cmap = cmap, zorder = -1, aspect = 'auto')
 
 		z0 = zs[vid,0]
+		ztops.append(z0)
+		xztops.append(tt)
 		j = ncells[vid,1] - 1
 		jmin = ncells[vid,0]
 		tprops = 0
@@ -483,6 +566,7 @@ def get_well_time_serie(
 
 	# ax.set_xlim(0,1)
 	# ax.set_xticks()
+	ax.plot(xztops, ztops, color = 'k', lw = 1)
 	ax.set_xlabel("time (yrs)")
 	ax.set_ylabel("Elevation (m)")
 	# ax.invert_yaxis()
@@ -490,7 +574,7 @@ def get_well_time_serie(
 	ax2 = fig.add_subplot(gs[:,90:])
 
 	cb = matplotlib.colorbar.ColorbarBase(ax2, orientation='vertical', 
-                               cmap=plt.get_cmap(cmap))
+                               cmap=plt.get_cmap(cmap), values = np.arange(minmax[0], minmax[1],(minmax[1] - minmax[0])/1000))
 
 	ax2.set_ylabel("Proportions of label %s"%(label))
 
@@ -499,7 +583,7 @@ def get_well_time_serie(
 
 
 
-def get_cross_section_EW(
+def get_cross_section(
 	ds, # The input ds 
 	# fname = "well.png",
 	sel,
@@ -511,6 +595,9 @@ def get_cross_section_EW(
 	nlabels = 2,
 	dpi = 300,
 	minmax = None,
+	direction = "EW",
+	proportion = True,
+	bedrock_color = "dimgray"
 
 ):
 
@@ -548,36 +635,41 @@ def get_cross_section_EW(
 	ax = fig.add_subplot(gs[:,:])
 	
 	gdz = tds[ChonkBase + "__depths_res_sed_proportions"].item(0)
-	row = np.argmin(np.abs(ds.y.values - sel["y"]))
+	row = np.argmin(np.abs(ds.y.values - sel["y"])) if direction == "EW" else np.argmin(np.abs(ds.x.values - sel["x"]))
+
+	if(proportion == False):
+		elev, cols, volume = _gather_cross_section_info_EW(ny,nx, zs, ncells, f1, gdz, dx, dy, label, nlabels, props, row) if direction == "EW" else _gather_cross_section_info_NS(ny,nx, zs, ncells, f1, gdz, dx, dy, label, nlabels, props, row)
+	else:
+		elev, cols, volume = _gather_cross_section_info_EW_props(ny,nx, zs, ncells, f1, gdz, dx, dy, label, nlabels, props, row) if direction == "EW" else _gather_cross_section_info_NS_props(ny,nx, zs, ncells, f1, gdz, dx, dy, label, nlabels, props, row)
 
 
-	elev, cols, volume = _gather_cross_section_info_EW(ny,nx, zs, ncells, f1, gdz, dx, dy, label, nlabels, props, row)
 	elev = np.asarray(elev)
 	# cols = np.asarray(cols).astype(np.int32)
 	volume = np.asarray(volume)
-	Ys = tds.x.values[cols]
+	Ys = tds.x.values[cols] if direction == "EW" else tds.y.values[cols]
 	zbins = np.arange( elev.min() - gdz, elev.max() + gdz, gdz)
 	# print(np.unique(np.isfinite(volume)))
 	# print(np.unique(np.isfinite(Ys)))
 	# print(np.unique(np.isfinite(zbins)))
 
-	ret = stats.binned_statistic_2d(Ys, elev, volume, 'median', bins=[tds.x.values, zbins])
+	ret = stats.binned_statistic_2d(Ys, elev, volume, 'median', bins=[tds.x.values if direction == "EW" else tds.y.values , zbins])
 	# ret.statistic[np.isfinite(ret.statistic ) == False] = 0
 
 	if(minmax is None):
-		cb = ax.imshow(np.rot90(ret.statistic), extent = [ret.x_edge.min(),ret.x_edge.max(), ret.y_edge.min(),ret.y_edge.max()], cmap = cmap, aspect = 'auto')
+		cb = ax.imshow(np.rot90(ret.statistic), extent = [ret.x_edge.min(),ret.x_edge.max(), ret.y_edge.min(),ret.y_edge.max()], cmap = cmap, aspect = 'auto', zorder = 2)
 	else:
-		cb = ax.imshow(np.rot90(ret.statistic), extent = [ret.x_edge.min(),ret.x_edge.max(), ret.y_edge.min(),ret.y_edge.max()], cmap = cmap, aspect = 'auto', vmin = minmax[0], vmax = minmax[1])
+		cb = ax.imshow(np.rot90(ret.statistic), extent = [ret.x_edge.min(),ret.x_edge.max(), ret.y_edge.min(),ret.y_edge.max()], cmap = cmap, aspect = 'auto', vmin = minmax[0], vmax = minmax[1], zorder = 2)
 
 
-	ax.plot(tds.x.values,tds.Topography__topography.values, color = 'k', lw =2)
-	ax.set_xlim(tds.x.values.min(),tds.x.values.max())
+	ax.plot((tds.x.values if direction == "EW" else tds.y.values),tds.Topography__topography.values, color = 'k', lw =2, zorder = 2)
+	ax.fill_between((tds.x.values if direction == "EW" else tds.y.values), ax.get_ylim()[0],tds.Topography__topography.values, color = bedrock_color, lw =0, zorder = 1)
+	ax.set_xlim((tds.x.values if direction == "EW" else tds.y.values).min(),(tds.x.values if direction == "EW" else tds.y.values).max())
 	# ax.set_xticks([])
-	ax.set_xlabel(r"Northing (m)")
+	ax.set_xlabel(r"Northing (m)" if direction == "EW" else r"Easting (m)")
 	ax.set_ylabel("Elevation (m)")
 	# ax.invert_yaxis()
 
-	plt.colorbar(cb, label = "Volume of label %s in $m^{3}$"%(label))
+	plt.colorbar(cb, label = "Volume of label %s in $m^{3}$"%(label) if (proportion == False) else "Proportion of label %s"%(label))
 
 	# ax2 = fig.add_subplot(gs[:,90:])
 
@@ -587,6 +679,9 @@ def get_cross_section_EW(
 	# ax2.set_ylabel("Proportions of label %s"%(label))
 
 	return fig, ax
+
+
+
 
 
 def get_cross_section_EW_props(
