@@ -60,7 +60,7 @@ class ChonkBase(object):
 	pref_strati = xs.variable(default = "test",description = "Common prefix to all strati files")
 	create_folder_strati = xs.variable(default = False, description = "If True, will create the folder/replace the folder of path_strati")
 
-	strati = xs.on_demand(default = False, description = "While it does not return anything meaningfull, it is needed to save the strati file at the right place/time")
+	strati = xs.on_demand(description = "While it does not return anything meaningfull, it is needed to save the strati file at the right place/time")
 
 
 	def initialize(self):
