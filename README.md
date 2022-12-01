@@ -2,13 +2,21 @@
 
 Repository accompanying the publication in GMD (ADD LINK and title). It contains the code used to run the simulations and generate the data behind the figures. 
 
-**What IS this code?** A sandbox experimental Landscape Evolution Model developed to test a method crossing cellular automata and graph theory in given scenarios described in the companion paper.
 
-**What is it NOT?** A stable and efficient framework to run LEMs simulations or develop new ones. While usable, it is more a proof-of-concept than anything else.
+#### What IS this code?
+ A sandbox experimental Landscape Evolution Model developed to test a method crossing cellular automata and graph theory in given scenarios described in the companion paper.
 
-**Why?** It required a lot of trial-and-errors to get all the features working (especially the lake solver). The code is slow, require a lot of memory and is easily breakable.
 
-**But what if I want to use the method?** So do we, that's why we are working on two other exciting projects:
+#### What is it NOT?
+ A stable and efficient framework to run LEMs simulations or develop new ones. While usable, it is more a proof-of-concept than anything else.
+
+
+#### Why?
+ It required a lot of trial-and-errors to get all the features working (especially the lake solver). The code is slow, require a lot of memory and is easily breakable.
+
+
+#### But what if I want to use the method?
+ So do we, that's why we are working on two other exciting projects:
 
 - First, a stable, efficient and production-ready version of CHONK - now we learnt from all these errors. While not offering (yet) all the aspects of CHONK, the new code is already indescribably faster, cleaner and more flexible while requiring (way) less memory. It should be available in the coming months. 
 
