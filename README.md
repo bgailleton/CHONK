@@ -1,30 +1,56 @@
-# MARBLES-CHONK-NAME_TO_FIND
+# CHONK prototype
 
-Flexible Semi-Lagrangian Explicit Landscape Evolution Model with Conditionless Depressions Solver and Provenance Tracking in Heterogeneous Environment. FSLELEMCDSPTHE not being a very nice name, we are currently trying to find one.
+Repository accompanying the publication in GMD (ADD LINK and title). It contains the code used to run the simulations and generate the data behind the figures. 
 
-TODO add short description here
+**What IS this code?** A sandbox experimental Landscape Evolution Model developed to test a method crossing cellular automata and graph theory in given scenarios described in the companion paper.
 
-This model will be part of the fastscape ecosystem. It is written in full combination of C++, Fortran and python. Python manage the model run and communicate with fastscalib-fortran to get node-ordering, then send everything to c++.
+**What is it NOT?** A stable and efficient framework to run LEMs simulations or develop new ones. While usable, it is more a proof-of-concept than anything else.
+
+**Why?** It required a lot of trial-and-errors to get all the features working (especially the lake solver). The code is slow, require a lot of memory and is easily breakable.
+
+**But what if I want to use the method?** So do we, that's why we are working on two other exciting projects:
+
+- First, a stable, efficient and production-ready version of CHONK - now we learnt from all these errors. While not offering (yet) all the aspects of CHONK, the new code is already indescribably faster, cleaner and more flexible while requiring (way) less memory. It should be available in the coming months. 
+
+- Then, a framework dedicated to building your own LEM following the philosophy described in the paper.
+
+In any case, see (here for updates about the projects)[https://bgailleton.github.io/chonk/] or feel free to contact me if you have more questions.
+
+## Installation 
+
+Right, let's say you still want to use this version to verify/reproduce the results from the manuscript.
+
+### Compiler
+
+You first need to install a `c++` compiler (if you already have one able to compile with the standard `c++14` you are good to go), it can be quite heavy on `MacOS` and `Windows`, so I tried to keep the minimum requirements: 
 
 
-## Installation
+- On Windows, look for "Build Tools for Visual Studio 2022" [here](https://visualstudio.microsoft.com/downloads/#build-tools-for-visual-studio-2022). It will install the minimum tools required to build `C++` projects on windows.
 
-### (optional) Using conda to manage dependencies
+- On MacOS, open a `Terminal` and run `xcode-select --install` to only install the command line tools to compile `c++` (already quite big...) and bypass the full installation of `Xcode`.
 
-TODO explain briefly how to use conda
+- On linux, make sure you have `gcc/g++` > 8. 
 
-### Installing the python package
+Note that on both Windows and MacOS you can also install some versions of `gcc/g++` through various methods, but they are quite difficult to get to work properly.
 
- - clone this repository
- - `pip install .`
+### Anaconda
 
+You then need an `anaconda` environment manager. If you don't know what it is, let's say it creates small boxes in your computer and put all the code needed for a given application in the box so that it can find everything it needs, in hte right version, without interfering with the rest of the system. `Anaconda` is a company but license-free versions of their tool exist. I recommend `mambaforge` - you can find it [there](https://github.com/conda-forge/miniforge#mambaforge). 
 
-## Main Features
+Follow the installation instructions and start a new terminal: 
 
-- Ensure comprehensive topological order from top to bottom with an unaltered topography and communicating depressions.
+- First you need to create a box (ONLY NEEDED ONCE): `mamba create -n CHONK`
+- Then you need to "enter" the box (NEEDED AT EACH NEW SESSION): `mamba activate CHONK`
+- Install the dependencies (ONLY NEEDED ONCE, the last 2 package are only recommended to load/save `DEM`): `mamba install matplotlib git numpy scipy jupyterlab ipympl pybind11 cmake rasterio gdal xtensor-python ipyfastscape xarray-simlab`
+- Now, you need to clone or download the current repository. `cd` wherever you wanna place it and run `git clone https://github.com/bgailleton/CHONK`
+- Finally, `cd` to `CHONK` and run `python setup.py install` (only needed once).
+- Done!
 
-## Code Structure
+## Usage
 
-### Node graph
+See the `notebooks` folder for some examples.
 
-The node graph is approaching its final form. The object, stored in `nodegraph.c/hpp`, provides tool to ingest information from `fastscapelib-fortran` and preprocess them for the model. The main difference (and very painful point to work on) from `fastscapelib-fortran` is that the depressions' topography is not altered with carving, it is instead left intact. However it considers that the depressions needs to be able to overflow in a meaningful way, it therefore needs to be processed in the right order. The preprocessing uses Cordonnier et al., 2019 to simulate a fake receiver to each pit nodes and rerun a topological sort on the obtained node graph. The topological order hence obtain guaranties that every nodes in the graph will be processed after all of his donors. If a depression overflows, it will be before it's receiving counterparts, if not, well it does not matter but at least it will have received all potential water available. The particular case of imbricated depressions will be treated using a "connected vessel" algorithm later develloped.
+# Credits
+
+This model was primarily developed by Boris Gailleton (boris.gailleton@univ-rennes1.fr) at the GFZ institute (Potsdam, Germany) with the help and advice of Luca Malatesta, Guillaume Cordonnier and Jean Braun.
+
