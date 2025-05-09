@@ -2,10 +2,10 @@
 
 Repository accompanying the publication in GMD [see paper](https://gmd.copernicus.org/articles/17/71/2024/). It contains the code used to run the simulations and generate the data behind the figures. 
 
+Update 2025 : I am still using this code here and there, but I am re-implementing the main feature in my new code base [`scabbard`](https://github.com/bgailleton/scabbard/tree/main)
 
 #### What IS this code?
  A sandbox experimental Landscape Evolution Model developed to test a method crossing cellular automata and graph theory in given scenarios described in the companion paper.
-
 
 #### What is it NOT?
  A stable and efficient framework to run LEMs simulations or develop new ones. While usable, it is more a proof-of-concept than anything else.
