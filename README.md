@@ -1,6 +1,6 @@
-# CHONK prototype
+# CHONK
 
-Repository accompanying the publication in GMD (ADD LINK and title). It contains the code used to run the simulations and generate the data behind the figures. 
+Repository accompanying the publication in GMD [see paper](https://gmd.copernicus.org/articles/17/71/2024/). It contains the code used to run the simulations and generate the data behind the figures. 
 
 
 #### What IS this code?
